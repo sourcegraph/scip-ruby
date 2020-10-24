@@ -481,13 +481,13 @@ TEST_CASE_FIXTURE(ProtocolTest, "SorbetURIsWork") {
     auto selectDefinitions = getDefinitions("folder/foo.rb", 1, 11);
     REQUIRE_EQ(selectDefinitions.size(), 1);
     auto &selectLoc = selectDefinitions.at(0);
-    REQUIRE(absl::StartsWith(selectLoc->uri, "sorbet:https://github.com/"));
+    REQUIRE(absl::StartsWith(selectLoc->uri, "sorbet://https://github.com/"));
     REQUIRE_FALSE(readFile(selectLoc->uri).empty());
 
     auto myMethodDefinitions = getDefinitions("folder/foo.rb", 2, 5);
     REQUIRE_EQ(myMethodDefinitions.size(), 1);
     auto &myMethodDefLoc = myMethodDefinitions.at(0);
-    REQUIRE_EQ(myMethodDefLoc->uri, "sorbet:folder/foo.rb");
+    REQUIRE_EQ(myMethodDefLoc->uri, "sorbet://folder/foo.rb");
     REQUIRE_EQ(readFile(myMethodDefLoc->uri), fileContents);
 
     // VS Code replaces : in https with something URL-escaped; test that we handle this use-case.
@@ -513,7 +513,7 @@ TEST_CASE_FIXTURE(ProtocolTest, "DoesNotTypecheckSorbetURIs") {
     auto selectDefinitions = getDefinitions("folder/foo.rb", 1, 11);
     REQUIRE_EQ(selectDefinitions.size(), 1);
     auto &selectLoc = selectDefinitions.at(0);
-    REQUIRE(absl::StartsWith(selectLoc->uri, "sorbet:https://github.com/"));
+    REQUIRE(absl::StartsWith(selectLoc->uri, "sorbet://https://github.com/"));
     auto contents = readFile(selectLoc->uri);
 
     // Test that opening and closing one of these files doesn't cause a slow path.

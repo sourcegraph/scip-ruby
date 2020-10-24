@@ -9,7 +9,7 @@ using namespace std;
 namespace sorbet::realmain::lsp {
 
 namespace {
-constexpr string_view sorbetScheme = "sorbet:"sv;
+constexpr string_view sorbetScheme = "sorbet://"sv;
 constexpr string_view httpsScheme = "https"sv;
 } // namespace
 
@@ -122,7 +122,7 @@ string LSPConfiguration::localName2Remote(string_view filePath) const {
         return string(relativeUri);
     }
 
-    // Use a sorbet: URI if the file is not present on the client AND the client supports sorbet: URIs
+    // Use a sorbet:// URI if the file is not present on the client AND the client supports sorbet:// URIs
     if (clientConfig->enableSorbetURIs &&
         FileOps::isFileIgnored(rootPath, filePath, opts.lspDirsMissingFromClient, {})) {
         return absl::StrCat(sorbetScheme, relativeUri);
@@ -145,7 +145,7 @@ string LSPConfiguration::remoteName2Local(string_view uri) const {
     }
 
     string path = string(start, uri.end());
-    // Note: May be `https://` or `https%3A//`. VS Code URLencodes the : in sorbet:https:// paths.
+    // Note: May be `https://` or `https%3A//`. VS Code URLencodes the : in sorbet://https:// paths.
     const bool isHttps = isSorbetURI && absl::StartsWith(path, httpsScheme) && path.length() > httpsScheme.length() &&
                          (path[httpsScheme.length()] == ':' || path[httpsScheme.length()] == '%');
     if (isHttps) {
