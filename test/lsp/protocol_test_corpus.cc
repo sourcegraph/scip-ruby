@@ -279,7 +279,6 @@ TEST_CASE_FIXTURE(ProtocolTest, "InitializeAndShutdown") {
     INFO("Expected a single response to shutdown request.");
     REQUIRE_EQ(resp.size(), 1);
     auto &r = resp.at(0)->asResponse();
-    REQUIRE_EQ(r.requestMethod, LSPMethod::Shutdown);
     assertDiagnostics(send(LSPMessage(make_unique<NotificationMessage>("2.0", LSPMethod::Exit, JSONNullObject()))), {});
 }
 
@@ -320,7 +319,6 @@ TEST_CASE_FIXTURE(ProtocolTest, "MissingRootPathInitialization") {
         auto &respMsg = responses.at(0);
         CHECK(respMsg->isResponse());
         auto &resp = respMsg->asResponse();
-        CHECK_EQ(resp.requestMethod, LSPMethod::Initialize);
     }
     assertDiagnostics(send(LSPMessage(make_unique<NotificationMessage>("2.0", LSPMethod::Initialized,
                                                                        make_unique<InitializedParams>()))),
@@ -357,7 +355,6 @@ TEST_CASE_FIXTURE(ProtocolTest, "MonacoInitialization") {
         auto &respMsg = responses.at(0);
         CHECK(respMsg->isResponse());
         auto &resp = respMsg->asResponse();
-        CHECK_EQ(resp.requestMethod, LSPMethod::Initialize);
     }
     assertDiagnostics(send(LSPMessage(make_unique<NotificationMessage>("2.0", LSPMethod::Initialized,
                                                                        make_unique<InitializedParams>()))),
