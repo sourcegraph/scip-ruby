@@ -16,7 +16,7 @@ void InitializeTask::preprocess(LSPPreprocessor &preprocessor) {
 }
 
 unique_ptr<ResponseMessage> InitializeTask::runRequest(LSPTypecheckerDelegate &ts) {
-    auto response = make_unique<ResponseMessage>("2.0", id, LSPMethod::Initialize);
+    auto response = make_unique<ResponseMessage>("2.0", id);
     const auto &opts = config.opts;
     auto serverCap = make_unique<ServerCapabilities>();
     serverCap->textDocumentSync = TextDocumentSyncKind::Full;

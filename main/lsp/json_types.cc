@@ -62,6 +62,9 @@ InvalidDiscriminatedUnionValueError::InvalidDiscriminatedUnionValueError(string_
                                      fieldName, discriminantValue, discriminantFieldName, expectedType)),
       fieldName(string(fieldName)) {}
 
+InvalidUndiscriminatedUnionValueError::InvalidUndiscriminatedUnionValueError()
+    : SerializationError(fmt::format("TODO(jez) Better error")) {}
+
 NullPtrError::NullPtrError(string_view fieldName)
     : SerializationError(fmt::format("Field `{}` does not have a value, and contains a null pointer", fieldName)) {}
 

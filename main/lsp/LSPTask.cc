@@ -108,7 +108,7 @@ bool LSPRequestTask::cancel(const MessageId &id) {
             latencyTimer->cancel();
             latencyTimer = nullptr;
         }
-        auto response = make_unique<ResponseMessage>("2.0", id, method);
+        auto response = make_unique<ResponseMessage>("2.0", id);
         prodCategoryCounterInc("lsp.messages.canceled", methodString());
         response->error = make_unique<ResponseError>((int)LSPErrorCodes::RequestCancelled, "Request was canceled");
         config.output->write(move(response));

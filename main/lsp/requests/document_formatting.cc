@@ -17,7 +17,7 @@ LSPTask::Phase DocumentFormattingTask::finalPhase() const {
 }
 
 void DocumentFormattingTask::index(LSPIndexer &index) {
-    auto response = make_unique<ResponseMessage>("2.0", id, LSPMethod::TextDocumentFormatting);
+    auto response = make_unique<ResponseMessage>("2.0", id);
     if (!config.opts.lspDocumentFormatRubyfmtEnabled) {
         response->error = make_unique<ResponseError>(
             (int)LSPErrorCodes::InvalidRequest,

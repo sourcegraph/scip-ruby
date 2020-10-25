@@ -97,7 +97,7 @@ bool LSPPreprocessor::ensureInitialized(LSPMethod method, const LSPMessage &msg)
     config->logger->error("Serving request before got an Initialize & Initialized handshake from IDE");
     if (!msg.isNotification()) {
         auto id = msg.id().value_or(0);
-        auto response = make_unique<ResponseMessage>("2.0", id, msg.method());
+        auto response = make_unique<ResponseMessage>("2.0", id);
         response->error = make_unique<ResponseError>((int)LSPErrorCodes::ServerNotInitialized,
                                                      "IDE did not initialize Sorbet correctly. No requests should "
                                                      "be made before Initialize & Initialized have been completed");

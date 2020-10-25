@@ -27,7 +27,7 @@ DocumentHighlightTask::DocumentHighlightTask(const LSPConfiguration &config, Mes
     : LSPRequestTask(config, move(id), LSPMethod::TextDocumentDocumentHighlight), params(move(params)) {}
 
 unique_ptr<ResponseMessage> DocumentHighlightTask::runRequest(LSPTypecheckerDelegate &typechecker) {
-    auto response = make_unique<ResponseMessage>("2.0", id, LSPMethod::TextDocumentDocumentHighlight);
+    auto response = make_unique<ResponseMessage>("2.0", id);
     if (!config.opts.lspDocumentHighlightEnabled) {
         response->error = make_unique<ResponseError>(
             (int)LSPErrorCodes::InvalidRequest, "The `Highlight` LSP feature is experimental and disabled by default.");

@@ -18,7 +18,7 @@ bool GetCountersTask::canPreempt(const LSPIndexer &) const {
 
 // Has to run on indexing thread, which is what coordinates all threads and collects all of the metrics.
 void GetCountersTask::index(LSPIndexer &indexer) {
-    auto response = make_unique<ResponseMessage>("2.0", id, LSPMethod::GETCOUNTERS);
+    auto response = make_unique<ResponseMessage>("2.0", id);
     unique_ptr<SorbetCounters> counters = make_unique<SorbetCounters>();
     counters->counters = getAndClearThreadCounters();
     response->result = move(counters);

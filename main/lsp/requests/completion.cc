@@ -749,7 +749,7 @@ void CompletionTask::findSimilarConstants(const core::GlobalState &gs, const cor
 }
 
 unique_ptr<ResponseMessage> CompletionTask::runRequest(LSPTypecheckerDelegate &typechecker) {
-    auto response = make_unique<ResponseMessage>("2.0", id, LSPMethod::TextDocumentCompletion);
+    auto response = make_unique<ResponseMessage>("2.0", id);
     auto emptyResult = make_unique<CompletionList>(false, vector<unique_ptr<CompletionItem>>{});
 
     const auto &gs = typechecker.state();

@@ -909,6 +909,41 @@ public:
     }
 };
 
+/**
+ * An 'undiscriminated union' type is a variant type where to deserialize, we try deserializing
+ * assuming it's each individual variant in turn, and take theh first one that deserializes without
+ * error.
+ */
+class JSONUndiscriminatedUnionVariantType final : public JSONVariantType {
+private:
+public:
+    JSONUndiscriminatedUnionVariantType(std::vector<std::shared_ptr<JSONType>> variants) : JSONVariantType(variants) {}
+
+    void emitFromJSONValue(fmt::memory_buffer &out, std::string_view from, AssignLambda assign,
+                           std::string_view fieldName) {
+        fmt::format_to(out, "throw std::runtime_error(\"unimplemented\");\n");
+    }
+
+    void emitToJSONValue(fmt::memory_buffer &out, std::string_view from, AssignLambda assign,
+                         std::string_view fieldName) {
+        int i = -1;
+        for (auto &variant : this->variants) {
+            i++;
+            if (i == 0) {
+                fmt::format_to(out, "if ");
+            } else {
+                fmt::format_to(out, "}} else if ");
+            }
+            fmt::format_to(out, "(auto discVal = std::get_if<{}>(&{})) {{\n", variant->getCPPType(), from);
+            variant->emitToJSONValue(out, "(*discVal)", assign, fieldName);
+        }
+        fmt::format_to(out, "}} else {{\n");
+        // TODO(jez) Error message
+        fmt::format_to(out, "throw InvalidUndiscriminatedUnionValueError();\n");
+        fmt::format_to(out, "}}\n");
+    }
+};
+
 class JSONBasicVariantType final : public JSONVariantType {
 public:
     JSONBasicVariantType(std::vector<std::shared_ptr<JSONType>> variants) : JSONVariantType(variants) {

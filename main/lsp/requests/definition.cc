@@ -10,7 +10,7 @@ DefinitionTask::DefinitionTask(const LSPConfiguration &config, MessageId id,
     : LSPRequestTask(config, move(id), LSPMethod::TextDocumentDefinition), params(move(params)) {}
 
 unique_ptr<ResponseMessage> DefinitionTask::runRequest(LSPTypecheckerDelegate &typechecker) {
-    auto response = make_unique<ResponseMessage>("2.0", id, LSPMethod::TextDocumentDefinition);
+    auto response = make_unique<ResponseMessage>("2.0", id);
     const core::GlobalState &gs = typechecker.state();
     auto result =
         queryByLoc(typechecker, params->textDocument->uri, *params->position, LSPMethod::TextDocumentDefinition, false);

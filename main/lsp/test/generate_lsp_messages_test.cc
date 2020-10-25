@@ -230,9 +230,9 @@ TEST_CASE("IntEnums") {
 // Ensures that LSPMessage parses ResultMessage/ResultMessageWithError/RequestMessage/NotificationMessage properly.
 TEST_CASE("DifferentLSPMessageTypes") {
     auto request = make_unique<RequestMessage>("2.0", 1, LSPMethod::Shutdown, make_optional<JSONNullObject>());
-    auto response = make_unique<ResponseMessage>("2.0", 1, LSPMethod::Shutdown);
+    auto response = make_unique<ResponseMessage>("2.0", 1);
     response->result = JSONNullObject();
-    auto responseWithError = make_unique<ResponseMessage>("2.0", 1, LSPMethod::SorbetError);
+    auto responseWithError = make_unique<ResponseMessage>("2.0", 1);
     responseWithError->error = make_unique<ResponseError>(20, "Bad request");
     auto notification = make_unique<NotificationMessage>("2.0", LSPMethod::Exit, make_optional<JSONNullObject>());
 

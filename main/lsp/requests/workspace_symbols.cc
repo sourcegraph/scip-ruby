@@ -330,7 +330,7 @@ bool WorkspaceSymbolsTask::isDelayable() const {
 
 unique_ptr<ResponseMessage> WorkspaceSymbolsTask::runRequest(LSPTypecheckerDelegate &typechecker) {
     Timer timeit(typechecker.state().tracer(), "LSPLoop::handleWorkspaceSymbols");
-    auto response = make_unique<ResponseMessage>("2.0", id, LSPMethod::WorkspaceSymbol);
+    auto response = make_unique<ResponseMessage>("2.0", id);
     ShowOperation op(config, ShowOperation::Kind::References);
     SymbolMatcher matcher(config, typechecker.state());
     response->result = matcher.doQuery(params->query);

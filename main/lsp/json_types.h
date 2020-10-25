@@ -66,6 +66,12 @@ public:
                                         std::string_view discriminantValue, std::string_view expectedType);
 };
 
+class InvalidUndiscriminatedUnionValueError final : public SerializationError {
+public:
+    // TODO(jez) Better message
+    InvalidUndiscriminatedUnionValueError();
+};
+
 class NullPtrError final : public SerializationError {
 public:
     NullPtrError(std::string_view fieldName);

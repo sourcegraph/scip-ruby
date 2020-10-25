@@ -50,6 +50,10 @@ makeDiscriminatedUnion(shared_ptr<FieldDef> fieldDef,
     return make_shared<JSONDiscriminatedUnionVariantType>(fieldDef, variantsByDiscriminant);
 }
 
+shared_ptr<JSONType> makeUndiscriminatedUnion(const vector<shared_ptr<JSONType>> variants) {
+    return make_shared<JSONUndiscriminatedUnionVariantType>(variants);
+}
+
 shared_ptr<JSONType> makeArray(shared_ptr<JSONType> type) {
     return make_shared<JSONArrayType>(type);
 }
@@ -1369,48 +1373,49 @@ void makeLSPTypes(vector<shared_ptr<JSONClassType>> &enumTypes, vector<shared_pt
                     methodField, makeField("params", RequestMessageParamsType)},
                    classTypes);
 
-    auto requestMethodField = makeField("requestMethod", LSPMethod);
-    auto ResponseMessageResultType = makeDiscriminatedUnion(
-        requestMethodField,
-        {
-            {"__GETCOUNTERS__", SorbetCounters},
-            {"initialize", InitializeResult},
-            {"shutdown", JSONNull},
-            // DocumentHighlight[] | null
-            {"textDocument/documentHighlight", makeVariant({JSONNull, makeArray(DocumentHighlight)})},
-            // DocumentSymbol[] | SymbolInformation[] | null
-            // Sorbet only uses DocumentSymbol[].
-            {"textDocument/documentSymbol", makeVariant({JSONNull, makeArray(DocumentSymbol)})},
-            // Location | Location[] | LocationLink[] | null
-            // Sorbet only uses Location[].
-            {"textDocument/definition", makeVariant({JSONNull, makeArray(Location)})},
-            {"textDocument/typeDefinition", makeVariant({JSONNull, makeArray(Location)})},
-            {"textDocument/hover", makeVariant({JSONNull, Hover})},
-            // CompletionItem[] | CompletionList | null
-            // Sorbet only sends CompletionList.
-            {"textDocument/completion", CompletionList},
-            {"textDocument/references", makeVariant({JSONNull, makeArray(Location)})},
-            {"textDocument/signatureHelp", makeVariant({JSONNull, SignatureHelp})},
-            {"textDocument/formatting", makeVariant({JSONNull, makeArray(TextEdit)})},
-            // (CodeAction | Command)[] | null
-            // Sorbet only sends CodeAction[].
-            {"textDocument/codeAction", makeVariant({JSONNull, makeArray(CodeAction)})},
-            // TODO: the following are more correct but I can only get the above to work.
-            // {"textDocument/codeAction", makeVariant({JSONNull, makeArray(makeVariant({CodeAction, Command}))})},
-            // {"textDocument/codeAction", makeVariant({JSONNull, makeArray(CodeAction), makeArray(Command)})},
-            {"workspace/symbol", makeVariant({JSONNull, makeArray(SymbolInformation)})},
-            {"sorbet/error", SorbetErrorParams},
-            {"sorbet/readFile", TextDocumentItem},
-        });
+    // auto requestMethodField = makeField("requestMethod", LSPMethod);
+    // TODO(jez) Put names of responses back here.
+    auto ResponseMessageResultType = makeUndiscriminatedUnion({
+        SorbetCounters,
+        InitializeResult,
+        JSONNull,
+        // DocumentHighlight[] | null
+        makeVariant({JSONNull, makeArray(DocumentHighlight)}),
+        // DocumentSymbol[] | SymbolInformation[] | null
+        // Sorbet only uses DocumentSymbol[].
+        makeVariant({JSONNull, makeArray(DocumentSymbol)}),
+        // Location | Location[] | LocationLink[] | null
+        // Sorbet only uses Location[].
+        makeVariant({JSONNull, makeArray(Location)}),
+        makeVariant({JSONNull, makeArray(Location)}),
+        makeVariant({JSONNull, Hover}),
+        // CompletionItem[] | CompletionList | null
+        // Sorbet only sends CompletionList.
+        CompletionList,
+        makeVariant({JSONNull, makeArray(Location)}),
+        makeVariant({JSONNull, SignatureHelp}),
+        makeVariant({JSONNull, makeArray(TextEdit)}),
+        // (CodeAction | Command)[] | null
+        // Sorbet only sends CodeAction[].
+        makeVariant({JSONNull, makeArray(CodeAction)}),
+        // TODO: the following are more correct but I can only get the above to work.
+        // {"textDocument/codeAction", makeVariant({JSONNull, makeArray(makeVariant({CodeAction, Command}))})},
+        // {"textDocument/codeAction", makeVariant({JSONNull, makeArray(CodeAction), makeArray(Command)})},
+        makeVariant({JSONNull, makeArray(SymbolInformation)}),
+        SorbetErrorParams,
+        TextDocumentItem,
+    });
     // N.B.: ResponseMessage.params must be optional, as it is not present when an error occurs.
     // N.B.: We add a 'requestMethod' field to response messages to make the discriminated union work.
     // Also note that we cannot name this field 'method', as it tricks clients into thinking it's a request
     // rather than a response.
     auto ResponseMessage = makeObject("ResponseMessage",
-                                      {makeField("jsonrpc", JSONRPCConstant),
-                                       makeField("id", makeVariant({JSONInt, JSONString, JSONNull})),
-                                       requestMethodField, makeField("result", makeOptional(ResponseMessageResultType)),
-                                       makeField("error", makeOptional(ResponseError))},
+                                      {
+                                          makeField("jsonrpc", JSONRPCConstant),
+                                          makeField("id", makeVariant({JSONInt, JSONString, JSONNull})),
+                                          makeField("result", makeOptional(ResponseMessageResultType)),
+                                          makeField("error", makeOptional(ResponseError)),
+                                      },
                                       classTypes);
 
     auto NotificationMessageParamsType =
@@ -1437,3 +1442,20 @@ void makeLSPTypes(vector<shared_ptr<JSONClassType>> &enumTypes, vector<shared_pt
                                            makeField("params", NotificationMessageParamsType)},
                                           classTypes);
 }
+
+// auto ResponseMessageResultType = makeUndiscriminatedUnion({
+//     CompletionList,
+//     Hover,
+//     InitializeResult,
+//     JSONNull,
+//     SignatureHelp,
+//     SorbetCounters,
+//     SorbetErrorParams,
+//     TextDocumentItem,
+//     makeArray(CodeAction),
+//     makeArray(DocumentHighlight),
+//     makeArray(DocumentSymbol),
+//     makeArray(Location),
+//     makeArray(SymbolInformation),
+//     makeArray(TextEdit),
+// });
