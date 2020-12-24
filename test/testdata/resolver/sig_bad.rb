@@ -15,7 +15,7 @@ class A
   sig do
     params(
       a: unsupported, # error: Unknown type syntax
-      b: T.enum, # error: Not enough arguments provided for method `T.enum`. Expected: `1`, got: `0`
+      b: T.enum, # error: Not enough arguments provided for method `enum` on `T.class_of(T)`. Expected: `1`, got: `0`
       c: T.enum(1),
       d: T.enum([]), # error: enum([]) is invalid
       e: T.enum([unsupported]), # error: Unsupported type literal

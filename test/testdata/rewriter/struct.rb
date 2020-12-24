@@ -68,7 +68,7 @@ class MixinStruct
 end
 
 class BadUsages
-  A = Struct.new # error: Not enough arguments provided for method `Struct#initialize`. Expected: `1+`, got: `0`
+  A = Struct.new # error: Not enough arguments provided for method `initialize` on `Struct`. Expected: `1+`, got: `0`
   B = Struct.new(giberish: 1) # error: Expected `T.any(Symbol, String)` but found `{giberish: Integer(1)}` for argument `arg0`
   C = Struct.new(keyword_init: true) # error: Expected `T.any(Symbol, String)` but found `{keyword_init: TrueClass}` for argument `arg0`
   local = true

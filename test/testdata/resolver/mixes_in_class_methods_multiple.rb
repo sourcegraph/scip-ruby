@@ -18,7 +18,7 @@ module Mixin
   end
 
   mixes_in_class_methods(ClassMethods1, ClassMethods2, ClassMethods3)
- 
+
   def mixin_method
   end
 end
@@ -66,7 +66,7 @@ class Test2
   include Mixin2
 end
 
-Test2.foo # error: Not enough arguments provided for method `Mixin2::ClassMethods4#foo`. Expected: `4`, got: `0`
+Test2.foo # error: Not enough arguments provided for method `foo` on `T.class_of(Test2)`. Expected: `4`, got: `0`
 
 module Bad1
   extend T::Sig

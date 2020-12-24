@@ -104,7 +104,7 @@ class OverridesNewBad
 
   def initialize; end
 
-  x = new # error: Not enough arguments provided for method `OverridesNewBad.new`
+  x = new # error: Not enough arguments provided for method `new` on `T.class_of(OverridesNewBad)`
   T.reveal_type(x) # error: Revealed type: `Integer`
 end
 
@@ -116,6 +116,6 @@ class OverridesNewNotGreatButWellTakeIt
 
   def initialize(arg0); end
 
-  x = new # error: Not enough arguments provided for method `OverridesNewNotGreatButWellTakeIt.new`
+  x = new # error: Not enough arguments provided for method `new` on `T.class_of(OverridesNewNotGreatButWellTakeIt)`
   T.reveal_type(x) # error: `T.attached_class (of OverridesNewNotGreatButWellTakeIt)`
 end
