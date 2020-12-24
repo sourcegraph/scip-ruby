@@ -569,6 +569,8 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                     }
                 }
             }
+            e.addErrorSection(ErrorSection("Got " + args.fullType.type.show(gs) + " originating from:",
+                                           args.fullType.origins2Explanations(gs, args.originForUninitialized)));
             if (args.fullType.type != args.thisType && symbol == Symbols::NilClass()) {
                 e.replaceWith("Wrap in `T.must`", core::Loc(args.locs.file, args.locs.receiver), "T.must({})",
                               core::Loc(args.locs.file, args.locs.receiver).source(gs));
@@ -868,6 +870,8 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                                 posArgs); // TODO: should use position and print the source tree, not the cfg one.
                 }
                 e.addErrorLine(method.data(gs)->loc(), "`{}` defined here", data->show(gs));
+                e.addErrorSection(ErrorSection("Got " + args.fullType.type.show(gs) + " originating from:",
+                                               args.fullType.origins2Explanations(gs, args.originForUninitialized)));
                 if (args.name == core::Names::any() &&
                     symbol == core::Symbols::T().data(gs)->lookupSingletonClass(gs)) {
                     e.addErrorNote("If you want to allow any type as an argument, use `{}`", "T.untyped");
