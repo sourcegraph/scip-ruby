@@ -859,15 +859,13 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
             if (auto e = gs.beginError(core::Loc(args.locs.file, args.locs.call),
                                        errors::Infer::MethodArgumentCountMismatch)) {
                 if (args.fullType.type != args.thisType) {
-                    e.setHeader(
-                        "Not enough arguments provided for method `{}` on `{}` component of `{}`. Expected: `{}`, got: "
-                        "`{}`",
-                        data->show(gs), args.thisType.show(gs), args.fullType.type.show(gs), prettyArity(gs, method),
-                        posArgs); // TODO: should use position and print the source tree, not the cfg one.
+                    e.setHeader("Not enough arguments provided for method `{}` on `{}` component of `{}`. Expected: "
+                                "`{}`, got: `{}`",
+                                data->name.show(gs), args.thisType.show(gs), args.fullType.type.show(gs),
+                                prettyArity(gs, method), posArgs);
                 } else {
-                    e.setHeader("Not enough arguments provided for method `{}`. Expected: `{}`, got: `{}`",
-                                data->show(gs), prettyArity(gs, method),
-                                posArgs); // TODO: should use position and print the source tree, not the cfg one.
+                    e.setHeader("Not enough arguments provided for method `{}` on `{}`. Expected: `{}`, got: `{}`",
+                                data->name.show(gs), args.thisType.show(gs), prettyArity(gs, method), posArgs);
                 }
                 e.addErrorLine(method.data(gs)->loc(), "`{}` defined here", data->show(gs));
                 e.addErrorSection(ErrorSection("Got " + args.fullType.type.show(gs) + " originating from:",
