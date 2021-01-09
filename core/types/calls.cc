@@ -993,16 +993,30 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
             auto hashCount = (numKwargs > 0 || hasKwsplat) ? 1 : 0;
             auto numArgsGiven = args.numPosArgs + hashCount;
             if (!hasKwargs) {
-                e.setHeader("Too many arguments provided for method `{}`. Expected: `{}`, got: `{}`", data->show(gs),
-                            prettyArity(gs, method), numArgsGiven);
+                if (args.fullType.type != args.thisType) {
+                    e.setHeader("Too many arguments provided for method `{}` on `{}` component of `{}`. Expected: "
+                                "`{}`, got `{}`",
+                                data->name.show(gs), args.thisType.show(gs), args.fullType.type.show(gs),
+                                prettyArity(gs, method), numArgsGiven);
+                }
+                e.setHeader("Too many arguments provided for method `{}` on `{}`. Expected: `{}`, got: `{}`",
+                            data->name.show(gs), args.thisType.show(gs), prettyArity(gs, method), numArgsGiven);
                 e.addErrorLine(method.data(gs)->loc(), "`{}` defined here", args.name.show(gs));
             } else {
                 // if we have keyword arguments, we should print a more informative message: otherwise, we might give
                 // people some slightly confusing error messages.
 
                 // print a helpful error message
-                e.setHeader("Too many positional arguments provided for method `{}`. Expected: `{}`, got: `{}`",
-                            data->show(gs), prettyArity(gs, method), posArgs);
+                if (args.fullType.type != args.thisType) {
+                    e.setHeader("Too many positional arguments provided for method `{}` on `{}` component of `{}`. "
+                                "Expected: `{}`, got: `{}`",
+                                data->name.show(gs), args.thisType.show(gs), args.fullType.type.show(gs),
+                                prettyArity(gs, method), posArgs);
+                } else {
+                    e.setHeader(
+                        "Too many positional arguments provided for method `{}` on `{}`. Expected: `{}`, got: `{}`",
+                        data->name.show(gs), args.thisType.show(gs), prettyArity(gs, method), posArgs);
+                }
                 e.addErrorLine(method.data(gs)->loc(), "`{}` defined here", args.name.show(gs));
 
                 // if there's an obvious first keyword argument that the user hasn't supplied, we can mention it
