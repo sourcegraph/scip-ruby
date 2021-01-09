@@ -215,11 +215,19 @@ unique_ptr<Error> matchArgType(const GlobalState &gs, TypeConstraint &constr, Lo
     return nullptr;
 }
 
-unique_ptr<Error> missingArg(const GlobalState &gs, Loc callLoc, Loc receiverLoc, SymbolRef method,
-                             const ArgInfo &arg) {
+unique_ptr<Error> missingArg(const GlobalState &gs, const DispatchArgs &args, SymbolRef method, const ArgInfo &arg) {
+    auto callLoc = Loc(args.locs.file, args.locs.call);
+    auto receiverLoc = Loc(args.locs.file, args.locs.receiver);
+
     if (auto e = gs.beginError(callLoc, errors::Infer::MethodArgumentCountMismatch)) {
-        e.setHeader("Missing required keyword argument `{}` for method `{}`", arg.name.show(gs),
-                    method.data(gs)->show(gs));
+        if (args.fullType.type != args.thisType) {
+            e.setHeader("Missing required keyword argument `{}` for method `{}` on `{}` component of `{}`",
+                        arg.name.show(gs), method.data(gs)->name.show(gs), args.thisType.show(gs),
+                        args.fullType.type.show(gs));
+        } else {
+            e.setHeader("Missing required keyword argument `{}` for method `{}` on `{}`", arg.name.show(gs),
+                        method.data(gs)->name.show(gs), args.thisType.show(gs));
+        }
         return e.build();
     }
     return nullptr;
@@ -939,8 +947,7 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                 });
                 if (arg == hash->keys.end()) {
                     if (!spec.flags.isDefault) {
-                        if (auto e = missingArg(gs, core::Loc(args.locs.file, args.locs.call),
-                                                core::Loc(args.locs.file, args.locs.receiver), method, spec)) {
+                        if (auto e = missingArg(gs, args, method, spec)) {
                             result.main.errors.emplace_back(std::move(e));
                         }
                     }
@@ -979,8 +986,7 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                 if (!spec.flags.isKeyword || spec.flags.isDefault || spec.flags.isRepeated) {
                     continue;
                 }
-                if (auto e = missingArg(gs, core::Loc(args.locs.file, args.locs.call),
-                                        core::Loc(args.locs.file, args.locs.receiver), method, spec)) {
+                if (auto e = missingArg(gs, args, method, spec)) {
                     result.main.errors.emplace_back(std::move(e));
                 }
             }
