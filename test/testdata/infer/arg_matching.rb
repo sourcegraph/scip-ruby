@@ -37,7 +37,7 @@ class TestArgs
 
   def call_kwarg
     # "too many arguments" and "missing keyword argument b"
-    kwarg(1, 2) # error: Missing required keyword argument `b` for method `TestArgs#kwarg`
+    kwarg(1, 2) # error: Missing required keyword argument `b` for method `kwarg` on `TestArgs`
   # ^^^^^^^^^^^ error: Too many positional arguments provided for method `kwarg` on `TestArgs`. Expected: `1`, got: `2`
     kwarg(1) # error: Missing required keyword argument `b`
 
@@ -96,7 +96,7 @@ class TestArgs
     # There's ambiguity here about whether to report `u` or `x` as
     # missing; We follow Ruby in complaining about `u`.
     optkw(u: 1) # error: Missing required keyword argument `u`
-    optkw(1, 2, 3) # error: Missing required keyword argument `u` for method `TestArgs#optkw`
+    optkw(1, 2, 3) # error: Missing required keyword argument `u` for method `optkw` on `TestArgs`
   # ^^^^^^^^^^^^^^ error: Too many positional arguments provided for method `optkw` on `TestArgs`. Expected: `1..2`, got: `3`
   end
 end
