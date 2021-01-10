@@ -22,12 +22,12 @@ T.assert_type! # error: Not enough arguments provided for method `assert_type!` 
 T.cast # error: Not enough arguments provided for method `cast` on `T.class_of(T)`. Expected: `2`, got: `0`
 T.unsafe # error: Not enough arguments provided for method `unsafe` on `T.class_of(T)`. Expected: `1`, got: `0`
 T.nilable # error: Not enough arguments provided for method `nilable` on `T.class_of(T)`. Expected: `1`, got: `0`
-T.proc(String) # error: Too many arguments provided for method `T.proc`. Expected: `0`, got: `1`
+T.proc(String) # error: Too many arguments provided for method `proc` on `T.class_of(T)`. Expected: `0`, got: `1`
 T.class_of # error: Not enough arguments provided for method `class_of` on `T.class_of(T)`. Expected: `1`, got: `0`
-T.noreturn(String) # error: Too many arguments provided for method `T.noreturn`. Expected: `0`, got: `1`
+T.noreturn(String) # error: Too many arguments provided for method `noreturn` on `T.class_of(T)`. Expected: `0`, got: `1`
 T.enum # error: Not enough arguments provided for method `enum` on `T.class_of(T)`. Expected: `1`, got: `0`
 
-T.untyped(String) # error: Too many arguments provided for method `T.untyped`. Expected: `0`, got: `1`
+T.untyped(String) # error: Too many arguments provided for method `untyped` on `T.class_of(T)`. Expected: `0`, got: `1`
 T.any # error: Not enough arguments provided for method `any` on `T.class_of(T)`. Expected: `2+`, got: `0`
 T.all # error: Not enough arguments provided for method `all` on `T.class_of(T)`. Expected: `2+`, got: `0`
 

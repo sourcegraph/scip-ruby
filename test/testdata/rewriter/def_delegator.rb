@@ -48,8 +48,8 @@ class IgnoredUsages
   not_def_delegator :thing, :foo # error: Method `not_def_delegator` does not exist
   def_delegator # error: Not enough arguments provided for method `def_delegator` on `T.class_of(IgnoredUsages)`
   def_delegator :thing # error: Not enough arguments provided for method `def_delegator` on `T.class_of(IgnoredUsages)`
-  def_delegator :thing, :foo, :bar, :baz # error: Too many arguments provided for method `Forwardable#def_delegator`
-  def_delegator :thing, :foo, :bar, kwarg: :thing # error: Too many arguments provided for method `Forwardable#def_delegator`
+  def_delegator :thing, :foo, :bar, :baz # error: Too many arguments provided for method `def_delegator` on `T.class_of(IgnoredUsages)`
+  def_delegator :thing, :foo, :bar, kwarg: :thing # error: Too many arguments provided for method `def_delegator` on `T.class_of(IgnoredUsages)`
   def_delegator :thing, kwarg: :thing # error: Expected `Symbol` but found `{kwarg: Symbol(:thing)}` for argument `method`
   def_delegator :foo, kwarg1: :thing, kwarg2: local # error: Expected `Symbol` but found `{kwarg1: Symbol(:thing), kwarg2: Integer(0)}` for argument `method`
   def_delegator :foo, local => :thing # error: Expected `Symbol` but found `{}` for argument `method`
