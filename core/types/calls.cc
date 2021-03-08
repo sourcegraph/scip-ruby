@@ -180,7 +180,8 @@ unique_ptr<Error> matchArgType(const GlobalState &gs, TypeConstraint &constr, Lo
 
     expectedType = Types::replaceSelfType(gs, expectedType, selfType);
 
-    if (Types::isSubTypeUnderConstraint(gs, constr, argTpe.type, expectedType, UntypedMode::AlwaysCompatible)) {
+    if (Types::isSubTypeUnderConstraint(gs, constr, Types::dropLiteral(gs, argTpe.type), expectedType,
+                                        UntypedMode::AlwaysCompatible)) {
         return nullptr;
     }
 
