@@ -248,6 +248,10 @@ void GlobalState::initEmpty() {
     ENFORCE(id == Symbols::T());
     id = synthesizeClass(core::Names::Constants::Class(), 0);
     ENFORCE(id == Symbols::Class());
+    // Current state: BasicObject is only symbol whose superClass does not exist.
+    // Even class <top> has superClass set to Object
+    // I think we should explicitly make BasicObject < <top> and make <top> not have superClass
+    // Except this doesn't see right because there are a lot of synthesizeClass(..., 0) calls... 🤔
     id = synthesizeClass(core::Names::Constants::BasicObject(), 0);
     ENFORCE(id == Symbols::BasicObject());
     id = synthesizeClass(core::Names::Constants::Kernel(), 0, true);
