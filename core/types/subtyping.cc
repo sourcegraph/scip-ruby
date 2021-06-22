@@ -1324,6 +1324,8 @@ bool Types::isSubTypeUnderConstraint(const GlobalState &gs, TypeConstraint &cons
                Types::isSubTypeUnderConstraint(gs, constr, a1->right, t2, mode);
     }
 
+    // TODO(jez) Should we invert this, because this is so common?
+    // Should we instrument the branches to know which is actually the fast path
     return isSubTypeUnderConstraintSingle(gs, constr, mode, t1, t2); // 1
 }
 
