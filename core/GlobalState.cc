@@ -306,6 +306,7 @@ void GlobalState::initEmpty() {
     ENFORCE(id == Symbols::T_Set());
     id = enterClassSymbol(Loc::none(), Symbols::Sorbet_Private_Static(), core::Names::Constants::Void());
     id.data(*this)->setIsModule(false);
+    id.data(*this)->setSuperClass(Symbols::top());
     ENFORCE(id == Symbols::void_());
     id = synthesizeClass(core::Names::Constants::TypeAlias(), 0);
     ENFORCE(id == Symbols::typeAliasTemp());
