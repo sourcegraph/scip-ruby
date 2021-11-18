@@ -389,6 +389,18 @@ bool autogenCanExitEarly(shared_ptr<spd::logger> &logger, options::Options &opts
 
         const auto &processedGlobalDSLInfo = autogen::mergeAndFilterGlobalDSLInfo(std::move(globalDSLInfo));
         fmt::memory_buffer out;
+        fmt::format_to(std::back_inserter(out), "Number of models analyzed: {}\n", processedGlobalDSLInfo.size());
+
+        int problemModels = 0;
+        for (const auto &it : processedGlobalDSLInfo) {
+            if (it.second.props.empty() || it.second.problemLocs.empty()) {
+                continue;
+            }
+
+            problemModels++;
+        }
+        fmt::format_to(std::back_inserter(out), "Number of models with problems: {}\n\n", problemModels);
+
         for (const auto &it : processedGlobalDSLInfo) {
             if (it.second.props.empty()) {
                 continue;
