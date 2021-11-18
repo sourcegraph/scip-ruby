@@ -10,6 +10,7 @@
 #include "main/autogen/autoloader.h"
 #include "main/autogen/cache.h"
 #include "main/autogen/crc_builder.h"
+#include "main/autogen/dsl_analysis.h"
 #include "main/autogen/data/version.h"
 #include "main/autogen/packages.h"
 #include "main/autogen/subclasses.h"
@@ -197,6 +198,8 @@ struct AutogenResult {
         string strval;
         string msgpack;
         optional<autogen::Subclasses::Map> subclasses;
+        optional<UnorderedMap<vector<core::NameRef>, autogen::DSLInfo>> dslInfo;
+        /* string dslAnalysisStrVal; */
     };
     CounterState counters;
     vector<pair<int, Serialized>> prints;
@@ -253,6 +256,13 @@ void runAutogen(const core::GlobalState &gs, options::Options &opts, const autog
                 if (opts.print.Autogen.enabled) {
                     Timer timeit(logger, "autogenToString");
                     serialized.strval = pf.toString(ctx, autogenVersion);
+                }
+                if (opts.print.DSLAnalysis.enabled) {
+                    auto &tree2 = indexed[idx];
+                    Timer timeit(logger, "dslAnalysisToString");
+                    auto daf = autogen::DSLAnalysis::generate(ctx, move(tree2), *crcBuilder);
+                    serialized.dslInfo = std::move(daf.dslInfo);
+                    /* serialized.dslAnalysisStrVal = daf.toString(ctx); */
                 }
                 if (opts.print.AutogenMsgPack.enabled) {
                     Timer timeit(logger, "autogenToMsgpack");
@@ -364,6 +374,33 @@ bool autogenCanExitEarly(shared_ptr<spd::logger> &logger, options::Options &opts
 
     if (opts.autogenChangedFiles.empty()) {
         return false;
+    }
+
+    if (opts.print.DSLAnalysis.enabled) {
+        Timer timeit(logger, "autogenDSLAnalysisPrint");
+
+        UnorderedMap<std::vector<core::NameRef>, autogen::DSLInfo> globalDSLInfo;
+
+        for (const auto &el : merged) {
+            if (el.dslInfo) {
+                for (auto &it : *el.dslInfo) {
+                    globalDSLInfo.emplace(it.first, it.second);
+                }
+                std::move(*el.dslInfo);
+            }
+        }
+
+        autogen::mergeAndFilterGlobalDSLInfo(globalDSLInfo);
+        fmt::memory_buffer out;
+        for (const auto &it : globalDSLInfo) {
+            if (it.second.props.empty()) {
+                continue;
+            }
+            it.second.printName(out, it.first, gs);
+            it.second.formatString(out, gs);
+        }
+
+        opts.print.DSLAnalysis.fmt("{}", to_string(out));
     }
 
     logger->info("Checking {} changed files", opts.autogenChangedFiles.size());
