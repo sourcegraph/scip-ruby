@@ -175,6 +175,7 @@ struct ParsedFile {
 };
 
 struct DSLInfo {
+    // mutator or model
     std::vector<core::NameRef> props;
     std::vector<std::vector<core::NameRef>> ancestors;
 
@@ -183,6 +184,9 @@ struct DSLInfo {
 
     // problem locs
     std::vector<core::LocOffsets> problemLocs;
+
+    // in case of mutators
+    std::vector<core::NameRef> model;
 
     void formatString(fmt::memory_buffer &out, const core::GlobalState &gs) const;
 };
