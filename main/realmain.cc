@@ -410,7 +410,7 @@ bool autogenCanExitEarly(shared_ptr<spd::logger> &logger, options::Options &opts
         fmt::format_to(std::back_inserter(out), "Number of mutators with problems: {}\n\n", problemMutators);
 
         for (const auto &it : processedGlobalDSLInfo) {
-            if (it.second.model.empty() || it.second.props.empty()) {
+            if (it.second.model.empty() || it.second.props.empty() || !it.second.problemLocs.empty()) {
                 continue;
             }
             autogen::printName(out, it.first, gs);
