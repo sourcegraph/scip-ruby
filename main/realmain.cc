@@ -413,7 +413,9 @@ bool autogenCanExitEarly(shared_ptr<spd::logger> &logger, options::Options &opts
             if (it.second.model.empty() || it.second.props.empty()) {
                 continue;
             }
+            fmt::format_to(std::back_inserter(out), "{}\n", "[mutator=");
             autogen::printName(out, it.first, gs);
+            fmt::format_to(std::back_inserter(out), "{}\n", "]");
             it.second.formatString(out, gs);
         }
 
