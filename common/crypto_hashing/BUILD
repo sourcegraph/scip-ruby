@@ -7,7 +7,7 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = ["//common"] + select({
-        "//tools/config:webasm": ["@com_github_blake2_blake2"],
+        "//tools/config:wasm": ["@com_github_blake2_blake2"],
         "//conditions:default": ["@com_github_blake2_libb2"],
     }),
 )

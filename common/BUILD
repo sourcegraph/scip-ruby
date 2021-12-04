@@ -12,7 +12,7 @@ cc_library(
         exclude = ["flycheck_*"],
     ) + select({
         "//tools/config:darwin": ["os/mac.cc"],
-        "//tools/config:webasm": ["os/emscripten.cc"],
+        "//tools/config:wasm": ["os/emscripten.cc"],
         "//conditions:default": ["os/linux.cc"],
     }),
     hdrs = [

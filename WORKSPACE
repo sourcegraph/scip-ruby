@@ -90,6 +90,14 @@ load("@build_bazel_rules_nodejs//:index.bzl", "node_repositories")
 
 node_repositories()
 
+load("@emsdk//:deps.bzl", emsdk_deps = "deps")
+
+emsdk_deps()
+
+load("@emsdk//:emscripten_deps.bzl", emsdk_emscripten_deps = "emscripten_deps")
+
+emsdk_emscripten_deps(emscripten_version = "2.0.31")
+
 BAZEL_VERSION = "4.2.1"
 
 BAZEL_INSTALLER_VERSION_LINUX_X86_64_SHA = "35f398ad93af2b5eadd4b6b4fd4d4803b726029e572f40c4e1fe736db3de944b"

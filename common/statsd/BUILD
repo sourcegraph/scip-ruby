@@ -1,7 +1,7 @@
 cc_library(
     name = "statsd",
     srcs = select({
-        "//tools/config:webasm": ["statsd-emscripten.cc"],
+        "//tools/config:wasm": ["statsd-emscripten.cc"],
         "//conditions:default": ["statsd.cc"],
     }),
     hdrs = [
@@ -17,7 +17,7 @@ cc_library(
         "//core",
         "//sorbet_version",
     ] + select({
-        "//tools/config:webasm": [],
+        "//tools/config:wasm": [],
         "//conditions:default": ["@statsd"],
     }),
 )

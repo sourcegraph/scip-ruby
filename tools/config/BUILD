@@ -33,9 +33,9 @@ config_setting(
 )
 
 config_setting(
-    name = "webasm",
+    name = "wasm",
     values = {
-        "cpu": "webasm",
+        "cpu": "wasm",
     },
 )
 

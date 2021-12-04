@@ -1,7 +1,7 @@
 cc_library(
     name = "cache",
     srcs = select({
-        "//tools/config:webasm": ["cache-orig.cc"],
+        "//tools/config:wasm": ["cache-orig.cc"],
         "//conditions:default": ["cache.cc"],
     }),
     hdrs = ["cache.h"],
@@ -11,7 +11,7 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = select({
-        "//tools/config:webasm": [],
+        "//tools/config:wasm": [],
         "//conditions:default": [
             "//common/kvstore",
             "//main/options",

@@ -235,31 +235,10 @@ package(default_visibility = ["//visibility:public"])
     )
 
     http_archive(
-        name = "emscripten_toolchain",
-        urls = _github_public_urls("kripken/emscripten/archive/1.38.25.tar.gz"),
-        build_file = "@com_stripe_ruby_typer//third_party:emscripten-toolchain.BUILD",
-        sha256 = "4d6fa350895fabc25b89ce5f9dcb528e719e7c2bf7dacab2a3e3cc818ecd7019",
-        strip_prefix = "emscripten-1.38.25",
-        patches = [
-            "@com_stripe_ruby_typer//third_party:emscripten_toolchain/emcc.py.patch",
-            "@com_stripe_ruby_typer//third_party:emscripten_toolchain/tools_shared.py.patch",
-        ],
-    )
-
-    http_archive(
-        name = "emscripten_clang_linux",
-        urls = _emscripten_urls("linux/emscripten-llvm-e1.38.25.tar.gz"),
-        build_file = "@com_stripe_ruby_typer//third_party:emscripten-clang.BUILD",
-        sha256 = "0e9a5a114a60c21604f4038b573109bd31424aeba275b4173480485ca0a56ba4",
-        strip_prefix = "emscripten-llvm-e1.38.25",
-    )
-
-    http_archive(
-        name = "emscripten_clang_darwin",
-        urls = _emscripten_urls("mac/emscripten-llvm-e1.38.25.tar.gz"),
-        build_file = "@com_stripe_ruby_typer//third_party:emscripten-clang.BUILD",
-        sha256 = "01519125c613d0b013193eaf5ac5031e6ec34aac2451c357fd4097874ceee38c",
-        strip_prefix = "emscripten-llvm-e1.38.25",
+        name = "emsdk",
+        urls = _github_public_urls("emscripten-core/emsdk/archive/2.0.31.tar.gz"),
+        sha256 = "6bf70f4522308de1941200f8cdb9bde6967ba7aacb03445e9d136a5dd812b728",
+        strip_prefix = "emsdk-2.0.31/bazel",
     )
 
     http_archive(

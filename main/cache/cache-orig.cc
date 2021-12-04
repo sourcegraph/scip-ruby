@@ -2,7 +2,12 @@
 
 using namespace std;
 
+namespace sorbet {
+class KeyValueStore final {};
+} // namespace sorbet
+
 namespace sorbet::realmain::cache {
+
 unique_ptr<OwnedKeyValueStore> maybeCreateKeyValueStore(const options::Options &opts) {
     return nullptr;
 }
