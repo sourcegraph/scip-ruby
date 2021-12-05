@@ -182,8 +182,8 @@ void DSLInfo::formatString(fmt::memory_buffer &out, const core::GlobalState &gs)
 
     if (!problemLocs.empty()) {
         fmt::format_to(std::back_inserter(out), "{}\n", "[problem_locs");
-        for (const auto &loc : problemLocs) {
-            fmt::format_to(std::back_inserter(out), "  {}\n", core::Loc(file, loc).showRaw(gs));
+        for (const auto &locInfo : problemLocs) {
+            fmt::format_to(std::back_inserter(out), "  {}\n", core::Loc(locInfo.file, locInfo.loc).showRaw(gs));
         }
         fmt::format_to(std::back_inserter(out), "{}\n", "]");
     }
@@ -243,6 +243,7 @@ mergeAndFilterGlobalDSLInfo(UnorderedMap<std::vector<core::NameRef>, DSLInfo> gl
                 }
                 DSLInfo &ancstInfo = ancstInfoIt->second;
                 info.props.insert(info.props.end(), ancstInfo.props.begin(), ancstInfo.props.end());
+                info.problemLocs.insert(info.problemLocs.end(), ancstInfo.problemLocs.begin(), ancstInfo.problemLocs.end());
             }
 
             result.emplace(klass, std::move(info));
