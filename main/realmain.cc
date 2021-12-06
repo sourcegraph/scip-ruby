@@ -382,12 +382,22 @@ bool autogenCanExitEarly(shared_ptr<spd::logger> &logger, options::Options &opts
         for (const auto &el : merged) {
             if (el.dslInfo) {
                 for (auto &it : std::move(*el.dslInfo)) {
+                    const auto existingDslInfoIt = globalDSLInfo.find(it.first);
+                    if (existingDslInfoIt != globalDSLInfo.end()) {
+                        autogen::DSLInfo &existingInfo = existingDslInfoIt->second;
+                        existingInfo.props.insert(existingInfo.props.end(), it.second.props.begin(),
+                                                  it.second.props.end());
+                        existingInfo.problemLocs.insert(existingInfo.problemLocs.end(), it.second.problemLocs.begin(),
+                                                        it.second.problemLocs.end());
+                        continue;
+                    }
+
                     globalDSLInfo.emplace(it.first, it.second);
                 }
             }
         }
 
-        const auto &processedGlobalDSLInfo = autogen::mergeAndFilterGlobalDSLInfo(std::move(globalDSLInfo));
+        const auto &processedGlobalDSLInfo = autogen::mergeAndFilterGlobalDSLInfo(gs, std::move(globalDSLInfo));
         fmt::memory_buffer out;
 
         int totalMutators = 0;
