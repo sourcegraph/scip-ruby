@@ -236,9 +236,9 @@ package(default_visibility = ["//visibility:public"])
 
     http_archive(
         name = "emsdk",
-        urls = _github_public_urls("emscripten-core/emsdk/archive/2.0.31.tar.gz"),
-        sha256 = "6bf70f4522308de1941200f8cdb9bde6967ba7aacb03445e9d136a5dd812b728",
-        strip_prefix = "emsdk-2.0.31/bazel",
+        urls = _github_public_urls("emscripten-core/emsdk/archive/3.0.0.tar.gz"),
+        sha256 = "a41dccfd15be9e85f923efaa0ac21943cbab77ec8d39e52f25eca1ec61a9ac9e",
+        strip_prefix = "emsdk-3.0.0/bazel",
     )
 
     http_archive(

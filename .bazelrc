@@ -244,10 +244,13 @@ build:wasm --compilation_mode=opt
 build:wasm --copt=-DNDEBUG --linkopt=-DNDEBUG # for some reason emscripten doesn't pass those when -O2\-Oz are specified
 build:wasm --copt=-Wno-unused-but-set-variable # causes some assertions to look like unused vars
 # TODO(jez) See if --config=lto flags works now
+# TODO(jez) Try turning on closure for dead code elim
 # Specify a "sane" C++ toolchain for the host platform.
 build:wasm --host_crosstool_top=@llvm_toolchain_12_0_0//:toolchain
 # TODO(jez) 3am hack to see if it works. Hopefully we can delete this
 build:wasm --copt=-fno-stack-protector
+# build:wasm --copt=-mthread-model=single
+# build:wasm --linkopt=--no-check-features
 
 ##
 ## Stripe's ci passes --config=ci, we need it to exist

@@ -96,7 +96,7 @@ emsdk_deps()
 
 load("@emsdk//:emscripten_deps.bzl", emsdk_emscripten_deps = "emscripten_deps")
 
-emsdk_emscripten_deps(emscripten_version = "2.0.31")
+emsdk_emscripten_deps(emscripten_version = "3.0.0")
 
 BAZEL_VERSION = "4.2.1"
 
