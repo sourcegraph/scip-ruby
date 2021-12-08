@@ -179,8 +179,15 @@ struct LocInfo {
     core::LocOffsets loc;
 };
 
+struct PrefixPropInfo {
+    core::NameRef name;
+    bool isKlassName;
+
+    std::string toString(const core::GlobalState &gs) const;
+};
+
 struct DSLInfo {
-    std::vector<core::NameRef> props;
+    std::vector<PrefixPropInfo> props;
     std::vector<std::vector<core::NameRef>> ancestors;
 
     // file

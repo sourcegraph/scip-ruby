@@ -166,14 +166,23 @@ string ParsedFile::toString(const core::GlobalState &gs, int version) const {
     return to_string(out);
 }
 
+std::string PrefixPropInfo::toString(const core::GlobalState &gs) const {
+    std::string nameStr = name.show(gs);
+    if (isKlassName) {
+        return nameStr.substr(nameStr.size() - 2);
+    }
+
+    return nameStr;
+}
+
 // Pretty-print a `DSLInfo object`
 void DSLInfo::formatString(fmt::memory_buffer &out, const core::GlobalState &gs) const {
     if (props.empty()) {
-        fmt::format_to(std::back_inserter(out), "  props:{}\n", "[]");
+        fmt::format_to(std::back_inserter(out), "  props: {}\n", "[]");
     } else {
         fmt::format_to(std::back_inserter(out), "  props:{}", "\n");
         for (const auto &prop : props) {
-            fmt::format_to(std::back_inserter(out), "  - {}\n", prop.show(gs));
+            fmt::format_to(std::back_inserter(out), "  - {}\n", prop.toString(gs));
         }
     }
 

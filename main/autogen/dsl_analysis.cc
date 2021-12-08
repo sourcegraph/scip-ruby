@@ -110,9 +110,9 @@ public:
 
             const auto prop = parseProp(ctx, original);
             if (prop.has_value()) {
-                dslInfo[curScope].props.emplace_back(std::move(*prop));
+                dslInfo[curScope].props.emplace_back(PrefixPropInfo{std::move(*prop), false});
             } else {
-                dslInfo[curScope].problemLocs.emplace_back(LocInfo{file, std::move(original->loc)});
+                dslInfo[curScope].props.emplace_back(PrefixPropInfo{curScope.back(), true});
             }
 
             return tree;
