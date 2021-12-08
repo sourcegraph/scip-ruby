@@ -8,36 +8,9 @@
 using namespace std;
 namespace sorbet::autogen {
 
-const std::vector<u4> KNOWN_PROP_METHODS = {
-    core::Names::prop().rawId(),         core::Names::tokenProp().rawId(),
-    core::Names::tokenProp().rawId(),    core::Names::timestampedTokenProp().rawId(),
-    core::Names::createdProp().rawId(),  core::Names::updatedProp().rawId(),
-    core::Names::merchantProp().rawId(), core::Names::merchantTokenProp().rawId(),
-    core::Names::const_().rawId()};
-
-const std::vector<core::NameRef> CHALK_ODM_IMMUTABLE_MODEL = {
-    core::Names::Constants::Chalk(), core::Names::Constants::ODM(), core::Names::Constants::ImmutableModel()};
-
-const std::vector<core::NameRef> OPUS_DB_SHARD_BY_MERCHANT = {
-    core::Names::Constants::Opus(), core::Names::Constants::DB(), core::Names::Constants::Sharding(),
-    core::Names::Constants::ShardByMerchant()};
-
-const std::vector<core::NameRef> OPUS_DB_SHARD_BY_MERCHANT_BASE = {
-    core::Names::Constants::Opus(), core::Names::Constants::DB(), core::Names::Constants::Sharding(),
-    core::Names::Constants::ShardByMerchantBase()};
-
-const std::vector<core::NameRef> OPUS_STORAGE_WAL_WALABLE = {
-    core::Names::Constants::Opus(), core::Names::Constants::Storage(), core::Names::Constants::WAL(),
-    core::Names::Constants::WALable()};
-
-const std::vector<core::NameRef> OPUS_STORAGE_WAL_WALABLE_CLASSMETHODS = {
-    core::Names::Constants::Opus(), core::Names::Constants::Storage(), core::Names::Constants::WAL(),
-    core::Names::Constants::WALable(), core::Names::Constants::ClassMethods()};
-
-struct PropInfoInternal {
-    core::NameRef name;
-    std::optional<ast::ExpressionPtr> typeExp;
-};
+const std::vector<u4> KNOWN_PROP_METHODS = {core::Names::tokenProp().rawId(),
+                                            core::Names::timestampedTokenProp().rawId(),
+                                            core::Names::registerPrefix().rawId()};
 
 class DSLAnalysisWalk {
     UnorderedMap<vector<core::NameRef>, DSLInfo> dslInfo;
@@ -56,101 +29,20 @@ class DSLAnalysisWalk {
         return out;
     }
 
-    std::optional<PropInfoInternal> parseProp(core::Context ctx, ast::Send *send) {
+    std::optional<core::NameRef> parseProp(core::Context ctx, ast::Send *send) {
         switch (send->fun.rawId()) {
-            case core::Names::const_().rawId():
-            case core::Names::prop().rawId(): {
-                auto *lit = ast::cast_tree<ast::Literal>(send->args.front());
-                if (lit && lit->isSymbol(ctx)) {
-                    if (send->args.size() > 1) {
-                        auto maybeTransformedType = transformTypeForMutator(ctx, send->args[1]);
-                        if (maybeTransformedType.has_value()) {
-                            return PropInfoInternal{lit->asSymbol(ctx), std::move(*maybeTransformedType)};
-                        } else {
-                            return PropInfoInternal{lit->asSymbol(ctx), std::move(send->args[1])};
-                        }
-                    }
-
-                    return PropInfoInternal{lit->asSymbol(ctx), std::nullopt};
-                }
-
-                break;
-            }
-            case core::Names::tokenProp().rawId():
+            case core::Names::registerPrefix().rawId():
             case core::Names::timestampedTokenProp().rawId():
-                return PropInfoInternal{
-                    core::Names::token(),
-                    ast::MK::Constant(send->loc, core::Symbols::String()),
-                };
-            case core::Names::createdProp().rawId():
-                return PropInfoInternal{core::Names::created(), ast::MK::Constant(send->loc, core::Symbols::Float())};
-            case core::Names::updatedProp().rawId():
-                return PropInfoInternal{core::Names::updated(), ast::MK::Constant(send->loc, core::Symbols::Float())};
-            case core::Names::merchantProp().rawId():
-                return PropInfoInternal{
-                    core::Names::merchant(),
-                    ast::MK::Constant(send->loc, core::Symbols::String()),
-                };
-            case core::Names::merchantTokenProp().rawId():
-                return PropInfoInternal{
-                    core::Names::merchant(),
-                    ast::MK::UnresolvedConstant(
-                        send->loc,
-                        ast::MK::UnresolvedConstant(
-                            send->loc,
-                            ast::MK::UnresolvedConstant(send->loc,
-                                                        ast::MK::UnresolvedConstant(send->loc, ast::MK::EmptyTree(),
-                                                                                    core::Names::Constants::Opus()),
-                                                        core::Names::Constants::Autogen()),
-                            core::Names::Constants::Tokens()),
-                        core::Names::Constants::AccountModelMerchantToken()),
-                };
+            case core::Names::tokenProp().rawId():
+                if (send->args.size() > 0) {
+                    auto *lit = ast::cast_tree<ast::Literal>(send->args.front());
+                    if (lit && lit->isString(ctx)) {
+                        return lit->asString(ctx);
+                    }
+                }
+                break;
             default:
                 return std::nullopt;
-        }
-
-        return std::nullopt;
-    }
-
-    std::optional<ast::ExpressionPtr> transformTypeForMutator(core::Context ctx, ast::ExpressionPtr &propType) {
-        auto *send = ast::cast_tree<ast::Send>(propType);
-        if (send) {
-            if (send->fun == core::Names::nilable()) {
-                auto innerType = transformTypeForMutator(ctx, send->args[0]);
-                if (innerType.has_value()) {
-                    auto *innerSend = ast::cast_tree<ast::Send>(*innerType);
-                    if (innerSend && innerSend->fun == core::Names::untyped()) {
-                        return innerType;
-                    }
-
-                    ast::Send::ARGS_store args;
-                    args.emplace_back(std::move(*innerType));
-
-                    return ast::MK::Send(propType.loc(), std::move(send->recv), core::Names::nilable(), 1,
-                                         std::move(args));
-                }
-            }
-
-            if (send->fun == core::Names::enum_() || send->fun == core::Names::deprecatedEnum()) {
-                return ast::MK::Send(propType.loc(), std::move(send->recv), core::Names::untyped(), 0, {});
-            }
-
-            if (send->fun == core::Names::squareBrackets()) {
-                // Typed hash, array
-                return ast::MK::Send(
-                    propType.loc(),
-                    ast::MK::UnresolvedConstant(propType.loc(), ast::MK::EmptyTree(), core::Names::Constants::T()),
-                    core::Names::untyped(), 0, {});
-            }
-
-            return std::nullopt;
-        }
-
-        if (ast::cast_tree<ast::Array>(propType) || ast::cast_tree<ast::Hash>(propType)) {
-            return ast::MK::Send(
-                propType.loc(),
-                ast::MK::UnresolvedConstant(propType.loc(), ast::MK::EmptyTree(), core::Names::Constants::T()),
-                core::Names::untyped(), 0, {});
         }
 
         return std::nullopt;
@@ -178,17 +70,12 @@ public:
             }
 
             const auto ancstName = symbolName(ctx, cnst->symbol);
-            if (ancstName == OPUS_DB_SHARD_BY_MERCHANT) {
-                ancestors.emplace_back(OPUS_DB_SHARD_BY_MERCHANT_BASE);
-            } else if (ancstName == OPUS_STORAGE_WAL_WALABLE) {
-                ancestors.emplace_back(OPUS_STORAGE_WAL_WALABLE_CLASSMETHODS);
-            }
             ancestors.emplace_back(std::move(ancstName));
         }
 
         const vector<core::NameRef> className = symbolName(ctx, original.symbol);
         nestingScopes.emplace_back(className);
-        dslInfo.emplace(className, DSLInfo{{}, ancestors, file, {}, {}});
+        dslInfo.emplace(className, DSLInfo{{}, ancestors, file, {}});
 
         return tree;
     }
@@ -221,28 +108,14 @@ public:
                 return tree;
             }
 
-            const auto propInfo = parseProp(ctx, original);
-            if (propInfo.has_value()) {
-                std::optional<std::string> typeStr;
-                if ((*propInfo).typeExp.has_value()) {
-                    typeStr = std::move(*((*propInfo).typeExp)).toString(ctx);
-                }
-
-                dslInfo[curScope].props.emplace_back(PropInfo{std::move((*propInfo).name), std::move(typeStr)});
+            const auto prop = parseProp(ctx, original);
+            if (prop.has_value()) {
+                dslInfo[curScope].props.emplace_back(std::move(*prop));
             } else {
                 dslInfo[curScope].problemLocs.emplace_back(LocInfo{file, std::move(original->loc)});
             }
 
             return tree;
-        }
-
-        if (original->fun == core::Names::modelDsl()) {
-            auto *cnst = ast::cast_tree<ast::ConstantLit>(original->args.front());
-            if (!validScope || cnst == nullptr || cnst->original == nullptr) {
-                return tree;
-            }
-
-            dslInfo[curScope].model = symbolName(ctx, cnst->symbol);
         }
 
         return tree;
@@ -251,12 +124,6 @@ public:
     ast::ExpressionPtr preTransformMethodDef(core::Context ctx, ast::ExpressionPtr tree) {
         if (nestingScopes.size() == 0 || !validScope) {
             // Not already in a valid scope
-            return tree;
-        }
-
-        auto &curScope = nestingScopes.back();
-        if (curScope == CHALK_ODM_IMMUTABLE_MODEL || curScope == OPUS_DB_SHARD_BY_MERCHANT_BASE ||
-            curScope == OPUS_STORAGE_WAL_WALABLE_CLASSMETHODS) {
             return tree;
         }
 

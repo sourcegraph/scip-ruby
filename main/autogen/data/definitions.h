@@ -174,19 +174,13 @@ struct ParsedFile {
     std::vector<std::string> listAllClasses(core::Context ctx);
 };
 
-struct PropInfo {
-    core::NameRef name;
-    std::optional<std::string> typeStr;
-};
-
 struct LocInfo {
     core::FileRef file;
     core::LocOffsets loc;
 };
 
 struct DSLInfo {
-    // mutator or model
-    std::vector<PropInfo> props;
+    std::vector<core::NameRef> props;
     std::vector<std::vector<core::NameRef>> ancestors;
 
     // file
@@ -194,9 +188,6 @@ struct DSLInfo {
 
     // problem locs
     std::vector<LocInfo> problemLocs;
-
-    // in case of mutators
-    std::vector<core::NameRef> model;
 
     void formatString(fmt::memory_buffer &out, const core::GlobalState &gs) const;
 };

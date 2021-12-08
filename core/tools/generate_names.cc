@@ -195,6 +195,7 @@ NameDef names[] = {
     {"prop"},
     {"tokenProp", "token_prop"},
     {"timestampedTokenProp", "timestamped_token_prop"},
+    {"registerPrefix", "register_prefix"},
     {"createdProp", "created_prop"},
     {"updatedProp", "updated_prop"},
     {"merchantProp", "merchant_prop"},

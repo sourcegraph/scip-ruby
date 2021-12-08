@@ -169,28 +169,19 @@ string ParsedFile::toString(const core::GlobalState &gs, int version) const {
 // Pretty-print a `DSLInfo object`
 void DSLInfo::formatString(fmt::memory_buffer &out, const core::GlobalState &gs) const {
     if (props.empty()) {
-        fmt::format_to(std::back_inserter(out), "{}\n", "[empty]");
-        return;
-    }
-
-    if (!model.empty()) {
-        fmt::format_to(std::back_inserter(out), "{}\n", "[model");
-        fmt::format_to(std::back_inserter(out), "{}", "  ");
-        autogen::printName(out, model, gs);
-        fmt::format_to(std::back_inserter(out), "{}\n", "]");
+        fmt::format_to(std::back_inserter(out), "  props:{}\n", "[]");
+    } else {
+        fmt::format_to(std::back_inserter(out), "  props:{}", "\n");
+        for (const auto &prop : props) {
+            fmt::format_to(std::back_inserter(out), "  - {}\n", prop.show(gs));
+        }
     }
 
     if (!problemLocs.empty()) {
-        fmt::format_to(std::back_inserter(out), "{}\n", "[problem_locs");
+        fmt::format_to(std::back_inserter(out), "  problem_locs:{}", "\n");
         for (const auto &locInfo : problemLocs) {
-            fmt::format_to(std::back_inserter(out), "  {}\n", core::Loc(locInfo.file, locInfo.loc).showRaw(gs));
+            fmt::format_to(std::back_inserter(out), "  - {}\n", core::Loc(locInfo.file, locInfo.loc).showRaw(gs));
         }
-        fmt::format_to(std::back_inserter(out), "{}\n", "]");
-    }
-
-    for (auto &prop : props) {
-        fmt::format_to(std::back_inserter(out), "[prop name={} type={}]\n", prop.name.show(gs),
-                       prop.typeStr.value_or("none"));
     }
 
     fmt::format_to(std::back_inserter(out), "{}", "\n");
@@ -199,7 +190,7 @@ void DSLInfo::formatString(fmt::memory_buffer &out, const core::GlobalState &gs)
 void printName(fmt::memory_buffer &out, const std::vector<core::NameRef> &parts, const core::GlobalState &gs) {
     for (auto &part : parts) {
         if (part == parts.back()) {
-            fmt::format_to(std::back_inserter(out), "{}\n", part.show(gs));
+            fmt::format_to(std::back_inserter(out), "{}", part.show(gs));
         } else {
             fmt::format_to(std::back_inserter(out), "{}::", part.show(gs));
         }
@@ -211,8 +202,6 @@ mergeAndFilterGlobalDSLInfo(const core::GlobalState &gs,
                             UnorderedMap<std::vector<core::NameRef>, DSLInfo> globalDSLInfo) {
     const std::vector<core::NameRef> CHALK_ODM_MODEL = {core::Names::Constants::Chalk(), core::Names::Constants::ODM(),
                                                         core::Names::Constants::Model()};
-    const std::vector<core::NameRef> CHALK_ODM_MUTATOR = {
-        core::Names::Constants::Chalk(), core::Names::Constants::ODM(), core::Names::Constants::Mutator()};
     UnorderedMap<std::vector<core::NameRef>, DSLInfo> result;
 
     for (auto &it : globalDSLInfo) {
@@ -235,7 +224,7 @@ mergeAndFilterGlobalDSLInfo(const core::GlobalState &gs,
             queue.insert(queue.end(), curAncstInfo->second.ancestors.begin(), curAncstInfo->second.ancestors.end());
         }
 
-        if (allAncestors.find(CHALK_ODM_MODEL) != allAncestors.end() && info.model.empty()) {
+        if (allAncestors.find(CHALK_ODM_MODEL) != allAncestors.end()) {
             // Models
             for (const std::vector<core::NameRef> &ancst : allAncestors) {
                 auto ancstInfoIt = globalDSLInfo.find(ancst);
@@ -249,26 +238,7 @@ mergeAndFilterGlobalDSLInfo(const core::GlobalState &gs,
             }
 
             result.emplace(klass, std::move(info));
-        } else if (allAncestors.find(CHALK_ODM_MUTATOR) != allAncestors.end() && !info.model.empty() &&
-                   klass[0] != core::Names::Constants::Test()) {
-            // Mutators
-            result.emplace(klass, std::move(info));
         }
-    }
-
-    for (auto &it : result) {
-        const std::vector<core::NameRef> &klass = it.first;
-        DSLInfo info = it.second;
-        const auto &model = info.model;
-        if (model.empty() || result.find(model) == result.end()) {
-            // Not a mutator, or not one with a corresponding model
-            continue;
-        }
-
-        info.props = result[model].props;
-        info.problemLocs = result[model].problemLocs;
-
-        result[klass] = std::move(info);
     }
 
     return result;
