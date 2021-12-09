@@ -211,10 +211,21 @@ mergeAndFilterGlobalDSLInfo(const core::GlobalState &gs,
                             UnorderedMap<std::vector<core::NameRef>, DSLInfo> globalDSLInfo) {
     const std::vector<core::NameRef> CHALK_ODM_MODEL = {core::Names::Constants::Chalk(), core::Names::Constants::ODM(),
                                                         core::Names::Constants::Model()};
+    const std::vector<core::NameRef> OPUS_EVENT_DEPRECATEDFRAMEWORK_ABSTRACTEVENT = {
+        core::Names::Constants::Opus(),
+        core::Names::Constants::Event(),
+        core::Names::Constants::DeprecatedFramework(),
+        core::Names::Constants::AbstractEvent()
+    };
+
     UnorderedMap<std::vector<core::NameRef>, DSLInfo> result;
 
     for (auto &it : globalDSLInfo) {
         const std::vector<core::NameRef> &klass = it.first;
+        if (klass == OPUS_EVENT_DEPRECATEDFRAMEWORK_ABSTRACTEVENT) {
+            continue;
+        }
+
         DSLInfo info = it.second;
         UnorderedSet<std::vector<core::NameRef>> allAncestors;
         std::deque<std::vector<core::NameRef>> queue;
@@ -241,9 +252,18 @@ mergeAndFilterGlobalDSLInfo(const core::GlobalState &gs,
                     continue;
                 }
                 DSLInfo &ancstInfo = ancstInfoIt->second;
-                info.props.insert(info.props.end(), ancstInfo.props.begin(), ancstInfo.props.end());
-                info.problemLocs.insert(info.problemLocs.end(), ancstInfo.problemLocs.begin(),
-                                        ancstInfo.problemLocs.end());
+                for (auto ancstProp : ancstInfo.props) {
+                    if (ancstProp.isKlassName) {
+                        ancstProp.name = klass.back();
+                    }
+
+                    info.props.emplace_back(ancstProp);
+                }
+
+                if (ancst != OPUS_EVENT_DEPRECATEDFRAMEWORK_ABSTRACTEVENT) {
+                    info.problemLocs.insert(info.problemLocs.end(), ancstInfo.problemLocs.begin(),
+                                          ancstInfo.problemLocs.end());
+                }
             }
 
             result.emplace(klass, std::move(info));

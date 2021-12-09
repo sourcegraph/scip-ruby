@@ -12,6 +12,14 @@ const std::vector<u4> KNOWN_PROP_METHODS = {core::Names::tokenProp().rawId(),
                                             core::Names::timestampedTokenProp().rawId(),
                                             core::Names::registerPrefix().rawId()};
 
+const std::vector<core::NameRef> ABSTRACT_BLACKLIST_RECORD = {
+    core::Names::Constants::Opus(),
+    core::Names::Constants::Risk(),
+    core::Names::Constants::Denylists(),
+    core::Names::Constants::Model(),
+    core::Names::Constants::AbstractBlacklistRecord(),
+};
+
 class DSLAnalysisWalk {
     UnorderedMap<vector<core::NameRef>, DSLInfo> dslInfo;
     vector<vector<core::NameRef>> nestingScopes;
@@ -124,6 +132,11 @@ public:
     ast::ExpressionPtr preTransformMethodDef(core::Context ctx, ast::ExpressionPtr tree) {
         if (nestingScopes.size() == 0 || !validScope) {
             // Not already in a valid scope
+            return tree;
+        }
+
+        auto &curScope = nestingScopes.back();
+        if (curScope == ABSTRACT_BLACKLIST_RECORD) {
             return tree;
         }
 
