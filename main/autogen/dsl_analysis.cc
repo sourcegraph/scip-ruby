@@ -8,7 +8,7 @@
 using namespace std;
 namespace sorbet::autogen {
 
-const std::vector<u4> KNOWN_PROP_METHODS = {core::Names::tokenProp().rawId(),
+const std::vector<uint32_t> KNOWN_PROP_METHODS = {core::Names::tokenProp().rawId(),
                                             core::Names::timestampedTokenProp().rawId(),
                                             core::Names::registerPrefix().rawId()};
 
@@ -30,8 +30,8 @@ class DSLAnalysisWalk {
     vector<core::NameRef> symbolName(core::Context ctx, core::SymbolRef sym) {
         vector<core::NameRef> out;
         while (sym.exists() && sym != core::Symbols::root()) {
-            out.emplace_back(sym.data(ctx)->name);
-            sym = sym.data(ctx)->owner;
+            out.emplace_back(sym.name(ctx));
+            sym = sym.owner(ctx);
         }
         reverse(out.begin(), out.end());
         return out;
@@ -42,8 +42,8 @@ class DSLAnalysisWalk {
             case core::Names::registerPrefix().rawId():
             case core::Names::timestampedTokenProp().rawId():
             case core::Names::tokenProp().rawId():
-                if (send->args.size() > 0) {
-                    auto *lit = ast::cast_tree<ast::Literal>(send->args.front());
+                if (send->numPosArgs() > 0) {
+                    auto *lit = ast::cast_tree<ast::Literal>(send->getPosArg(0));
                     if (lit && lit->isString(ctx)) {
                         return lit->asString(ctx);
                     }
@@ -108,7 +108,7 @@ public:
         auto *original = ast::cast_tree<ast::Send>(tree);
         auto &curScope = nestingScopes.back();
 
-        u4 funId = original->fun.rawId();
+        uint32_t funId = original->fun.rawId();
         bool isProp = absl::c_any_of(KNOWN_PROP_METHODS, [&](const auto &nrid) -> bool { return nrid == funId; });
         if (isProp) {
             if (!validScope) {

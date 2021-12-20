@@ -206,7 +206,7 @@ mergeAndFilterGlobalDSLInfo(const core::GlobalState &gs,
 
 struct DSLAnalysisFile {
     // the checksum of this file
-    u4 cksum;
+    uint32_t cksum;
 
     // map of class -> DSLInfo
     UnorderedMap<std::vector<core::NameRef>, DSLInfo> dslInfo;
