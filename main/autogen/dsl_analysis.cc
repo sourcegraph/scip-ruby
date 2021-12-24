@@ -8,9 +8,9 @@
 using namespace std;
 namespace sorbet::autogen {
 
-const std::vector<uint32_t> KNOWN_PROP_METHODS = {core::Names::tokenProp().rawId(),
-                                            core::Names::timestampedTokenProp().rawId(),
-                                            core::Names::registerPrefix().rawId()};
+const std::vector<uint32_t> KNOWN_PROP_METHODS = {
+    core::Names::tokenProp().rawId(), core::Names::timestampedTokenProp().rawId(),
+    core::Names::registerPrefix().rawId(), core::Names::setArchiveTokenPrefix().rawId()};
 
 const std::vector<core::NameRef> ABSTRACT_BLACKLIST_RECORD = {
     core::Names::Constants::Opus(),
@@ -37,15 +37,32 @@ class DSLAnalysisWalk {
         return out;
     }
 
-    std::optional<core::NameRef> parseProp(core::Context ctx, ast::Send *send) {
+    struct PropInfoInternal {
+        core::NameRef name;
+        bool isTimestamped;
+    };
+
+    std::optional<PropInfoInternal> parseProp(core::Context ctx, ast::Send *send) {
         switch (send->fun.rawId()) {
-            case core::Names::registerPrefix().rawId():
             case core::Names::timestampedTokenProp().rawId():
+                if (send->numPosArgs() > 0) {
+                    auto *lit = ast::cast_tree<ast::Literal>(send->getPosArg(0));
+                    if (lit && lit->isString(ctx)) {
+                        return PropInfoInternal{lit->asString(ctx), true};
+                    } else {
+                        return PropInfoInternal{core::NameRef::noName(), true};
+                    }
+                }
+                break;
+            case core::Names::setArchiveTokenPrefix().rawId():
+            case core::Names::registerPrefix().rawId():
             case core::Names::tokenProp().rawId():
                 if (send->numPosArgs() > 0) {
                     auto *lit = ast::cast_tree<ast::Literal>(send->getPosArg(0));
                     if (lit && lit->isString(ctx)) {
-                        return lit->asString(ctx);
+                        return PropInfoInternal{lit->asString(ctx), false};
+                    } else {
+                        return PropInfoInternal{core::NameRef::noName(), false};
                     }
                 }
                 break;
@@ -118,9 +135,10 @@ public:
 
             const auto prop = parseProp(ctx, original);
             if (prop.has_value()) {
-                dslInfo[curScope].props.emplace_back(PrefixPropInfo{std::move(*prop), false});
+                dslInfo[curScope].props.emplace_back(
+                    PrefixPropInfo{std::move((*prop).name), std::move((*prop).isTimestamped)});
             } else {
-                dslInfo[curScope].props.emplace_back(PrefixPropInfo{curScope.back(), true});
+                dslInfo[curScope].props.emplace_back(PrefixPropInfo{core::NameRef::noName(), false});
             }
 
             return tree;

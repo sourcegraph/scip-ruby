@@ -181,9 +181,9 @@ struct LocInfo {
 
 struct PrefixPropInfo {
     core::NameRef name;
-    bool isKlassName;
+    bool isTimestamped;
 
-    std::string toString(const core::GlobalState &gs) const;
+    std::string toString(const std::vector<core::NameRef> &klass, const core::GlobalState &gs) const;
 };
 
 struct DSLInfo {
@@ -196,7 +196,8 @@ struct DSLInfo {
     // problem locs
     std::vector<LocInfo> problemLocs;
 
-    void formatString(fmt::memory_buffer &out, const core::GlobalState &gs) const;
+    void formatString(fmt::memory_buffer &out, const std::vector<core::NameRef> &klass,
+                      const core::GlobalState &gs) const;
 };
 
 void printName(fmt::memory_buffer &out, const std::vector<core::NameRef> &parts, const core::GlobalState &gs);

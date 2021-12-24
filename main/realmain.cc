@@ -359,20 +359,6 @@ void runAutogen(const core::GlobalState &gs, options::Options &opts, const autog
         opts.print.AutogenSubclasses.fmt(
             "{}\n", fmt::join(serializedDescendantsMap.begin(), serializedDescendantsMap.end(), "\n"));
     }
-}
-
-// Returns `true` if the constant hash information provided tells us
-// we can exit `autogen` early, and `false` otherwise.
-bool autogenCanExitEarly(shared_ptr<spd::logger> &logger, options::Options &opts) {
-    Timer timeit(logger, "autogenCanExitEarly");
-
-    if (opts.autogenConstantCacheFile.empty()) {
-        return false;
-    }
-
-    if (opts.autogenChangedFiles.empty()) {
-        return false;
-    }
 
     if (opts.print.DSLAnalysis.enabled) {
         Timer timeit(logger, "autogenDSLAnalysisPrint");
@@ -403,10 +389,24 @@ bool autogenCanExitEarly(shared_ptr<spd::logger> &logger, options::Options &opts
         for (const auto &it : processedGlobalDSLInfo) {
             autogen::printName(out, it.first, gs);
             fmt::format_to(std::back_inserter(out), "{}\n", ":");
-            it.second.formatString(out, gs);
+            it.second.formatString(out, it.first, gs);
         }
 
         opts.print.DSLAnalysis.fmt("{}", to_string(out));
+    }
+}
+
+// Returns `true` if the constant hash information provided tells us
+// we can exit `autogen` early, and `false` otherwise.
+bool autogenCanExitEarly(shared_ptr<spd::logger> &logger, options::Options &opts) {
+    Timer timeit(logger, "autogenCanExitEarly");
+
+    if (opts.autogenConstantCacheFile.empty()) {
+        return false;
+    }
+
+    if (opts.autogenChangedFiles.empty()) {
+        return false;
     }
 
     logger->info("Checking {} changed files", opts.autogenChangedFiles.size());

@@ -1,9 +1,12 @@
 #include "main/autogen/data/definitions.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_join.h"
 #include "ast/ast.h"
 #include "common/formatting.h"
 #include "core/Files.h"
 #include "core/GlobalState.h"
 #include "main/autogen/data/msgpack.h"
+#include <regex>
 
 using namespace std;
 
@@ -166,23 +169,34 @@ string ParsedFile::toString(const core::GlobalState &gs, int version) const {
     return to_string(out);
 }
 
-std::string PrefixPropInfo::toString(const core::GlobalState &gs) const {
-    std::string nameStr = name.show(gs);
-    if (isKlassName) {
-        return nameStr.substr(nameStr.size() - 2);
+std::string PrefixPropInfo::toString(const std::vector<core::NameRef> &klass, const core::GlobalState &gs) const {
+    if (name == core::NameRef::noName()) {
+        if (isTimestamped) {
+            vector<std::string> prefixParts;
+            std::regex caps("[^A-Z]");
+            std::transform(klass.begin(), klass.end(), std::back_inserter(prefixParts),
+                           [&gs, &caps](const auto &nr) -> std::string {
+                               return absl::AsciiStrToLower(std::regex_replace(nr.show(gs), caps, ""));
+                           });
+
+            return absl::StrJoin(prefixParts, "");
+        } else {
+            return absl::AsciiStrToLower(klass.back().show(gs).substr(0, 3));
+        }
     }
 
-    return nameStr;
+    return name.show(gs);
 }
 
 // Pretty-print a `DSLInfo object`
-void DSLInfo::formatString(fmt::memory_buffer &out, const core::GlobalState &gs) const {
+void DSLInfo::formatString(fmt::memory_buffer &out, const std::vector<core::NameRef> &klass,
+                           const core::GlobalState &gs) const {
     if (props.empty()) {
         fmt::format_to(std::back_inserter(out), "  props: {}\n", "[]");
     } else {
         fmt::format_to(std::back_inserter(out), "  props:{}", "\n");
         for (const auto &prop : props) {
-            fmt::format_to(std::back_inserter(out), "  - {}\n", prop.toString(gs));
+            fmt::format_to(std::back_inserter(out), "  - {}\n", prop.toString(klass, gs));
         }
     }
 
@@ -197,11 +211,11 @@ void DSLInfo::formatString(fmt::memory_buffer &out, const core::GlobalState &gs)
 }
 
 void printName(fmt::memory_buffer &out, const std::vector<core::NameRef> &parts, const core::GlobalState &gs) {
-    for (auto &part : parts) {
-        if (part == parts.back()) {
-            fmt::format_to(std::back_inserter(out), "{}", part.show(gs));
+    for (int i = 0; i < parts.size(); i++) {
+        if (i == parts.size() - 1) {
+            fmt::format_to(std::back_inserter(out), "{}", parts[i].show(gs));
         } else {
-            fmt::format_to(std::back_inserter(out), "{}::", part.show(gs));
+            fmt::format_to(std::back_inserter(out), "{}::", parts[i].show(gs));
         }
     }
 }
@@ -212,10 +226,14 @@ mergeAndFilterGlobalDSLInfo(const core::GlobalState &gs,
     const std::vector<core::NameRef> CHALK_ODM_MODEL = {core::Names::Constants::Chalk(), core::Names::Constants::ODM(),
                                                         core::Names::Constants::Model()};
     const std::vector<core::NameRef> OPUS_EVENT_DEPRECATEDFRAMEWORK_ABSTRACTEVENT = {
+        core::Names::Constants::Opus(), core::Names::Constants::Event(), core::Names::Constants::DeprecatedFramework(),
+        core::Names::Constants::AbstractEvent()};
+    const std::vector<core::NameRef> OPUS_RISK_DENYLISTS_MODEL_ABSTRACT_BLACKLIST_RECORD = {
         core::Names::Constants::Opus(),
-        core::Names::Constants::Event(),
-        core::Names::Constants::DeprecatedFramework(),
-        core::Names::Constants::AbstractEvent()
+        core::Names::Constants::Risk(),
+        core::Names::Constants::Denylists(),
+        core::Names::Constants::Model(),
+        core::Names::Constants::AbstractBlacklistRecord(),
     };
 
     UnorderedMap<std::vector<core::NameRef>, DSLInfo> result;
@@ -252,17 +270,13 @@ mergeAndFilterGlobalDSLInfo(const core::GlobalState &gs,
                     continue;
                 }
                 DSLInfo &ancstInfo = ancstInfoIt->second;
-                for (auto ancstProp : ancstInfo.props) {
-                    if (ancstProp.isKlassName) {
-                        ancstProp.name = klass.back();
-                    }
 
-                    info.props.emplace_back(ancstProp);
-                }
-
-                if (ancst != OPUS_EVENT_DEPRECATEDFRAMEWORK_ABSTRACTEVENT) {
+                if (ancst != OPUS_EVENT_DEPRECATEDFRAMEWORK_ABSTRACTEVENT &&
+                    ancst != OPUS_RISK_DENYLISTS_MODEL_ABSTRACT_BLACKLIST_RECORD) {
                     info.problemLocs.insert(info.problemLocs.end(), ancstInfo.problemLocs.begin(),
-                                          ancstInfo.problemLocs.end());
+                                            ancstInfo.problemLocs.end());
+                } else {
+                    info.props.insert(info.props.end(), ancstInfo.props.begin(), ancstInfo.props.end());
                 }
             }
 
