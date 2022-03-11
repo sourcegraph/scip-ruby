@@ -212,14 +212,14 @@ private:
         Nesting *scope = nesting.get();
         while (scope != nullptr) {
             if (scope->scope.isClassOrModule()) {
-                auto lookup = scope->scope.asClassOrModuleRef().data(ctx)->findMember(ctx, name);
+                auto lookup = scope->scope.asClassOrModuleRef().data(ctx)->findMemberNoDealias(ctx, name);
                 if (lookup.exists()) {
                     return lookup;
                 }
             }
             scope = scope->parent.get();
         }
-        return nesting->scope.asClassOrModuleRef().data(ctx)->findMemberTransitive(ctx, name);
+        return nesting->scope.asClassOrModuleRef().data(ctx)->findMemberTransitiveNoDealias(ctx, name);
     }
 
     static bool isAlreadyResolved(core::Context ctx, const ast::ConstantLit &original) {
