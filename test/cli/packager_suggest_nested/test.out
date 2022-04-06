@@ -1,0 +1,11 @@
+consumer_auth/data/identifier_struct.rb:6: Unable to resolve constant `IdentifierType` https://srb.help/5002
+     6 |    puts(Project::ConsumerAuth::IdentifierType)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Autocorrect: Use `-a` to autocorrect
+    consumer_auth/data/identifier_struct.rb:6: Replace with `Project::ConsumerAuth::IdentifierType`
+     6 |    puts(Project::ConsumerAuth::IdentifierType)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    consumer_auth/identity_type.rb:5: Did you mean: `Project::ConsumerAuth::IdentifierType`?
+     5 |  class IdentifierType
+          ^^^^^^^^^^^^^^^^^^^^
+Errors: 1
