@@ -97,11 +97,26 @@ string LiteralType::showValue(const GlobalState &gs) const {
                 return fmt::format(":{}", shown);
             }
         }
-        case LiteralType::LiteralTypeKind::Integer:
-            return to_string(asInteger());
         case LiteralType::LiteralTypeKind::Float:
             return to_string(asFloat());
     }
+}
+
+string LiteralIntegerType::toStringWithTabs(const GlobalState &gs, int tabs) const {
+    return fmt::format("{}({})", this->underlying(gs).toStringWithTabs(gs, tabs), showValue(gs));
+}
+
+string LiteralIntegerType::show(const GlobalState &gs, ShowOptions options) const {
+    if (options.showForRBI) {
+        // RBI generator: Users type the class name, not `String("value")`.
+        return fmt::format("{}", this->underlying(gs).show(gs, options));
+    }
+
+    return fmt::format("{}({})", this->underlying(gs).show(gs, options), showValue(gs));
+}
+
+string LiteralIntegerType::showValue(const GlobalState &gs) const {
+    return to_string(this->value);
 }
 
 string TupleType::toStringWithTabs(const GlobalState &gs, int tabs) const {
