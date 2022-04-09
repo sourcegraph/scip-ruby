@@ -273,6 +273,10 @@ TypePtr Types::dropLiteral(const GlobalState &gs, const TypePtr &tp) {
         auto a = cast_type_nonnull<LiteralType>(tp);
         return a.underlying(gs);
     }
+    if (isa_type<LiteralIntegerType>(tp)) {
+        auto &i = cast_type_nonnull<LiteralIntegerType>(tp);
+        return i.underlying(gs);
+    }
     return tp;
 }
 
@@ -784,6 +788,7 @@ TypePtr Types::unwrapSelfTypeParam(Context ctx, const TypePtr &type) {
         type, [&](const ClassType &klass) { ret = type; }, [&](const TypeVar &tv) { ret = type; },
         [&](const LambdaParam &tv) { ret = type; }, [&](const SelfType &self) { ret = type; },
         [&](const LiteralType &lit) { ret = type; },
+        [&](const LiteralIntegerType &i) { ret = type; },
         [&](const AndType &andType) {
             ret = AndType::make_shared(unwrapSelfTypeParam(ctx, andType.left), unwrapSelfTypeParam(ctx, andType.right));
         },
