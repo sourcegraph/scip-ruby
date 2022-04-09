@@ -3197,7 +3197,12 @@ public:
         auto values = shape->values;
         auto addShapeEntry = [&keys, &values](const TypePtr &keyType, const LiteralType &key, const TypePtr &value) {
             auto fnd =
-                absl::c_find_if(keys, [&key](auto &lit) { return key.equals(cast_type_nonnull<LiteralType>(lit)); });
+                absl::c_find_if(keys, [&key](auto &lit) {
+                        if (!isa_type<LiteralType>(lit)) {
+                            return false;
+                        }
+                        return key.equals(cast_type_nonnull<LiteralType>(lit));
+                    });
             if (fnd == keys.end()) {
                 keys.emplace_back(keyType);
                 values.emplace_back(value);
@@ -3224,6 +3229,9 @@ public:
         // then kwsplat
         if (kwsplat != nullptr) {
             for (auto &keyType : kwsplat->keys) {
+                if (!isa_type<LiteralType>(keyType)) {
+                    return;
+                }
                 auto key = cast_type_nonnull<LiteralType>(keyType);
                 addShapeEntry(keyType, key, kwsplat->values[&keyType - &kwsplat->keys.front()]);
             }
