@@ -2098,7 +2098,8 @@ public:
         ENFORCE(args.args.size() % 2 == 0);
 
         for (int i = 0; i < args.args.size(); i += 2) {
-            if (!isa_type<LiteralType>(args.args[i]->type)) {
+            if (!isa_type<LiteralType>(args.args[i]->type) &&
+                !isa_type<LiteralIntegerType>(args.args[i]->type)) {
                 res.returnType = Types::hashOfUntyped();
                 return;
             }
