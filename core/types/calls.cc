@@ -506,7 +506,7 @@ TypePtr unwrapType(const GlobalState &gs, Loc loc, const TypePtr &tp) {
             unwrappedElems.emplace_back(unwrapType(gs, loc, elem));
         }
         return make_type<TupleType>(move(unwrappedElems));
-    } else if (isa_type<LiteralType>(tp)) {
+    } else if (isa_type<LiteralType>(tp) || isa_type<LiteralIntegerType>(tp)) {
         if (auto e = gs.beginError(loc, errors::Infer::BareTypeUsage)) {
             e.setHeader("Unexpected bare `{}` value found in type position", tp.show(gs));
         }
@@ -1245,6 +1245,9 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                 ++kwit;
 
                 auto arg = absl::c_find_if(hash->keys, [&](const TypePtr &litType) {
+                        if (!isa_type<LiteralType>(litType)) {
+                            return false;
+                        }
                     auto lit = cast_type_nonnull<LiteralType>(litType);
                     auto underlying = lit.underlying(gs);
                     return cast_type_nonnull<ClassType>(underlying).symbol == Symbols::Symbol() &&
