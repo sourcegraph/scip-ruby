@@ -169,20 +169,28 @@ string ShapeType::show(const GlobalState &gs, ShowOptions options) const {
             fmt::format_to(std::back_inserter(buf), ", ");
         }
 
-        const auto &keyLiteral = cast_type_nonnull<LiteralType>(key);
         const auto &value = *valueIterator;
+        ++valueIterator;
 
+        string keyStr;
+        string_view sepStr = " => ";
         // properties beginning with $ need to be printed as :$prop => type.
-        if (keyLiteral.literalKind == core::LiteralType::LiteralTypeKind::Symbol &&
-            !absl::StartsWith(keyLiteral.asName(gs).shortName(gs), "$")) {
-            fmt::format_to(std::back_inserter(buf), "{}: {}", keyLiteral.asName(gs).show(gs), value.show(gs, options));
+        if (isa_type<LiteralType>(key)) {
+            const auto &keyLiteral = cast_type_nonnull<LiteralType>(key);
+            if (keyLiteral.literalKind == core::LiteralType::LiteralTypeKind::Symbol &&
+                !absl::StartsWith(keyLiteral.asName(gs).shortName(gs), "$")) {
+                keyStr = keyLiteral.asName(gs).show(gs);
+                sepStr = ": ";
+            } else {
+                keyStr = options.showForRBI ? keyLiteral.showValue(gs) : keyLiteral.show(gs, options);
+            }
         } else {
-            fmt::format_to(std::back_inserter(buf), "{} => {}",
-                           options.showForRBI ? keyLiteral.showValue(gs) : keyLiteral.show(gs, options),
-                           value.show(gs, options));
+            ENFORCE(isa_type<LiteralIntegerType>(key));
+            const auto &keyLiteral = cast_type_nonnull<LiteralIntegerType>(key);
+            keyStr = options.showForRBI ? keyLiteral.showValue(gs) : keyLiteral.show(gs, options);
         }
 
-        ++valueIterator;
+        fmt::format_to(std::back_inserter(buf), "{}{}{}", keyStr, sepStr, value.show(gs, options));
     }
     fmt::format_to(std::back_inserter(buf), "}}");
     return to_string(buf);
