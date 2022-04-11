@@ -146,15 +146,35 @@ public:
     // why raw pointers are safe.
     const IntrinsicMethod *intrinsic = nullptr;
     ArgumentsStore arguments;
-    InlinedVector<TypeArgumentRef, 4> typeArguments;
+
+    InlinedVector<TypeArgumentRef, 4> &getOrCreateTypeArguments() {
+        if (typeArgs) {
+            return *typeArgs;
+        }
+        typeArgs = std::make_unique<InlinedVector<TypeArgumentRef, 4>>();
+        return *typeArgs;
+    }
+
+    absl::Span<const TypeArgumentRef> typeArguments() const {
+        if (typeArgs) {
+            return *typeArgs;
+        }
+        return {};
+    }
+
+    InlinedVector<TypeArgumentRef, 4> &existingTypeArguments() {
+        ENFORCE(typeArgs != nullptr);
+        return *typeArgs;
+    }
 
 private:
     InlinedVector<Loc, 2> locs_;
+    std::unique_ptr<InlinedVector<TypeArgumentRef, 4>> typeArgs;
 
 public:
     Flags flags;
 };
-CheckSize(Method, 192, 8);
+CheckSize(Method, 176, 8);
 
 // Contains a field or a static field
 class Field final {
