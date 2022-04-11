@@ -1193,7 +1193,9 @@ string ClassOrModuleRef::toStringWithOptions(const GlobalState &gs, int tabs, bo
 
     fmt::format_to(std::back_inserter(buf), "{} {}", showKind(gs), showRaw ? toStringFullName(gs) : showFullName(gs));
 
-    auto typeMembers = sym->typeMembers();
+    auto membersSpan = sym->typeMembers();
+    InlinedVector<TypeMemberRef, 4> typeMembers;
+    typeMembers.assign(membersSpan.begin(), membersSpan.end());
     auto it =
         remove_if(typeMembers.begin(), typeMembers.end(), [&gs](auto &sym) -> bool { return sym.data(gs)->isFixed(); });
     typeMembers.erase(it, typeMembers.end());
@@ -2010,7 +2012,9 @@ Symbol Symbol::deepCopy(const GlobalState &to, bool keepGsId) const {
     result.resultType = this->resultType;
     result.name = NameRef(to, this->name);
     result.locs_ = this->locs_;
-    result.typeParams = this->typeParams;
+    if (this->typeParams) {
+        result.typeParams = std::make_unique<InlinedVector<TypeMemberRef, 4>>(*this->typeParams);
+    }
     if (keepGsId) {
         result.members_ = this->members_;
     } else {
@@ -2210,9 +2214,11 @@ uint32_t Symbol::hash(const GlobalState &gs) const {
             result = mix(result, _hash(e.data(gs)->name.shortName(gs)));
         }
     }
-    for (const auto &e : typeParams) {
-        if (e.exists()) {
-            result = mix(result, _hash(e.data(gs)->name.shortName(gs)));
+    if (isClassOrModule()) {
+        for (const auto &e : typeMembers()) {
+            if (e.exists()) {
+                result = mix(result, _hash(e.data(gs)->name.shortName(gs)));
+            }
         }
     }
 
