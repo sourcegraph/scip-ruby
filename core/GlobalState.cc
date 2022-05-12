@@ -2117,6 +2117,7 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash() const {
     uint32_t fieldHash = 0;
     uint32_t methodHash = 0;
     UnorderedMap<NameHash, uint32_t> methodHashesMap;
+    UnorderedMap<NameHash, uint32_t> staticFieldHashesMap;
     int counter = 0;
 
     for (const auto &sym : this->classAndModules) {
@@ -2159,12 +2160,13 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash() const {
     for (const auto &field : this->fields) {
         counter++;
         // No fields are ignored in hashing.
-        // TODO(jez) We're abusing methodHashes--after this change, the name is no longer accurate.
-        auto &target = methodHashes[NameHash(*this, field.name)];
         uint32_t symhash = field.hash(*this);
+        if (field.flags.isStaticField) {
+            auto &target = staticFieldHashesMap[NameHash(*this, field.name)];
+            target = mix(target, symhash);
+        }
         hierarchyHash = mix(hierarchyHash, field.fieldShapeHash(*this));
         fieldHash = mix(fieldHash, symhash);
-        target = mix(target, symhash);
 
         if (DEBUG_HASHING_TAIL && counter > this->fields.size() - 15) {
             errorQueue->logger.info("Hashing symbols: {}, {}", hierarchyHash, field.name.show(*this));
@@ -2192,11 +2194,16 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash() const {
 
     unique_ptr<LocalSymbolTableHashes> result = make_unique<LocalSymbolTableHashes>();
     result->methodHashes.reserve(methodHashesMap.size());
+    result->staticFieldHashes.reserve(staticFieldHashesMap.size());
     for (const auto &[nameHash, symbolHash] : methodHashesMap) {
         result->methodHashes.emplace_back(nameHash, LocalSymbolTableHashes::patchHash(symbolHash));
     }
+    for (const auto &[nameHash, symbolHash] : staticFieldHashesMap) {
+        result->staticFieldHashes.emplace_back(nameHash, LocalSymbolTableHashes::patchHash(symbolHash));
+    }
     // Sort the hashes. Semantically important for quickly diffing hashes.
     fast_sort(result->methodHashes);
+    fast_sort(result->staticFieldHashes);
 
     result->hierarchyHash = LocalSymbolTableHashes::patchHash(hierarchyHash);
     result->classModuleHash = LocalSymbolTableHashes::patchHash(classModuleHash);
