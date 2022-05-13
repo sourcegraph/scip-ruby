@@ -814,6 +814,7 @@ TypePtr Types::unwrapSelfTypeParam(Context ctx, const TypePtr &type) {
         [&](const LambdaParam &tv) { ret = type; }, [&](const SelfType &self) { ret = type; },
         [&](const LiteralType &lit) { ret = type; },
         [&](const LiteralIntegerType &i) { ret = type; },
+        [&](const FloatLiteralType &i) { ret = type; },
         [&](const AndType &andType) {
             ret = AndType::make_shared(unwrapSelfTypeParam(ctx, andType.left), unwrapSelfTypeParam(ctx, andType.right));
         },
