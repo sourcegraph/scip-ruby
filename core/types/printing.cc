@@ -199,9 +199,12 @@ string ShapeType::show(const GlobalState &gs, ShowOptions options) const {
             } else {
                 keyStr = options.showForRBI ? keyLiteral.showValue(gs) : keyLiteral.show(gs, options);
             }
-        } else {
-            ENFORCE(isa_type<LiteralIntegerType>(key));
+        } else if (isa_type<LiteralIntegerType>(key)) {
             const auto &keyLiteral = cast_type_nonnull<LiteralIntegerType>(key);
+            keyStr = options.showForRBI ? keyLiteral.showValue(gs) : keyLiteral.show(gs, options);
+        } else {
+            ENFORCE(isa_type<FloatLiteralType>(key));
+            const auto &keyLiteral = cast_type_nonnull<FloatLiteralType>(key);
             keyStr = options.showForRBI ? keyLiteral.showValue(gs) : keyLiteral.show(gs, options);
         }
 
