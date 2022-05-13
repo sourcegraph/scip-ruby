@@ -45,6 +45,10 @@ bool LiteralIntegerType::derivesFrom(const GlobalState &gs, core::ClassOrModuleR
     return underlying(gs).derivesFrom(gs, klass);
 }
 
+bool FloatLiteralType::derivesFrom(const GlobalState &gs, core::ClassOrModuleRef klass) const {
+    return underlying(gs).derivesFrom(gs, klass);
+}
+
 bool ShapeType::derivesFrom(const GlobalState &gs, core::ClassOrModuleRef klass) const {
     return underlying(gs).derivesFrom(gs, klass);
 }
@@ -58,6 +62,10 @@ DispatchResult LiteralType::dispatchCall(const GlobalState &gs, const DispatchAr
 }
 
 DispatchResult LiteralIntegerType::dispatchCall(const GlobalState &gs, const DispatchArgs &args) const {
+    return dispatchCallProxyType(gs, underlying(gs), args);
+}
+
+DispatchResult FloatLiteralType::dispatchCall(const GlobalState &gs, const DispatchArgs &args) const {
     return dispatchCallProxyType(gs, underlying(gs), args);
 }
 

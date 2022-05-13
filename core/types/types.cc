@@ -277,6 +277,10 @@ TypePtr Types::dropLiteral(const GlobalState &gs, const TypePtr &tp) {
         auto &i = cast_type_nonnull<LiteralIntegerType>(tp);
         return i.underlying(gs);
     }
+    if (isa_type<FloatLiteralType>(tp)) {
+        auto &f = cast_type_nonnull<FloatLiteralType>(tp);
+        return f.underlying(gs);
+    }
     return tp;
 }
 
@@ -329,10 +333,6 @@ void sanityCheckProxyType(const GlobalState &gs, TypePtr underlying) {
 }
 } // namespace
 
-LiteralType::LiteralType(double val) : floatval(val), literalKind(LiteralTypeKind::Float) {
-    categoryCounterInc("types.allocated", "literaltype.double");
-}
-
 LiteralType::LiteralType(ClassOrModuleRef klass, NameRef val)
     : nameId(val.rawId()), literalKind(klass == Symbols::String() ? LiteralTypeKind::String : LiteralTypeKind::Symbol) {
     if (klass == Symbols::String()) {
@@ -341,11 +341,6 @@ LiteralType::LiteralType(ClassOrModuleRef klass, NameRef val)
         categoryCounterInc("types.allocated", "literaltype.symbol");
     }
     ENFORCE(klass == Symbols::String() || klass == Symbols::Symbol());
-}
-
-double LiteralType::asFloat() const {
-    ENFORCE_NO_TIMER(literalKind == LiteralTypeKind::Float);
-    return floatval;
 }
 
 core::NameRef LiteralType::asName(const core::GlobalState &gs) const {
@@ -360,8 +355,6 @@ core::NameRef LiteralType::unsafeAsName() const {
 
 TypePtr LiteralType::underlying(const GlobalState &gs) const {
     switch (literalKind) {
-        case LiteralTypeKind::Float:
-            return Types::Float();
         case LiteralTypeKind::String:
             return Types::String();
         case LiteralTypeKind::Symbol:
@@ -376,6 +369,14 @@ LiteralIntegerType::LiteralIntegerType(int64_t val) : value(val) {
 
 TypePtr LiteralIntegerType::underlying(const GlobalState &gs) const {
     return Types::Integer();
+}
+
+FloatLiteralType::FloatLiteralType(double val) : value(val) {
+    categoryCounterInc("types.allocated", "floatliteraltype");
+}
+
+TypePtr FloatLiteralType::underlying(const GlobalState &gs) const {
+    return Types::Float();
 }
 
 TupleType::TupleType(vector<TypePtr> elements) : elems(move(elements)) {
@@ -396,8 +397,6 @@ bool LiteralType::equals(const LiteralType &rhs) const {
         return false;
     }
     switch (this->literalKind) {
-        case LiteralTypeKind::Float:
-            return this->floatval == rhs.floatval;
         case LiteralTypeKind::Symbol:
         case LiteralTypeKind::String:
             return this->nameId == rhs.nameId;
@@ -409,6 +408,14 @@ void LiteralIntegerType::_sanityCheck(const GlobalState &gs) const {
 }
 
 bool LiteralIntegerType::equals(const LiteralIntegerType &rhs) const {
+    return this->value == rhs.value;
+}
+
+void FloatLiteralType::_sanityCheck(const GlobalState &gs) const {
+    sanityCheckProxyType(gs, underlying(gs));
+}
+
+bool FloatLiteralType::equals(const FloatLiteralType &rhs) const {
     return this->value == rhs.value;
 }
 
