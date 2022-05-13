@@ -3133,12 +3133,14 @@ public:
             return;
         }
 
-        if (!isa_type<LiteralType>(args.args.front()->type)) {
+        auto &arg = args.args.front()->type;
+        if (!isa_type<LiteralType>(arg) &&
+            !isa_type<LiteralIntegerType>(arg) &&
+            !isa_type<FloatLiteralType>(arg)) {
             return;
         }
 
-        auto argLit = cast_type_nonnull<LiteralType>(args.args.front()->type);
-        if (auto idx = shape.indexForKey(argLit)) {
+        if (auto idx = shape.indexForKey(arg)) {
             auto valueType = shape.values[*idx];
             auto expectedType = valueType;
             auto actualType = *args.args[1];
@@ -3155,13 +3157,16 @@ public:
                     e.addErrorSection(actualType.explainGot(gs, args.originForUninitialized));
 
                     if (args.fullType.origins.size() == 1 &&
-                        argLit.literalKind == LiteralType::LiteralTypeKind::Symbol) {
-                        auto key = argLit.asName(gs);
-                        auto loc = locOfValueForKey(gs, args.fullType.origins[0], key, expectedType);
+                        isa_type<LiteralType>(arg)) {
+                        auto argLit = cast_type_nonnull<LiteralType>(arg);
+                        if (argLit.literalKind == LiteralType::LiteralTypeKind::Symbol) {
+                            auto key = argLit.asName(gs);
+                            auto loc = locOfValueForKey(gs, args.fullType.origins[0], key, expectedType);
 
-                        if (loc.has_value() && loc->exists()) {
-                            e.replaceWith("Initialize with `T.let`", *loc, "T.let({}, {})", loc->source(gs).value(),
-                                          Types::any(gs, expectedType, actualType.type).show(gs));
+                            if (loc.has_value() && loc->exists()) {
+                                e.replaceWith("Initialize with `T.let`", *loc, "T.let({}, {})", loc->source(gs).value(),
+                                              Types::any(gs, expectedType, actualType.type).show(gs));
+                            }
                         }
                     }
                 }
