@@ -747,6 +747,7 @@ public:
     std::optional<size_t> indexForKey(const TypePtr &t) const;
     std::optional<size_t> indexForKey(const LiteralType &lit) const;
     std::optional<size_t> indexForKey(const LiteralIntegerType &lit) const;
+    std::optional<size_t> indexForKey(const FloatLiteralType &lit) const;
 };
 CheckSize(ShapeType, 48, 8);
 
