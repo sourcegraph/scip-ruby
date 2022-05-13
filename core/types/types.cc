@@ -432,7 +432,7 @@ void TupleType::_sanityCheck(const GlobalState &gs) const {
 }
 
 ShapeType::ShapeType(vector<TypePtr> keys, vector<TypePtr> values) : keys(move(keys)), values(move(values)) {
-    DEBUG_ONLY(for (auto &k : this->keys) { ENFORCE(isa_type<LiteralType>(k) || isa_type<LiteralIntegerType>(k)); };);
+    DEBUG_ONLY(for (auto &k : this->keys) { ENFORCE(isa_type<LiteralType>(k) || isa_type<LiteralIntegerType>(k) || isa_type<FloatLiteralType>(k)); };);
     categoryCounterInc("types.allocated", "shapetype");
     histogramInc("shapetype.keys", this->keys.size());
 }
