@@ -3206,21 +3206,16 @@ public:
             }
         }
 
-        auto keys = shape->keys;
-        auto values = shape->values;
-        auto addShapeEntry = [&keys, &values](const TypePtr &keyType, const LiteralType &key, const TypePtr &value) {
-            auto fnd =
-                absl::c_find_if(keys, [&key](auto &lit) {
-                        if (!isa_type<LiteralType>(lit)) {
-                            return false;
-                        }
-                        return key.equals(cast_type_nonnull<LiteralType>(lit));
-                    });
-            if (fnd == keys.end()) {
-                keys.emplace_back(keyType);
-                values.emplace_back(value);
+        // Deliberately copy the keys and values, since we may be adding entries.
+        auto copyTypePtr = make_type<ShapeType>(shape->keys, shape->values);
+        auto *copy = cast_type<ShapeType>(copyTypePtr);
+        ENFORCE(copy != nullptr);
+        auto addShapeEntry = [&copy](const TypePtr &keyType, const TypePtr &value) {
+            if (auto optind = copy->indexForKey(keyType)) {
+                copy->values[*optind] = value;
             } else {
-                values[fnd - keys.begin()] = value;
+                copy->keys.emplace_back(keyType);
+                copy->values.emplace_back(value);
             }
         };
 
@@ -3236,21 +3231,22 @@ public:
                 return;
             }
 
-            addShapeEntry(keyType, key, args.args[i + 1]->type);
+            addShapeEntry(keyType, args.args[i + 1]->type);
         }
 
         // then kwsplat
         if (kwsplat != nullptr) {
             for (auto &keyType : kwsplat->keys) {
-                if (!isa_type<LiteralType>(keyType)) {
+                if (!isa_type<LiteralType>(keyType) &&
+                    !isa_type<LiteralIntegerType>(keyType) &&
+                    !isa_type<FloatLiteralType>(keyType)) {
                     return;
                 }
-                auto key = cast_type_nonnull<LiteralType>(keyType);
-                addShapeEntry(keyType, key, kwsplat->values[&keyType - &kwsplat->keys.front()]);
+                addShapeEntry(keyType, kwsplat->values[&keyType - &kwsplat->keys.front()]);
             }
         }
 
-        res.returnType = make_type<ShapeType>(std::move(keys), std::move(values));
+        res.returnType = std::move(copyTypePtr);
     }
 } Shape_merge;
 
