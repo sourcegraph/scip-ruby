@@ -18,6 +18,7 @@ class NonRefcounted {};
 class Refcounted {
     std::atomic<uint32_t> counter{0};
 
+public:
     void addref() {
 	this->counter.fetch_add(1);
     }
