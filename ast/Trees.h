@@ -937,7 +937,7 @@ public:
 
     void _sanityCheck();
 };
-CheckSize(Cast, 40, 8);
+CheckSize(Cast, 32, 8);
 
 EXPRESSION(Hash) {
 public:
@@ -1005,7 +1005,7 @@ public:
 
     void _sanityCheck();
 };
-CheckSize(Literal, 24, 8);
+CheckSize(Literal, 16, 8);
 
 EXPRESSION(UnresolvedConstantLit) {
 public:
