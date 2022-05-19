@@ -1,9 +1,8 @@
 #ifndef RUBY_TYPER_FILE_HASH_H
 #define RUBY_TYPER_FILE_HASH_H
 #include "common/common.h"
+#include "core/FoundDefinitions.h"
 namespace sorbet::core {
-class NameRef;
-class GlobalState;
 class ShortNameHash {
 public:
     /** Sorts an array of ShortNameHashes and removes duplicates. */
@@ -86,6 +85,30 @@ struct SymbolHash {
         return this->nameHash < h.nameHash || (!(h.nameHash < this->nameHash) && this->symbolHash < h.symbolHash);
     }
 };
+
+struct FoundDefinitionHash {
+    const FoundDefinitionRef definition;
+
+    // Owner associated with `definition`
+    const FoundDefinitionRef owner;
+
+    // Hash of the name associated with `definition`
+    //
+    // If `!hash.isDefined()`, it means that FoundDefinitionRef is not a definition kind that we
+    // support taking the fast path for name changes.
+    const FullNameHash hash;
+
+    FoundDefinitionHash(FoundDefinitionRef definition, FoundDefinitionRef owner, FullNameHash hash)
+        : definition(definition), owner(owner), hash(hash) {
+        sanityCheck();
+    };
+
+    void sanityCheck() const;
+
+    // Debug string
+    std::string toString() const;
+};
+CheckSize(FoundDefinitionHash, 12, 4);
 
 // When a file is edited, we run index and resolve it using an local (empty) GlobalState.
 // We then hash the symbols defined in that local GlobalState, and use the result to quickly decide

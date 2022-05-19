@@ -54,6 +54,29 @@ void FullNameHash::sortAndDedupe(std::vector<core::FullNameHash> &hashes) {
     hashes.resize(std::distance(hashes.begin(), std::unique(hashes.begin(), hashes.end())));
 }
 
+void FoundDefinitionHash::sanityCheck() const {
+    // Maybe someone will relax this in the future as support for more definition kinds are added.
+    ENFORCE((definition.kind() == FoundDefinitionRef::Kind::Method) == (hash.isDefined()),
+            "Only Method FoundDefinitionRef's maybe have defined hash values.");
+    DEBUG_ONLY(switch (definition.kind()) {
+        case FoundDefinitionRef::Kind::ClassRef:
+        case FoundDefinitionRef::Kind::Empty:
+        case FoundDefinitionRef::Kind::Symbol:
+            ENFORCE(false, "This is a non-definition FoundDefinitionRef (see FoundDefinitions::_definitions)");
+            break;
+        case FoundDefinitionRef::Kind::Class:
+        case FoundDefinitionRef::Kind::Method:
+        case FoundDefinitionRef::Kind::StaticField:
+        case FoundDefinitionRef::Kind::TypeMember:
+            break;
+    });
+}
+
+string FoundDefinitionHash::toString() const {
+    return fmt::format("FoundDefinitionHash {{ definition = FoundDefinitionRef {{ kind = {}, idx = {} }}, hash = {} }}",
+                       FoundDefinitionRef::kindToString(definition.kind()), definition.idx(), hash._hashValue);
+}
+
 FileHash::FileHash(LocalSymbolTableHashes &&localSymbolTableHashes, UsageHash &&usages)
     : localSymbolTableHashes(move(localSymbolTableHashes)), usages(move(usages)) {}
 
