@@ -470,6 +470,7 @@ private:
             v = CALL_MEMBER_preTransformCast<FUNC>::call(func, ctx, std::move(v));
         }
         cast_tree_nonnull<Cast>(v).arg = mapIt(std::move(cast_tree_nonnull<Cast>(v).arg), ctx);
+        cast_tree_nonnull<Cast>(v).typeExpr = mapIt(std::move(cast_tree_nonnull<Cast>(v).typeExpr), ctx);
 
         if constexpr (HAS_MEMBER_postTransformCast<FUNC>()) {
             return CALL_MEMBER_postTransformCast<FUNC>::call(func, ctx, std::move(v));
@@ -938,6 +939,7 @@ private:
             v = CALL_MEMBER_preTransformCast<FUNC>::call(func, ctx, std::move(v));
         }
         cast_tree_nonnull<Cast>(v).arg = mapIt(std::move(cast_tree_nonnull<Cast>(v).arg), ctx);
+        cast_tree_nonnull<Cast>(v).typeExpr = mapIt(std::move(cast_tree_nonnull<Cast>(v).typeExpr), ctx);
 
         if constexpr (HAS_MEMBER_postTransformCast<FUNC>()) {
             return CALL_MEMBER_postTransformCast<FUNC>::call(func, ctx, std::move(v));

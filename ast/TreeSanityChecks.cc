@@ -79,6 +79,7 @@ void Cast::_sanityCheck() {
     ENFORCE(type);
     ENFORCE(cast == core::Names::cast() || cast == core::Names::assertType() || cast == core::Names::let() ||
             cast == core::Names::uncheckedLet() || cast == core::Names::bind() || cast == core::Names::syntheticBind());
+    ENFORCE(typeExpr);
 }
 
 void ClassDef::_sanityCheck() {
