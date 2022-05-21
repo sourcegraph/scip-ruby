@@ -200,7 +200,29 @@ InsSeq{
           rhs = Cast{
               cast = <U cast>,
               arg = Literal{ value = nil }
-              type = Integer | NilClass,
+              type = T.nilable(Integer),
+              typeExpr = Send{
+                flags = {}
+                recv = ConstantLit{
+                  symbol = (module ::T)
+                  orig = UnresolvedConstantLit{
+                    cnst = <C <U T>>
+                    scope = EmptyTree
+                  }
+                }
+                fun = <U nilable>
+                block = nullptr
+                pos_args = 1
+                args = [
+                  ConstantLit{
+                    symbol = (class ::Integer)
+                    orig = UnresolvedConstantLit{
+                      cnst = <C <U Integer>>
+                      scope = EmptyTree
+                    }
+                  }
+                ]
+              },
           }
 
         }
