@@ -12,6 +12,7 @@
 #include "common/concurrency/WorkerPool.h"
 #include "common/sort.h"
 #include "core/Context.h"
+#include "core/FileHash.h"
 #include "core/FoundDefinitions.h"
 #include "core/Names.h"
 #include "core/Symbols.h"
@@ -1161,6 +1162,43 @@ public:
             }
         }
     }
+
+    void populateFoundDefinitionHashes(core::Context ctx, core::FoundDefinitionHashes &foundDefinitionHashesOut) {
+        for (const auto &ref : foundDefs.definitions()) {
+            switch (ref.kind()) {
+                case core::FoundDefinitionRef::Kind::Method: {
+                    auto &method = ref.method(foundDefs);
+                    auto owner = method.owner;
+                    auto fullNameHash = core::FullNameHash(ctx, method.name);
+                    foundDefinitionHashesOut.emplace_back(ref, owner, fullNameHash);
+                    break;
+                }
+                case core::FoundDefinitionRef::Kind::Class: {
+                    auto owner = ref.klass(foundDefs).owner;
+                    auto invalid = core::FullNameHash();
+                    foundDefinitionHashesOut.emplace_back(ref, owner, invalid);
+                    break;
+                }
+                case core::FoundDefinitionRef::Kind::StaticField: {
+                    auto owner = ref.staticField(foundDefs).owner;
+                    auto invalid = core::FullNameHash();
+                    foundDefinitionHashesOut.emplace_back(ref, owner, invalid);
+                    break;
+                }
+                case core::FoundDefinitionRef::Kind::TypeMember: {
+                    auto owner = ref.typeMember(foundDefs).owner;
+                    auto invalid = core::FullNameHash();
+                    foundDefinitionHashesOut.emplace_back(ref, owner, invalid);
+                    break;
+                }
+                case core::FoundDefinitionRef::Kind::ClassRef:
+                case core::FoundDefinitionRef::Kind::Empty:
+                case core::FoundDefinitionRef::Kind::Symbol: {
+                    ENFORCE(false, "Unexpected non-definition in foundDefs.definitions()");
+                }
+            }
+        }
+    }
 };
 
 /**
@@ -1781,7 +1819,7 @@ vector<SymbolFinderResult> findSymbols(const core::GlobalState &gs, vector<ast::
 }
 
 ast::ParsedFilesOrCancelled defineSymbols(core::GlobalState &gs, vector<SymbolFinderResult> allFoundDefinitions,
-                                          WorkerPool &workers) {
+                                          WorkerPool &workers, core::FoundDefinitionHashes *foundDefinitionHashesOut) {
     Timer timeit(gs.tracer(), "naming.defineSymbols");
     vector<ast::ParsedFile> output;
     output.reserve(allFoundDefinitions.size());
@@ -1800,6 +1838,9 @@ ast::ParsedFilesOrCancelled defineSymbols(core::GlobalState &gs, vector<SymbolFi
         SymbolDefiner symbolDefiner(move(fileFoundDefinitions.names));
         output.emplace_back(move(fileFoundDefinitions.tree));
         symbolDefiner.run(ctx);
+        if (foundDefinitionHashesOut != nullptr) {
+            symbolDefiner.populateFoundDefinitionHashes(ctx, *foundDefinitionHashesOut);
+        }
     }
     return output;
 }
@@ -1865,7 +1906,8 @@ ast::ParsedFilesOrCancelled Namer::symbolizeTreesBestEffort(const core::GlobalSt
     return symbolizeTrees(gs, move(trees), workers, bestEffort);
 }
 
-ast::ParsedFilesOrCancelled Namer::run(core::GlobalState &gs, vector<ast::ParsedFile> trees, WorkerPool &workers) {
+ast::ParsedFilesOrCancelled Namer::run(core::GlobalState &gs, vector<ast::ParsedFile> trees, WorkerPool &workers,
+                                       core::FoundDefinitionHashes *foundDefinitionHashesOut) {
     auto foundDefs = findSymbols(gs, move(trees), workers);
     if (gs.epochManager->wasTypecheckingCanceled()) {
         trees.reserve(foundDefs.size());
@@ -1874,7 +1916,11 @@ ast::ParsedFilesOrCancelled Namer::run(core::GlobalState &gs, vector<ast::Parsed
         }
         return ast::ParsedFilesOrCancelled::cancel(move(trees), workers);
     }
-    auto result = defineSymbols(gs, move(foundDefs), workers);
+    if (foundDefinitionHashesOut != nullptr) {
+        ENFORCE(foundDefs.size() == 1,
+                "Producing foundDefinitionHashes is meant to only happen when hashing a single file");
+    }
+    auto result = defineSymbols(gs, move(foundDefs), workers, foundDefinitionHashesOut);
     if (!result.hasResult()) {
         return result;
     }

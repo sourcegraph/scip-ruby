@@ -77,7 +77,9 @@ string FoundDefinitionHash::toString() const {
                        FoundDefinitionRef::kindToString(definition.kind()), definition.idx(), hash._hashValue);
 }
 
-FileHash::FileHash(LocalSymbolTableHashes &&localSymbolTableHashes, UsageHash &&usages)
-    : localSymbolTableHashes(move(localSymbolTableHashes)), usages(move(usages)) {}
+FileHash::FileHash(LocalSymbolTableHashes &&localSymbolTableHashes, UsageHash &&usages,
+                   FoundDefinitionHashes &&foundDefinitionHashes)
+    : localSymbolTableHashes(move(localSymbolTableHashes)), usages(move(usages)),
+      foundDefinitionHashes(move(foundDefinitionHashes)) {}
 
 } // namespace sorbet::core

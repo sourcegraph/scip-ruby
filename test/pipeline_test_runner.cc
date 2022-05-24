@@ -478,7 +478,8 @@ TEST_CASE("PerPhaseTest") { // NOLINT
             {
                 core::UnfreezeNameTable nameTableAccess(*rbiGenGs);     // creates singletons and class names
                 core::UnfreezeSymbolTable symbolTableAccess(*rbiGenGs); // enters symbols
-                trees = move(namer::Namer::run(*rbiGenGs, move(trees), *workers).result());
+                core::FoundDefinitionHashes foundDefinitionHashes;      // compute this just for test coverage
+                trees = move(namer::Namer::run(*rbiGenGs, move(trees), *workers, &foundDefinitionHashes).result());
             }
 
             // Resolver
@@ -515,7 +516,8 @@ TEST_CASE("PerPhaseTest") { // NOLINT
             core::UnfreezeSymbolTable symbolTableAccess(*gs); // enters symbols
             vector<ast::ParsedFile> vTmp;
             vTmp.emplace_back(move(tree));
-            vTmp = move(namer::Namer::run(*gs, move(vTmp), *workers).result());
+            core::FoundDefinitionHashes foundDefinitionHashes; // compute this just for test coverage
+            vTmp = move(namer::Namer::run(*gs, move(vTmp), *workers, &foundDefinitionHashes).result());
             namedTree = testSerialize(*gs, move(vTmp[0]));
         }
 
@@ -838,7 +840,8 @@ TEST_CASE("PerPhaseTest") { // NOLINT
             core::UnfreezeSymbolTable symbolTableAccess(*gs);
             vector<ast::ParsedFile> vTmp;
             vTmp.emplace_back(move(tree));
-            vTmp = move(namer::Namer::run(*gs, move(vTmp), *workers).result());
+            core::FoundDefinitionHashes foundDefinitionHashes; // compute this just for test coverage
+            vTmp = move(namer::Namer::run(*gs, move(vTmp), *workers, &foundDefinitionHashes).result());
             tree = testSerialize(*gs, move(vTmp[0]));
 
             handler.addObserved(*gs, "name-tree", [&]() { return tree.tree.toString(*gs); });

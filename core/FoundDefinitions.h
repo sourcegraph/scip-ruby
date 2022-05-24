@@ -45,6 +45,11 @@ public:
     FoundDefinitionRef(FoundDefinitionRef &&nm) = default;
     FoundDefinitionRef &operator=(const FoundDefinitionRef &rhs) = default;
 
+    // Construct a FoundDefinitionRef by writing to `_storage` directly (used by serialize.cc)
+    static FoundDefinitionRef fromRaw(uint32_t raw);
+    // bit_cast the _storage value to a uint32_t (used by serialize.cc)
+    uint32_t rawStorage() const;
+
     static FoundDefinitionRef root() {
         return FoundDefinitionRef(FoundDefinitionRef::Kind::Symbol, core::SymbolRef(core::Symbols::root()).rawId());
     }

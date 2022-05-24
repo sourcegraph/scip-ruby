@@ -1,8 +1,20 @@
 #include "core/FoundDefinitions.h"
+#include "absl/base/casts.h"
 
 using namespace std;
 
 namespace sorbet::core {
+
+FoundDefinitionRef FoundDefinitionRef::fromRaw(uint32_t raw) {
+    FoundDefinitionRef result;
+    // bit_cast static asserts that the source and dest types have the same sizes
+    result._storage = absl::bit_cast<Storage>(raw);
+    return result;
+}
+
+uint32_t FoundDefinitionRef::rawStorage() const {
+    return absl::bit_cast<uint32_t>(this->_storage);
+}
 
 FoundClassRef &FoundDefinitionRef::klassRef(FoundDefinitions &foundDefs) {
     ENFORCE(kind() == FoundDefinitionRef::Kind::ClassRef);

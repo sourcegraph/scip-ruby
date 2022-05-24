@@ -110,6 +110,8 @@ struct FoundDefinitionHash {
 };
 CheckSize(FoundDefinitionHash, 12, 4);
 
+using FoundDefinitionHashes = std::vector<FoundDefinitionHash>;
+
 // When a file is edited, we run index and resolve it using an local (empty) GlobalState.
 // We then hash the symbols defined in that local GlobalState, and use the result to quickly decide
 // whether "something" changed, or whether nothing changed (and thus we can take the fast path).
@@ -215,9 +217,11 @@ struct UsageHash {
 struct FileHash {
     LocalSymbolTableHashes localSymbolTableHashes;
     UsageHash usages;
+    FoundDefinitionHashes foundDefinitionHashes;
 
     FileHash() = default;
-    FileHash(LocalSymbolTableHashes &&localSymbolTableHashes, UsageHash &&usages);
+    FileHash(LocalSymbolTableHashes &&localSymbolTableHashes, UsageHash &&usages,
+             FoundDefinitionHashes &&foundDefinitionHashes);
 };
 
 }; // namespace sorbet::core

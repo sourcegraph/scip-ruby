@@ -462,7 +462,9 @@ bool LSPTypechecker::runSlowPath(LSPFileUpdates updates, WorkerPool &workers, bo
         if (gs->sleepInSlowPath) {
             Timer::timedSleep(3000ms, *logger, "slow_path.resolve.sleep");
         }
-        auto maybeResolved = pipeline::resolve(gs, move(indexedCopies), config->opts, workers);
+        // Only need to compute FoundDefinitionHashes when running to compute a FileHash
+        auto foundDefinitionHashes = nullptr;
+        auto maybeResolved = pipeline::resolve(gs, move(indexedCopies), config->opts, workers, foundDefinitionHashes);
         if (!maybeResolved.hasResult()) {
             return;
         }

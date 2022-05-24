@@ -253,6 +253,12 @@ void SerializerImpl::pickle(Pickler &p, shared_ptr<const FileHash> fh) {
     for (const auto &e : fh->usages.sends) {
         p.putU4(e._hashValue);
     }
+    p.putU4(fh->foundDefinitionHashes.size());
+    for (const auto &fdh : fh->foundDefinitionHashes) {
+        p.putU4(fdh.owner.rawStorage());
+        p.putU4(fdh.owner.rawStorage());
+        p.putU4(fdh.hash._hashValue);
+    }
 }
 
 unique_ptr<const FileHash> SerializerImpl::unpickleFileHash(UnPickler &p) {
@@ -283,6 +289,15 @@ unique_ptr<const FileHash> SerializerImpl::unpickleFileHash(UnPickler &p) {
         ShortNameHash key;
         key._hashValue = p.getU4();
         ret.usages.sends.emplace_back(key);
+    }
+    auto foundDefinitionHashesSize = p.getU4();
+    ret.foundDefinitionHashes.reserve(foundDefinitionHashesSize);
+    for (int it = 0; it < foundDefinitionHashesSize; it++) {
+        auto definition = FoundDefinitionRef::fromRaw(p.getU4());
+        auto owner = FoundDefinitionRef::fromRaw(p.getU4());
+        FullNameHash fullNameHash;
+        fullNameHash._hashValue = p.getU4();
+        ret.foundDefinitionHashes.emplace_back(definition, owner, fullNameHash);
     }
     return make_unique<const FileHash>(move(ret));
 }
