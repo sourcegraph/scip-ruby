@@ -99,6 +99,13 @@ struct FoundClassRef final {
 };
 CheckSize(FoundClassRef, 16, 4);
 
+// TODO(jez) A lot of this stuff is location information, which we actually don't care about
+//
+// TODO(jez) Might be able to get away with not all found definitions, but just those that would be
+// enough to figure out whether only methods have changed (classes and methods maybe?)
+//
+// TODO(jez) Only need enough information to figure out whether we need to mangle rename before
+// entering a method symbol.
 struct FoundClass final {
     FoundDefinitionRef owner;
     FoundDefinitionRef klass;
