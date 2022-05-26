@@ -38,6 +38,7 @@ void CompilerState::trace(string_view msg) const {
 
 namespace {
 llvm::GlobalVariable *declareNullptrPlaceholder(llvm::Module &module, llvm::Type *type, const string &name) {
+    module->
     // This variable is conceptually `const` (even though we're going to change its
     // initializer during compilation, at runtime its value doesn't change), but
     // if we declare that up front, LLVM will fold loads of its value, which

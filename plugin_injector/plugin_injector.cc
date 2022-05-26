@@ -99,6 +99,26 @@ public:
     TypecheckThreadState() : codegenPayload(compiler::PayloadLoader::readDefaultModule(lctx)) {}
 };
 
+class SCIPSemanticExtension : public SemanticExtension {
+public:
+    optional<string> compiledOutputDir;
+    void run(core::MutableContext &ctx, ast::ClassDef *cd) const override {
+        fmt::print("SCIP!! {}\n", sorbet_full_version_string);
+    };
+    virtual void finishTypecheckFile(const core::GlobalState &, const core::FileRef &) const override{};
+    virtual void finishTypecheck(const core::GlobalState &) const override{};
+    virtual void typecheck(const core::GlobalState &, core::FileRef file, cfg::CFG &,
+                           ast::MethodDef &) const override{};
+
+    virtual std::unique_ptr<SemanticExtension> deepCopy(const core::GlobalState &from, core::GlobalState &to) override {
+        return make_unique<SCIPSemanticExtension>();
+    };
+    virtual void merge(const core::GlobalState &from, core::GlobalState &to, core::NameSubstitution &subst) override{};
+
+    SCIPSemanticExtension() = default;
+    ~SCIPSemanticExtension() = default;
+};
+
 class LLVMSemanticExtension : public SemanticExtension {
     optional<string> compiledOutputDir;
     optional<string> irOutputDir;
@@ -371,6 +391,19 @@ public:
     virtual void merge(const core::GlobalState &from, core::GlobalState &to, core::NameSubstitution &subst) override {}
 };
 
+class SCIPSemanticExtensionProvider : public SemanticExtensionProvider {
+public:
+    void injectOptions(cxxopts::Options &) const override{};
+    std::unique_ptr<SemanticExtension> readOptions(cxxopts::ParseResult &) const override {
+        return make_unique<SCIPSemanticExtension>();
+    };
+    virtual std::unique_ptr<SemanticExtension> defaultInstance() const override {
+        return make_unique<SCIPSemanticExtension>();
+    };
+    static std::vector<SemanticExtensionProvider *> getProviders();
+    virtual ~SCIPSemanticExtensionProvider() = default;
+};
+
 class LLVMSemanticExtensionProvider : public SemanticExtensionProvider {
 public:
     virtual void injectOptions(cxxopts::Options &optsBuilder) const override {
@@ -428,6 +461,7 @@ public:
 
 vector<SemanticExtensionProvider *> SemanticExtensionProvider::getProviders() {
     static LLVMSemanticExtensionProvider provider;
-    return {&provider};
+    static SCIPSemanticExtensionProvider scipProvider;
+    return {&provider, &scipProvider};
 }
 } // namespace sorbet::pipeline::semantic_extension
