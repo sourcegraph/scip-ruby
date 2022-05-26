@@ -238,6 +238,7 @@ vector<core::FileRef> LSPTypechecker::runFastPath(LSPFileUpdates &updates, Worke
     Timer timeit(config->logger, "fast_path");
     vector<core::FileRef> subset;
     vector<core::ShortNameHash> changedHashes;
+    UnorderedMap<core::FileRef, core::FoundDefinitionHashes> oldFoundDefinitionHashesForFiles;
     // Replace error queue with one that is owned by this thread.
     gs->errorQueue = make_shared<core::ErrorQueue>(gs->errorQueue->logger, gs->errorQueue->tracer, errorFlusher);
     {
@@ -269,6 +270,11 @@ vector<core::FileRef> LSPTypechecker::runFastPath(LSPFileUpdates &updates, Worke
                 // deduped later.
                 set_difference(oldMethodHashes.begin(), oldMethodHashes.end(), newMethodHashes.begin(),
                                newMethodHashes.end(), std::back_inserter(changedMethodHashes));
+
+                // Okay to `move` here (steals component of getFileHash) because we're about to use
+                // replaceFile to clobber fref.data(*gs) anyways.
+                oldFoundDefinitionHashesForFiles.emplace(fref,
+                                                         move(fref.data(*gs).getFileHash()->foundDefinitionHashes));
 
                 gs->replaceFile(fref, updatedFile);
                 // If file doesn't have a typed: sigil, then we need to ensure it's typechecked using typed: false.
@@ -323,7 +329,8 @@ vector<core::FileRef> LSPTypechecker::runFastPath(LSPFileUpdates &updates, Worke
     }
 
     ENFORCE(gs->lspQuery.isEmpty());
-    auto resolved = pipeline::incrementalResolve(*gs, move(updatedIndexed), config->opts);
+    auto resolved = pipeline::incrementalResolve(*gs, move(updatedIndexed), std::move(oldFoundDefinitionHashesForFiles),
+                                                 config->opts);
     auto sorted = sortParsedFiles(*gs, *errorReporter, move(resolved));
     const auto presorted = true;
     const auto cancelable = false;
@@ -676,7 +683,9 @@ vector<ast::ParsedFile> LSPTypechecker::getResolved(const vector<core::FileRef> 
             updatedIndexed.emplace_back(ast::ParsedFile{indexed.tree.deepCopy(), indexed.file});
         }
     }
-    return pipeline::incrementalResolve(*gs, move(updatedIndexed), config->opts);
+    // TODO(jez) I think it should be fine to not need a foundDefinitionHashesForFiles list...
+    // Makes the type signatures somewhat annoying but we can make it work.
+    return pipeline::incrementalResolve(*gs, move(updatedIndexed), nullopt, config->opts);
 }
 
 const core::GlobalState &LSPTypechecker::state() const {

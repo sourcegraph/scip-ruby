@@ -455,7 +455,10 @@ public:
  */
 class SymbolDefiner {
     const core::FoundDefinitions foundDefs;
+    const optional<core::FoundDefinitionHashes> oldFoundDefinitionHashes;
+    // See getOwnerSymbol
     vector<core::ClassOrModuleRef> definedClasses;
+    // See getOwnerSymbol
     vector<core::MethodRef> definedMethods;
 
     // Returns a symbol to the referenced name. Name must be a class or module.
@@ -1110,33 +1113,94 @@ class SymbolDefiner {
     }
 
 public:
-    SymbolDefiner(unique_ptr<core::FoundDefinitions> foundDefs) : foundDefs(move(*foundDefs)) {}
+    SymbolDefiner(unique_ptr<core::FoundDefinitions> foundDefs,
+                  optional<core::FoundDefinitionHashes> oldFoundDefinitionHashes)
+        : foundDefs(move(*foundDefs)), oldFoundDefinitionHashes(move(oldFoundDefinitionHashes)) {}
 
     void run(core::MutableContext ctx) {
         definedClasses.reserve(foundDefs.klasses().size());
         definedMethods.reserve(foundDefs.methods().size());
 
-        for (auto &ref : foundDefs.definitions()) {
-            switch (ref.kind()) {
+        auto &currentFoundDefs = foundDefs.definitions();
+        size_t oldIdx;
+        size_t currentIdx;
+        for (oldIdx = 0, currentIdx = 0; currentIdx < currentFoundDefs.size();) {
+            auto currentDef = currentFoundDefs[currentIdx];
+            if (oldFoundDefinitionHashes.has_value()) {
+                auto &oldFoundHashes = oldFoundDefinitionHashes.value();
+                if (currentDef.kind() != core::FoundDefinitionRef::Kind::Method) {
+                    while (oldIdx < oldFoundHashes.size()) {
+                        auto &oldDefHash = oldFoundHashes[oldIdx];
+                        if (oldDefHash.definition.kind() == currentDef.kind()) {
+                            break;
+                        }
+
+                        // Can safely increment now because we'll never break out of loop below
+                        // (we'll only sometimes `continue` early, so it's convenient to increment
+                        // now rather than at the bottom of the loop)
+                        oldIdx++;
+
+                        ENFORCE(oldDefHash.definition.kind() == core::FoundDefinitionRef::Kind::Method,
+                                "non-method symbol changed, should have taken slow path");
+                        ENFORCE(oldDefHash.owner.kind() == core::FoundDefinitionRef::Kind::Class,
+                                "method that was not owned by class?");
+
+                        // Because a change to classes would have take the slow path, should be safe
+                        // to look up old owner in current foundDefs.
+                        auto owner = getOwnerSymbol(oldDefHash.owner);
+                        ENFORCE(owner.isClassOrModule());
+                        auto oldMethod = core::Symbols::noSymbol();
+                        for (const auto &[memberName, memberSym] : owner.asClassOrModuleRef().data(ctx)->members()) {
+                            if (!memberSym.isMethod()) {
+                                continue;
+                            }
+
+                            auto memberFullNameHash = core::FullNameHash(ctx, memberName);
+                            if (memberFullNameHash == oldDefHash.hash) {
+                                oldMethod = memberSym;
+                                break;
+                            }
+                        }
+                        ENFORCE(oldMethod.exists());
+                        if (!oldMethod.exists()) {
+                            // TODO(jez) defensive, double check whether this is required
+                            // If we couldn't find a method, something must have went wrong? Let's
+                            // just assume we properly deleted this method and move on.
+                            continue;
+                        }
+
+                        // TODO(jez) This might actually be a usecase for completely deleting a method,
+                        // not just mangling it
+                        ctx.state.mangleRenameSymbol(oldMethod, oldMethod.name(ctx));
+                    }
+
+                    // TODO(jez) what next? now we're either out of oldFoundHashes, or oldIdx
+                    // points to the same kind() as currentIdx
+                }
+
+                // TODO(jez) What next?
+            }
+
+            switch (currentDef.kind()) {
                 case core::FoundDefinitionRef::Kind::Class: {
-                    const auto &klass = ref.klass(foundDefs);
-                    ENFORCE(definedClasses.size() == ref.idx());
+                    const auto &klass = currentDef.klass(foundDefs);
+                    ENFORCE(definedClasses.size() == currentDef.idx());
                     definedClasses.emplace_back(insertClass(ctx.withOwner(getOwnerSymbol(klass.owner)), klass));
                     break;
                 }
                 case core::FoundDefinitionRef::Kind::Method: {
-                    const auto &method = ref.method(foundDefs);
-                    ENFORCE(definedMethods.size() == ref.idx());
+                    const auto &method = currentDef.method(foundDefs);
+                    ENFORCE(definedMethods.size() == currentDef.idx());
                     definedMethods.emplace_back(insertMethod(ctx.withOwner(getOwnerSymbol(method.owner)), method));
                     break;
                 }
                 case core::FoundDefinitionRef::Kind::StaticField: {
-                    const auto &staticField = ref.staticField(foundDefs);
+                    const auto &staticField = currentDef.staticField(foundDefs);
                     insertStaticField(ctx.withOwner(getOwnerSymbol(staticField.owner)), staticField);
                     break;
                 }
                 case core::FoundDefinitionRef::Kind::TypeMember: {
-                    const auto &typeMember = ref.typeMember(foundDefs);
+                    const auto &typeMember = currentDef.typeMember(foundDefs);
                     insertTypeMember(ctx.withOwner(getOwnerSymbol(typeMember.owner)), typeMember);
                     break;
                 }
@@ -1144,6 +1208,11 @@ public:
                     ENFORCE(false);
                     break;
             }
+
+            currentIdx++;
+        }
+        if (oldFoundDefinitionHashes.has_value() && oldIdx != oldFoundDefinitionHashes.value().size()) {
+            // TODO(jez) Remove all the extra old methods
         }
 
         // TODO: Split up?
@@ -1169,6 +1238,8 @@ public:
                 case core::FoundDefinitionRef::Kind::Method: {
                     auto &method = ref.method(foundDefs);
                     auto owner = method.owner;
+                    // TODO(jez) Probably going to have to put the argument names and types into the hash
+                    // TODO(jez) Maybe there's a way to get the localSymbolTableHash function to take care of this?
                     auto fullNameHash = core::FullNameHash(ctx, method.name);
                     foundDefinitionHashesOut.emplace_back(ref, owner, fullNameHash);
                     break;
@@ -1818,8 +1889,10 @@ vector<SymbolFinderResult> findSymbols(const core::GlobalState &gs, vector<ast::
     return allFoundDefinitions;
 }
 
-ast::ParsedFilesOrCancelled defineSymbols(core::GlobalState &gs, vector<SymbolFinderResult> allFoundDefinitions,
-                                          WorkerPool &workers, core::FoundDefinitionHashes *foundDefinitionHashesOut) {
+ast::ParsedFilesOrCancelled
+defineSymbols(core::GlobalState &gs, vector<SymbolFinderResult> allFoundDefinitions, WorkerPool &workers,
+              UnorderedMap<core::FileRef, core::FoundDefinitionHashes> &&oldFoundDefinitionHashesForFiles,
+              core::FoundDefinitionHashes *foundDefinitionHashesOut) {
     Timer timeit(gs.tracer(), "naming.defineSymbols");
     vector<ast::ParsedFile> output;
     output.reserve(allFoundDefinitions.size());
@@ -1834,8 +1907,13 @@ ast::ParsedFilesOrCancelled defineSymbols(core::GlobalState &gs, vector<SymbolFi
             }
             return ast::ParsedFilesOrCancelled::cancel(move(output), workers);
         }
-        core::MutableContext ctx(gs, core::Symbols::root(), fileFoundDefinitions.tree.file);
-        SymbolDefiner symbolDefiner(move(fileFoundDefinitions.names));
+        auto fref = fileFoundDefinitions.tree.file;
+        core::MutableContext ctx(gs, core::Symbols::root(), fref);
+        auto oldFoundDefinitionHashes =
+            oldFoundDefinitionHashesForFiles.find(fref) == oldFoundDefinitionHashesForFiles.end()
+                ? make_optional<core::FoundDefinitionHashes>()
+                : std::move(oldFoundDefinitionHashesForFiles[fref]);
+        SymbolDefiner symbolDefiner(move(fileFoundDefinitions.names), move(oldFoundDefinitionHashes));
         output.emplace_back(move(fileFoundDefinitions.tree));
         symbolDefiner.run(ctx);
         if (foundDefinitionHashesOut != nullptr) {
@@ -1920,7 +1998,36 @@ ast::ParsedFilesOrCancelled Namer::run(core::GlobalState &gs, vector<ast::Parsed
         ENFORCE(foundDefs.size() == 1,
                 "Producing foundDefinitionHashes is meant to only happen when hashing a single file");
     }
-    auto result = defineSymbols(gs, move(foundDefs), workers, foundDefinitionHashesOut);
+    // There were no old FoundDefinitionHashes; just defineSymbols like normal.
+    auto oldFoundDefinitionHashesForFiles = UnorderedMap<core::FileRef, core::FoundDefinitionHashes>{};
+    auto result = defineSymbols(gs, move(foundDefs), workers, std::move(oldFoundDefinitionHashesForFiles),
+                                foundDefinitionHashesOut);
+    if (!result.hasResult()) {
+        return result;
+    }
+    auto bestEffort = false;
+    trees = symbolizeTrees(gs, move(result.result()), workers, bestEffort);
+    return trees;
+}
+
+ast::ParsedFilesOrCancelled
+Namer::runIncremental(core::GlobalState &gs, std::vector<ast::ParsedFile> trees,
+                      UnorderedMap<core::FileRef, core::FoundDefinitionHashes> &&oldFoundDefinitionHashesForFiles,
+                      WorkerPool &workers) {
+    // TODO(jez) Clever way to de-dup this with Namer::run ?
+    auto foundDefs = findSymbols(gs, move(trees), workers);
+    if (gs.epochManager->wasTypecheckingCanceled()) {
+        trees.reserve(foundDefs.size());
+        for (auto &def : foundDefs) {
+            trees.emplace_back(move(def.tree));
+        }
+        return ast::ParsedFilesOrCancelled::cancel(move(trees), workers);
+    }
+
+    // We should never be combining Namer::runIncremental with the namer call that produces FileHashes
+    auto foundDefinitionHashesOut = nullptr;
+    auto result = defineSymbols(gs, move(foundDefs), workers, std::move(oldFoundDefinitionHashesForFiles),
+                                foundDefinitionHashesOut);
     if (!result.hasResult()) {
         return result;
     }
