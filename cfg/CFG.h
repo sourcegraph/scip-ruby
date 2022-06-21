@@ -176,7 +176,9 @@ public:
     class ReadsAndWrites {
     public:
         ReadsAndWrites(uint32_t maxBasicBlockId, uint32_t numLocalVariables);
+        // Describes which variables are read from each basic block id.
         std::vector<UIntSet> reads;
+        // Describes which variables are written to in each basic block id.
         std::vector<UIntSet> writes;
 
         // The "dead" set reports, for each block, variables that are *only*
