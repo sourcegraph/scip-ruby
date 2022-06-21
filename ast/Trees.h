@@ -382,8 +382,13 @@ CheckSize(ClassDef, 120, 8);
 
 EXPRESSION(MethodDef) {
 public:
+    /// The range for the entire method definition + body; starting from 'def'
+    /// and ending after the matching 'end'.
     const core::LocOffsets loc;
+    /// The range for the method declaration, including 'def' and ending
+    /// after the closing ')' after the parameter list.
     core::LocOffsets declLoc;
+    /// Reference to the method data.
     core::MethodRef symbol;
 
     ExpressionPtr rhs;
