@@ -47,7 +47,7 @@ void CFGBuilder::simplify(core::Context ctx, CFG &cfg) {
 
             if (thenb == elseb) {
                 // Remove condition from unconditional jumps
-                bb->bexit.cond = LocalRef::unconditional();
+                bb->bexit.cond = LocalOccurrence{LocalRef::unconditional(), bb->bexit.loc}; // TODO(varun): right loc?
             }
             if (thenb == elseb && thenb != cfg.deadBlock() && thenb != bb &&
                 bb->rubyRegionId == thenb->rubyRegionId) { // can be squashed togather
@@ -133,9 +133,10 @@ void CFGBuilder::sanityCheck(core::Context ctx, CFG &cfg) {
     }
 }
 
-LocalRef maybeDealias(core::Context ctx, CFG &cfg, LocalRef what, UnorderedMap<LocalRef, LocalRef> &aliases) {
-    if (what.isSyntheticTemporary(cfg)) {
-        auto fnd = aliases.find(what);
+LocalOccurrence maybeDealias(core::Context ctx, CFG &cfg, LocalOccurrence what,
+                             UnorderedMap<LocalRef, LocalOccurrence> &aliases) {
+    if (what.variable.isSyntheticTemporary(cfg)) {
+        auto fnd = aliases.find(what.variable);
         if (fnd != aliases.end()) {
             return fnd->second;
         }
@@ -148,7 +149,7 @@ LocalRef maybeDealias(core::Context ctx, CFG &cfg, LocalRef what, UnorderedMap<L
  * because `a.foo(a = "2", if (...) a = true; else a = null; end)`
  */
 void CFGBuilder::dealias(core::Context ctx, CFG &cfg) {
-    vector<UnorderedMap<LocalRef, LocalRef>> outAliases;
+    vector<UnorderedMap<LocalRef, LocalOccurrence>> outAliases;
     outAliases.resize(cfg.maxBasicBlockId);
 
     for (auto it = cfg.forwardsTopoSort.rbegin(); it != cfg.forwardsTopoSort.rend(); ++it) {
@@ -168,9 +169,11 @@ void CFGBuilder::dealias(core::Context ctx, CFG &cfg) {
                     auto &el = *it;
                     auto fnd = other.find(el.first);
                     if (fnd != other.end()) {
-                        if (fnd->second != el.second) {
+                        if (fnd->second.variable != el.second.variable) {
                             current.erase(it++);
                         } else {
+                            // TODO(varun): This causes some test failures
+                            // ENFORCE(fnd->second.loc == el.second.loc, "equal variables => equal locs");
                             ++it;
                         }
                     } else {
@@ -185,17 +188,19 @@ void CFGBuilder::dealias(core::Context ctx, CFG &cfg) {
         // Will have false positives, but no false negatives. Avoids an expensive inner loop below.
         UIntSet mayHaveAlias(cfg.numLocalVariables());
         for (auto &alias : current) {
-            mayHaveAlias.add(alias.second.id());
+            mayHaveAlias.add(alias.second.variable.id());
         }
 
         for (Binding &bind : bb->exprs) {
             if (auto *i = cast_instruction<Ident>(bind.value)) {
-                i->what = maybeDealias(ctx, cfg, i->what, current);
+                i->what = maybeDealias(ctx, cfg, LocalOccurrence::synthetic(i->what), current).variable;
             }
             if (mayHaveAlias.contains(bind.bind.variable.id())) {
                 /* invalidate a stale record (uncommon) */
                 for (auto it = current.begin(); it != current.end(); /* nothing */) {
-                    if (it->second == bind.bind.variable) {
+                    if (it->second.variable == bind.bind.variable) {
+                        // TODO(varun): This causes some test failures
+                        // ENFORCE(it->second.loc == bind.bind.loc, "equal variables should have equal locs");
                         current.erase(it++);
                     } else {
                         ++it;
@@ -208,27 +213,27 @@ void CFGBuilder::dealias(core::Context ctx, CFG &cfg) {
                 // we don't allow dealiasing values into synthetic instructions
                 // as otherwise it fools dead code analysis.
                 if (auto *v = cast_instruction<Ident>(bind.value)) {
-                    v->what = maybeDealias(ctx, cfg, v->what, current);
+                    v->what = maybeDealias(ctx, cfg, LocalOccurrence::synthetic(v->what), current).variable;
                 } else if (auto *v = cast_instruction<Send>(bind.value)) {
-                    v->recv = maybeDealias(ctx, cfg, v->recv.variable, current);
+                    v->recv = maybeDealias(ctx, cfg, v->recv.occurrence(), current);
                     for (auto &arg : v->args) {
-                        arg = maybeDealias(ctx, cfg, arg.variable, current);
+                        arg = maybeDealias(ctx, cfg, arg.occurrence(), current);
                     }
                 } else if (auto *v = cast_instruction<TAbsurd>(bind.value)) {
-                    v->what = maybeDealias(ctx, cfg, v->what.variable, current);
+                    v->what = maybeDealias(ctx, cfg, v->what.occurrence(), current);
                 } else if (auto *v = cast_instruction<Return>(bind.value)) {
-                    v->what = maybeDealias(ctx, cfg, v->what.variable, current);
+                    v->what = maybeDealias(ctx, cfg, v->what.occurrence(), current);
                 }
             }
 
             // record new aliases
             if (auto *i = cast_instruction<Ident>(bind.value)) {
-                current[bind.bind.variable] = i->what;
+                current[bind.bind.variable] = {i->what, bind.loc};
                 mayHaveAlias.add(i->what.id());
             }
         }
         if (bb->bexit.cond.variable != LocalRef::unconditional()) {
-            bb->bexit.cond = maybeDealias(ctx, cfg, bb->bexit.cond.variable, current);
+            bb->bexit.cond = maybeDealias(ctx, cfg, bb->bexit.cond.occurrence(), current);
         }
     }
 }
@@ -405,7 +410,9 @@ vector<UIntSet> CFGBuilder::fillInBlockArguments(core::Context ctx, const CFG::R
             intersection.intersect(upperBounds2[it->id]);
             // Note: forEach enqueues arguments in sorted order. We assume that args is empty so we don't need to sort.
             ENFORCE_NO_TIMER(it->args.empty());
-            intersection.forEach([&it](uint32_t local) -> void { it->args.emplace_back(local); });
+            // FIXME(varun): We should be updating argument locations here, I think?
+            intersection.forEach(
+                [&it](uint32_t local) -> void { it->args.emplace_back(local, core::LocOffsets::none()); });
             // it->args is now sorted in LocalRef ID order.
             ENFORCE(absl::c_is_sorted(it->args,
                                       [](auto &a, auto &b) -> bool { return a.variable.id() < b.variable.id(); }));

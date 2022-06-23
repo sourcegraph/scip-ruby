@@ -17,15 +17,15 @@ unique_ptr<CFG> CFGBuilder::buildFor(core::Context ctx, ast::MethodDef &md) {
     uint32_t temporaryCounter = 1;
     UnorderedMap<core::SymbolRef, LocalRef> aliases;
     UnorderedMap<core::NameRef, LocalRef> discoveredUndeclaredFields;
-    CFGContext cctx(ctx, *res.get(), LocalRef::noVariable(), 0, nullptr, nullptr, nullptr, aliases,
-                    discoveredUndeclaredFields, temporaryCounter);
+    CFGContext cctx(ctx, *res.get(), LocalOccurrence::synthetic(LocalRef::noVariable()), 0, nullptr, nullptr, nullptr,
+                    aliases, discoveredUndeclaredFields, temporaryCounter);
 
-    LocalRef retSym;
+    LocalOccurrence retSym;
     BasicBlock *entry = res->entry();
     BasicBlock *cont;
     {
         CFG::UnfreezeCFGLocalVariables unfreezeVars(*res);
-        retSym = cctx.newTemporary(core::Names::returnMethodTemp());
+        retSym = cctx.newTemporaryOccurrence(core::Names::returnMethodTemp());
 
         auto selfClaz = md.symbol.data(ctx)->rebind;
         if (!selfClaz.exists()) {
@@ -101,14 +101,15 @@ unique_ptr<CFG> CFGBuilder::buildFor(core::Context ctx, ast::MethodDef &md) {
     } else {
         rvLoc = cont->exprs.back().loc;
     }
-    synthesizeExpr(cont, retSym1, rvLoc, make_insn<Return>(retSym, rvLoc)); // dead assign.
+    synthesizeExpr(cont, retSym1, rvLoc, make_insn<Return>(retSym.variable, rvLoc)); // dead assign.
     jumpToDead(cont, *res.get(), rvLoc);
 
     vector<Binding> aliasesPrefix;
     for (auto kv : aliases) {
         core::SymbolRef global = kv.first;
         LocalRef local = kv.second;
-        aliasesPrefix.emplace_back(local, core::LocOffsets::none(), make_insn<Alias>(global));
+        aliasesPrefix.emplace_back(LocalOccurrence::synthetic(local), core::LocOffsets::none(),
+                                   make_insn<Alias>(global));
         if (global.isFieldOrStaticField()) {
             res->minLoops[local.id()] = CFG::MIN_LOOP_FIELD;
         } else {
@@ -121,7 +122,7 @@ unique_ptr<CFG> CFGBuilder::buildFor(core::Context ctx, ast::MethodDef &md) {
         }
     }
     for (auto kv : discoveredUndeclaredFields) {
-        aliasesPrefix.emplace_back(kv.second, core::LocOffsets::none(),
+        aliasesPrefix.emplace_back(LocalOccurrence::synthetic(kv.second), core::LocOffsets::none(),
                                    make_insn<Alias>(core::Symbols::Magic_undeclaredFieldStub(), kv.first));
         res->minLoops[kv.second.id()] = CFG::MIN_LOOP_FIELD;
     }
@@ -181,7 +182,7 @@ void CFGBuilder::fillInTopoSorts(core::Context ctx, CFG &cfg) {
     }
 }
 
-CFGContext CFGContext::withTarget(LocalRef target) {
+CFGContext CFGContext::withTarget(LocalOccurrence target) {
     auto ret = CFGContext(*this);
     ret.target = target;
     return ret;
