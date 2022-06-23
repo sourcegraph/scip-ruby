@@ -265,9 +265,13 @@ INSN(Send) : public Instruction, private core::TrailingObjects<Send, LocalRef, c
 public:
     bool isPrivateOk;
     const uint16_t numPosArgs;
+    /// The method name, i.e. 'f' in 'x.f(<args>)'.
     core::NameRef fun;
+    /// The receiver for the message send, i.e. 'x' in 'x.f(<args>)'.
     VariableUseSite recv;
+    /// Source location for 'f' in 'x.f(<args>)'.
     core::LocOffsets funLoc;
+    /// Source location for 'x' in 'x.f(<args>)'.
     core::LocOffsets receiverLoc;
     const uint32_t numArgs;
     LinkRef link;
