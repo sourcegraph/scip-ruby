@@ -26,6 +26,7 @@ private:
     static void unconditionalJump(BasicBlock *from, BasicBlock *to, CFG &inWhat, core::LocOffsets loc);
     static void jumpToDead(BasicBlock *from, CFG &inWhat, core::LocOffsets loc);
     static void synthesizeExpr(BasicBlock *bb, LocalRef var, core::LocOffsets loc, InstructionPtr inst);
+    static void synthesizeExpr(BasicBlock *bb, LocalOccurrence occ, core::LocOffsets loc, InstructionPtr inst);
     static BasicBlock *walkHash(CFGContext cctx, ast::Hash &h, BasicBlock *current, core::NameRef method);
     static std::tuple<LocalRef, BasicBlock *, BasicBlock *>
     walkDefault(CFGContext cctx, int argIndex, const core::ArgInfo &argInfo, LocalRef argLocal, core::LocOffsets argLoc,
@@ -37,7 +38,7 @@ class CFGContext {
 public:
     core::Context ctx;
     CFG &inWhat;
-    LocalRef target;
+    LocalOccurrence target;
     LocalRef blockBreakTarget;
     int loops;
     bool isInsideRubyBlock;
@@ -51,17 +52,18 @@ public:
 
     uint32_t &temporaryCounter;
 
-    CFGContext withTarget(LocalRef target);
+    CFGContext withTarget(LocalOccurrence target);
     CFGContext withBlockBreakTarget(LocalRef blockBreakTarget);
     CFGContext withLoopBreakTarget(LocalRef blockBreakTarget);
     CFGContext withLoopScope(BasicBlock *nextScope, BasicBlock *breakScope, bool insideRubyBlock = false);
     CFGContext withSendAndBlockLink(const std::shared_ptr<core::SendAndBlockLink> &link);
 
     LocalRef newTemporary(core::NameRef name);
+    LocalOccurrence newTemporaryOccurrence(core::NameRef name);
 
 private:
     friend std::unique_ptr<CFG> CFGBuilder::buildFor(core::Context ctx, ast::MethodDef &md);
-    CFGContext(core::Context ctx, CFG &inWhat, LocalRef target, int loops, BasicBlock *nextScope,
+    CFGContext(core::Context ctx, CFG &inWhat, LocalOccurrence target, int loops, BasicBlock *nextScope,
                BasicBlock *breakScope, BasicBlock *rescueScope, UnorderedMap<core::SymbolRef, LocalRef> &aliases,
                UnorderedMap<core::NameRef, LocalRef> &discoveredUndeclaredFields, uint32_t &temporaryCounter)
         : ctx(ctx), inWhat(inWhat), target(target), loops(loops), isInsideRubyBlock(false), breakIsJump(false),
