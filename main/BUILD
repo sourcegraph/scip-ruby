@@ -37,6 +37,35 @@ cc_binary(
 )
 
 cc_binary(
+    name = "scip-ruby",
+    srcs = [
+        "main.cc",
+    ],
+    # When changing this, you should also update the REQUIRED_STACK_SIZE variable in common/os/os.cc.
+    linkopts = select({
+        "//tools/config:darwindbg": [
+            "-Wl,-stack_size",
+            "-Wl,0x4000000",
+        ],
+        "//conditions:default": [],
+    }),
+    linkstatic = select({
+        "//tools/config:linkshared": 0,
+        "//conditions:default": 1,
+    }),
+    malloc = select({
+        ":jemalloc": "@jemalloc//:jemalloc",
+        "//conditions:default": "@bazel_tools//tools/cpp:malloc",
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        "realmain",
+        "//scip_indexer:scip_indexer",
+        "//payload",
+    ],
+)
+
+cc_binary(
     name = "sorbet-orig",
     srcs = [
         "main.cc",
