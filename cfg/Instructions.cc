@@ -73,7 +73,8 @@ void InstructionPtr::deleteTagged(Tag tag, void *expr) noexcept {
 #undef DELETE_INSN
 }
 
-Return::Return(LocalRef what, core::LocOffsets whatLoc) : what(what), whatLoc(whatLoc) {
+// NOTE(varun): loc copying
+Return::Return(LocalRef what, core::LocOffsets whatLoc) : what(what, whatLoc), whatLoc(whatLoc) {
     categoryCounterInc("cfg", "return");
 }
 
@@ -95,7 +96,7 @@ string Return::showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs) co
                        this->what.showRaw(gs, cfg, tabs + 1));
 }
 
-BlockReturn::BlockReturn(LinkRef link, LocalRef what) : link(link), what(what) {
+BlockReturn::BlockReturn(LinkRef link, LocalRef what) : link(link), what(VariableUseSite::synthetic(what)) {
     categoryCounterInc("cfg", "blockreturn");
 }
 
@@ -134,9 +135,10 @@ Send::SendInitializer Send::make(LocalRef recv, core::LocOffsets receiverLoc, co
     return SendInitializer(snd);
 }
 
+// NOTE(varun): loc copying
 Send::Send(LocalRef recv, core::LocOffsets receiverLoc, core::NameRef fun, core::LocOffsets funLoc, uint16_t numPosArgs,
            bool isPrivateOk, uint32_t numArgs)
-    : isPrivateOk(isPrivateOk), numPosArgs(numPosArgs), fun(fun), recv(recv), funLoc(funLoc), receiverLoc(receiverLoc),
+    : isPrivateOk(isPrivateOk), numPosArgs(numPosArgs), fun(fun), recv(recv, receiverLoc), funLoc(funLoc), receiverLoc(receiverLoc),
       numArgs(numArgs) {
     ENFORCE(numPosArgs <= numArgs, "Expected {} positional arguments, but only have {} args", numPosArgs, numArgs);
 
@@ -331,6 +333,10 @@ string TAbsurd::toString(const core::GlobalState &gs, const CFG &cfg) const {
 string TAbsurd::showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs) const {
     return fmt::format("TAbsurd {{\n{0}&nbsp;what = {1},\n{0}}}", spacesForTabLevel(tabs),
                        this->what.showRaw(gs, cfg, tabs + 1));
+}
+
+string LocalOccurrence::toString(const core::GlobalState &gs, core::FileRef file, const CFG &cfg) const {
+    return fmt::format("local_occ {} @ {}", this->variable.toString(gs, cfg), core::Loc(file, this->loc).toString(gs));
 }
 
 string KeepAlive::toString(const core::GlobalState &gs, const CFG &cfg) const {

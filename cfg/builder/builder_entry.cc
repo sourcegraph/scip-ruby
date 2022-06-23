@@ -75,12 +75,12 @@ unique_ptr<CFG> CFGBuilder::buildFor(CFGContext cctx, unique_ptr<CFG> res, absl:
     auto ctx = cctx.ctx;
     Timer timeit(ctx.state.tracer(), "cfg");
 
-    LocalRef retSym;
+    LocalOccurrence retSym;
     BasicBlock *entry = res->entry();
     BasicBlock *cont;
     {
         CFG::UnfreezeCFGLocalVariables unfreezeVars(*res);
-        retSym = cctx.newTemporary(core::Names::returnMethodTemp());
+        retSym = cctx.newTemporaryOccurrence(core::Names::returnMethodTemp());
 
         auto selfClaz = res->symbol.data(ctx)->rebind;
         if (!selfClaz.exists()) {
@@ -178,14 +178,15 @@ unique_ptr<CFG> CFGBuilder::buildFor(CFGContext cctx, unique_ptr<CFG> res, absl:
     } else {
         rvLoc = cont->exprs.back().loc;
     }
-    synthesizeExpr(cont, retSym1, rvLoc, make_insn<Return>(retSym, rvLoc)); // dead assign.
+    synthesizeExpr(cont, retSym1, rvLoc, make_insn<Return>(retSym.variable, rvLoc)); // dead assign.
     jumpToDead(cont, *res.get(), rvLoc);
 
     vector<Binding> aliasesPrefix;
     for (auto kv : cctx.aliases) {
         core::SymbolRef global = kv.first;
         LocalRef local = kv.second;
-        aliasesPrefix.emplace_back(local, core::LocOffsets::none(), make_insn<Alias>(global));
+        aliasesPrefix.emplace_back(LocalOccurrence::synthetic(local), core::LocOffsets::none(),
+                                   make_insn<Alias>(global));
         if (global.isFieldOrStaticField()) {
             res->minLoops[local.id()] = CFG::MIN_LOOP_FIELD;
         } else {
@@ -198,7 +199,7 @@ unique_ptr<CFG> CFGBuilder::buildFor(CFGContext cctx, unique_ptr<CFG> res, absl:
         }
     }
     for (auto kv : cctx.discoveredUndeclaredFields) {
-        aliasesPrefix.emplace_back(kv.second, core::LocOffsets::none(),
+        aliasesPrefix.emplace_back(LocalOccurrence::synthetic(kv.second), core::LocOffsets::none(),
                                    make_insn<Alias>(core::Symbols::Magic_undeclaredFieldStub(), kv.first));
         res->minLoops[kv.second.id()] = CFG::MIN_LOOP_FIELD;
     }
@@ -256,7 +257,7 @@ void CFGBuilder::fillInTopoSorts(core::Context ctx, CFG &cfg) {
     }
 }
 
-CFGContext CFGContext::withTarget(LocalRef target) {
+CFGContext CFGContext::withTarget(LocalOccurrence target) {
     auto ret = CFGContext(*this);
     ret.target = target;
     return ret;
