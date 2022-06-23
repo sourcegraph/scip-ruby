@@ -35,6 +35,19 @@ public:
     BlockExit() : cond(), thenb(nullptr), elseb(nullptr){};
 };
 
+/// A single entry in a CFG, nominally represented as an "assignment"
+/// of the form.
+///
+///  binding = <instruction>
+///
+/// The loc field is a source location for the entire Binding.
+/// For example, for an assignment in the source code:
+///     a = b
+///     ^^^^^
+///   loc for corresponding Binding
+///
+/// Individual instructions (such as Send) may track extra source locations
+/// for different parts of the RHS.
 class Binding final {
 public:
     VariableUseSite bind;
