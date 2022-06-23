@@ -23,7 +23,7 @@ public:
     explicit VariableUseSite(LocalRef local) : variable(local){};
     VariableUseSite(LocalRef local, core::TypePtr type) : variable(local), type(std::move(type)){};
     VariableUseSite(const VariableUseSite &) = delete;
-    const VariableUseSite &operator=(const VariableUseSite &rhs) = delete;
+    VariableUseSite &operator=(const VariableUseSite &rhs) = delete;
     VariableUseSite(VariableUseSite &&) = default;
     VariableUseSite &operator=(VariableUseSite &&rhs) = default;
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
