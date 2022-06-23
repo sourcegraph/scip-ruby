@@ -18,7 +18,7 @@ void CFGBuilder::conditionalJump(BasicBlock *from, LocalRef cond, BasicBlock *th
         ENFORCE(!from->bexit.isCondSet(), "condition for block already set");
         ENFORCE(from->bexit.thenb == nullptr, "thenb already set");
         ENFORCE(from->bexit.elseb == nullptr, "elseb already set");
-        from->bexit.cond = cond;
+        from->bexit.cond = LocalOccurrence::synthetic(cond);
         from->bexit.thenb = thenb;
         from->bexit.elseb = elseb;
         from->bexit.loc = loc;
@@ -33,7 +33,7 @@ void CFGBuilder::unconditionalJump(BasicBlock *from, BasicBlock *to, CFG &inWhat
         ENFORCE(!from->bexit.isCondSet(), "condition for block already set");
         ENFORCE(from->bexit.thenb == nullptr, "thenb already set");
         ENFORCE(from->bexit.elseb == nullptr, "elseb already set");
-        from->bexit.cond = LocalRef::unconditional();
+        from->bexit.cond = LocalOccurrence::synthetic(LocalRef::unconditional());
         from->bexit.elseb = to;
         from->bexit.thenb = to;
         from->bexit.loc = loc;
@@ -116,7 +116,7 @@ void CFGBuilder::jumpToDead(BasicBlock *from, CFG &inWhat, core::LocOffsets loc)
         ENFORCE(!from->bexit.isCondSet(), "condition for block already set");
         ENFORCE(from->bexit.thenb == nullptr, "thenb already set");
         ENFORCE(from->bexit.elseb == nullptr, "elseb already set");
-        from->bexit.cond = LocalRef::unconditional();
+        from->bexit.cond = LocalOccurrence::synthetic(LocalRef::unconditional());
         from->bexit.elseb = db;
         from->bexit.thenb = db;
         from->bexit.loc = loc;
@@ -124,9 +124,13 @@ void CFGBuilder::jumpToDead(BasicBlock *from, CFG &inWhat, core::LocOffsets loc)
     }
 }
 
-void CFGBuilder::synthesizeExpr(BasicBlock *bb, LocalRef var, core::LocOffsets loc, InstructionPtr inst) {
-    auto &inserted = bb->exprs.emplace_back(var, loc, move(inst));
+void CFGBuilder::synthesizeExpr(BasicBlock *bb, LocalOccurrence occ, core::LocOffsets loc, InstructionPtr inst) {
+    auto &inserted = bb->exprs.emplace_back(occ, loc, move(inst));
     inserted.value.setSynthetic();
+}
+
+void CFGBuilder::synthesizeExpr(BasicBlock *bb, LocalRef var, core::LocOffsets loc, InstructionPtr inst) {
+    synthesizeExpr(bb, LocalOccurrence::synthetic(var), loc, move(inst));
 }
 
 BasicBlock *CFGBuilder::walkHash(CFGContext cctx, ast::Hash &h, BasicBlock *current, core::NameRef method) {
@@ -135,8 +139,8 @@ BasicBlock *CFGBuilder::walkHash(CFGContext cctx, ast::Hash &h, BasicBlock *curr
     for (int i = 0; i < h.keys.size(); i++) {
         LocalRef keyTmp = cctx.newTemporary(core::Names::hashTemp());
         LocalRef valTmp = cctx.newTemporary(core::Names::hashTemp());
-        current = walk(cctx.withTarget(keyTmp), h.keys[i], current);
-        current = walk(cctx.withTarget(valTmp), h.values[i], current);
+        current = walk(cctx.withTarget(LocalOccurrence::synthetic(keyTmp)), h.keys[i], current);
+        current = walk(cctx.withTarget(LocalOccurrence::synthetic(valTmp)), h.values[i], current);
         vars.emplace_back(keyTmp);
         vars.emplace_back(valTmp);
         locs.emplace_back(h.keys[i].loc());
@@ -180,7 +184,7 @@ tuple<LocalRef, BasicBlock *, BasicBlock *> CFGBuilder::walkDefault(CFGContext c
     // Walk the default, and check the type of its final value
     // Walk the default, and check the type of its final value, but discard the result of the cast.
     auto result = cctx.newTemporary(core::Names::statTemp());
-    defaultNext = walk(cctx.withTarget(result), def, defaultNext);
+    defaultNext = walk(cctx.withTarget(LocalOccurrence::synthetic(result)), def, defaultNext);
 
     if (argInfo.type != nullptr) {
         auto tmp = cctx.newTemporary(core::Names::castTemp());
@@ -217,15 +221,17 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
 
                 LocalRef condSym = cctx.newTemporary(core::Names::whileTemp());
                 auto headerEnd =
-                    walk(cctx.withTarget(condSym).withLoopScope(headerBlock, continueBlock), a.cond, headerBlock);
+                    walk(cctx.withTarget(LocalOccurrence::synthetic(condSym)).withLoopScope(headerBlock, continueBlock),
+                         a.cond, headerBlock);
                 auto bodyBlock = cctx.inWhat.freshBlock(cctx.loops + 1, current->rubyRegionId);
                 conditionalJump(headerEnd, condSym, bodyBlock, breakNotCalledBlock, cctx.inWhat, a.cond.loc());
                 // finishHeader
                 LocalRef bodySym = cctx.newTemporary(core::Names::statTemp());
 
-                auto body = walk(
-                    cctx.withTarget(bodySym).withLoopScope(headerBlock, continueBlock).withLoopBreakTarget(cctx.target),
-                    a.body, bodyBlock);
+                auto body = walk(cctx.withTarget(LocalOccurrence::synthetic(bodySym))
+                                     .withLoopScope(headerBlock, continueBlock)
+                                     .withLoopBreakTarget(cctx.target.variable),
+                                 a.body, bodyBlock);
                 unconditionalJump(body, headerBlock, cctx.inWhat, a.loc);
 
                 synthesizeExpr(breakNotCalledBlock, cctx.target, a.loc, make_insn<Literal>(core::Types::nilClass()));
@@ -253,16 +259,17 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                  */
             },
             [&](ast::Return &a) {
-                LocalRef retSym = cctx.newTemporary(core::Names::returnTemp());
+                auto retSym = cctx.newTemporaryOccurrence(core::Names::returnTemp());
                 auto cont = walk(cctx.withTarget(retSym), a.expr, current);
-                cont->exprs.emplace_back(cctx.target, a.loc, make_insn<Return>(retSym, a.expr.loc())); // dead assign.
+                cont->exprs.emplace_back(cctx.target, a.loc,
+                                         make_insn<Return>(retSym.variable, a.expr.loc())); // dead assign.
                 jumpToDead(cont, cctx.inWhat, a.loc);
                 ret = cctx.inWhat.deadBlock();
             },
             [&](ast::If &a) {
                 LocalRef ifSym = cctx.newTemporary(core::Names::ifTemp());
                 ENFORCE(ifSym.exists(), "ifSym does not exist");
-                auto cont = walk(cctx.withTarget(ifSym), a.cond, current);
+                auto cont = walk(cctx.withTarget(LocalOccurrence::synthetic(ifSym)), a.cond, current);
                 auto thenBlock = cctx.inWhat.freshBlock(cctx.loops, current->rubyRegionId);
                 auto elseBlock = cctx.inWhat.freshBlock(cctx.loops, current->rubyRegionId);
                 conditionalJump(cont, ifSym, thenBlock, elseBlock, cctx.inWhat, a.cond.loc());
@@ -298,14 +305,13 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                 Exception::raise("Should have been eliminated by namer/resolver");
             },
             [&](ast::ConstantLit &a) {
-                auto aliasName = cctx.newTemporary(core::Names::cfgAlias());
+                auto aliasName = cctx.newTemporaryOccurrence(core::Names::cfgAlias());
                 if (a.symbol == core::Symbols::StubModule()) {
                     current->exprs.emplace_back(aliasName, a.loc, make_insn<Alias>(core::Symbols::untyped()));
                 } else {
                     current->exprs.emplace_back(aliasName, a.loc, make_insn<Alias>(a.symbol));
                 }
-
-                synthesizeExpr(current, cctx.target, a.loc, make_insn<Ident>(aliasName));
+                synthesizeExpr(current, cctx.target, a.loc, make_insn<Ident>(aliasName.variable));
 
                 if (a.original) {
                     auto *orig = ast::cast_tree<ast::UnresolvedConstantLit>(a.original);
@@ -314,10 +320,10 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                     // the **only** we'll ever want.
                     if (ast::isa_tree<ast::ConstantLit>(orig->scope)) {
                         LocalRef deadSym = cctx.newTemporary(core::Names::keepForIde());
-                        current = walk(cctx.withTarget(deadSym), orig->scope, current);
+                        current = walk(cctx.withTarget(LocalOccurrence::synthetic(deadSym)), orig->scope, current);
                     } else if (ast::isa_tree<ast::Send>(orig->scope)) {
                         LocalRef deadSym = cctx.newTemporary(core::Names::keepForIde());
-                        current = walk(cctx.withTarget(deadSym), orig->scope, current);
+                        current = walk(cctx.withTarget(LocalOccurrence::synthetic(deadSym)), orig->scope, current);
                     }
                 }
 
@@ -341,26 +347,66 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                     Exception::raise("should never be reached");
                 }
 
-                auto rhsCont = walk(cctx.withTarget(lhs), a.rhs, current);
+                auto locatedLhs = LocalOccurrence{lhs, a.lhs.loc()};
+                auto rhsCont = walk(cctx.withTarget(locatedLhs), a.rhs, current);
                 rhsCont->exprs.emplace_back(cctx.target, a.loc, make_insn<Ident>(lhs));
                 ret = rhsCont;
             },
             [&](ast::InsSeq &a) {
                 for (auto &exp : a.stats) {
                     LocalRef temp = cctx.newTemporary(core::Names::statTemp());
-                    current = walk(cctx.withTarget(temp), exp, current);
+                    current = walk(cctx.withTarget(LocalOccurrence::synthetic(temp)), exp, current);
                 }
                 ret = walk(cctx, a.expr, current);
             },
             [&](ast::Send &s) {
                 LocalRef recv;
 
-                // For performance, we do the name check first (single integer comparison in the
-                // common case)
-                if (s.fun == core::Names::absurd() && sendRecvIsT(s)) {
-                    if (s.hasKwArgs()) {
-                        if (auto e = cctx.ctx.beginError(s.loc, core::errors::CFG::MalformedTAbsurd)) {
-                            e.setHeader("`{}` does not accept keyword arguments", "T.absurd");
+                if (s.fun == core::Names::absurd()) {
+                    if (auto cnst = ast::cast_tree<ast::ConstantLit>(s.recv)) {
+                        if (cnst->symbol == core::Symbols::T()) {
+                            if (s.hasKwArgs()) {
+                                if (auto e = cctx.ctx.beginError(s.loc, core::errors::CFG::MalformedTAbsurd)) {
+                                    e.setHeader("`{}` does not accept keyword arguments", "T.absurd");
+                                }
+                                ret = current;
+                                return;
+                            }
+
+                            if (s.numPosArgs() != 1) {
+                                if (auto e = cctx.ctx.beginError(s.loc, core::errors::CFG::MalformedTAbsurd)) {
+                                    e.setHeader("`{}` expects exactly one argument but got `{}`", "T.absurd",
+                                                s.numPosArgs());
+                                }
+                                ret = current;
+                                return;
+                            }
+
+                            auto &posArg0 = s.getPosArg(0);
+                            if (!ast::isa_tree<ast::Local>(posArg0) && !ast::isa_tree<ast::UnresolvedIdent>(posArg0)) {
+                                if (auto e = cctx.ctx.beginError(s.loc, core::errors::CFG::MalformedTAbsurd)) {
+                                    // Providing a send is the most common way T.absurd is misused, so we provide a
+                                    // little extra hint in the error message in that case.
+                                    if (ast::isa_tree<ast::Send>(posArg0)) {
+                                        e.setHeader("`{}` expects to be called on a variable, not a method call",
+                                                    "T.absurd");
+                                    } else {
+                                        e.setHeader("`{}` expects to be called on a variable", "T.absurd");
+                                    }
+                                    e.addErrorLine(core::Loc(cctx.ctx.file, posArg0.loc()),
+                                                   "Assign this expression to a variable, and use it in both the "
+                                                   "conditional and the `{}` call",
+                                                   "T.absurd");
+                                }
+                                ret = current;
+                                return;
+                            }
+
+                            auto temp = cctx.newTemporary(core::Names::statTemp());
+                            current = walk(cctx.withTarget(LocalOccurrence::synthetic(temp)), posArg0, current);
+                            current->exprs.emplace_back(cctx.target, s.loc, make_insn<TAbsurd>(temp));
+                            ret = current;
+                            return;
                         }
                         ret = current;
                         return;
@@ -394,7 +440,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                     }
 
                     auto temp = cctx.newTemporary(core::Names::statTemp());
-                    current = walk(cctx.withTarget(temp), posArg0, current);
+                    current = walk(cctx.withTarget(LocalOccurrence::synthetic(temp)), posArg0, current);
                     current->exprs.emplace_back(cctx.target, s.loc, make_insn<TAbsurd>(temp));
                     ret = current;
                     return;
@@ -404,7 +450,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                 }
 
                 recv = cctx.newTemporary(core::Names::statTemp());
-                current = walk(cctx.withTarget(recv), s.recv, current);
+                current = walk(cctx.withTarget(LocalOccurrence::synthetic(recv)), s.recv, current);
 
                 InlinedVector<LocalRef, 2> args;
                 InlinedVector<core::LocOffsets, 2> argLocs;
@@ -412,7 +458,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                 for (auto argIdx = 0; argIdx < posEnd; ++argIdx) {
                     auto &exp = s.getPosArg(argIdx);
                     LocalRef temp = cctx.newTemporary(core::Names::statTemp());
-                    current = walk(cctx.withTarget(temp), exp, current);
+                    current = walk(cctx.withTarget(LocalOccurrence::synthetic(temp)), exp, current);
                     args.emplace_back(temp);
                     argLocs.emplace_back(exp.loc());
                 }
@@ -423,8 +469,8 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                     auto &val = s.getKwValue(argIdx);
                     LocalRef keyTmp = cctx.newTemporary(core::Names::hashTemp());
                     LocalRef valTmp = cctx.newTemporary(core::Names::hashTemp());
-                    current = walk(cctx.withTarget(keyTmp), key, current);
-                    current = walk(cctx.withTarget(valTmp), val, current);
+                    current = walk(cctx.withTarget(LocalOccurrence::synthetic(keyTmp)), key, current);
+                    current = walk(cctx.withTarget(LocalOccurrence::synthetic(valTmp)), val, current);
                     args.emplace_back(keyTmp);
                     args.emplace_back(valTmp);
                     argLocs.emplace_back(key.loc());
@@ -433,7 +479,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
 
                 if (auto *exp = s.kwSplat()) {
                     LocalRef temp = cctx.newTemporary(core::Names::statTemp());
-                    current = walk(cctx.withTarget(temp), *exp, current);
+                    current = walk(cctx.withTarget(LocalOccurrence::synthetic(temp)), *exp, current);
                     args.emplace_back(temp);
                     argLocs.emplace_back(exp->loc());
                 }
@@ -451,7 +497,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                                                 !!s.flags.isPrivateOk, link);
                     LocalRef sendTemp = cctx.newTemporary(core::Names::blockPreCallTemp());
                     auto solveConstraint = make_insn<SolveConstraint>(link, sendTemp);
-                    current->exprs.emplace_back(sendTemp, s.loc, move(send));
+                    current->exprs.emplace_back(LocalOccurrence::synthetic(sendTemp), s.loc, move(send));
                     LocalRef restoreSelf = cctx.newTemporary(core::Names::selfRestore());
                     synthesizeExpr(current, restoreSelf, core::LocOffsets::none(),
                                    make_insn<Ident>(LocalRef::selfVariable()));
@@ -464,15 +510,15 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                     auto bodyLoops = cctx.loops + 1;
                     auto bodyBlock = cctx.inWhat.freshBlock(bodyLoops, newRubyRegionId);
 
-                    LocalRef argTemp = cctx.newTemporary(core::Names::blkArg());
-                    bodyBlock->exprs.emplace_back(LocalRef::selfVariable(), s.loc,
+                    auto argTemp = cctx.newTemporaryOccurrence(core::Names::blkArg());
+                    bodyBlock->exprs.emplace_back(LocalOccurrence::synthetic(LocalRef::selfVariable()), s.loc,
                                                   make_insn<LoadSelf>(link, LocalRef::selfVariable()));
                     bodyBlock->exprs.emplace_back(argTemp, s.block()->loc, make_insn<LoadYieldParams>(link));
 
                     auto *argBlock = bodyBlock;
                     for (int i = 0; i < blockArgFlags.size(); ++i) {
                         auto &arg = blockArgFlags[i];
-                        LocalRef argLoc = cctx.inWhat.enterLocal(arg.local);
+                        auto argLoc = LocalOccurrence{cctx.inWhat.enterLocal(arg.local), arg.loc};
 
                         if (arg.flags.isRepeated) {
                             // Mixing positional and rest args in blocks is
@@ -516,8 +562,8 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                     unconditionalJump(current, headerBlock, cctx.inWhat, s.loc);
 
                     LocalRef blockrv = cctx.newTemporary(core::Names::blockReturnTemp());
-                    auto blockLast = walk(cctx.withTarget(blockrv)
-                                              .withBlockBreakTarget(cctx.target)
+                    auto blockLast = walk(cctx.withTarget(LocalOccurrence::synthetic(blockrv))
+                                              .withBlockBreakTarget(cctx.target.variable)
                                               .withLoopScope(headerBlock, postBlock, true)
                                               .withSendAndBlockLink(link),
                                           s.block()->body, argBlock);
@@ -565,11 +611,12 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
 
             [&](ast::Next &a) {
                 LocalRef exprSym = cctx.newTemporary(core::Names::nextTemp());
-                auto afterNext = walk(cctx.withTarget(exprSym), a.expr, current);
+                auto afterNext = walk(cctx.withTarget(LocalOccurrence::synthetic(exprSym)), a.expr, current);
                 if (afterNext != cctx.inWhat.deadBlock() && cctx.isInsideRubyBlock) {
                     LocalRef dead = cctx.newTemporary(core::Names::nextTemp());
                     ENFORCE(cctx.link.get() != nullptr);
-                    afterNext->exprs.emplace_back(dead, a.loc, make_insn<BlockReturn>(cctx.link, exprSym));
+                    afterNext->exprs.emplace_back(LocalOccurrence::synthetic(dead), a.loc,
+                                                  make_insn<BlockReturn>(cctx.link, exprSym));
                 }
 
                 if (cctx.nextScope == nullptr) {
@@ -587,7 +634,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
 
             [&](ast::Break &a) {
                 LocalRef exprSym = cctx.newTemporary(core::Names::returnTemp());
-                auto afterBreak = walk(cctx.withTarget(exprSym), a.expr, current);
+                auto afterBreak = walk(cctx.withTarget(LocalOccurrence::synthetic(exprSym)), a.expr, current);
 
                 // Here, since cctx.blockBreakTarget refers to something outside of the block,
                 // it will show up on the pinned variables list (with type of NilClass).
@@ -602,7 +649,8 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
 
                 // This is a temporary hack until we change how pining works to handle this case.
                 auto blockBreakAssign = cctx.newTemporary(core::Names::blockBreakAssign());
-                afterBreak->exprs.emplace_back(blockBreakAssign, a.loc, make_insn<Ident>(exprSym));
+                afterBreak->exprs.emplace_back(LocalOccurrence::synthetic(blockBreakAssign), a.loc,
+                                               make_insn<Ident>(exprSym));
 
                 // Only emit `<blockBreak>` in a block context
                 if (!cctx.breakIsJump) {
@@ -624,7 +672,8 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                                                    core::LocOffsets::none(), args.size(), args, locs, isPrivateOk));
                 }
 
-                afterBreak->exprs.emplace_back(cctx.blockBreakTarget, a.loc, make_insn<Ident>(blockBreakAssign));
+                afterBreak->exprs.emplace_back(LocalOccurrence::synthetic(cctx.blockBreakTarget), a.loc,
+                                               make_insn<Ident>(blockBreakAssign));
 
                 if (cctx.breakScope == nullptr) {
                     if (auto e = cctx.ctx.beginError(a.loc, core::errors::CFG::NoNextScope)) {
@@ -709,8 +758,8 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                     ENFORCE(local != nullptr, "rescue case var not a local?");
 
                     auto localVar = cctx.inWhat.enterLocal(local->localVariable);
-                    rescueHandlersBlock->exprs.emplace_back(localVar, rescueCase->var.loc(),
-                                                            make_insn<Ident>(exceptionValue));
+                    rescueHandlersBlock->exprs.emplace_back(LocalOccurrence{localVar, local->loc},
+                                                            rescueCase->var.loc(), make_insn<Ident>(exceptionValue));
 
                     // Mark the exception as handled
                     synthesizeExpr(caseBody, exceptionValue, core::LocOffsets::none(),
@@ -733,7 +782,8 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                     for (auto &ex : exceptions) {
                         auto loc = ex.loc();
                         auto exceptionClass = cctx.newTemporary(core::Names::exceptionClassTemp());
-                        rescueHandlersBlock = walk(cctx.withTarget(exceptionClass), ex, rescueHandlersBlock);
+                        rescueHandlersBlock =
+                            walk(cctx.withTarget(LocalOccurrence::synthetic(exceptionClass)), ex, rescueHandlersBlock);
 
                         auto isaCheck = cctx.newTemporary(core::Names::isaCheckTemp());
                         InlinedVector<cfg::LocalRef, 2> args;
@@ -741,7 +791,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                         args.emplace_back(exceptionClass);
 
                         auto isPrivateOk = false;
-                        rescueHandlersBlock->exprs.emplace_back(isaCheck, loc,
+                        rescueHandlersBlock->exprs.emplace_back(LocalOccurrence::synthetic(isaCheck), loc,
                                                                 make_insn<Send>(localVar, loc, core::Names::isA_p(),
                                                                                 core::LocOffsets::none(), args.size(),
                                                                                 args, argLocs, isPrivateOk));
@@ -766,7 +816,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                 unconditionalJump(rescueHandlersBlock, ensureBody, cctx.inWhat, a.loc);
 
                 auto throwAway = cctx.newTemporary(core::Names::throwAwayTemp());
-                ensureBody = walk(cctx.withTarget(throwAway), a.ensure, ensureBody);
+                ensureBody = walk(cctx.withTarget(LocalOccurrence::synthetic(throwAway)), a.ensure, ensureBody);
                 ret = cctx.inWhat.freshBlock(cctx.loops, current->rubyRegionId);
                 conditionalJump(ensureBody, gotoDeadTemp, cctx.inWhat.deadBlock(), ret, cctx.inWhat, a.loc);
             },
@@ -778,7 +828,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                 InlinedVector<core::LocOffsets, 2> locs;
                 for (auto &elem : a.elems) {
                     LocalRef tmp = cctx.newTemporary(core::Names::arrayTemp());
-                    current = walk(cctx.withTarget(tmp), elem, current);
+                    current = walk(cctx.withTarget(LocalOccurrence::synthetic(tmp)), elem, current);
                     vars.emplace_back(tmp);
                     locs.emplace_back(a.loc);
                 }
@@ -795,15 +845,16 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
             [&](ast::Cast &c) {
                 LocalRef tmp = cctx.newTemporary(core::Names::castTemp());
                 core::LocOffsets argLoc = c.arg.loc();
-                current = walk(cctx.withTarget(tmp), c.arg, current);
+                current = walk(cctx.withTarget(LocalOccurrence::synthetic(tmp)), c.arg, current);
                 if (c.cast == core::Names::uncheckedLet()) {
                     current->exprs.emplace_back(cctx.target, c.loc, make_insn<Ident>(tmp));
                 } else if (c.cast == core::Names::bind() || c.cast == core::Names::syntheticBind()) {
                     auto isSynthetic = c.cast == core::Names::syntheticBind();
                     if (c.arg.isSelfReference()) {
                         auto self = cctx.inWhat.enterLocal(core::LocalVariable::selfVariable());
-                        auto &inserted = current->exprs.emplace_back(
-                            self, c.loc, make_insn<Cast>(tmp, argLoc, c.type, core::Names::cast()));
+                        auto &inserted =
+                            current->exprs.emplace_back(LocalOccurrence::synthetic(self), c.loc,
+                                                        make_insn<Cast>(tmp, argLoc, c.type, core::Names::cast()));
                         if (isSynthetic) {
                             inserted.value.setSynthetic();
                         }
@@ -811,7 +862,8 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
 
                         if (cctx.rescueScope) {
                             cctx.rescueScope->exprs.emplace_back(
-                                self, c.loc, make_insn<Cast>(tmp, argLoc, c.type, core::Names::cast()));
+                                LocalOccurrence::synthetic(self), c.loc,
+                                make_insn<Cast>(tmp, argLoc, c.type, core::Names::cast()));
                             cctx.rescueScope->exprs.emplace_back(cctx.target, c.loc, make_insn<Ident>(self));
                         }
                     } else {
@@ -823,7 +875,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                     current->exprs.emplace_back(cctx.target, c.loc, make_insn<Cast>(tmp, argLoc, c.type, c.cast));
                 }
                 if (c.cast == core::Names::let()) {
-                    cctx.inWhat.minLoops[cctx.target.id()] = CFG::MIN_LOOP_LET;
+                    cctx.inWhat.minLoops[cctx.target.variable.id()] = CFG::MIN_LOOP_LET;
                 }
 
                 ret = current;
@@ -858,5 +910,9 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
 
 LocalRef CFGContext::newTemporary(core::NameRef name) {
     return inWhat.enterLocal(core::LocalVariable{name, ++temporaryCounter});
+}
+
+LocalOccurrence CFGContext::newTemporaryOccurrence(core::NameRef name) {
+    return LocalOccurrence::synthetic(newTemporary(name));
 }
 } // namespace sorbet::cfg

@@ -70,7 +70,8 @@ void InstructionPtr::deleteTagged(Tag tag, void *expr) noexcept {
 #undef DELETE_INSN
 }
 
-Return::Return(LocalRef what, core::LocOffsets whatLoc) : what(what), whatLoc(whatLoc) {
+// NOTE(varun): loc copying
+Return::Return(LocalRef what, core::LocOffsets whatLoc) : what(what, whatLoc), whatLoc(whatLoc) {
     categoryCounterInc("cfg", "return");
 }
 
@@ -91,7 +92,9 @@ string Return::showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs) co
                        this->what.showRaw(gs, cfg, tabs + 1));
 }
 
-BlockReturn::BlockReturn(shared_ptr<core::SendAndBlockLink> link, LocalRef what) : link(std::move(link)), what(what) {
+// TODO(varun): Should we pass in a location here?
+BlockReturn::BlockReturn(shared_ptr<core::SendAndBlockLink> link, LocalRef what)
+    : link(std::move(link)), what(VariableUseSite::synthetic(what)) {
     categoryCounterInc("cfg", "blockreturn");
 }
 
@@ -117,11 +120,12 @@ string LoadSelf::showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs) 
     return fmt::format("LoadSelf {{ link = {} }}", this->link->fun.showRaw(gs));
 }
 
+// NOTE(varun): loc copying
 Send::Send(LocalRef recv, core::LocOffsets receiverLoc, core::NameRef fun, core::LocOffsets funLoc, uint16_t numPosArgs,
            const InlinedVector<LocalRef, 2> &args, InlinedVector<core::LocOffsets, 2> argLocs, bool isPrivateOk,
            const shared_ptr<core::SendAndBlockLink> &link)
-    : isPrivateOk(isPrivateOk), numPosArgs(numPosArgs), fun(fun), recv(recv), funLoc(funLoc), receiverLoc(receiverLoc),
-      argLocs(std::move(argLocs)), link(move(link)) {
+    : isPrivateOk(isPrivateOk), numPosArgs(numPosArgs), fun(fun), recv(recv, receiverLoc), funLoc(funLoc),
+      receiverLoc(receiverLoc), argLocs(std::move(argLocs)), link(move(link)) {
     ENFORCE(numPosArgs <= args.size(), "Expected {} positional arguments, but only have {} args", numPosArgs,
             args.size());
 
@@ -304,6 +308,10 @@ string TAbsurd::toString(const core::GlobalState &gs, const CFG &cfg) const {
 string TAbsurd::showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs) const {
     return fmt::format("TAbsurd {{\n{0}&nbsp;what = {1},\n{0}}}", spacesForTabLevel(tabs),
                        this->what.showRaw(gs, cfg, tabs + 1));
+}
+
+string LocalOccurrence::toString(const core::GlobalState &gs, core::FileRef file, const CFG &cfg) const {
+    return fmt::format("local_occ {} @ {}", this->variable.toString(gs, cfg), core::Loc(file, this->loc).toString(gs));
 }
 
 string VariableUseSite::toString(const core::GlobalState &gs, const CFG &cfg) const {
