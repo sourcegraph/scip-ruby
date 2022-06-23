@@ -108,9 +108,13 @@ INSN(Send) : public Instruction {
 public:
     bool isPrivateOk;
     uint16_t numPosArgs;
+    /// The method name, i.e. 'f' in 'x.f(<args>)'.
     core::NameRef fun;
+    /// The receiver for the messsage send, i.e. 'x' in 'x.f(<args>)'.
     VariableUseSite recv;
+    /// Source location for 'f' in 'x.f(<args>)'.
     core::LocOffsets funLoc;
+    /// Source location for 'x' in 'x.f(<args>)'.
     core::LocOffsets receiverLoc;
     InlinedVector<VariableUseSite, 2> args;
     InlinedVector<core::LocOffsets, 2> argLocs;
