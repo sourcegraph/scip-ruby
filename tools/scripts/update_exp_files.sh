@@ -11,6 +11,6 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
 ./bazel test \
   //gems/sorbet-runtime:update_call_validation \
-  //test/cli:update //test/lsp:update -c opt "$@"
+  //test/cli:update //test/lsp:update //test/scip:update -c opt "$@"
 
 tools/scripts/update_testdata_exp.sh

@@ -53,6 +53,7 @@ _TEST_RUNNERS = {
     "PrismPosTests": ":pipeline_test_runner",
     "LSPTests": ":lsp_test_runner",
     "PrismLSPTests": ":lsp_test_runner",
+    "SCIPTests": ":scip_test_runner",
     "WhitequarkParserTests": ":parser_test_runner",
     "PackagerTests": ":pipeline_test_runner",
 }
