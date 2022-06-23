@@ -11,18 +11,49 @@
 #include <memory>
 
 namespace sorbet::cfg {
+
+/// Convenience type for representing a local variable with its source range
+/// but without a type.
+struct LocalOccurrence final {
+    LocalRef variable;
+    /// Original source location for this occurrence, potentially non-existent
+    /// (such as for temporaries generated during lowering).
+    core::LocOffsets loc;
+
+    static LocalOccurrence synthetic(LocalRef variable) {
+        return {variable, core::LocOffsets::none()};
+    }
+
+    std::string toString(const core::GlobalState &gs, core::FileRef file, const CFG &cfg) const;
+};
+
 class VariableUseSite final {
 public:
     LocalRef variable;
     core::TypePtr type;
+    core::LocOffsets loc;
     VariableUseSite() = default;
-    VariableUseSite(LocalRef local) : variable(local){};
+    VariableUseSite(LocalRef local, core::LocOffsets loc) : variable(local), loc(loc){};
     VariableUseSite(const VariableUseSite &) = delete;
     VariableUseSite &operator=(const VariableUseSite &rhs) = delete;
+    VariableUseSite &operator=(LocalOccurrence l) { // HACK(varun): For assignments from maybeDealias
+        this->variable = l.variable;
+        this->loc = l.loc;
+        return *this;
+    }
     VariableUseSite(VariableUseSite &&) = default;
     VariableUseSite &operator=(VariableUseSite &&rhs) = default;
+
+    static VariableUseSite synthetic(LocalRef local) {
+        return VariableUseSite(local, core::LocOffsets::none());
+    }
+    // TODO(varun): These need to take a FileRef to also print the source location.
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs = 0) const;
+
+    LocalOccurrence occurrence() const {
+        return {this->variable, this->loc};
+    }
 };
 
 // TODO: convert it to implicitly numbered instead of explicitly bound
@@ -242,8 +273,8 @@ public:
     uint16_t argId;
     VariableUseSite yieldParam;
 
-    YieldLoadArg(uint16_t argId, core::ArgInfo::ArgFlags flags, LocalRef yieldParam)
-        : flags(flags), argId(argId), yieldParam(yieldParam) {
+    YieldLoadArg(uint16_t argId, core::ArgInfo::ArgFlags flags, LocalOccurrence yieldParam)
+        : flags(flags), argId(argId), yieldParam(yieldParam.variable, yieldParam.loc) {
         categoryCounterInc("cfg", "yieldloadarg");
     }
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
@@ -258,8 +289,9 @@ public:
     core::LocOffsets valueLoc;
     core::TypePtr type;
 
+    // NOTE(varun): loc copying
     Cast(LocalRef value, core::LocOffsets valueLoc, const core::TypePtr &type, core::NameRef cast)
-        : cast(cast), value(value), valueLoc(valueLoc), type(type) {
+        : cast(cast), value(VariableUseSite(value, valueLoc)), valueLoc(valueLoc), type(type) {
         categoryCounterInc("cfg", "cast");
     }
 
@@ -272,7 +304,8 @@ INSN(TAbsurd) : public Instruction {
 public:
     VariableUseSite what;
 
-    TAbsurd(LocalRef what) : what(what) {
+    // TODO(varun): Add location here?
+    TAbsurd(LocalRef what) : what(VariableUseSite::synthetic(what)) {
         categoryCounterInc("cfg", "tabsurd");
     }
 

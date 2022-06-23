@@ -55,7 +55,7 @@ public:
 
     InstructionPtr value;
 
-    Binding(LocalRef bind, core::LocOffsets loc, InstructionPtr value);
+    Binding(LocalOccurrence bind, core::LocOffsets loc, InstructionPtr value);
     Binding(Binding &&other) = default;
     Binding() = default;
 

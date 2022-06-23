@@ -358,7 +358,7 @@ string BasicBlock::showRaw(const core::GlobalState &gs, const CFG &cfg) const {
     return to_string(buf);
 }
 
-Binding::Binding(LocalRef bind, core::LocOffsets loc, InstructionPtr value)
-    : bind(bind), loc(loc), value(std::move(value)) {}
+Binding::Binding(LocalOccurrence bind, core::LocOffsets loc, InstructionPtr value)
+    : bind(bind.variable, bind.loc), loc(loc), value(std::move(value)) {}
 
 } // namespace sorbet::cfg
