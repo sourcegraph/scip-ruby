@@ -58,6 +58,43 @@ cc_binary(
 )
 
 cc_binary(
+    name = "scip_test_runner",
+    testonly = 1,
+    srcs = [
+        "scip_test_runner.cc"
+    ],
+    linkstatic = select({
+        "//tools/config:linkshared": 0,
+        "//conditions:default": 1,
+    }),
+    visibility = ["//tools:__pkg__", "//test/scip:__pkg__"],
+    deps = [ # TODO(varun): Revisit dependencies after rewriting test runner.
+        "//ast/desugar",
+        "//ast/treemap",
+        "//cfg/builder",
+        "//class_flatten",
+        "//common/web_tracer_framework:tracing",
+        "//core/serialize",
+        "//definition_validator",
+        "//infer",
+        "//local_vars",
+        "//main/autogen", # TODO(varun): why is this needed?
+        "//namer",
+        "//payload",
+        "//proto",
+        "//resolver",
+        "//rewriter",
+        "//scip_indexer:interface",
+        "//scip_indexer:scip_indexer",
+        "//test/helpers",
+        "@com_google_absl//absl/strings",
+        "@cxxopts",
+        "@doctest",
+        "@doctest//:doctest_custom_main",
+    ]
+)
+
+cc_binary(
     name = "parser_test_runner",
     testonly = 1,
     srcs = [
@@ -249,6 +286,17 @@ pipeline_tests(
         "whitequark/**/*.exp",
     ]),
     "WhitequarkParserTests",
+)
+
+pipeline_tests(
+    "test_corpus_scip",
+    glob(
+        [
+            "testdata/scip/**/*.rb",
+            "testdata/scip/**/*.exp",
+        ],
+    ),
+    "SCIPTests",
 )
 
 pipeline_tests(

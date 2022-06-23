@@ -119,6 +119,7 @@ compilation_database(
         "//test:lsp_test_runner",
         "//test:parser_test_runner",
         "//test:pipeline_test_runner",
+        "//test:scip_test_runner",
         "//test:pkg-autocorrects-test",
         "//test:print_document_symbols",
         "//test/fuzz:fuzz_dash_e",
