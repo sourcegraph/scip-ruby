@@ -4,6 +4,12 @@
 
 # Sorbet
 
+NOTE: This code is in Sourcegraph's fork of Sorbet, modified to add support
+for emitting SCIP indexes. See scip-ruby.md for details on running tests etc.
+The original README follows below.
+
+---
+
 This repository contains Sorbet, a fast, powerful type checker designed for Ruby.
 It aims to be easy to add to existing codebases with gradual types, and fast to
 respond with errors and suggestions.
