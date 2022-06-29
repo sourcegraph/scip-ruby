@@ -107,8 +107,12 @@ static bool isTemporary(const core::GlobalState &gs, const core::LocalVariable &
     if (var.isSyntheticTemporary()) {
         return true;
     }
-    return var._name == Names::finalReturn() || var._name == Names::blockPreCallTemp() ||
-           var._name == Names::blockTemp() || var._name == Names::blockPassTemp() || var._name == Names::forTemp();
+    auto n = var._name;
+    return n == Names::blockPreCallTemp() || n == Names::blockTemp() || n == Names::blockPassTemp() ||
+           n == Names::forTemp() || n == Names::blkArg() || n == Names::blockCall() ||
+           // Insert checks because sometimes temporaries are initialized with a 0 unique value. 😬
+           n == Names::finalReturn() || n == NameRef::noName() || n == Names::blockCall() || n == Names::selfLocal() ||
+           n == Names::unconditional();
 }
 
 struct LocalOccurrence {
