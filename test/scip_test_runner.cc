@@ -13,6 +13,7 @@
 #include <sys/types.h>
 #include <vector>
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 
@@ -239,9 +240,15 @@ void formatSnapshot(const scip::Document &document, std::ostream &out) {
     }
 }
 
+string snapshot_path(string rb_path) {
+    ENFORCE(absl::EndsWith(rb_path, ".rb"));
+    rb_path.erase(rb_path.size() - 3, 3);
+    return rb_path + ".snapshot.rb";
+}
+
 void updateSnapshots(const scip::Index &index, const std::filesystem::path &outputDir) {
     for (auto &doc : index.documents()) {
-        auto outputFilePath = doc.relative_path() + ".snapshot";
+        auto outputFilePath = snapshot_path(doc.relative_path());
         ofstream out(outputFilePath);
         if (!out.is_open()) {
             FAIL(fmt::format("failed to open snapshot output file at {}", outputFilePath));
@@ -252,7 +259,7 @@ void updateSnapshots(const scip::Index &index, const std::filesystem::path &outp
 
 void compareSnapshots(const scip::Index &index, const std::filesystem::path &snapshotDir) {
     for (auto &doc : index.documents()) {
-        auto filePath = doc.relative_path() + ".snapshot"; // TODO: Separate out folders!
+        auto filePath = snapshot_path(doc.relative_path()); // TODO: Separate out folders!
         ifstream inputStream(filePath);
         if (!inputStream.is_open()) {
             FAIL(fmt::format("failed to open snapshot file at {}", filePath));

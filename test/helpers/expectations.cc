@@ -77,8 +77,10 @@ bool addToExpectations(Expectations &exp, string_view filePath, bool isDirectory
         exp.minimizeRBI = filePath;
         return true;
     } else if (absl::EndsWith(filePath, ".rb") || absl::EndsWith(filePath, ".rbi")) {
-        exp.sourceFiles.emplace_back(filePath);
-        return true;
+        if (!absl::EndsWith(filePath, ".snapshot.rb")) {
+            exp.sourceFiles.emplace_back(filePath);
+            return true;
+        }
     } else if (absl::EndsWith(filePath, ".exp")) {
         auto kind_start = filePath.rfind(".", filePath.size() - strlen(".exp") - 1);
         auto kind = filePath.substr(kind_start + 1, filePath.size() - kind_start - strlen(".exp") - 1);
