@@ -1,11 +1,11 @@
 def basename(p):
     return p.rpartition("/")[-1]
 
-def extension(p):
-    ext = basename(p).partition(".")[-1]
-    if ext == ",": # partition returns "," if there is no match 🙃
-        return ""
-    return ext
+def split_extension(p):
+    (before, _, ext) = basename(p).rpartition(".")
+    if before == "":
+        (before, ext) = (ext, "")
+    return (before, ext)
 
 def scip_test_suite(paths):
     tests = []
@@ -28,16 +28,16 @@ def scip_test_suite(paths):
 def scip_test(path):
     # path will end in either .snapshot, .rb or have no extension.
 
-    ext = extension(path)
-    if ext == "snapshot":
-        return 
-    
+    filename, ext = split_extension(path)
     if ext != "rb":
         # TODO(varun): Add support for folder tests, when there is no extension
         return None
+    test_name, other_ext = split_extension(filename)
+    if other_ext != "":
+        # Don't make separate tests for .snapshot.rb files
+        return None
 
-    test_name = basename(path).partition(".")[0]
-    snapshot_path = path + ".snapshot"
+    snapshot_path = path[:-3] + ".snapshot.rb"
     args = ["$(location {})".format(path), "--output=$(location {})".format(snapshot_path)]
     data = [path, snapshot_path, "//test:scip_test_runner"]
     native.sh_test(
