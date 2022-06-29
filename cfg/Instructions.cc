@@ -130,9 +130,11 @@ Send::Send(LocalRef recv, core::LocOffsets receiverLoc, core::NameRef fun, core:
             args.size());
 
     this->args.resize(args.size());
+    ENFORCE(this->args.size() == this->argLocs.size(), "Expected number of args and argLocs to match");
     int i = 0;
     for (const auto &e : args) {
         this->args[i].variable = e;
+        this->args[i].loc = this->argLocs[i]; // NOTE(varun): loc copying
         i++;
     }
     categoryCounterInc("cfg", "send");
