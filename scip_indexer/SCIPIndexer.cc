@@ -524,6 +524,10 @@ public:
                             this->emitLocalOccurrence(cfg, bb, send->recv.occurrence(), ValueCategory::RValue);
                         }
 
+                        // TODO:(varun) For arrays, hashes etc., try to identify if the function
+                        // matches a known operator (e.g. []=), and emit an appropriate 'WriteAccess'
+                        // symbol role for it.
+
                         // Emit reference for the method being called
                         if (send->fun.exists() && !isTemporary(gs, core::LocalVariable(send->fun, 1))) {
                             // HACK(varun): We should probably add a helper function to check
