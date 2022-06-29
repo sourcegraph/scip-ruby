@@ -292,7 +292,7 @@ TEST_CASE("SCIPTest") {
     using Provider = pipeline::semantic_extension::SemanticExtensionProvider;
 
     auto indexFilePath = filesystem::temp_directory_path();
-    indexFilePath.concat(test.basename + ".scip"); // FIXME(varun): Update for folder tests with multiple files?
+    indexFilePath.append(test.basename + ".scip"); // FIXME(varun): Update for folder tests with multiple files?
 
     auto providers = Provider::getProviders();
     ENFORCE(providers.size() == 1);
