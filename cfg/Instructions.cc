@@ -130,8 +130,11 @@ Send::Send(LocalRef recv, core::LocOffsets receiverLoc, core::NameRef fun, core:
             args.size());
 
     this->args.reserve(args.size());
+    ENFORCE(args.size() == this->argLocs.size(), "Expected number of args and argLocs to match");
+    unsigned i = 0;
     for (const auto &e : args) {
-        this->args.emplace_back(e);
+        this->args.emplace_back(e, this->argLocs[i]); // NOTE(varun): loc copying
+        i++;
     }
     categoryCounterInc("cfg", "send");
     histogramInc("cfg.send.args", this->args.size());
