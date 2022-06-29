@@ -188,8 +188,14 @@ void formatSnapshot(const scip::Document &document, std::ostream &out) {
             }
             bool isDefinition = ((unsigned(occ.symbol_roles()) & unsigned(scip::SymbolRole::Definition)) > 0);
 
+            string symbolRole = "";
+            if (!isDefinition && (occ.symbol_roles() & scip::SymbolRole::WriteAccess)) {
+                symbolRole = (occ.symbol_roles() & scip::SymbolRole::ReadAccess) ? "(read+write) " : "(write) ";
+            }
+
             out << '#' << string(range.start.column - 1, ' ') << string(range.end.column - range.start.column, '^')
-                << ' ' << string(isDefinition ? "definition" : "reference") << ' ' << formatSymbol(occ.symbol());
+                << ' ' << string(isDefinition ? "definition" : "reference") << ' ' << symbolRole
+                << formatSymbol(occ.symbol());
             if (!(isDefinition && symbolTable.contains(occ.symbol()))) {
                 out << '\n';
                 occ_i++;
