@@ -518,29 +518,37 @@ public:
                     case cfg::Tag::Send: {
                         // emit occurrence for function
                         auto send = cfg::cast_instruction<cfg::Send>(binding.value);
-                        if (!send->fun.exists()) {
-                            // TODO(varun): when does this happen?
-                            continue;
-                        }
+
                         // Emit reference for the receiver, if present.
                         if (send->recv.loc.exists() && !send->recv.loc.empty()) {
                             this->emitLocalOccurrence(cfg, bb, send->recv.occurrence(), ValueCategory::RValue);
                         }
 
                         // Emit reference for the method being called
-                        if (!isTemporary(gs, core::LocalVariable(send->fun, 1))) {
+                        if (send->fun.exists() && !isTemporary(gs, core::LocalVariable(send->fun, 1))) {
                             // HACK(varun): We should probably add a helper function to check
                             // for names corresponding to temporaries? Making up a fake local
                             // variable seems a little gross.
                             auto funSym = lookupRecursive(gs, method, send->fun);
-                            if (!funSym.exists()) {
-                                print_err("# lookup for fun symbol {} failed\n", send->fun.shortName(gs));
-                                continue;
+                            if (funSym.exists()) {
+                                ENFORCE(send->funLoc.exists() && !send->funLoc.empty());
+                                auto status =
+                                    this->scipState.saveReference(gs, this->ctx.file, funSym, send->funLoc, 0);
+                                ENFORCE(status.ok());
                             }
-                            ENFORCE(send->funLoc.exists());
-                            ENFORCE(!send->funLoc.empty());
-                            auto status = this->scipState.saveReference(gs, this->ctx.file, funSym, send->funLoc, 0);
-                            ENFORCE_NO_TIMER(status.ok());
+                            print_err("# lookup for fun symbol {} failed\n", send->fun.shortName(gs));
+                        }
+
+                        // Emit references for arguments
+                        for (auto &arg : send->args) {
+                            // NOTE: For constructs like a += b, the instruction sequence ends up being:
+                            //   $tmp = $b
+                            //   $a = $tmp.+($b)
+                            // The location for $tmp will point to $a in the source. However, the second one is a read,
+                            // and the first one is a write. Instead of emitting two occurrences, it'd be nice to emit
+                            // a combined read-write occurrence. However, that would require complicating the code a
+                            // bit, so let's leave it as-is for now.
+                            this->emitLocalOccurrence(cfg, bb, arg.occurrence(), ValueCategory::RValue);
                         }
 
                         break;
