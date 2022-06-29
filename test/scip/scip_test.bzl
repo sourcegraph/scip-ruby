@@ -47,7 +47,7 @@ def scip_test(path):
         data = data,
         size = "small",
     )
-    update_test_name = "update_".format(test_name) 
+    update_test_name = "update_{}".format(test_name)
     native.sh_test(
         name = update_test_name,
         srcs = ["scip_test_runner.sh"],
