@@ -11,14 +11,14 @@
    if x == 1
 #     ^ reference local 1~#2393773952
      y = 2
-#    ^ definition local 2~#2393773952
+#    ^ reference (write) local 2~#2393773952
    elsif x == 2
 #        ^ reference local 1~#2393773952
      y = 3
-#    ^ definition local 2~#2393773952
+#    ^ reference (write) local 2~#2393773952
    else
      y = x
-#    ^ definition local 2~#2393773952
+#    ^ reference (write) local 2~#2393773952
 #        ^ reference local 1~#2393773952
    end
  
