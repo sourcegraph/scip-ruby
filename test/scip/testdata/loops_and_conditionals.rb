@@ -20,4 +20,6 @@ def if_elsif_else()
       x+1
     end
   z = z if z != 10
+
+  return
 end
