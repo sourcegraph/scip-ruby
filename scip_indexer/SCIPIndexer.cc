@@ -182,11 +182,6 @@ InlinedVector<int32_t, 4> fromSorbetLoc(const core::GlobalState &gs, core::Loc l
     return r;
 }
 
-enum class Check : bool {
-    Definition = true,
-    WriteReference = false,
-};
-
 absl::StatusOr<core::Loc> occurrenceLoc(const core::GlobalState &gs, const core::SymbolRef symRef) {
     // FIXME(varun): For methods, this returns the full line!
     return symRef.loc(gs);
@@ -199,7 +194,16 @@ class SCIPState {
 public:
     UnorderedMap<core::FileRef, vector<scip::Occurrence>> occurrenceMap;
     UnorderedMap<core::FileRef, vector<scip::SymbolInformation>> symbolMap;
-    UnorderedMap<core::Loc, std::pair<OwnedLocal, Check>> savedLocalLValues;
+    // Cache of occurrences for locals that have been emitted in this function.
+    //
+    // Note that the SymbolRole is a part of the key too, because we can
+    // have a read-reference and write-reference at the same location
+    // (we don't merge those for now).
+    //
+    // The 'value' in the map is purely for sanity-checking. It's a bit
+    // cumbersome to conditionalize the type to be a set in non-debug and
+    // map in debug, so keeping it a map.
+    UnorderedMap<std::pair<core::LocOffsets, /*SymbolRole*/ int32_t>, uint32_t> localOccurrenceCache;
     vector<scip::Document> documents;
     vector<scip::SymbolInformation> externalSymbols;
 
@@ -276,33 +280,43 @@ private:
     // Returns true if there was a cache hit.
     //
     // Otherwise, inserts the location into the cache and returns false.
-    bool cacheLValueOccurrence(const core::GlobalState &gs, core::Loc loc, Check check, OwnedLocal occ) {
+    bool cacheOccurrence(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ, int32_t symbolRoles) {
         // Optimization:
-        //   Avoid emitting duplicate defs/write-refs for locals.
+        //   Avoid emitting duplicate defs/refs for locals.
         //   This can happen with constructs like:
         //     z = if cond then expr else expr end
         //   When this is lowered to a CFG, we will end up with
         //   multiple bindings with the same LHS location.
         //
-        // This also makes snapshot output cleaner.
-        auto [it, inserted] = this->savedLocalLValues.insert({loc, {occ, check}});
+        //   Repeated reads for the same occurrence can happen for rvalues too.
+        //   If the compiler has proof that a scrutinee variable is not modified,
+        //   each comparison in a case will perform a read.
+        //     case x
+        //       when 0 then <stuff>
+        //       when 1 then <stuff>
+        //       else <stuff>
+        //     end
+        //   The CFG for this involves two reads for x in calls to ==.
+        //   (This wouldn't have happened if x was always stashed away into
+        //    a temporary first, but the temporary only appears in the CFG if
+        //    evaluating one of the cases has a chance to modify x.)
+        auto [it, inserted] = this->localOccurrenceCache.insert({{occ.offsets, symbolRoles}, occ.counter});
         if (inserted) {
             return false;
         }
-        auto [savedOcc, isDefinition] = it->second;
-        ENFORCE(isDefinition == check, "mixed reference and definition at same location {}", loc.showRaw(gs));
-        ENFORCE(occ.counter == savedOcc.counter, "cannot have distinct local variable {} at same location {}",
-                bool(check) ? "definitions" : "references", loc.showRaw(gs));
+        auto savedCounter = it->second;
+        ENFORCE(occ.counter == savedCounter, "cannot have distinct local variable {} at same location {}",
+                (symbolRoles & scip::SymbolRole::Definition) ? "definitions" : "references",
+                core::Loc(file, occ.offsets).showRaw(gs));
         return true;
     }
 
 public:
     absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ) {
-        auto loc = core::Loc(file, occ.offsets);
-        if (cacheLValueOccurrence(gs, loc, Check::Definition, occ)) {
+        if (this->cacheOccurrence(gs, file, occ, scip::SymbolRole::Definition)) {
             return absl::OkStatus();
         }
-        return this->saveDefinitionImpl(gs, file, occ.toString(gs, file), loc);
+        return this->saveDefinitionImpl(gs, file, occ.toString(gs, file), core::Loc(file, occ.offsets));
     }
 
     // Save definition when you have a sorbet Symbol.
@@ -327,8 +341,7 @@ public:
     }
 
     absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ, int32_t symbol_roles) {
-        if ((symbol_roles & scip::SymbolRole::WriteAccess) != 0 &&
-            this->cacheLValueOccurrence(gs, core::Loc(file, occ.offsets), Check::WriteReference, occ)) {
+        if (this->cacheOccurrence(gs, file, occ, symbol_roles)) {
             return absl::OkStatus();
         }
         return this->saveReferenceImpl(gs, file, occ.toString(gs, file), occ.offsets, symbol_roles);

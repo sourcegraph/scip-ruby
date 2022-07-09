@@ -11,6 +11,8 @@ class MutableContext;
 
 constexpr int INVALID_POS_LOC = 0xfffffff;
 struct LocOffsets {
+    template <typename H> friend H AbslHashValue(H h, const LocOffsets &m);
+
     uint32_t beginLoc = INVALID_POS_LOC;
     uint32_t endLoc = INVALID_POS_LOC;
     uint32_t beginPos() const {
@@ -51,6 +53,9 @@ struct LocOffsets {
 };
 CheckSize(LocOffsets, 8, 4);
 
+template <typename H> H AbslHashValue(H h, const LocOffsets &m) {
+    return H::combine(std::move(h), m.beginLoc, m.endLoc);
+}
 } // namespace sorbet::core
 
 #endif // SORBET_CORE_LOCOFFSETS_H
