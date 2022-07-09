@@ -23,3 +23,32 @@ def if_elsif_else()
 
   return
 end
+
+def unless()
+  z = 0
+  x = 1
+  unless z == 9
+    z = 9
+  end
+
+  unless x == 10
+    x = 3
+  else
+    x = 2
+  end
+  return
+end
+
+def case(x, y)
+  case x
+    when 0
+      x = 3
+    when y
+      x = 2
+    when (3 == (x = 1))
+      x = 0
+    else
+      x = 1
+  end
+  return
+end
