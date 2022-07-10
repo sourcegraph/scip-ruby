@@ -20,8 +20,9 @@
 # a cache entry from a non-default branch (on an LRU basis). That should create
 # enough space for a new cache entry.
 
-import datetime
+from datetime import datetime
 import requests
+import operator
 import os
 
 DEFAULT_BRANCH_NAME = 'scip-ruby/master'
@@ -75,13 +76,13 @@ def default_main():
         return
 
     entries_and_times = [
-        (x, datetime.fromisoformat(x['last_accessed_at']))
+        (x, datetime.strptime(x['last_accessed_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
         for x in other_branch_cache_entries
     ]
 
     # Sort descending based on timestamps, and evict the oldest one.
-    sorted(entries_and_times, key=itemgetter(1))
-    earliest_entry = entries_and_times[0]
+    sorted(entries_and_times, key=operator.itemgetter(1))
+    earliest_entry = entries_and_times[0][0]
 
     if os.getenv('DRY_RUN'):
         print('dry run: Will evict:\n{}'.format(earliest_entry))
