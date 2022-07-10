@@ -2,7 +2,7 @@
  
  def if_elsif_else()
 #^^^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO if_elsif_else().
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO <static-init>().
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO <static-init>().
    x = 0
 #  ^ definition local 1~#2393773952
    y = 0
@@ -89,4 +89,39 @@
 #      ^ reference (write) local 1~#2602907825
    end
    return
+ end
+ 
+ def for(xs)
+#^^^^^^^^^^^ definition scip-ruby gem TODO TODO for().
+#        ^^ definition local 1~#2901640080
+   for e in xs
+#      ^ definition local 2~#2901640080
+#           ^^ reference local 1~#2901640080
+     puts e
+#         ^ reference local 2~#2901640080
+   end
+ 
+   for f in xs
+#      ^ definition local 3~#2901640080
+#           ^^ reference local 1~#2901640080
+     g = f+1
+#    ^ definition local 4~#2901640080
+#        ^ reference local 3~#2901640080
+     next if g == 0
+#            ^ reference local 4~#2901640080
+     next g+1 if g == 1
+#         ^ reference local 4~#2901640080
+#                ^ reference local 4~#2901640080
+     break if g == 2
+#    ^^^^^ definition local 5~#2901640080
+#    ^^^^^ reference local 5~#2901640080
+#             ^ reference local 4~#2901640080
+     break g+1 if g == 3
+#    ^^^^^^^^^ definition local 6~#2901640080
+#    ^^^^^^^^^ reference local 6~#2901640080
+#          ^ reference local 4~#2901640080
+#                 ^ reference local 4~#2901640080
+     redo if g == 4
+#            ^ reference local 4~#2901640080
+   end
  end

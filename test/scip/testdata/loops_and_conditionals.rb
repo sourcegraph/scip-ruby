@@ -52,3 +52,18 @@ def case(x, y)
   end
   return
 end
+
+def for(xs)
+  for e in xs
+    puts e
+  end
+
+  for f in xs
+    g = f+1
+    next if g == 0
+    next g+1 if g == 1
+    break if g == 2
+    break g+1 if g == 3
+    redo if g == 4
+  end
+end
