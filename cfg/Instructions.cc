@@ -312,8 +312,8 @@ string TAbsurd::showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs) c
                        this->what.showRaw(gs, cfg, tabs + 1));
 }
 
-string LocalOccurrence::toString(const core::GlobalState &gs, core::FileRef file, const CFG &cfg) const {
-    return fmt::format("local_occ {} @ {}", this->variable.toString(gs, cfg), core::Loc(file, this->loc).toString(gs));
+string LocalOccurrence::showRaw(const core::GlobalState &gs, core::FileRef file, const CFG &cfg) const {
+    return fmt::format("local_occ {} @ {}", this->variable.toString(gs, cfg), core::Loc(file, this->loc).showRaw(gs));
 }
 
 string VariableUseSite::toString(const core::GlobalState &gs, const CFG &cfg) const {
