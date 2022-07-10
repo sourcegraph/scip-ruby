@@ -20,6 +20,7 @@
 #include "cfg/CFG.h"
 #include "common/common.h"
 #include "common/sort.h"
+#include "core/ErrorQueue.h"
 #include "core/Loc.h"
 #include "core/SymbolRef.h"
 #include "core/Symbols.h"
@@ -67,11 +68,6 @@ template <typename T, typename Fn> static string vec_to_string(const vector<T> v
     return out.str();
 }
 
-static string bbvec_to_string(const vector<sorbet::cfg::BasicBlock *> &parents) {
-    return vec_to_string(
-        parents, [](const auto &ptr) -> auto { return fmt::format("(id: {}, ptr: {})", ptr->id, (void *)ptr); });
-};
-
 template <typename T> static void drain(vector<T> &input, vector<T> &output) {
     output.reserve(output.size() + input.size());
     for (auto &v : input) {
@@ -109,7 +105,7 @@ static bool isTemporary(const core::GlobalState &gs, const core::LocalVariable &
     }
     auto n = var._name;
     return n == Names::blockPreCallTemp() || n == Names::blockTemp() || n == Names::blockPassTemp() ||
-           n == Names::forTemp() || n == Names::blkArg() || n == Names::blockCall() ||
+           n == Names::blkArg() || n == Names::blockCall() || n == Names::blockBreakAssign() || n == Names::forTemp() ||
            // Insert checks because sometimes temporaries are initialized with a 0 unique value. 😬
            n == Names::finalReturn() || n == NameRef::noName() || n == Names::blockCall() || n == Names::selfLocal() ||
            n == Names::unconditional();
@@ -198,6 +194,16 @@ class SCIPState {
 public:
     UnorderedMap<core::FileRef, vector<scip::Occurrence>> occurrenceMap;
     UnorderedMap<core::FileRef, vector<scip::SymbolInformation>> symbolMap;
+    // Cache of occurrences for locals that have been emitted in this function.
+    //
+    // Note that the SymbolRole is a part of the key too, because we can
+    // have a read-reference and write-reference at the same location
+    // (we don't merge those for now).
+    //
+    // The 'value' in the map is purely for sanity-checking. It's a bit
+    // cumbersome to conditionalize the type to be a set in non-debug and
+    // map in debug, so keeping it a map.
+    UnorderedMap<std::pair<core::LocOffsets, /*SymbolRole*/ int32_t>, uint32_t> localOccurrenceCache;
     vector<scip::Document> documents;
     vector<scip::SymbolInformation> externalSymbols;
 
@@ -271,14 +277,52 @@ private:
         return absl::OkStatus();
     }
 
+    // Returns true if there was a cache hit.
+    //
+    // Otherwise, inserts the location into the cache and returns false.
+    bool cacheOccurrence(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ, int32_t symbolRoles) {
+        // Optimization:
+        //   Avoid emitting duplicate defs/refs for locals.
+        //   This can happen with constructs like:
+        //     z = if cond then expr else expr end
+        //   When this is lowered to a CFG, we will end up with
+        //   multiple bindings with the same LHS location.
+        //
+        //   Repeated reads for the same occurrence can happen for rvalues too.
+        //   If the compiler has proof that a scrutinee variable is not modified,
+        //   each comparison in a case will perform a read.
+        //     case x
+        //       when 0 then <stuff>
+        //       when 1 then <stuff>
+        //       else <stuff>
+        //     end
+        //   The CFG for this involves two reads for x in calls to ==.
+        //   (This wouldn't have happened if x was always stashed away into
+        //    a temporary first, but the temporary only appears in the CFG if
+        //    evaluating one of the cases has a chance to modify x.)
+        auto [it, inserted] = this->localOccurrenceCache.insert({{occ.offsets, symbolRoles}, occ.counter});
+        if (inserted) {
+            return false;
+        }
+        auto savedCounter = it->second;
+        ENFORCE(occ.counter == savedCounter, "cannot have distinct local variable {} at same location {}",
+                (symbolRoles & scip::SymbolRole::Definition) ? "definitions" : "references",
+                core::Loc(file, occ.offsets).showRaw(gs));
+        return true;
+    }
+
 public:
     absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ) {
+        if (this->cacheOccurrence(gs, file, occ, scip::SymbolRole::Definition)) {
+            return absl::OkStatus();
+        }
         return this->saveDefinitionImpl(gs, file, occ.toString(gs, file), core::Loc(file, occ.offsets));
     }
 
     // Save definition when you have a sorbet Symbol.
     // Meant for methods, fields etc., but not local variables.
     absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, core::SymbolRef symRef) {
+        // TODO:(varun) Should we cache here too to avoid emitting duplicate definitions?
         scip::Symbol symbol;
         auto status = symbolForExpr(gs, symRef, symbol);
         if (!status.ok()) {
@@ -297,11 +341,15 @@ public:
     }
 
     absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ, int32_t symbol_roles) {
+        if (this->cacheOccurrence(gs, file, occ, symbol_roles)) {
+            return absl::OkStatus();
+        }
         return this->saveReferenceImpl(gs, file, occ.toString(gs, file), occ.offsets, symbol_roles);
     }
 
     absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, core::SymbolRef symRef,
                                core::LocOffsets occLoc, int32_t symbol_roles) {
+        // TODO:(varun) Should we cache here to to avoid emitting duplicate references?
         absl::StatusOr<string *> valueOrStatus(this->saveSymbolString(gs, symRef, nullptr));
         if (!valueOrStatus.ok()) {
             return valueOrStatus.status();
@@ -357,7 +405,29 @@ core::SymbolRef lookupRecursive(const core::GlobalState &gs, const core::SymbolR
 }
 
 class CFGTraversal final {
-    UnorderedMap<const cfg::BasicBlock *, UnorderedMap<cfg::LocalRef, core::Loc>> blockLocals;
+    // A map from each basic block to the locals in it.
+    //
+    // The locals may be coming from the parents, or they may be defined in the
+    // block. Locals coming from the parents may be in the form of basic block
+    // arguments or they may be "directly referenced."
+    //
+    // For example, if you have code like:
+    //
+    //     def f(x):
+    //         y = 0
+    //         if cond:
+    //             y = x + $z
+    //
+    // Then x and $z will be passed as arguments to the basic block for the
+    // true branch, whereas 'y' won't be. However, 'y' is still technically
+    // coming from the parent basic block, otherwise we'd end up marking the
+    // assignment as a definition instead of a (write) reference.
+    //
+    // At the start of the traversal of a basic block, the entry for a basic
+    // block is populated with the locals coming from the parents. Then,
+    // we traverse each instruction and populate it with the locals defined
+    // in the block.
+    UnorderedMap<const cfg::BasicBlock *, UnorderedSet<cfg::LocalRef>> blockLocals;
     UnorderedMap<cfg::LocalRef, uint32_t> functionLocals;
 
     // Local variable counter that is reset for every function.
@@ -370,8 +440,8 @@ public:
         : blockLocals(), functionLocals(), scipState(scipState), ctx(ctx) {}
 
 private:
-    void addLocal(const cfg::BasicBlock *bb, cfg::LocalRef localRef, core::Loc loc) {
-        this->blockLocals[bb][localRef] = loc;
+    void addLocal(const cfg::BasicBlock *bb, cfg::LocalRef localRef) {
+        this->blockLocals[bb].insert(localRef);
         this->functionLocals[localRef] = ++this->counter;
     }
 
@@ -405,7 +475,7 @@ private:
                 if (!this->functionLocals.contains(localRef)) {
                     isDefinition = true; // If we're seeing this for the first time in topological order,
                                          // The current block must have a definition for the variable.
-                    this->addLocal(bb, localRef, this->ctx.locAt(local.loc));
+                    this->addLocal(bb, localRef);
                 }
                 // The variable wasn't passed in as an argument, and hasn't already been recorded
                 // as a local in the block. So this must be a definition line.
@@ -419,7 +489,7 @@ private:
                     // Ill-formed code where we're trying to access a variable
                     // without setting it first. Emit a local as a best-effort.
                     // TODO(varun): Will Sorbet error out before we get here?
-                    this->addLocal(bb, localRef, this->ctx.locAt(local.loc));
+                    this->addLocal(bb, localRef);
                 }
                 // TODO(varun): Will Sorbet error out before we get here?
                 // It's possible that we have ill-formed code where the variable
@@ -448,22 +518,22 @@ private:
         return true;
     }
 
-    void addArgLocals(cfg::BasicBlock *bb, const cfg::CFG &cfg) {
-        this->blockLocals[bb] = {};
-        for (auto &bbArgs : bb->args) {
-            bool found = false;
-            for (auto parentBB : bb->backEdges) {
-                if (this->blockLocals[parentBB].contains(bbArgs.variable)) {
-                    this->blockLocals[bb][bbArgs.variable] = this->blockLocals[parentBB][bbArgs.variable];
-                    found = true;
-                    break;
-                }
+    void copyLocalsFromParents(cfg::BasicBlock *bb, const cfg::CFG &cfg) {
+        UnorderedSet<cfg::LocalRef> bbLocals{};
+        for (auto parentBB : bb->backEdges) {
+            if (!this->blockLocals.contains(parentBB)) { // e.g. loops
+                continue;
             }
-            if (!found) {
-                print_dbg("# basic block argument {} did not come from parents {}\n",
-                          bbArgs.toString(this->ctx.state, cfg), bbvec_to_string(bb->backEdges));
+            auto &parentLocals = this->blockLocals[parentBB];
+            if (bbLocals.size() + parentLocals.size() > bbLocals.capacity()) {
+                bbLocals.reserve(bbLocals.size() + parentLocals.size());
+            }
+            for (auto local : parentLocals) {
+                bbLocals.insert(local);
             }
         }
+        ENFORCE(!this->blockLocals.contains(bb));
+        this->blockLocals[bb] = std::move(bbLocals);
     }
 
 public:
@@ -471,19 +541,11 @@ public:
         auto &gs = this->ctx.state;
         auto method = this->ctx.owner;
 
-        auto print_map = [&cfg, &gs](const UnorderedMap<cfg::LocalRef, core::Loc> &map, cfg::BasicBlock *ptr) {
-            print_dbg("# blockLocals (id: {}, ptr: {}) = {}\n", ptr->id, (void *)ptr,
-                      map_to_string(
-                          map, [&](const auto &localref, const auto &loc) -> auto {
-                              return fmt::format("{} {}", localref.data(cfg).toString(gs), loc.showRaw(gs));
-                          }));
-        };
-
         // I don't fully understand the doc comment for forwardsTopoSort; it seems backwards in practice.
         for (auto it = cfg.forwardsTopoSort.rbegin(); it != cfg.forwardsTopoSort.rend(); ++it) {
             cfg::BasicBlock *bb = *it;
             print_dbg("# Looking at block id: {} ptr: {}\n", bb->id, (void *)bb);
-            this->addArgLocals(bb, cfg);
+            this->copyLocalsFromParents(bb, cfg);
             for (auto &binding : bb->exprs) {
                 if (auto *aliasInstr = cfg::cast_instruction<cfg::Alias>(binding.value)) {
                     auto aliasName = aliasInstr->name;
@@ -497,7 +559,7 @@ public:
                                   method.toString(gs));
                         continue;
                     }
-                    this->addLocal(bb, binding.bind.variable, aliasedSym.loc(gs));
+                    this->addLocal(bb, binding.bind.variable);
                     continue;
                 }
                 if (!binding.loc.exists() || binding.loc.empty()) { // TODO(varun): When can each case happen?
@@ -599,7 +661,6 @@ public:
                     }
                 }
             }
-            print_map(this->blockLocals.at(bb), bb);
         }
     }
 };
