@@ -24,7 +24,7 @@ struct LocalOccurrence final {
         return {variable, core::LocOffsets::none()};
     }
 
-    std::string toString(const core::GlobalState &gs, core::FileRef file, const CFG &cfg) const;
+    std::string showRaw(const core::GlobalState &gs, core::FileRef file, const CFG &cfg) const;
 };
 
 class VariableUseSite final {

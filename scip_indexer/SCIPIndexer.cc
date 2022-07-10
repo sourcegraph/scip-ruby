@@ -115,7 +115,7 @@ static bool isTemporary(const core::GlobalState &gs, const core::LocalVariable &
            n == Names::unconditional();
 }
 
-struct LocalOccurrence {
+struct OwnedLocal {
     /// Parent method.
     const core::SymbolRef owner;
     /// Counter corresponding to the local's definition, unique within a method.
@@ -272,7 +272,7 @@ private:
     }
 
 public:
-    absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, LocalOccurrence occ) {
+    absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ) {
         return this->saveDefinitionImpl(gs, file, occ.toString(gs, file), core::Loc(file, occ.offsets));
     }
 
@@ -296,8 +296,7 @@ public:
         return this->saveDefinitionImpl(gs, file, symbolString, occLocStatus.value());
     }
 
-    absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, LocalOccurrence occ,
-                               int32_t symbol_roles) {
+    absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ, int32_t symbol_roles) {
         return this->saveReferenceImpl(gs, file, occ.toString(gs, file), occ.offsets, symbol_roles);
     }
 
@@ -361,6 +360,7 @@ class CFGTraversal final {
     UnorderedMap<const cfg::BasicBlock *, UnorderedMap<cfg::LocalRef, core::Loc>> blockLocals;
     UnorderedMap<cfg::LocalRef, uint32_t> functionLocals;
 
+    // Local variable counter that is reset for every function.
     uint32_t counter = 0;
     SCIPState &scipState;
     core::Context ctx;
@@ -387,6 +387,9 @@ private:
         RValue,
     };
 
+    // Emit an occurrence for a local variable if applicable.
+    //
+    // Returns true if an occurrence was emitted.
     bool emitLocalOccurrence(const cfg::CFG &cfg, const cfg::BasicBlock *bb, cfg::LocalOccurrence local,
                              ValueCategory category) {
         auto localRef = local.variable;
@@ -436,10 +439,10 @@ private:
         absl::Status status;
         if (isDefinition) {
             status = this->scipState.saveDefinition(this->ctx.state, this->ctx.file,
-                                                    LocalOccurrence{this->ctx.owner, localId, local.loc});
+                                                    OwnedLocal{this->ctx.owner, localId, local.loc});
         } else {
             status = this->scipState.saveReference(this->ctx.state, this->ctx.file,
-                                                   LocalOccurrence{this->ctx.owner, localId, local.loc}, referenceRole);
+                                                   OwnedLocal{this->ctx.owner, localId, local.loc}, referenceRole);
         }
         ENFORCE_NO_TIMER(status.ok());
         return true;
@@ -550,7 +553,7 @@ public:
                         // Emit references for arguments
                         for (auto &arg : send->args) {
                             // NOTE: For constructs like a += b, the instruction sequence ends up being:
-                            //   $tmp = $b
+                            //   $tmp = $a
                             //   $a = $tmp.+($b)
                             // The location for $tmp will point to $a in the source. However, the second one is a read,
                             // and the first one is a write. Instead of emitting two occurrences, it'd be nice to emit
