@@ -2,7 +2,7 @@
  
  def if_elsif_else()
 #^^^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO if_elsif_else().
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO <static-init>().
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO <static-init>().
    x = 0
 #  ^ definition local 1~#2393773952
    y = 0
@@ -117,6 +117,8 @@
      break g+1 if g == 3
 #          ^ reference local 4~#2901640080
 #                 ^ reference local 4~#2901640080
+     # NOTE: redo is unsupported (https://srb.help/3003)
+     # but emitting a reference here does work
      redo if g == 4
 #            ^ reference local 4~#2901640080
    end
@@ -152,6 +154,8 @@
      break g+1 if g == 3
 #          ^ reference local 4~#231090382
 #                 ^ reference local 4~#231090382
+     # NOTE: redo is unsupported (https://srb.help/3003)
+     # but emitting a reference here does work
      redo if g == 4
 #            ^ reference local 4~#231090382
    end
@@ -187,7 +191,26 @@
      break g+1 if g == 3
 #          ^ reference local 4~#3132432719
 #                 ^ reference local 4~#3132432719
+     # NOTE: redo is unsupported (https://srb.help/3003)
+     # but emitting a reference here does work
      redo if g == 4
 #            ^ reference local 4~#3132432719
+   end
+ end
+ 
+ def flip_flop(xs)
+#^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO flip_flop().
+#              ^^ definition local 1~#2191960030
+   # NOTE: flip-flops are unsupported (https://srb.help/3003)
+   # Unlike redo, which somehow works, we fail to emit references
+   # for the conditions.
+   # Keep this test anyways to check that we don't crash/mess something up
+   for x in xs
+#      ^ definition local 2~#2191960030
+#           ^^ reference local 1~#2191960030
+     puts x if x==2..x==8
+#         ^ reference local 2~#2191960030
+     puts x+1 if x==4...x==6
+#         ^ reference local 2~#2191960030
    end
  end

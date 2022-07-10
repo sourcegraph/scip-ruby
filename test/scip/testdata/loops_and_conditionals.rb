@@ -64,6 +64,8 @@ def for(xs)
     next g+1 if g == 1
     break if g == 2
     break g+1 if g == 3
+    # NOTE: redo is unsupported (https://srb.help/3003)
+    # but emitting a reference here does work
     redo if g == 4
   end
 end
@@ -81,6 +83,8 @@ def while(xs)
     next g+1 if g == 1
     break if g == 2
     break g+1 if g == 3
+    # NOTE: redo is unsupported (https://srb.help/3003)
+    # but emitting a reference here does work
     redo if g == 4
   end
 end
@@ -98,6 +102,19 @@ def until(xs)
     next g+1 if g == 1
     break if g == 2
     break g+1 if g == 3
+    # NOTE: redo is unsupported (https://srb.help/3003)
+    # but emitting a reference here does work
     redo if g == 4
+  end
+end
+
+def flip_flop(xs)
+  # NOTE: flip-flops are unsupported (https://srb.help/3003)
+  # Unlike redo, which somehow works, we fail to emit references
+  # for the conditions.
+  # Keep this test anyways to check that we don't crash/mess something up
+  for x in xs
+    puts x if x==2..x==8
+    puts x+1 if x==4...x==6
   end
 end
