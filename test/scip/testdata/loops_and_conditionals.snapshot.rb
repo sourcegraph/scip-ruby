@@ -2,7 +2,7 @@
  
  def if_elsif_else()
 #^^^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO if_elsif_else().
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO <static-init>().
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO <static-init>().
    x = 0
 #  ^ definition local 1~#2393773952
    y = 0
@@ -119,5 +119,75 @@
 #                 ^ reference local 4~#2901640080
      redo if g == 4
 #            ^ reference local 4~#2901640080
+   end
+ end
+ 
+ def while(xs)
+#^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO while().
+#          ^^ definition local 1~#231090382
+   i = 0
+#  ^ definition local 2~#231090382
+   while i < 10
+#        ^ reference local 2~#231090382
+     puts xs[i]
+#         ^^ reference local 1~#231090382
+#            ^ reference local 2~#231090382
+   end
+ 
+   j = 0
+#  ^ definition local 3~#231090382
+   while j < 10
+#        ^ reference local 3~#231090382
+     g = xs[j]
+#    ^ definition local 4~#231090382
+#        ^^ reference local 1~#231090382
+#           ^ reference local 3~#231090382
+     next if g == 0
+#            ^ reference local 4~#231090382
+     next g+1 if g == 1
+#         ^ reference local 4~#231090382
+#                ^ reference local 4~#231090382
+     break if g == 2
+#             ^ reference local 4~#231090382
+     break g+1 if g == 3
+#          ^ reference local 4~#231090382
+#                 ^ reference local 4~#231090382
+     redo if g == 4
+#            ^ reference local 4~#231090382
+   end
+ end
+ 
+ def until(xs)
+#^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO until().
+#          ^^ definition local 1~#3132432719
+   i = 0
+#  ^ definition local 2~#3132432719
+   until i > 10
+#        ^ reference local 2~#3132432719
+     puts xs[i]
+#         ^^ reference local 1~#3132432719
+#            ^ reference local 2~#3132432719
+   end
+ 
+   j = 0
+#  ^ definition local 3~#3132432719
+   until j > 10
+#        ^ reference local 3~#3132432719
+     g = xs[j]
+#    ^ definition local 4~#3132432719
+#        ^^ reference local 1~#3132432719
+#           ^ reference local 3~#3132432719
+     next if g == 0
+#            ^ reference local 4~#3132432719
+     next g+1 if g == 1
+#         ^ reference local 4~#3132432719
+#                ^ reference local 4~#3132432719
+     break if g == 2
+#             ^ reference local 4~#3132432719
+     break g+1 if g == 3
+#          ^ reference local 4~#3132432719
+#                 ^ reference local 4~#3132432719
+     redo if g == 4
+#            ^ reference local 4~#3132432719
    end
  end

@@ -67,3 +67,37 @@ def for(xs)
     redo if g == 4
   end
 end
+
+def while(xs)
+  i = 0
+  while i < 10
+    puts xs[i]
+  end
+
+  j = 0
+  while j < 10
+    g = xs[j]
+    next if g == 0
+    next g+1 if g == 1
+    break if g == 2
+    break g+1 if g == 3
+    redo if g == 4
+  end
+end
+
+def until(xs)
+  i = 0
+  until i > 10
+    puts xs[i]
+  end
+
+  j = 0
+  until j > 10
+    g = xs[j]
+    next if g == 0
+    next g+1 if g == 1
+    break if g == 2
+    break g+1 if g == 3
+    redo if g == 4
+  end
+end
