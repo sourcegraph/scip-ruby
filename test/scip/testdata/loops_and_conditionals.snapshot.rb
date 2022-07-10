@@ -113,12 +113,8 @@
 #         ^ reference local 4~#2901640080
 #                ^ reference local 4~#2901640080
      break if g == 2
-#    ^^^^^ definition local 5~#2901640080
-#    ^^^^^ reference local 5~#2901640080
 #             ^ reference local 4~#2901640080
      break g+1 if g == 3
-#    ^^^^^^^^^ definition local 6~#2901640080
-#    ^^^^^^^^^ reference local 6~#2901640080
 #          ^ reference local 4~#2901640080
 #                 ^ reference local 4~#2901640080
      redo if g == 4
