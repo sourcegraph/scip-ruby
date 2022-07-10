@@ -361,6 +361,7 @@ class CFGTraversal final {
     UnorderedMap<const cfg::BasicBlock *, UnorderedMap<cfg::LocalRef, core::Loc>> blockLocals;
     UnorderedMap<cfg::LocalRef, uint32_t> functionLocals;
 
+    // Local variable counter that is reset for every function.
     uint32_t counter = 0;
     SCIPState &scipState;
     core::Context ctx;
@@ -387,6 +388,9 @@ private:
         RValue,
     };
 
+    // Emit an occurrence for a local variable if applicable.
+    //
+    // Returns true if an occurrence was emitted.
     bool emitLocalOccurrence(const cfg::CFG &cfg, const cfg::BasicBlock *bb, cfg::LocalOccurrence local,
                              ValueCategory category) {
         auto localRef = local.variable;
@@ -550,7 +554,7 @@ public:
                         // Emit references for arguments
                         for (auto &arg : send->args) {
                             // NOTE: For constructs like a += b, the instruction sequence ends up being:
-                            //   $tmp = $b
+                            //   $tmp = $a
                             //   $a = $tmp.+($b)
                             // The location for $tmp will point to $a in the source. However, the second one is a read,
                             // and the first one is a write. Instead of emitting two occurrences, it'd be nice to emit
