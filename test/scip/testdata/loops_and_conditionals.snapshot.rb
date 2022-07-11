@@ -113,10 +113,8 @@
 #         ^ reference local 4~#2901640080
 #                ^ reference local 4~#2901640080
      break if g == 2
-#    ^^^^^ reference scip-ruby gem TODO TODO <Magic>#
 #             ^ reference local 4~#2901640080
      break g+1 if g == 3
-#    ^^^^^^^^^ reference scip-ruby gem TODO TODO <Magic>#
 #          ^ reference local 4~#2901640080
 #                 ^ reference local 4~#2901640080
      # NOTE: redo is unsupported (https://srb.help/3003)

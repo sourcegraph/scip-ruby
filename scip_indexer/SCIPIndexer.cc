@@ -547,33 +547,6 @@ public:
             print_dbg("# Looking at block id: {} ptr: {}\n", bb->id, (void *)bb);
             this->copyLocalsFromParents(bb, cfg);
             for (auto &binding : bb->exprs) {
-                if (auto *aliasInstr = cfg::cast_instruction<cfg::Alias>(binding.value)) {
-                    if (!binding.loc.exists()) {
-                        print_dbg("non-existent location for binding{}\n", binding.value.showRaw(gs, cfg));
-                        // This likely corresponds to some synthesized class (e.g. top-level),
-                        // so don't emit a reference here.
-                        continue;
-                    }
-                    if (binding.loc.empty()) {
-                        print_dbg("empty location for binding {}\n", binding.value.showRaw(gs, cfg));
-                        continue;
-                    }
-                    auto aliasedSym = aliasInstr->what;
-                    if (!aliasedSym.exists()) {
-                        if (!aliasInstr->name.exists()) {
-                            print_dbg("# alias name doesn't exist @ {}, what = {}\n",
-                                      core::Loc(this->ctx.file, binding.loc).showRaw(gs), aliasInstr->what.showRaw(gs));
-                            // TODO(varun): When does this happen?
-                            continue;
-                        }
-                        print_dbg("# missing symbol for RHS {}\n", aliasInstr->name.shortName(gs));
-                        continue;
-                    }
-                    auto status = this->scipState.saveReference(gs, this->ctx.file, aliasedSym, binding.loc, 0);
-                    ENFORCE(status.ok());
-                    this->addLocal(bb, binding.bind.variable);
-                    continue;
-                }
                 if (!binding.loc.exists() || binding.loc.empty()) { // TODO(varun): When can each case happen?
                     continue;
                 }
@@ -639,7 +612,25 @@ public:
                         break;
                     }
                     case cfg::Tag::Alias: {
-                        ENFORCE(false, "already handled earlier");
+                        auto alias = cfg::cast_instruction<cfg::Alias>(binding.value);
+                        auto aliasedSym = alias->what;
+                        if (!aliasedSym.exists()) {
+                            if (!alias->name.exists()) {
+                                print_dbg("# alias name doesn't exist @ {}, what = {}\n",
+                                          core::Loc(this->ctx.file, binding.loc).showRaw(gs), alias->what.showRaw(gs));
+                                break;
+                            }
+                            print_dbg("# missing symbol for RHS {}\n", alias->name.shortName(gs));
+                            break;
+                        } else if (aliasedSym == core::Symbols::Magic()) {
+                            break;
+                        }
+                        absl::Status status =
+                            this->scipState.saveReference(gs, this->ctx.file, aliasedSym, binding.loc, 0);
+                        print_err("# emitted ref for\n{}@ {}\n------------------\n", aliasedSym.toString(gs),
+                                  core::Loc(this->ctx.file, binding.loc).showRaw(gs));
+                        ENFORCE(status.ok());
+                        this->addLocal(bb, binding.bind.variable);
                         break;
                     }
                     case cfg::Tag::Return: {
