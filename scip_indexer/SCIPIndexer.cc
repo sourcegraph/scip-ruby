@@ -548,17 +548,29 @@ public:
             this->copyLocalsFromParents(bb, cfg);
             for (auto &binding : bb->exprs) {
                 if (auto *aliasInstr = cfg::cast_instruction<cfg::Alias>(binding.value)) {
-                    auto aliasName = aliasInstr->name;
-                    if (!aliasName.exists()) {
-                        // TODO(varun): When does this happen?
+                    if (!binding.loc.exists()) {
+                        print_dbg("non-existent location for binding{}\n", binding.value.showRaw(gs, cfg));
+                        // This likely corresponds to some synthesized class (e.g. top-level),
+                        // so don't emit a reference here.
                         continue;
                     }
-                    auto aliasedSym = lookupRecursive(gs, method, aliasName);
+                    if (binding.loc.empty()) {
+                        print_dbg("empty location for binding {}\n", binding.value.showRaw(gs, cfg));
+                        continue;
+                    }
+                    auto aliasedSym = aliasInstr->what;
                     if (!aliasedSym.exists()) {
-                        print_err("# lookup for symbol {} failed starting from {}\n", aliasName.shortName(gs),
-                                  method.toString(gs));
+                        if (!aliasInstr->name.exists()) {
+                            print_dbg("# alias name doesn't exist @ {}, what = {}\n",
+                                      core::Loc(this->ctx.file, binding.loc).showRaw(gs), aliasInstr->what.showRaw(gs));
+                            // TODO(varun): When does this happen?
+                            continue;
+                        }
+                        print_dbg("# missing symbol for RHS {}\n", aliasInstr->name.shortName(gs));
                         continue;
                     }
+                    auto status = this->scipState.saveReference(gs, this->ctx.file, aliasedSym, binding.loc, 0);
+                    ENFORCE(status.ok());
                     this->addLocal(bb, binding.bind.variable);
                     continue;
                 }
