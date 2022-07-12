@@ -1,7 +1,7 @@
  # typed: true
  
  def arrays(a, i)
-#^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO arrays().
+#^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO Object#arrays().
 #           ^ definition local 1~#513334479
 #              ^ definition local 2~#513334479
    a[0] = 0
