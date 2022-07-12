@@ -54,12 +54,16 @@ absl::Status emitSymbolString(const scip::Symbol &symbol, string &out) {
     } else {
         out.append(". . ");
     }
-    if (symbol.descriptors_size() == 1) {
-        return emitDescriptorString(symbol.descriptors()[0], out);
+    if (symbol.descriptors_size() == 0) {
+        return absl::InvalidArgumentError("expected symbol to have at least 1 descriptor");
     }
-    // FIXME(varun): Are we going to emit multiple descriptors per symbol?
-    return absl::InvalidArgumentError(
-        absl::StrCat("expected symbol to have 1 descriptor but found %d", symbol.descriptors_size()));
+    for (auto i = 0; i < symbol.descriptors_size(); ++i) {
+        auto status = emitDescriptorString(symbol.descriptors()[i], out);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return absl::OkStatus();
 }
 
 }; // end namespace scip::utils

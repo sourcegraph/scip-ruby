@@ -1,7 +1,7 @@
  # typed: true
  
  def args(x, y)
-#^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO args().
+#^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO Object#args().
 #         ^ definition local 1~#2634721084
 #            ^ definition local 2~#2634721084
    z = x + y
