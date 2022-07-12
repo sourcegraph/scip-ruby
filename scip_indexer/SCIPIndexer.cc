@@ -655,7 +655,15 @@ public:
                              method == gs.lookupStaticInitForClass(aliasedSym.asClassOrModuleRef().data(gs)->owner))) {
                             status = this->scipState.saveDefinition(gs, this->ctx.file, aliasedSym, binding.loc);
                         } else {
-                            status = this->scipState.saveReference(gs, this->ctx.file, aliasedSym, binding.loc, 0);
+                            // When we have code like MyModule::MyClass, the source location in binding.loc corresponds
+                            // to 'MyModule::MyClass', whereas we want a range for 'MyClass'. So we cut off the prefix.
+                            auto loc = binding.loc;
+                            auto source = this->ctx.locAt(binding.loc).source(gs);
+                            if (source.has_value() && source.value().find("::"sv) != std::string::npos) {
+                                loc.beginLoc = binding.loc.endPos() -
+                                               static_cast<uint32_t>(aliasedSym.name(gs).shortName(gs).length());
+                            }
+                            status = this->scipState.saveReference(gs, this->ctx.file, aliasedSym, loc, 0);
                         }
                         ENFORCE(status.ok());
                         this->addLocal(bb, binding.bind.variable);
