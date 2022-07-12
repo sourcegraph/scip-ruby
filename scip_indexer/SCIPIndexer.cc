@@ -134,36 +134,49 @@ absl::Status symbolForExpr(const core::GlobalState &gs, core::SymbolRef symRef, 
     package.set_version("TODO");
     *symbol.mutable_package() = move(package);
 
-    scip::Descriptor descriptor;
-    *descriptor.mutable_name() = symRef.name(gs).show(gs);
-
-    // TODO: Are the scip descriptor kinds correct?
-    switch (symRef.kind()) {
-        case core::SymbolRef::Kind::Method:
-            // NOTE: There is a separate isOverloaded field in the flags field,
-            // despite SO/docs saying that Ruby doesn't support method overloading,
-            // Technically, we should better understand how this works and set the
-            // disambiguator based on that. However, right now, an extension's
-            // type-checking function is not run if a method is overloaded,
-            // (see pipeline.cc), so it's unclear if we need to care about that.
-            descriptor.set_suffix(scip::Descriptor::Method);
-            break;
-        case core::SymbolRef::Kind::ClassOrModule:
-            descriptor.set_suffix(scip::Descriptor::Type);
-            break;
-        case core::SymbolRef::Kind::TypeArgument:
-            descriptor.set_suffix(scip::Descriptor::TypeParameter);
-            break;
-        case core::SymbolRef::Kind::FieldOrStaticField:
-            descriptor.set_suffix(scip::Descriptor::Term);
-            break;
-        case core::SymbolRef::Kind::TypeMember: // TODO: What does TypeMember mean?
-            descriptor.set_suffix(scip::Descriptor::Type);
-            break;
-        default:
-            return absl::InvalidArgumentError("unexpected expr type for symbol computation");
+    InlinedVector<scip::Descriptor, 4> descriptors;
+    auto cur = symRef;
+    while (cur != core::Symbols::root()) {
+        // NOTE:(varun) The current scheme will cause multiple 'definitions' for the same
+        // entity if it is present in different files, because the path is not encoded
+        // in the descriptor whose parent is the root. This matches the semantics of
+        // RubyMine, but we may want to revisit this if it is problematic for classes
+        // that are extended in lots of places.
+        scip::Descriptor descriptor;
+        *descriptor.mutable_name() = cur.name(gs).show(gs);
+        // TODO: Are the scip descriptor kinds correct?
+        switch (cur.kind()) {
+            case core::SymbolRef::Kind::Method:
+                // NOTE: There is a separate isOverloaded field in the flags field,
+                // despite SO/docs saying that Ruby doesn't support method overloading,
+                // Technically, we should better understand how this works and set the
+                // disambiguator based on that. However, right now, an extension's
+                // type-checking function is not run if a method is overloaded,
+                // (see pipeline.cc), so it's unclear if we need to care about that.
+                descriptor.set_suffix(scip::Descriptor::Method);
+                break;
+            case core::SymbolRef::Kind::ClassOrModule:
+                descriptor.set_suffix(scip::Descriptor::Type);
+                break;
+            case core::SymbolRef::Kind::TypeArgument:
+                descriptor.set_suffix(scip::Descriptor::TypeParameter);
+                break;
+            case core::SymbolRef::Kind::FieldOrStaticField:
+                descriptor.set_suffix(scip::Descriptor::Term);
+                break;
+            case core::SymbolRef::Kind::TypeMember: // TODO: What does TypeMember mean?
+                descriptor.set_suffix(scip::Descriptor::Type);
+                break;
+            default:
+                return absl::InvalidArgumentError("unexpected expr type for symbol computation");
+        }
+        descriptors.push_back(move(descriptor));
+        cur = cur.owner(gs);
     }
-    *symbol.add_descriptors() = move(descriptor);
+    while (!descriptors.empty()) {
+        *symbol.add_descriptors() = move(descriptors.back());
+        descriptors.pop_back();
+    }
     return absl::OkStatus();
 }
 
