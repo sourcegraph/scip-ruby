@@ -809,8 +809,10 @@ public:
         }
 
         auto scipState = this->getSCIPState();
-        auto status = scipState->saveDefinition(gs, file, core::SymbolRef(methodDef.symbol));
-        ENFORCE(status.ok());
+        if (methodDef.name != core::Names::staticInit()) {
+            auto status = scipState->saveDefinition(gs, file, core::SymbolRef(methodDef.symbol));
+            ENFORCE(status.ok());
+        }
         // It looks like Sorbet only stores symbols at the granularity of classes and methods
         // So we need to recompute local variable information from scratch. The LocalVarFinder
         // which is used by the LSP implementation is tailored for finding the local variable

@@ -2,7 +2,6 @@
  
  def for_loop()
 #^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO for_loop().
-#^^^^^^^^^^^ definition scip-ruby gem TODO TODO <static-init>().
    y = 0
 #  ^ definition local 1~#1120785331
    for x in [1, 2, 3]
