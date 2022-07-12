@@ -2,7 +2,6 @@
  
  def globalFn1()
 #^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO globalFn1().
-#^^^^^^^^^ definition scip-ruby gem TODO TODO <static-init>().
    x = 10
 #  ^ definition local 1~#3846536873
    x
