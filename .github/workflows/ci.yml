@@ -22,4 +22,4 @@ jobs:
           path: ~/.cache/bazel
           key: bazel
       - name: Run tests
-        run: ./bazel test --test_output=errors //test/scip --config=dbg
+        run: bazel test --test_output=errors //test/scip --config=dbg
