@@ -27,4 +27,38 @@ def local_class()
   end
   _c = localClass.new
   _m = localClass.myMethod
+  return
+end
+
+module M4
+  K = 0
+end
+
+def module_access()
+  _ = M4::K
+  return
+end
+
+module M5
+  module M6
+    def self.g()
+    end
+  end
+
+  def self.h()
+    M6.g()
+    return
+  end
+end
+
+class C7
+  module M8
+    def self.i()
+    end
+  end
+
+  def j()
+    M8.j()
+    return
+  end
 end
