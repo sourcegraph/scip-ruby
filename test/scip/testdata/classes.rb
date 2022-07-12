@@ -14,3 +14,6 @@ module M2
   class C2
   end
 end
+
+class M3::C3
+end

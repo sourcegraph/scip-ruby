@@ -2,7 +2,7 @@
  
  _ = 0
 #^ definition local 1~#119448696
-#^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO <static-init>().
+#^^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO <static-init>().
  
  class C1
 #^^^^^^^^^^ definition scip-ruby gem TODO TODO <static-init>().
@@ -27,4 +27,10 @@
 #  ^^^^^^^^^^^^ definition scip-ruby gem TODO TODO <static-init>().
 #        ^^ definition scip-ruby gem TODO TODO C2#
    end
+ end
+ 
+ class M3::C3
+#^^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO <static-init>().
+#      ^^ definition scip-ruby gem TODO TODO M3#
+#          ^^ definition scip-ruby gem TODO TODO C3#
  end
