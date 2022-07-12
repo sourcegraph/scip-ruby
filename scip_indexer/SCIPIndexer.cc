@@ -321,7 +321,9 @@ public:
 
     // Save definition when you have a sorbet Symbol.
     // Meant for methods, fields etc., but not local variables.
-    absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, core::SymbolRef symRef) {
+    // TODO(varun): Should we always pass in the location instead of sometimes only?
+    absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, core::SymbolRef symRef,
+                                std::optional<core::LocOffsets> loc = std::nullopt) {
         // TODO:(varun) Should we cache here too to avoid emitting duplicate definitions?
         scip::Symbol symbol;
         auto status = symbolForExpr(gs, symRef, symbol);
@@ -333,11 +335,19 @@ public:
             return valueOrStatus.status();
         }
         string &symbolString = *valueOrStatus.value();
-        auto occLocStatus = occurrenceLoc(gs, symRef);
-        if (!occLocStatus.ok()) {
-            return occLocStatus.status();
+
+        core::Loc occLoc;
+        if (loc.has_value()) {
+            occLoc = core::Loc(file, loc.value());
+        } else {
+            auto occLocStatus = occurrenceLoc(gs, symRef);
+            if (!occLocStatus.ok()) {
+                return occLocStatus.status();
+            }
+            occLoc = occLocStatus.value();
         }
-        return this->saveDefinitionImpl(gs, file, symbolString, occLocStatus.value());
+
+        return this->saveDefinitionImpl(gs, file, symbolString, occLoc);
     }
 
     absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ, int32_t symbol_roles) {
@@ -402,6 +412,19 @@ core::SymbolRef lookupRecursive(const core::GlobalState &gs, const core::SymbolR
         return lookupRecursive(gs, owner.owner(gs), name);
     }
     return lookupRecursive(gs, owner.enclosingClass(gs), name);
+}
+
+std::string format_ancestry(const core::GlobalState &gs, core::SymbolRef sym) {
+    UnorderedSet<core::SymbolRef> visited;
+    auto i = 0;
+    std::ostringstream out;
+    while (sym.exists() && !visited.contains(sym)) {
+        out << fmt::format("#{}{}{}\n", std::string(i * 2, ' '), i == 0 ? "" : "<- ", sym.name(gs).toString(gs));
+        visited.insert(sym);
+        sym = sym.owner(gs);
+        i++;
+    }
+    return out.str();
 }
 
 class CFGTraversal final {
@@ -540,6 +563,7 @@ public:
     void traverse(const cfg::CFG &cfg) {
         auto &gs = this->ctx.state;
         auto method = this->ctx.owner;
+        auto isMethodFileStaticInit = method == gs.lookupStaticInitForFile(this->ctx.file);
 
         // I don't fully understand the doc comment for forwardsTopoSort; it seems backwards in practice.
         for (auto it = cfg.forwardsTopoSort.rbegin(); it != cfg.forwardsTopoSort.rend(); ++it) {
@@ -547,21 +571,6 @@ public:
             print_dbg("# Looking at block id: {} ptr: {}\n", bb->id, (void *)bb);
             this->copyLocalsFromParents(bb, cfg);
             for (auto &binding : bb->exprs) {
-                if (auto *aliasInstr = cfg::cast_instruction<cfg::Alias>(binding.value)) {
-                    auto aliasName = aliasInstr->name;
-                    if (!aliasName.exists()) {
-                        // TODO(varun): When does this happen?
-                        continue;
-                    }
-                    auto aliasedSym = lookupRecursive(gs, method, aliasName);
-                    if (!aliasedSym.exists()) {
-                        print_err("# lookup for symbol {} failed starting from {}\n", aliasName.shortName(gs),
-                                  method.toString(gs));
-                        continue;
-                    }
-                    this->addLocal(bb, binding.bind.variable);
-                    continue;
-                }
                 if (!binding.loc.exists() || binding.loc.empty()) { // TODO(varun): When can each case happen?
                     continue;
                 }
@@ -627,7 +636,37 @@ public:
                         break;
                     }
                     case cfg::Tag::Alias: {
-                        ENFORCE(false, "already handled earlier");
+                        auto alias = cfg::cast_instruction<cfg::Alias>(binding.value);
+                        auto aliasedSym = alias->what;
+                        if (!aliasedSym.exists()) {
+                            if (!alias->name.exists()) {
+                                print_dbg("# alias name doesn't exist @ {}, what = {}\n",
+                                          core::Loc(this->ctx.file, binding.loc).showRaw(gs), alias->what.showRaw(gs));
+                                break;
+                            }
+                            print_dbg("# missing symbol for RHS {}\n", alias->name.shortName(gs));
+                            break;
+                        } else if (aliasedSym == core::Symbols::Magic()) {
+                            break;
+                        }
+                        absl::Status status;
+                        auto loc = binding.loc;
+                        auto source = this->ctx.locAt(binding.loc).source(gs);
+                        if (source.has_value() && source.value().find("::"sv) != std::string::npos) {
+                            loc.beginLoc = binding.loc.endPos() -
+                                           static_cast<uint32_t>(aliasedSym.name(gs).shortName(gs).length());
+                        }
+                        if (aliasedSym.isClassOrModule() &&
+                            (isMethodFileStaticInit ||
+                             method == gs.lookupStaticInitForClass(aliasedSym.asClassOrModuleRef().data(gs)->owner))) {
+                            status = this->scipState.saveDefinition(gs, this->ctx.file, aliasedSym, loc);
+                        } else {
+                            // When we have code like MyModule::MyClass, the source location in binding.loc corresponds
+                            // to 'MyModule::MyClass', whereas we want a range for 'MyClass'. So we cut off the prefix.
+                            status = this->scipState.saveReference(gs, this->ctx.file, aliasedSym, loc, 0);
+                        }
+                        ENFORCE(status.ok());
+                        this->addLocal(bb, binding.bind.variable);
                         break;
                     }
                     case cfg::Tag::Return: {
