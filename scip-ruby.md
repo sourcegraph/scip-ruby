@@ -44,7 +44,7 @@ Typically, I'll copy over the minimized code
 to the root and run:
 
 ```
-./bazel build //main:scip-ruby --config=dbg && ./bazel-out/darwin-dbg/bin/main/scip-ruby tmp.rb -p cfg-text --index-file index.scip
+./bazel build //main:scip-ruby --config=dbg && ./bazel-out/darwin-dbg/bin/main/scip-ruby tmp.rb -p cfg-text --index-file /dev/null
 ```
 
 Alternately, it may be useful to create a `tmp.rb`
@@ -55,5 +55,5 @@ file under the `test/scip/snapshots/` directory
 # Check
 ./bazel test //test/scip:tmp --config=dbg
 # View output
-./bazel test //test/scip:update_tmp --config=dbg && cat test/scip/snapshots/tmp.snapshot.rb
+./bazel test //test/scip:update_tmp --config=dbg && cat test/scip/testdata/tmp.snapshot.rb
 ```
