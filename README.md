@@ -5,8 +5,8 @@
 # Sorbet
 
 NOTE: This code is in Sourcegraph's fork of Sorbet, modified to add support
-for emitting SCIP indexes. See scip-ruby.md for details on running tests etc.
-The original README follows below.
+for emitting SCIP indexes. See [scip-ruby.md](./scip-ruby.md) for details
+on running tests etc. The original README follows below.
 
 ---
 
