@@ -8,10 +8,10 @@
    def f()
 #  ^^^^^^^ definition scip-ruby gem TODO TODO C1#f().
      _a = C1.new
-#    ^^ definition local 2~#3809224601
+#    ^^ definition local 1~#3809224601
 #         ^^ reference scip-ruby gem TODO TODO C1#
      _b = M2::C2.new
-#    ^^ definition local 5~#3809224601
+#    ^^ definition local 3~#3809224601
 #         ^^ reference scip-ruby gem TODO TODO M2#
 #             ^^ reference scip-ruby gem TODO TODO M2#C2#
      return
@@ -26,14 +26,14 @@
  end
  
  class M3::C3
-#      ^^ definition scip-ruby gem TODO TODO M3#
+#      ^^ reference scip-ruby gem TODO TODO M3#
 #          ^^ definition scip-ruby gem TODO TODO M3#C3#
  end
  
  def local_class()
 #^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO Object#local_class().
    localClass = Class.new
-#  ^^^^^^^^^^ definition local 2~#552113551
+#  ^^^^^^^^^^ definition local 1~#552113551
 #               ^^^^^ reference scip-ruby gem TODO TODO Class#
    # Technically, this is not supported by Sorbet (https://srb.help/3001),
    # but make sure we don't crash or do something weird.
@@ -43,10 +43,10 @@
    end
    _c = localClass.new
 #  ^^ definition local 3~#552113551
-#       ^^^^^^^^^^ reference local 2~#552113551
+#       ^^^^^^^^^^ reference local 1~#552113551
    _m = localClass.myMethod
 #  ^^ definition local 4~#552113551
-#       ^^^^^^^^^^ reference local 2~#552113551
+#       ^^^^^^^^^^ reference local 1~#552113551
 #                  ^^^^^^^^ reference scip-ruby gem TODO TODO Object#myMethod().
    return
  end
@@ -54,14 +54,14 @@
  module M4
 #       ^^ definition scip-ruby gem TODO TODO M4#
    K = 0
-#  ^ definition local 1~#119448696
-#  ^^^^^ reference local 1~#119448696
+#  ^ definition scip-ruby gem TODO TODO M4#K.
+#  ^^^^^ reference scip-ruby gem TODO TODO M4#K.
  end
  
  def module_access()
 #^^^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO Object#module_access().
    _ = M4::K
-#  ^ definition local 2~#3353511840
+#  ^ definition local 1~#3353511840
 #      ^^ reference scip-ruby gem TODO TODO M4#
 #          ^ reference scip-ruby gem TODO TODO M4#K.
    return
