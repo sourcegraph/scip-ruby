@@ -230,6 +230,7 @@ public:
             // that are extended in lots of places.
             scip::Descriptor descriptor;
             *descriptor.mutable_name() = cur.name(gs).show(gs);
+            ENFORCE(!descriptor.name().empty());
             // TODO: Are the scip descriptor kinds correct?
             switch (cur.kind()) {
                 case core::SymbolRef::Kind::Method:
@@ -267,6 +268,7 @@ public:
             scip::Descriptor descriptor;
             descriptor.set_suffix(scip::Descriptor::Term);
             *descriptor.mutable_name() = this->name.shortName(gs);
+            ENFORCE(!descriptor.name().empty());
             *symbol.add_descriptors() = move(descriptor);
         }
         return absl::OkStatus();
@@ -515,26 +517,6 @@ public:
         this->documents.push_back(move(document));
     }
 };
-
-core::SymbolRef lookupRecursive(const core::GlobalState &gs, const core::SymbolRef owner, core::NameRef name) {
-    if (!owner.exists()) {
-        return core::SymbolRef();
-    }
-    ENFORCE(name.exists(), "non-existent name passed for lookup 😧")
-    string ownerNameString = owner.name(gs).exists() ? owner.name(gs).toString(gs) : "<no name>";
-    print_dbg("# looking up {} in {}\n", name.toString(gs), ownerNameString);
-    if (owner.isClassOrModule()) {
-        auto symRef = gs.lookupSymbol(owner.asClassOrModuleRef(), name);
-        if (symRef.exists()) {
-            return symRef;
-        }
-        if (owner.owner(gs) == owner) {
-            return core::SymbolRef();
-        }
-        return lookupRecursive(gs, owner.owner(gs), name);
-    }
-    return lookupRecursive(gs, owner.enclosingClass(gs), name);
-}
 
 std::string format_ancestry(const core::GlobalState &gs, core::SymbolRef sym) {
     UnorderedSet<core::SymbolRef> visited;
@@ -844,23 +826,32 @@ public:
                             this->emitLocalOccurrence(cfg, bb, send->recv.occurrence(), ValueCategory::RValue);
                         }
 
-                        // TODO:(varun) For arrays, hashes etc., try to identify if the function
-                        // matches a known operator (e.g. []=), and emit an appropriate 'WriteAccess'
-                        // symbol role for it.
-
                         // Emit reference for the method being called
-                        if (send->fun.exists() && !isTemporary(gs, core::LocalVariable(send->fun, 1))) {
-                            // HACK(varun): We should probably add a helper function to check
-                            // for names corresponding to temporaries? Making up a fake local
-                            // variable seems a little gross.
-                            auto funSym = lookupRecursive(gs, method, send->fun);
-                            if (funSym.exists()) {
-                                ENFORCE(send->funLoc.exists() && !send->funLoc.empty());
-                                auto status = this->scipState.saveReference(gs, file, NamedSymbolRef::method(funSym),
-                                                                            send->funLoc, 0);
-                                ENFORCE(status.ok());
+                        auto recvType = send->recv.type;
+                        // TODO(varun): When is the isTemporary check going to succeed?
+                        if (recvType && send->fun.exists() && send->funLoc.exists() && !send->funLoc.empty() &&
+                            !isTemporary(gs, core::LocalVariable(send->fun, 1))) {
+                            core::ClassOrModuleRef recv{};
+                            // NOTE(varun): Based on core::Types::getRepresentedClass. Trying to use it directly didn't
+                            // quite work properly, but we might want to consolidate the implementation. I didn't quite
+                            // understand the bit about attachedClass.
+                            if (core::isa_type<core::ClassType>(recvType)) {
+                                recv = core::cast_type_nonnull<core::ClassType>(recvType).symbol;
+                            } else if (core::isa_type<core::AppliedType>(send->recv.type)) {
+                                // Triggered for a module nested inside a class
+                                recv = core::cast_type_nonnull<core::AppliedType>(send->recv.type).klass;
                             }
-                            print_err("# lookup for fun symbol {} failed\n", send->fun.shortName(gs));
+                            if (recv.exists()) {
+                                auto funSym = gs.lookupMethodSymbol(recv, send->fun);
+                                if (funSym.exists()) {
+                                    // TODO:(varun) For arrays, hashes etc., try to identify if the function
+                                    // matches a known operator (e.g. []=), and emit an appropriate 'WriteAccess'
+                                    // symbol role for it.
+                                    auto status = this->scipState.saveReference(
+                                        gs, file, NamedSymbolRef::method(funSym), send->funLoc, 0);
+                                    ENFORCE(status.ok());
+                                }
+                            }
                         }
 
                         // Emit references for arguments
@@ -1054,7 +1045,9 @@ public:
 
     virtual void typecheck(const core::GlobalState &gs, core::FileRef file, cfg::CFG &cfg,
                            ast::MethodDef &methodDef) const override {
-        if (methodDef.flags.isRewriterSynthesized) { // TODO: What should we do for these?
+        // FIXME[rewriter-synthesized]: We need to remove this check and make some tweaks inside
+        // the occurrence handling code to emit occurrences properly.
+        if (methodDef.flags.isRewriterSynthesized) {
             return;
         }
 

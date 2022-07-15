@@ -44,10 +44,11 @@
    _c = localClass.new
 #  ^^ definition local 3~#552113551
 #       ^^^^^^^^^^ reference local 1~#552113551
+#                  ^^^ reference scip-ruby gem TODO TODO Class#new().
+   # TODO: Missing occurrence for myMethod
    _m = localClass.myMethod
 #  ^^ definition local 4~#552113551
 #       ^^^^^^^^^^ reference local 1~#552113551
-#                  ^^^^^^^^ reference scip-ruby gem TODO TODO Object#myMethod().
    return
  end
  
@@ -80,6 +81,7 @@
 #  ^^^^^^^^^^^^ definition scip-ruby gem TODO TODO <Class:M5>#h().
      M6.g()
 #    ^^ reference scip-ruby gem TODO TODO M5#M6#
+#       ^ reference scip-ruby gem TODO TODO M5#<Class:M6>#g().
      return
    end
  end
@@ -95,9 +97,9 @@
  
    def j()
 #  ^^^^^^^ definition scip-ruby gem TODO TODO C7#j().
-     M8.j()
+     M8.i()
 #    ^^ reference scip-ruby gem TODO TODO C7#M8#
-#       ^ reference scip-ruby gem TODO TODO C7#j().
+#       ^ reference scip-ruby gem TODO TODO C7#<Class:M8>#i().
      return
    end
  end
