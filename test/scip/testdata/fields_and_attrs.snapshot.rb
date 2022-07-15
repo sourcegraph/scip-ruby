@@ -91,10 +91,13 @@
  # Accessors
  class P
 #      ^ definition scip-ruby gem TODO TODO P#
-   # FIXME[rewriter-syntesized]: Missing definitions
    attr_accessor :a
+#  ^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO P#a=().
+#  ^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO P#a().
    attr_reader :r
+#  ^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO P#r().
    attr_writer :w
+#  ^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO P#w=().
  
    def init
 #  ^^^^^^^^ definition scip-ruby gem TODO TODO P#init().
@@ -105,4 +108,33 @@
 #         ^^^ reference scip-ruby gem TODO TODO P#w=().
 #                  ^ reference scip-ruby gem TODO TODO P#a().
    end
+ 
+   def wrong_init
+#  ^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO P#wrong_init().
+     # Check that 'r' is a method access but 'a' and 'w' are locals
+     a = r
+#    ^ definition local 1~#1021288725
+#        ^ reference scip-ruby gem TODO TODO P#r().
+     w = a
+#    ^ definition local 2~#1021288725
+#    ^^^^^ reference local 2~#1021288725
+#        ^ reference local 1~#1021288725
+   end
+ end
+ 
+ def useP
+#^^^^^^^^ definition scip-ruby gem TODO TODO Object#useP().
+   p = P.new
+#  ^ definition local 1~#2121829932
+#      ^ reference scip-ruby gem TODO TODO P#
+   p.a = p.r
+#  ^ reference local 1~#2121829932
+#    ^^^ reference scip-ruby gem TODO TODO P#a=().
+#        ^ reference local 1~#2121829932
+#          ^ reference scip-ruby gem TODO TODO P#r().
+   p.w = p.a
+#  ^ reference local 1~#2121829932
+#    ^^^ reference scip-ruby gem TODO TODO P#w=().
+#        ^ reference local 1~#2121829932
+#          ^ reference scip-ruby gem TODO TODO P#a().
  end

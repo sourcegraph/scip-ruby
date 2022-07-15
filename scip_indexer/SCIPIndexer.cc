@@ -1045,17 +1045,17 @@ public:
 
     virtual void typecheck(const core::GlobalState &gs, core::FileRef file, cfg::CFG &cfg,
                            ast::MethodDef &methodDef) const override {
-        // FIXME[rewriter-synthesized]: We need to remove this check and make some tweaks inside
-        // the occurrence handling code to emit occurrences properly.
-        if (methodDef.flags.isRewriterSynthesized) {
-            return;
-        }
-
         auto scipState = this->getSCIPState();
         if (methodDef.name != core::Names::staticInit()) {
             auto status = scipState->saveDefinition(gs, file, scip_indexer::NamedSymbolRef::method(methodDef.symbol));
             ENFORCE(status.ok());
         }
+
+        // It is not useful to emit occurrences for method bodies that are synthesized.
+        if (methodDef.flags.isRewriterSynthesized) {
+            return;
+        }
+
         // It looks like Sorbet only stores symbols at the granularity of classes and methods
         // So we need to recompute local variable information from scratch. The LocalVarFinder
         // which is used by the LSP implementation is tailored for finding the local variable

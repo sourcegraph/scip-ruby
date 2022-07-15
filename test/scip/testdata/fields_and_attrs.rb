@@ -61,7 +61,6 @@ end
 
 # Accessors
 class P
-  # FIXME[rewriter-syntesized]: Missing definitions
   attr_accessor :a
   attr_reader :r
   attr_writer :w
@@ -70,4 +69,16 @@ class P
     self.a = self.r
     self.w = self.a
   end
+
+  def wrong_init
+    # Check that 'r' is a method access but 'a' and 'w' are locals
+    a = r
+    w = a
+  end
+end
+
+def useP
+  p = P.new
+  p.a = p.r
+  p.w = p.a
 end
