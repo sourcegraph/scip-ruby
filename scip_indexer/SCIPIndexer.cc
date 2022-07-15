@@ -9,6 +9,7 @@
 
 #include <cxxopts.hpp>
 
+#include "absl/hash/hash.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -126,59 +127,159 @@ struct OwnedLocal {
     }
 };
 
-// Returns true if we were able to compute a symbol for the expression.
-absl::Status symbolForExpr(const core::GlobalState &gs, core::SymbolRef symRef, scip::Symbol &symbol) {
-    // Don't set symbol.scheme and package.manager here because those are hard-coded to 'scip-ruby' and 'gem' anyways.
-    scip::Package package;
-    package.set_name("TODO");
-    package.set_version("TODO");
-    *symbol.mutable_package() = move(package);
+// A wrapper type to handle both top-level symbols (like classes) as well as
+// "inner symbols" like fields (@x). In a statically typed language, field
+// symbols are like any other symbols, but in Ruby, they aren't declared
+// ahead-of-time. So Sorbet represents them with a separate name on the side.
+//
+// Structurally, this is similar to the Alias instruction. One key difference
+// is that the SymbolRef may refer to the owner in some situations.
+class NamedSymbolRef final {
+    core::SymbolRef selfOrOwner;
+    core::NameRef name;
 
-    InlinedVector<scip::Descriptor, 4> descriptors;
-    auto cur = symRef;
-    while (cur != core::Symbols::root()) {
-        // NOTE:(varun) The current scheme will cause multiple 'definitions' for the same
-        // entity if it is present in different files, because the path is not encoded
-        // in the descriptor whose parent is the root. This matches the semantics of
-        // RubyMine, but we may want to revisit this if it is problematic for classes
-        // that are extended in lots of places.
-        scip::Descriptor descriptor;
-        *descriptor.mutable_name() = cur.name(gs).show(gs);
-        // TODO: Are the scip descriptor kinds correct?
-        switch (cur.kind()) {
-            case core::SymbolRef::Kind::Method:
-                // NOTE: There is a separate isOverloaded field in the flags field,
-                // despite SO/docs saying that Ruby doesn't support method overloading,
-                // Technically, we should better understand how this works and set the
-                // disambiguator based on that. However, right now, an extension's
-                // type-checking function is not run if a method is overloaded,
-                // (see pipeline.cc), so it's unclear if we need to care about that.
-                descriptor.set_suffix(scip::Descriptor::Method);
-                break;
-            case core::SymbolRef::Kind::ClassOrModule:
-                descriptor.set_suffix(scip::Descriptor::Type);
-                break;
-            case core::SymbolRef::Kind::TypeArgument:
-                descriptor.set_suffix(scip::Descriptor::TypeParameter);
-                break;
-            case core::SymbolRef::Kind::FieldOrStaticField:
-                descriptor.set_suffix(scip::Descriptor::Term);
-                break;
-            case core::SymbolRef::Kind::TypeMember: // TODO: What does TypeMember mean?
-                descriptor.set_suffix(scip::Descriptor::Type);
-                break;
-            default:
-                return absl::InvalidArgumentError("unexpected expr type for symbol computation");
+public:
+    enum class Kind {
+        ClassOrModule,
+        UndeclaredField,
+        StaticField,
+        Method,
+    };
+
+private:
+    NamedSymbolRef(core::SymbolRef s, core::NameRef n, Kind k) : selfOrOwner(s), name(n) {
+        switch (k) {
+            case Kind::ClassOrModule:
+                ENFORCE(s.isClassOrModule());
+                ENFORCE(!n.exists());
+                return;
+            case Kind::StaticField:
+                ENFORCE(s.isFieldOrStaticField());
+                ENFORCE(!n.exists());
+                return;
+            case Kind::UndeclaredField:
+                ENFORCE(n.exists());
+                return;
+            case Kind::Method:
+                ENFORCE(s.isMethod());
+                ENFORCE(!n.exists());
         }
-        descriptors.push_back(move(descriptor));
-        cur = cur.owner(gs);
     }
-    while (!descriptors.empty()) {
-        *symbol.add_descriptors() = move(descriptors.back());
-        descriptors.pop_back();
+
+public:
+    NamedSymbolRef(const NamedSymbolRef &) = default;
+    NamedSymbolRef(NamedSymbolRef &&) = default;
+    NamedSymbolRef &operator=(const NamedSymbolRef &) = default;
+    NamedSymbolRef &operator=(NamedSymbolRef &&) = default;
+
+    friend bool operator==(const NamedSymbolRef &lhs, const NamedSymbolRef &rhs) {
+        return lhs.selfOrOwner == rhs.selfOrOwner && lhs.name == rhs.name;
     }
-    return absl::OkStatus();
-}
+
+    template <typename H> friend H AbslHashValue(H h, const NamedSymbolRef &c) {
+        return H::combine(std::move(h), c.selfOrOwner, c.name);
+    }
+
+    static NamedSymbolRef classOrModule(core::SymbolRef self) {
+        return NamedSymbolRef(self, {}, Kind::ClassOrModule);
+    }
+
+    static NamedSymbolRef undeclaredField(core::SymbolRef owner, core::NameRef name) {
+        return NamedSymbolRef(owner, name, Kind::UndeclaredField);
+    }
+
+    static NamedSymbolRef staticField(core::SymbolRef self) {
+        return NamedSymbolRef(self, {}, Kind::StaticField);
+    }
+
+    static NamedSymbolRef method(core::SymbolRef self) {
+        return NamedSymbolRef(self, {}, Kind::Method);
+    }
+
+    Kind kind() const {
+        if (this->name.exists()) {
+            return Kind::UndeclaredField;
+        }
+        if (this->selfOrOwner.isFieldOrStaticField()) {
+            return Kind::StaticField;
+        }
+        return Kind::ClassOrModule;
+    }
+
+    core::SymbolRef asSymbolRef() const {
+        ENFORCE(this->kind() != Kind::UndeclaredField);
+        return this->selfOrOwner;
+    }
+
+    // Returns OK if we were able to compute a symbol for the expression.
+    absl::Status symbolForExpr(const core::GlobalState &gs, scip::Symbol &symbol) const {
+        // Don't set symbol.scheme and package.manager here because those are hard-coded to 'scip-ruby' and 'gem'
+        // anyways.
+        scip::Package package;
+        package.set_name("TODO");
+        package.set_version("TODO");
+        *symbol.mutable_package() = move(package);
+
+        InlinedVector<scip::Descriptor, 4> descriptors;
+        auto cur = this->selfOrOwner;
+        while (cur != core::Symbols::root()) {
+            // NOTE:(varun) The current scheme will cause multiple 'definitions' for the same
+            // entity if it is present in different files, because the path is not encoded
+            // in the descriptor whose parent is the root. This matches the semantics of
+            // RubyMine, but we may want to revisit this if it is problematic for classes
+            // that are extended in lots of places.
+            scip::Descriptor descriptor;
+            *descriptor.mutable_name() = cur.name(gs).show(gs);
+            ENFORCE(!descriptor.name().empty());
+            // TODO: Are the scip descriptor kinds correct?
+            switch (cur.kind()) {
+                case core::SymbolRef::Kind::Method:
+                    // NOTE: There is a separate isOverloaded field in the flags field,
+                    // despite SO/docs saying that Ruby doesn't support method overloading,
+                    // Technically, we should better understand how this works and set the
+                    // disambiguator based on that. However, right now, an extension's
+                    // type-checking function is not run if a method is overloaded,
+                    // (see pipeline.cc), so it's unclear if we need to care about that.
+                    descriptor.set_suffix(scip::Descriptor::Method);
+                    break;
+                case core::SymbolRef::Kind::ClassOrModule:
+                    descriptor.set_suffix(scip::Descriptor::Type);
+                    break;
+                case core::SymbolRef::Kind::TypeArgument:
+                    descriptor.set_suffix(scip::Descriptor::TypeParameter);
+                    break;
+                case core::SymbolRef::Kind::FieldOrStaticField:
+                    descriptor.set_suffix(scip::Descriptor::Term);
+                    break;
+                case core::SymbolRef::Kind::TypeMember: // TODO: What does TypeMember mean?
+                    descriptor.set_suffix(scip::Descriptor::Type);
+                    break;
+                default:
+                    return absl::InvalidArgumentError("unexpected expr type for symbol computation");
+            }
+            descriptors.push_back(move(descriptor));
+            cur = cur.owner(gs);
+        }
+        while (!descriptors.empty()) {
+            *symbol.add_descriptors() = move(descriptors.back());
+            descriptors.pop_back();
+        }
+        if (this->name != core::NameRef::noName()) {
+            scip::Descriptor descriptor;
+            descriptor.set_suffix(scip::Descriptor::Term);
+            *descriptor.mutable_name() = this->name.shortName(gs);
+            ENFORCE(!descriptor.name().empty());
+            *symbol.add_descriptors() = move(descriptor);
+        }
+        return absl::OkStatus();
+    }
+
+    core::Loc symbolLoc(const core::GlobalState &gs) const {
+        // FIXME(varun): For methods, this returns the full line!
+        ENFORCE(this->name == core::NameRef::noName());
+        return this->selfOrOwner.loc(gs);
+    }
+};
 
 InlinedVector<int32_t, 4> fromSorbetLoc(const core::GlobalState &gs, core::Loc loc) {
     ENFORCE_NO_TIMER(!loc.empty());
@@ -189,20 +290,35 @@ InlinedVector<int32_t, 4> fromSorbetLoc(const core::GlobalState &gs, core::Loc l
     r.push_back(start.line - 1);
     r.push_back(start.column - 1);
     if (start.line != end.line) {
+        ENFORCE(false, "None of the occurrence types we emit currently should have multiline ranges");
         r.push_back(end.line - 1);
+    } else {
+        ENFORCE(start.column < end.column);
     }
     r.push_back(end.column - 1);
     return r;
 }
 
-absl::StatusOr<core::Loc> occurrenceLoc(const core::GlobalState &gs, const core::SymbolRef symRef) {
-    // FIXME(varun): For methods, this returns the full line!
-    return symRef.loc(gs);
+core::Loc trimColonColonPrefix(const core::GlobalState &gs, core::Loc baseLoc) {
+    ENFORCE(!baseLoc.empty());
+    auto source = baseLoc.source(gs);
+    if (!source.has_value()) {
+        return baseLoc;
+    }
+    auto colonColonOffsetFromRangeStart = source.value().rfind("::"sv);
+    if (colonColonOffsetFromRangeStart == std::string::npos) {
+        return baseLoc;
+    }
+    auto occLen = source.value().length() - (colonColonOffsetFromRangeStart + 2);
+    ENFORCE(occLen < baseLoc.endPos());
+    auto newBeginLoc = baseLoc.endPos() - uint32_t(occLen);
+    ENFORCE(newBeginLoc > baseLoc.beginPos());
+    return core::Loc(baseLoc.file(), {.beginLoc = newBeginLoc, .endLoc = baseLoc.endPos()});
 }
 
 class SCIPState {
     string symbolScratchBuffer;
-    UnorderedMap<core::SymbolRef, string> symbolStringCache;
+    UnorderedMap<NamedSymbolRef, string> symbolStringCache;
 
 public:
     UnorderedMap<core::FileRef, vector<scip::Occurrence>> occurrenceMap;
@@ -232,7 +348,7 @@ public:
     // If the returned value is as success, the pointer is non-null.
     //
     // The argument symbol is used instead of recomputing from scratch if it is non-null.
-    absl::StatusOr<string *> saveSymbolString(const core::GlobalState &gs, core::SymbolRef symRef,
+    absl::StatusOr<string *> saveSymbolString(const core::GlobalState &gs, NamedSymbolRef symRef,
                                               const scip::Symbol *symbol) {
         auto pair = this->symbolStringCache.find(symRef);
         if (pair != this->symbolStringCache.end()) {
@@ -246,7 +362,7 @@ public:
             status = scip::utils::emitSymbolString(*symbol, this->symbolScratchBuffer);
         } else {
             scip::Symbol symbol;
-            status = symbolForExpr(gs, symRef, symbol);
+            status = symRef.symbolForExpr(gs, symbol);
             if (!status.ok()) {
                 return status;
             }
@@ -262,6 +378,8 @@ public:
 private:
     absl::Status saveDefinitionImpl(const core::GlobalState &gs, core::FileRef file, const string &symbolString,
                                     core::Loc occLoc) {
+        ENFORCE(!symbolString.empty());
+        occLoc = trimColonColonPrefix(gs, occLoc);
         scip::SymbolInformation symbolInfo;
         symbolInfo.set_symbol(symbolString);
         this->symbolMap[file].push_back(symbolInfo);
@@ -278,11 +396,13 @@ private:
     }
 
     absl::Status saveReferenceImpl(const core::GlobalState &gs, core::FileRef file, const string &symbolString,
-                                   core::LocOffsets occLoc, int32_t symbol_roles) {
+                                   core::LocOffsets occLocOffsets, int32_t symbol_roles) {
+        ENFORCE(!symbolString.empty());
+        auto occLoc = trimColonColonPrefix(gs, core::Loc(file, occLocOffsets));
         scip::Occurrence occurrence;
         occurrence.set_symbol(symbolString);
         occurrence.set_symbol_roles(symbol_roles);
-        for (auto val : sorbet::scip_indexer::fromSorbetLoc(gs, core::Loc(file, occLoc))) {
+        for (auto val : sorbet::scip_indexer::fromSorbetLoc(gs, occLoc)) {
             occurrence.add_range(val);
         }
         this->occurrenceMap[file].push_back(occurrence);
@@ -335,11 +455,11 @@ public:
     // Save definition when you have a sorbet Symbol.
     // Meant for methods, fields etc., but not local variables.
     // TODO(varun): Should we always pass in the location instead of sometimes only?
-    absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, core::SymbolRef symRef,
+    absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, NamedSymbolRef symRef,
                                 std::optional<core::LocOffsets> loc = std::nullopt) {
         // TODO:(varun) Should we cache here too to avoid emitting duplicate definitions?
         scip::Symbol symbol;
-        auto status = symbolForExpr(gs, symRef, symbol);
+        auto status = symRef.symbolForExpr(gs, symbol);
         if (!status.ok()) {
             return status;
         }
@@ -349,16 +469,7 @@ public:
         }
         string &symbolString = *valueOrStatus.value();
 
-        core::Loc occLoc;
-        if (loc.has_value()) {
-            occLoc = core::Loc(file, loc.value());
-        } else {
-            auto occLocStatus = occurrenceLoc(gs, symRef);
-            if (!occLocStatus.ok()) {
-                return occLocStatus.status();
-            }
-            occLoc = occLocStatus.value();
-        }
+        auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs);
 
         return this->saveDefinitionImpl(gs, file, symbolString, occLoc);
     }
@@ -370,7 +481,7 @@ public:
         return this->saveReferenceImpl(gs, file, occ.toString(gs, file), occ.offsets, symbol_roles);
     }
 
-    absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, core::SymbolRef symRef,
+    absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, NamedSymbolRef symRef,
                                core::LocOffsets occLoc, int32_t symbol_roles) {
         // TODO:(varun) Should we cache here to to avoid emitting duplicate references?
         absl::StatusOr<string *> valueOrStatus(this->saveSymbolString(gs, symRef, nullptr));
@@ -407,26 +518,6 @@ public:
     }
 };
 
-core::SymbolRef lookupRecursive(const core::GlobalState &gs, const core::SymbolRef owner, core::NameRef name) {
-    if (!owner.exists()) {
-        return core::SymbolRef();
-    }
-    ENFORCE(name.exists(), "non-existent name passed for lookup 😧")
-    string ownerNameString = owner.name(gs).exists() ? owner.name(gs).toString(gs) : "<no name>";
-    print_dbg("# looking up {} in {}\n", name.toString(gs), ownerNameString);
-    if (owner.isClassOrModule()) {
-        auto symRef = gs.lookupSymbol(owner.asClassOrModuleRef(), name);
-        if (symRef.exists()) {
-            return symRef;
-        }
-        if (owner.owner(gs) == owner) {
-            return core::SymbolRef();
-        }
-        return lookupRecursive(gs, owner.owner(gs), name);
-    }
-    return lookupRecursive(gs, owner.enclosingClass(gs), name);
-}
-
 std::string format_ancestry(const core::GlobalState &gs, core::SymbolRef sym) {
     UnorderedSet<core::SymbolRef> visited;
     auto i = 0;
@@ -439,6 +530,82 @@ std::string format_ancestry(const core::GlobalState &gs, core::SymbolRef sym) {
     }
     return out.str();
 }
+
+// Loosely inspired by AliasesAndKeywords in IREmitterContext.cc
+class AliasMap final {
+public:
+    using Impl = UnorderedMap<cfg::LocalRef, std::tuple<NamedSymbolRef, core::LocOffsets, /*emitted*/ bool>>;
+
+private:
+    Impl map;
+
+    AliasMap(const AliasMap &) = delete;
+    AliasMap &operator=(const AliasMap &) = delete;
+
+public:
+    AliasMap() = default;
+
+    void populate(const core::Context &ctx, const cfg::CFG &cfg) {
+        this->map = {};
+        auto &gs = ctx.state;
+        auto method = ctx.owner;
+        auto klass = method.owner(gs);
+        for (auto &bb : cfg.basicBlocks) {
+            for (auto &bind : bb->exprs) {
+                auto *instr = cfg::cast_instruction<cfg::Alias>(bind.value);
+                if (!instr) {
+                    continue;
+                }
+                ENFORCE(this->map.find(bind.bind.variable) == this->map.end(),
+                        "Overwriting an entry in the aliases map");
+                auto sym = instr->what;
+                if (!sym.exists() || sym == core::Symbols::Magic()) {
+                    continue;
+                }
+                if (sym == core::Symbols::Magic_undeclaredFieldStub()) {
+                    ENFORCE(!bind.loc.empty());
+                    this->map.insert(
+                        {bind.bind.variable, {NamedSymbolRef::undeclaredField(klass, instr->name), bind.loc, false}});
+                    continue;
+                }
+                if (sym.isStaticField(gs)) {
+                    this->map.insert({bind.bind.variable, {NamedSymbolRef::staticField(instr->what), bind.loc, false}});
+                    continue;
+                }
+                // Outside of definition contexts for classes & modules,
+                // we emit a reference directly at the alias instruction
+                // instead of relying on usages. The reason for this is that
+                // in some cases, there may not be any usages.
+                //
+                // For example, if you have access to M::K, there will be no usage
+                // for the alias to M. I'm not 100% sure if this is a Sorbet bug
+                // where it is missing a keep_for_ide call (which we can rely on
+                // in definition contexts) of if this is deliberate.
+                if (sym.isClassOrModule()) {
+                    auto loc = bind.loc;
+                    if (!loc.exists() || loc.empty()) { // For special classes like Sorbet::Private::Static
+                        continue;
+                    }
+                    this->map.insert({bind.bind.variable, {NamedSymbolRef::classOrModule(sym), loc, false}});
+                }
+            }
+        }
+    }
+
+    optional<std::pair<NamedSymbolRef, core::LocOffsets>> try_consume(cfg::LocalRef localRef) {
+        auto it = this->map.find(localRef);
+        if (it == this->map.end()) {
+            return nullopt;
+        }
+        auto &[namedSym, loc, emitted] = it->second;
+        emitted = true;
+        return {{namedSym, loc}};
+    }
+
+    void extract(Impl &out) {
+        out = std::move(this->map);
+    }
+};
 
 class CFGTraversal final {
     // A map from each basic block to the locals in it.
@@ -465,6 +632,7 @@ class CFGTraversal final {
     // in the block.
     UnorderedMap<const cfg::BasicBlock *, UnorderedSet<cfg::LocalRef>> blockLocals;
     UnorderedMap<cfg::LocalRef, uint32_t> functionLocals;
+    AliasMap aliasMap;
 
     // Local variable counter that is reset for every function.
     uint32_t counter = 0;
@@ -473,7 +641,7 @@ class CFGTraversal final {
 
 public:
     CFGTraversal(SCIPState &scipState, core::Context ctx)
-        : blockLocals(), functionLocals(), scipState(scipState), ctx(ctx) {}
+        : blockLocals(), functionLocals(), aliasMap(), scipState(scipState), ctx(ctx) {}
 
 private:
     void addLocal(const cfg::BasicBlock *bb, cfg::LocalRef localRef) {
@@ -500,7 +668,8 @@ private:
                              ValueCategory category) {
         auto localRef = local.variable;
         auto localVar = localRef.data(cfg);
-        if (isTemporary(ctx.state, localVar)) {
+        auto symRef = this->aliasMap.try_consume(localRef);
+        if (!symRef.has_value() && isTemporary(ctx.state, localVar)) {
             return false;
         }
         scip::SymbolRole referenceRole;
@@ -541,15 +710,26 @@ private:
                 ENFORCE(false, "unhandled case of ValueCategory")
         }
         ENFORCE(this->functionLocals.contains(localRef), "should've added local earlier if it was missing");
-        uint32_t localId = this->functionLocals[localRef];
         absl::Status status;
-        if (isDefinition) {
-            status = this->scipState.saveDefinition(this->ctx.state, this->ctx.file,
-                                                    OwnedLocal{this->ctx.owner, localId, local.loc});
+        auto loc = local.loc;
+        if (symRef.has_value()) {
+            auto [namedSym, _] = symRef.value();
+            if (isDefinition) {
+                status = this->scipState.saveDefinition(this->ctx.state, this->ctx.file, namedSym, loc);
+            } else {
+                status = this->scipState.saveReference(this->ctx.state, this->ctx.file, namedSym, loc, referenceRole);
+            }
         } else {
-            status = this->scipState.saveReference(this->ctx.state, this->ctx.file,
-                                                   OwnedLocal{this->ctx.owner, localId, local.loc}, referenceRole);
+            uint32_t localId = this->functionLocals[localRef];
+            if (isDefinition) {
+                status = this->scipState.saveDefinition(this->ctx.state, this->ctx.file,
+                                                        OwnedLocal{this->ctx.owner, localId, loc});
+            } else {
+                status = this->scipState.saveReference(this->ctx.state, this->ctx.file,
+                                                       OwnedLocal{this->ctx.owner, localId, loc}, referenceRole);
+            }
         }
+
         ENFORCE_NO_TIMER(status.ok());
         return true;
     }
@@ -574,23 +754,54 @@ private:
 
 public:
     void traverse(const cfg::CFG &cfg) {
+        this->aliasMap.populate(this->ctx, cfg);
         auto &gs = this->ctx.state;
+        auto file = this->ctx.file;
         auto method = this->ctx.owner;
-        auto isMethodFileStaticInit = method == gs.lookupStaticInitForFile(this->ctx.file);
+        auto isMethodFileStaticInit = method == gs.lookupStaticInitForFile(file);
+
+        // Returns true if the caller should not process the binding further.
+        auto skipProcessing = [&](const cfg::Binding &binding) -> bool {
+            if (binding.loc.exists() && !binding.loc.empty()) {
+                return false;
+            }
+            if (binding.value.tag() != cfg::Tag::Send) {
+                return true;
+            }
+            auto send = cfg::cast_instruction<cfg::Send>(binding.value);
+            if (send->fun != core::Names::keepForIde()) {
+                return true;
+            }
+            ENFORCE(send->args.size() == 1);
+            auto &arg = send->args[0];
+            auto symRef = this->aliasMap.try_consume(arg.variable);
+            ENFORCE(symRef.has_value());
+            auto [namedSym, _] = symRef.value();
+            auto check =
+                isMethodFileStaticInit ||
+                method == gs.lookupStaticInitForClass(namedSym.asSymbolRef().asClassOrModuleRef().data(gs)->owner,
+                                                      /*allowMissing*/ true);
+            ENFORCE(check);
+            auto status = this->scipState.saveDefinition(gs, file, namedSym, arg.loc);
+            ENFORCE(status.ok());
+            return true;
+        };
 
         // I don't fully understand the doc comment for forwardsTopoSort; it seems backwards in practice.
         for (auto it = cfg.forwardsTopoSort.rbegin(); it != cfg.forwardsTopoSort.rend(); ++it) {
             cfg::BasicBlock *bb = *it;
-            print_dbg("# Looking at block id: {} ptr: {}\n", bb->id, (void *)bb);
             this->copyLocalsFromParents(bb, cfg);
             for (auto &binding : bb->exprs) {
-                if (!binding.loc.exists() || binding.loc.empty()) { // TODO(varun): When can each case happen?
+                if (skipProcessing(binding)) {
                     continue;
                 }
-                // Emit occurrence information for the LHS
-                this->emitLocalOccurrence(cfg, bb,
-                                          cfg::LocalOccurrence{binding.bind.variable, lhsLocIfPresent(binding)},
-                                          ValueCategory::LValue);
+                // For aliases, don't emit an occurrence for the LHS; it will be emitted
+                // when the alias is used or separately at the end. See NOTE[alias-handling].
+                if (binding.value.tag() != cfg::Tag::Alias) {
+                    // Emit occurrence information for the LHS
+                    auto occ = cfg::LocalOccurrence{binding.bind.variable, lhsLocIfPresent(binding)};
+                    this->emitLocalOccurrence(cfg, bb, occ, ValueCategory::LValue);
+                }
                 // Emit occurrence information for the RHS
                 auto emitLocal = [this, &cfg, &bb, &binding](cfg::LocalRef local) -> void {
                     (void)this->emitLocalOccurrence(cfg, bb, cfg::LocalOccurrence{local, binding.loc},
@@ -615,23 +826,32 @@ public:
                             this->emitLocalOccurrence(cfg, bb, send->recv.occurrence(), ValueCategory::RValue);
                         }
 
-                        // TODO:(varun) For arrays, hashes etc., try to identify if the function
-                        // matches a known operator (e.g. []=), and emit an appropriate 'WriteAccess'
-                        // symbol role for it.
-
                         // Emit reference for the method being called
-                        if (send->fun.exists() && !isTemporary(gs, core::LocalVariable(send->fun, 1))) {
-                            // HACK(varun): We should probably add a helper function to check
-                            // for names corresponding to temporaries? Making up a fake local
-                            // variable seems a little gross.
-                            auto funSym = lookupRecursive(gs, method, send->fun);
-                            if (funSym.exists()) {
-                                ENFORCE(send->funLoc.exists() && !send->funLoc.empty());
-                                auto status =
-                                    this->scipState.saveReference(gs, this->ctx.file, funSym, send->funLoc, 0);
-                                ENFORCE(status.ok());
+                        auto recvType = send->recv.type;
+                        // TODO(varun): When is the isTemporary check going to succeed?
+                        if (recvType && send->fun.exists() && send->funLoc.exists() && !send->funLoc.empty() &&
+                            !isTemporary(gs, core::LocalVariable(send->fun, 1))) {
+                            core::ClassOrModuleRef recv{};
+                            // NOTE(varun): Based on core::Types::getRepresentedClass. Trying to use it directly didn't
+                            // quite work properly, but we might want to consolidate the implementation. I didn't quite
+                            // understand the bit about attachedClass.
+                            if (core::isa_type<core::ClassType>(recvType)) {
+                                recv = core::cast_type_nonnull<core::ClassType>(recvType).symbol;
+                            } else if (core::isa_type<core::AppliedType>(send->recv.type)) {
+                                // Triggered for a module nested inside a class
+                                recv = core::cast_type_nonnull<core::AppliedType>(send->recv.type).klass;
                             }
-                            print_err("# lookup for fun symbol {} failed\n", send->fun.shortName(gs));
+                            if (recv.exists()) {
+                                auto funSym = gs.lookupMethodSymbol(recv, send->fun);
+                                if (funSym.exists()) {
+                                    // TODO:(varun) For arrays, hashes etc., try to identify if the function
+                                    // matches a known operator (e.g. []=), and emit an appropriate 'WriteAccess'
+                                    // symbol role for it.
+                                    auto status = this->scipState.saveReference(
+                                        gs, file, NamedSymbolRef::method(funSym), send->funLoc, 0);
+                                    ENFORCE(status.ok());
+                                }
+                            }
                         }
 
                         // Emit references for arguments
@@ -646,40 +866,6 @@ public:
                             this->emitLocalOccurrence(cfg, bb, arg.occurrence(), ValueCategory::RValue);
                         }
 
-                        break;
-                    }
-                    case cfg::Tag::Alias: {
-                        auto alias = cfg::cast_instruction<cfg::Alias>(binding.value);
-                        auto aliasedSym = alias->what;
-                        if (!aliasedSym.exists()) {
-                            if (!alias->name.exists()) {
-                                print_dbg("# alias name doesn't exist @ {}, what = {}\n",
-                                          core::Loc(this->ctx.file, binding.loc).showRaw(gs), alias->what.showRaw(gs));
-                                break;
-                            }
-                            print_dbg("# missing symbol for RHS {}\n", alias->name.shortName(gs));
-                            break;
-                        } else if (aliasedSym == core::Symbols::Magic()) {
-                            break;
-                        }
-                        absl::Status status;
-                        auto loc = binding.loc;
-                        auto source = this->ctx.locAt(binding.loc).source(gs);
-                        if (source.has_value() && source.value().find("::"sv) != std::string::npos) {
-                            loc.beginLoc = binding.loc.endPos() -
-                                           static_cast<uint32_t>(aliasedSym.name(gs).shortName(gs).length());
-                        }
-                        if (aliasedSym.isClassOrModule() &&
-                            (isMethodFileStaticInit ||
-                             method == gs.lookupStaticInitForClass(aliasedSym.asClassOrModuleRef().data(gs)->owner))) {
-                            status = this->scipState.saveDefinition(gs, this->ctx.file, aliasedSym, loc);
-                        } else {
-                            // When we have code like MyModule::MyClass, the source location in binding.loc corresponds
-                            // to 'MyModule::MyClass', whereas we want a range for 'MyClass'. So we cut off the prefix.
-                            status = this->scipState.saveReference(gs, this->ctx.file, aliasedSym, loc, 0);
-                        }
-                        ENFORCE(status.ok());
-                        this->addLocal(bb, binding.bind.variable);
                         break;
                     }
                     case cfg::Tag::Return: {
@@ -699,6 +885,16 @@ public:
                     }
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wimplicit-fallthrough"
+                    case cfg::Tag::Alias:
+                        // NOTE[alias-handling]: Aliases are handled in two ways.
+                        // 1. We create an alias map and when emitting a local occurrence, we de-alias if
+                        //    that makes sense. Based on the usage, we emit a def or a ref.
+                        //    For example, if you have a method with an assignment to a field for the first
+                        //    time in the body of that method, we'll emit a definition.
+                        //    (This matches the Go to Definition behavior of RubyMine.)
+                        // 2. For nested classes, sometimes, there is no usage at all in the method body
+                        //    (in some cases, there is a keep_for_ide send instruction, which we special-case).
+                        //    In such a situation, we emit unused aliases after processing the CFG.
                     case cfg::Tag::SolveConstraint:
                     case cfg::Tag::TAbsurd:
                     case cfg::Tag::LoadSelf:
@@ -713,6 +909,38 @@ public:
                     }
                 }
             }
+        }
+
+        // See NOTE[alias-handling].
+        AliasMap::Impl map;
+        this->aliasMap.extract(map);
+        using SymbolWithLoc = std::pair<NamedSymbolRef, core::LocOffsets>;
+        std::vector<SymbolWithLoc> todo;
+        for (auto &[_, value] : map) {
+            auto &[namedSym, loc, emitted] = value;
+            if (!emitted) {
+                todo.emplace_back(namedSym, loc);
+            }
+        }
+        // Sort for determinism
+        fast_sort(todo, [](const SymbolWithLoc &p1, const SymbolWithLoc &p2) -> bool {
+            ENFORCE(p1.second.beginPos() != p2.second.beginPos(),
+                    "Different alias instructions should correspond to different start offsets");
+            return p1.second.beginPos() < p2.second.beginPos();
+        });
+        // NOTE:(varun) Not 100% sure if emitting a reference here. Here's why it's written this
+        // way right now. This code path is hit in two different kinds of situations:
+        // - You have a reference to a nested class etc. inside a method body.
+        // - You have a 'direct' definition of a nested class
+        //     class M::C
+        //       # blah
+        //     end
+        //   In this situation, M should count as a reference if we're mimicking RubyMine.
+        //   Specifically, Go to Definition for modules seems to go to 'module M' even
+        //   when other forms like 'class M::C' are present.
+        for (auto &[namedSym, loc] : todo) {
+            auto status = this->scipState.saveReference(gs, file, namedSym, loc, 0);
+            ENFORCE(status.ok());
         }
     }
 };
@@ -817,15 +1045,17 @@ public:
 
     virtual void typecheck(const core::GlobalState &gs, core::FileRef file, cfg::CFG &cfg,
                            ast::MethodDef &methodDef) const override {
-        if (methodDef.flags.isRewriterSynthesized) { // TODO: What should we do for these?
+        auto scipState = this->getSCIPState();
+        if (methodDef.name != core::Names::staticInit()) {
+            auto status = scipState->saveDefinition(gs, file, scip_indexer::NamedSymbolRef::method(methodDef.symbol));
+            ENFORCE(status.ok());
+        }
+
+        // It is not useful to emit occurrences for method bodies that are synthesized.
+        if (methodDef.flags.isRewriterSynthesized) {
             return;
         }
 
-        auto scipState = this->getSCIPState();
-        if (methodDef.name != core::Names::staticInit()) {
-            auto status = scipState->saveDefinition(gs, file, core::SymbolRef(methodDef.symbol));
-            ENFORCE(status.ok());
-        }
         // It looks like Sorbet only stores symbols at the granularity of classes and methods
         // So we need to recompute local variable information from scratch. The LocalVarFinder
         // which is used by the LSP implementation is tailored for finding the local variable
