@@ -47,8 +47,8 @@ public:
     BasicBlock *breakScope;
     BasicBlock *rescueScope;
     std::shared_ptr<core::SendAndBlockLink> link;
-    UnorderedMap<core::SymbolRef, LocalRef> &aliases;
-    UnorderedMap<core::NameRef, LocalRef> &discoveredUndeclaredFields;
+    UnorderedMap<core::SymbolRef, LocalOccurrence> &aliases;
+    UnorderedMap<core::NameRef, LocalOccurrence> &discoveredUndeclaredFields;
 
     uint32_t &temporaryCounter;
 
@@ -64,8 +64,8 @@ public:
 private:
     friend std::unique_ptr<CFG> CFGBuilder::buildFor(core::Context ctx, ast::MethodDef &md);
     CFGContext(core::Context ctx, CFG &inWhat, LocalOccurrence target, int loops, BasicBlock *nextScope,
-               BasicBlock *breakScope, BasicBlock *rescueScope, UnorderedMap<core::SymbolRef, LocalRef> &aliases,
-               UnorderedMap<core::NameRef, LocalRef> &discoveredUndeclaredFields, uint32_t &temporaryCounter)
+               BasicBlock *breakScope, BasicBlock *rescueScope, UnorderedMap<core::SymbolRef, LocalOccurrence> &aliases,
+               UnorderedMap<core::NameRef, LocalOccurrence> &discoveredUndeclaredFields, uint32_t &temporaryCounter)
         : ctx(ctx), inWhat(inWhat), target(target), loops(loops), isInsideRubyBlock(false), breakIsJump(false),
           nextScope(nextScope), breakScope(breakScope), rescueScope(rescueScope), aliases(aliases),
           discoveredUndeclaredFields(discoveredUndeclaredFields), temporaryCounter(temporaryCounter){};
