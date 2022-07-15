@@ -43,7 +43,7 @@ void CFGBuilder::unconditionalJump(BasicBlock *from, BasicBlock *to, CFG &inWhat
 
 namespace {
 
-LocalRef global2Local(CFGContext cctx, core::SymbolRef what) {
+LocalRef global2Local(CFGContext cctx, core::SymbolRef what, core::LocOffsets loc) {
     if (what == core::Symbols::StubModule()) {
         // We don't need all stub module assignments to alias to the same temporary.
         // (The fact that there's a StubModule at all means an error was already reported elsewhere)
@@ -51,11 +51,12 @@ LocalRef global2Local(CFGContext cctx, core::SymbolRef what) {
     }
 
     // Note: this will add an empty local to aliases if 'what' is not there
-    LocalRef &alias = cctx.aliases[what];
-    if (!alias.exists()) {
-        alias = cctx.newTemporary(what.name(cctx.ctx));
+    auto &alias = cctx.aliases[what];
+    if (!alias.variable.exists()) {
+        alias.loc = loc;
+        alias.variable = cctx.newTemporary(what.name(cctx.ctx));
     }
-    return alias;
+    return alias.variable;
 }
 
 pair<LocalRef, bool> unresolvedIdent2Local(CFGContext cctx, const ast::UnresolvedIdent &id, bool isAssign) {
@@ -97,12 +98,12 @@ pair<LocalRef, bool> unresolvedIdent2Local(CFGContext cctx, const ast::Unresolve
                 }
             }
             auto ret = cctx.newTemporary(id.name);
-            cctx.discoveredUndeclaredFields[id.name] = ret;
+            cctx.discoveredUndeclaredFields[id.name] = {ret, id.loc};
             return {ret, hasError && isAssign};
         }
-        return {fnd->second, hasError && isAssign};
+        return {fnd->second.variable, hasError && isAssign};
     } else {
-        return {global2Local(cctx, sym), false};
+        return {global2Local(cctx, sym, id.loc), false};
     }
 }
 
@@ -586,7 +587,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, const ast::ExpressionPtr &what, Ba
             },
             [&](const ast::Assign &a) {
                 if (auto lhsIdent = ast::cast_tree<ast::ConstantLit>(a.lhs)) {
-                    auto lhs = global2Local(cctx, lhsIdent->symbol());
+                    auto lhs = global2Local(cctx, lhsIdent->symbol(), a.loc);
                     ret = walkAssign(cctx, a.rhs, a.loc, LocalOccurrence{lhs, a.lhs.loc()}, current);
                 } else if (auto lhsLocal = ast::cast_tree<ast::Local>(a.lhs)) {
                     auto lhs = cctx.inWhat.enterLocal(lhsLocal->localVariable);

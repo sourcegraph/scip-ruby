@@ -26,6 +26,7 @@ def local_class()
     ":)"
   end
   _c = localClass.new
+  # TODO: Missing occurrence for myMethod
   _m = localClass.myMethod
   return
 end
@@ -58,7 +59,7 @@ class C7
   end
 
   def j()
-    M8.j()
+    M8.i()
     return
   end
 end
