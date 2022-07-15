@@ -194,6 +194,8 @@ void formatSnapshot(const scip::Document &document, std::ostream &out) {
                 symbolRole = (occ.symbol_roles() & scip::SymbolRole::ReadAccess) ? "(read+write) " : "(write) ";
             }
 
+            ENFORCE(range.start.column < range.end.column, "We shouldn't be emitting empty ranges 🙅");
+
             out << '#' << string(range.start.column - 1, ' ') << string(range.end.column - range.start.column, '^')
                 << ' ' << string(isDefinition ? "definition" : "reference") << ' ' << symbolRole
                 << formatSymbol(occ.symbol());

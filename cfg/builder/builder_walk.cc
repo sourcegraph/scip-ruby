@@ -43,7 +43,7 @@ void CFGBuilder::unconditionalJump(BasicBlock *from, BasicBlock *to, CFG &inWhat
 
 namespace {
 
-LocalRef global2Local(CFGContext cctx, core::SymbolRef what) {
+LocalRef global2Local(CFGContext cctx, core::SymbolRef what, core::LocOffsets loc) {
     if (what == core::Symbols::StubModule()) {
         // We don't need all stub module assignments to alias to the same temporary.
         // (The fact that there's a StubModule at all means an error was already reported elsewhere)
@@ -51,11 +51,12 @@ LocalRef global2Local(CFGContext cctx, core::SymbolRef what) {
     }
 
     // Note: this will add an empty local to aliases if 'what' is not there
-    LocalRef &alias = cctx.aliases[what];
-    if (!alias.exists()) {
-        alias = cctx.newTemporary(what.name(cctx.ctx));
+    auto &alias = cctx.aliases[what];
+    if (!alias.variable.exists()) {
+        alias.loc = loc;
+        alias.variable = cctx.newTemporary(what.name(cctx.ctx));
     }
-    return alias;
+    return alias.variable;
 }
 
 LocalRef unresolvedIdent2Local(CFGContext cctx, const ast::UnresolvedIdent &id) {
@@ -91,12 +92,12 @@ LocalRef unresolvedIdent2Local(CFGContext cctx, const ast::UnresolvedIdent &id) 
                 }
             }
             auto ret = cctx.newTemporary(id.name);
-            cctx.discoveredUndeclaredFields[id.name] = ret;
+            cctx.discoveredUndeclaredFields[id.name] = {ret, id.loc};
             return ret;
         }
-        return fnd->second;
+        return fnd->second.variable;
     } else {
-        return global2Local(cctx, sym);
+        return global2Local(cctx, sym, id.loc);
     }
 }
 
@@ -337,7 +338,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
             [&](ast::Assign &a) {
                 LocalRef lhs;
                 if (auto lhsIdent = ast::cast_tree<ast::ConstantLit>(a.lhs)) {
-                    lhs = global2Local(cctx, lhsIdent->symbol);
+                    lhs = global2Local(cctx, lhsIdent->symbol, a.loc);
                 } else if (auto lhsLocal = ast::cast_tree<ast::Local>(a.lhs)) {
                     lhs = cctx.inWhat.enterLocal(lhsLocal->localVariable);
                 } else if (auto ident = ast::cast_tree<ast::UnresolvedIdent>(a.lhs)) {
