@@ -13,6 +13,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
 #include "absl/synchronization/mutex.h"
 #include "spdlog/fmt/fmt.h"
 
@@ -127,6 +128,32 @@ struct OwnedLocal {
     }
 };
 
+class GemMetadata final {
+    string _name;
+    string _version;
+
+    GemMetadata(string name, string version) : _name(name), _version(version) {}
+
+public:
+    GemMetadata &operator=(const GemMetadata &) = default;
+
+    static GemMetadata tryParseOrDefault(string metadata) {
+        vector<string> v = absl::StrSplit(metadata, '@');
+        if (v.size() != 2 || v[0].empty() || v[1].empty()) {
+            return GemMetadata{"TODO", "TODO"};
+        }
+        return GemMetadata{v[0], v[1]};
+    }
+
+    const std::string &name() const {
+        return this->_name;
+    }
+
+    const std::string &version() const {
+        return this->_version;
+    }
+};
+
 // A wrapper type to handle both top-level symbols (like classes) as well as
 // "inner symbols" like fields (@x). In a statically typed language, field
 // symbols are like any other symbols, but in Ruby, they aren't declared
@@ -212,12 +239,12 @@ public:
     }
 
     // Returns OK if we were able to compute a symbol for the expression.
-    absl::Status symbolForExpr(const core::GlobalState &gs, scip::Symbol &symbol) const {
+    absl::Status symbolForExpr(const core::GlobalState &gs, const GemMetadata &metadata, scip::Symbol &symbol) const {
         // Don't set symbol.scheme and package.manager here because those are hard-coded to 'scip-ruby' and 'gem'
         // anyways.
         scip::Package package;
-        package.set_name("TODO");
-        package.set_version("TODO");
+        package.set_name(metadata.name());
+        package.set_version(metadata.version());
         *symbol.mutable_package() = move(package);
 
         InlinedVector<scip::Descriptor, 4> descriptors;
@@ -319,6 +346,7 @@ core::Loc trimColonColonPrefix(const core::GlobalState &gs, core::Loc baseLoc) {
 class SCIPState {
     string symbolScratchBuffer;
     UnorderedMap<NamedSymbolRef, string> symbolStringCache;
+    GemMetadata gemMetadata;
 
 public:
     UnorderedMap<core::FileRef, vector<scip::Occurrence>> occurrenceMap;
@@ -337,7 +365,7 @@ public:
     vector<scip::SymbolInformation> externalSymbols;
 
 public:
-    SCIPState() = default;
+    SCIPState(GemMetadata metadata) : symbolScratchBuffer(), symbolStringCache(), gemMetadata(metadata) {}
     ~SCIPState() = default;
     SCIPState(SCIPState &&) = default;
     SCIPState &operator=(SCIPState &&other) = default;
@@ -362,7 +390,7 @@ public:
             status = scip::utils::emitSymbolString(*symbol, this->symbolScratchBuffer);
         } else {
             scip::Symbol symbol;
-            status = symRef.symbolForExpr(gs, symbol);
+            status = symRef.symbolForExpr(gs, this->gemMetadata, symbol);
             if (!status.ok()) {
                 return status;
             }
@@ -459,7 +487,7 @@ public:
                                 std::optional<core::LocOffsets> loc = std::nullopt) {
         // TODO:(varun) Should we cache here too to avoid emitting duplicate definitions?
         scip::Symbol symbol;
-        auto status = symRef.symbolForExpr(gs, symbol);
+        auto status = symRef.symbolForExpr(gs, this->gemMetadata, symbol);
         if (!status.ok()) {
             return status;
         }
@@ -954,6 +982,7 @@ using LocalSymbolTable = UnorderedMap<core::LocalVariable, core::Loc>;
 class SCIPSemanticExtension : public SemanticExtension {
 public:
     string indexFilePath;
+    scip_indexer::GemMetadata gemMetadata;
 
     using SCIPState = sorbet::scip_indexer::SCIPState;
 
@@ -977,7 +1006,7 @@ public:
             //
             // We will move the state out later, so use a no-op deleter.
             return mutableState.states[this_thread::get_id()] =
-                       shared_ptr<SCIPState>(new SCIPState(), [](SCIPState *) {});
+                       shared_ptr<SCIPState>(new SCIPState(gemMetadata), [](SCIPState *) {});
         }
     }
 
@@ -985,14 +1014,27 @@ public:
         auto classLoc = core::Loc(file, cd->name.loc());
     }
 
+    bool doNothing() const {
+        return this->indexFilePath.empty();
+    }
+
     void run(core::MutableContext &ctx, ast::ClassDef *cd) const override {
+        if (this->doNothing()) {
+            return;
+        }
         // FIXME:(varun) This is a no-op???
         emitSymbol(ctx.state, ctx.file, cd);
     };
     virtual void finishTypecheckFile(const core::GlobalState &gs, const core::FileRef &file) const override {
+        if (this->doNothing()) {
+            return;
+        }
         getSCIPState()->saveDocument(gs, file);
     };
     virtual void finishTypecheck(const core::GlobalState &gs) const override {
+        if (this->doNothing()) {
+            return;
+        }
         scip::ToolInfo toolInfo;
         toolInfo.set_name("scip-ruby");
         toolInfo.set_version(sorbet_version);
@@ -1045,6 +1087,9 @@ public:
 
     virtual void typecheck(const core::GlobalState &gs, core::FileRef file, cfg::CFG &cfg,
                            ast::MethodDef &methodDef) const override {
+        if (this->doNothing()) {
+            return;
+        }
         auto scipState = this->getSCIPState();
         if (methodDef.name != core::Names::staticInit()) {
             auto status = scipState->saveDefinition(gs, file, scip_indexer::NamedSymbolRef::method(methodDef.symbol));
@@ -1067,11 +1112,12 @@ public:
     }
 
     virtual unique_ptr<SemanticExtension> deepCopy(const core::GlobalState &from, core::GlobalState &to) override {
-        return make_unique<SCIPSemanticExtension>(this->indexFilePath);
+        return make_unique<SCIPSemanticExtension>(this->indexFilePath, this->gemMetadata);
     };
     virtual void merge(const core::GlobalState &from, core::GlobalState &to, core::NameSubstitution &subst) override{};
 
-    SCIPSemanticExtension(string indexFilePath) : indexFilePath(indexFilePath), mutableState() {}
+    SCIPSemanticExtension(string indexFilePath, scip_indexer::GemMetadata metadata)
+        : indexFilePath(indexFilePath), gemMetadata(metadata), mutableState() {}
     ~SCIPSemanticExtension() {}
 };
 
@@ -1080,15 +1126,21 @@ public:
     void injectOptions(cxxopts::Options &optsBuilder) const override {
         optsBuilder.add_options("indexer")("index-file", "Output SCIP index to a directory, which must already exist",
                                            cxxopts::value<string>());
+        optsBuilder.add_options("name@version")(
+            "gem-metadata", "Name and version pair to be used for cross-repository code navigation.",
+            cxxopts::value<string>());
     };
     unique_ptr<SemanticExtension> readOptions(cxxopts::ParseResult &providedOptions) const override {
         if (providedOptions.count("index-file") > 0) {
-            return make_unique<SCIPSemanticExtension>(providedOptions["index-file"].as<string>());
+            return make_unique<SCIPSemanticExtension>(
+                providedOptions["index-file"].as<string>(),
+                scip_indexer::GemMetadata::tryParseOrDefault(
+                    providedOptions.count("gem-metadata") > 0 ? providedOptions["gem-metadata"].as<string>() : ""));
         }
         return this->defaultInstance();
     };
     virtual unique_ptr<SemanticExtension> defaultInstance() const override {
-        return make_unique<SCIPSemanticExtension>("index.scip");
+        return make_unique<SCIPSemanticExtension>("", scip_indexer::GemMetadata::tryParseOrDefault(""));
     };
     static vector<SemanticExtensionProvider *> getProviders();
     virtual ~SCIPSemanticExtensionProvider() = default;
