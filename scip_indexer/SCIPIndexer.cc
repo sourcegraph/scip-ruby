@@ -230,6 +230,9 @@ public:
         if (this->selfOrOwner.isFieldOrStaticField()) {
             return Kind::StaticField;
         }
+        if (this->selfOrOwner.isMethod()) {
+            return Kind::Method;
+        }
         return Kind::ClassOrModule;
     }
 
