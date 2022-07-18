@@ -825,7 +825,10 @@ public:
                 }
                 // For aliases, don't emit an occurrence for the LHS; it will be emitted
                 // when the alias is used or separately at the end. See NOTE[alias-handling].
-                if (binding.value.tag() != cfg::Tag::Alias) {
+                //
+                // For ArgPresent instructions (which come up with default arguments), we will
+                // emit defs/refs for direct usages, so don't emit a local for the temporary here.
+                if (binding.value.tag() != cfg::Tag::Alias && binding.value.tag() != cfg::Tag::ArgPresent) {
                     // Emit occurrence information for the LHS
                     auto occ = cfg::LocalOccurrence{binding.bind.variable, lhsLocIfPresent(binding)};
                     this->emitLocalOccurrence(cfg, bb, occ, ValueCategory::LValue);
