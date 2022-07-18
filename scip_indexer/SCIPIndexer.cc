@@ -1046,7 +1046,9 @@ public:
         scip::Metadata metadata;
         metadata.set_version(scip::UnspecifiedProtocolVersion);
         *metadata.mutable_tool_info() = toolInfo;
-        metadata.set_project_root("file://Users/varun/Code/scip-ruby"); // FIXME(varun): Remove hard-coded string
+        // NOTE: We are not respecting the path prefix option here. Should we do that?
+        // FIXME: filesystem::current_path() returns the path in 'native' format, so this won't work on Windows.
+        metadata.set_project_root("file:/" + filesystem::current_path().string());
         metadata.set_text_document_encoding(scip::TextEncoding::UTF8);
 
         vector<SCIPState> allStates;
