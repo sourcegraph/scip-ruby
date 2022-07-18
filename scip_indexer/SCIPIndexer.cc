@@ -317,7 +317,6 @@ InlinedVector<int32_t, 4> fromSorbetLoc(const core::GlobalState &gs, core::Loc l
     r.push_back(start.line - 1);
     r.push_back(start.column - 1);
     if (start.line != end.line) {
-        ENFORCE(false, "None of the occurrence types we emit currently should have multiline ranges");
         r.push_back(end.line - 1);
     } else {
         ENFORCE(start.column < end.column);
@@ -466,9 +465,10 @@ private:
             return false;
         }
         auto savedCounter = it->second;
-        ENFORCE(occ.counter == savedCounter, "cannot have distinct local variable {} at same location {}",
-                (symbolRoles & scip::SymbolRole::Definition) ? "definitions" : "references",
-                core::Loc(file, occ.offsets).showRaw(gs));
+        ENFORCE(occ.counter == savedCounter, "found distinct local variable {} at same location in {}:\n{}",
+                (symbolRoles & scip::SymbolRole::Definition) ? "definitions" : "references", file.data(gs).path(),
+                core::Loc(file, occ.offsets).toString(gs));
+
         return true;
     }
 
