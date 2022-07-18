@@ -596,6 +596,11 @@ public:
         auto &gs = ctx.state;
         auto method = ctx.owner;
         auto klass = method.owner(gs);
+        // Make sure that the offsets we store here match the offsets we use
+        // in saveDefinition/saveReference.
+        auto trim = [&](core::LocOffsets loc) -> core::LocOffsets {
+            return trimColonColonPrefix(gs, core::Loc(ctx.file, loc)).offsets();
+        };
         for (auto &bb : cfg.basicBlocks) {
             for (auto &bind : bb->exprs) {
                 auto *instr = cfg::cast_instruction<cfg::Alias>(bind.value);
@@ -610,12 +615,13 @@ public:
                 }
                 if (sym == core::Symbols::Magic_undeclaredFieldStub()) {
                     ENFORCE(!bind.loc.empty());
-                    this->map.insert(
+                    this->map.insert( // no trim(...) because undeclared fields shouldn't have ::
                         {bind.bind.variable, {NamedSymbolRef::undeclaredField(klass, instr->name), bind.loc, false}});
                     continue;
                 }
                 if (sym.isStaticField(gs)) {
-                    this->map.insert({bind.bind.variable, {NamedSymbolRef::staticField(instr->what), bind.loc, false}});
+                    this->map.insert(
+                        {bind.bind.variable, {NamedSymbolRef::staticField(instr->what), trim(bind.loc), false}});
                     continue;
                 }
                 // Outside of definition contexts for classes & modules,
@@ -632,7 +638,7 @@ public:
                     if (!loc.exists() || loc.empty()) { // For special classes like Sorbet::Private::Static
                         continue;
                     }
-                    this->map.insert({bind.bind.variable, {NamedSymbolRef::classOrModule(sym), loc, false}});
+                    this->map.insert({bind.bind.variable, {NamedSymbolRef::classOrModule(sym), trim(loc), false}});
                 }
             }
         }
