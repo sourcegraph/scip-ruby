@@ -15,6 +15,7 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
+#include "absl/strings/str_split.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 
 #include "ast/ast.h"
@@ -278,10 +279,24 @@ void compareSnapshots(const scip::Index &index, const std::filesystem::path &sna
     }
 }
 
+optional<string> readGemMetadataFromComment(string_view path) {
+    ifstream input(path);
+    for (string line; getline(input, line);) {
+        if (absl::StrContains(line, "# gem-metadata: ")) {
+            auto s = absl::StripPrefix(line, "# gem-metadata: ");
+            ENFORCE(!s.empty());
+            return string(s);
+        }
+    }
+    return nullopt;
+}
+
 TEST_CASE("SCIPTest") {
     // FIXME(varun): Add support for multifile tests.
     ENFORCE(inputs.size() == 1);
     Expectations test = Expectations::getExpectations(inputs[0]);
+
+    optional<string> gemMetadata = readGemMetadataFromComment(inputs[0]);
 
     vector<unique_ptr<core::Error>> errors;
     auto inputPath = test.folder + test.basename;
@@ -315,8 +330,14 @@ TEST_CASE("SCIPTest") {
 
     cxxopts::Options options{"scip-ruby-snapshot-test"};
     scipProvider->injectOptions(options);
-    std::vector<const char *> argv = {"scip-ruby-snapshot-test", "--index-file", indexFilePath.c_str(), nullptr};
-    auto parseResult = options.parse(3, argv.data());
+    std::vector<const char *> argv = {"scip-ruby-snapshot-test", "--index-file", indexFilePath.c_str()};
+    if (gemMetadata.has_value()) {
+        argv.push_back("--gem-metadata");
+        ENFORCE(!gemMetadata.value().empty());
+        argv.push_back(gemMetadata.value().data());
+    }
+    argv.push_back(nullptr);
+    auto parseResult = options.parse(argv.size() - 1, argv.data());
 
     gs.semanticExtensions.push_back(scipProvider->readOptions(parseResult));
     {
