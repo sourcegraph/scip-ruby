@@ -236,6 +236,21 @@ public:
         return Kind::ClassOrModule;
     }
 
+    string showRaw(const core::GlobalState &gs) const {
+        switch (this->kind()) {
+            case Kind::UndeclaredField:
+                return fmt::format("UndeclaredField(owner: {}, name: {})", this->selfOrOwner.showFullName(gs),
+                                   this->name.toString(gs));
+            case Kind::StaticField:
+                return fmt::format("StaticField {}", this->selfOrOwner.showFullName(gs));
+            case Kind::ClassOrModule:
+                return fmt::format("ClassOrModule {}", this->selfOrOwner.showFullName(gs));
+            case Kind::Method:
+                return fmt::format("Method {}", this->selfOrOwner.showFullName(gs));
+        }
+        ENFORCE(false, "impossible");
+    }
+
     core::SymbolRef asSymbolRef() const {
         ENFORCE(this->kind() != Kind::UndeclaredField);
         return this->selfOrOwner;
@@ -957,9 +972,11 @@ public:
             }
         }
         // Sort for determinism
-        fast_sort(todo, [](const SymbolWithLoc &p1, const SymbolWithLoc &p2) -> bool {
+        fast_sort(todo, [&](const SymbolWithLoc &p1, const SymbolWithLoc &p2) -> bool {
             ENFORCE(p1.second.beginPos() != p2.second.beginPos(),
-                    "Different alias instructions should correspond to different start offsets");
+                    "found alias instructions with same start offset in {}, source:\n{}\nsym1 = {}, sym2 = {}\n",
+                    file.data(gs).path(), core::Loc(file, p1.second).toString(gs), p1.first.showRaw(gs),
+                    p2.first.showRaw(gs));
             return p1.second.beginPos() < p2.second.beginPos();
         });
         // NOTE:(varun) Not 100% sure if emitting a reference here. Here's why it's written this
