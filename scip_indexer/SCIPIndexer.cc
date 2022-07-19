@@ -230,7 +230,25 @@ public:
         if (this->selfOrOwner.isFieldOrStaticField()) {
             return Kind::StaticField;
         }
+        if (this->selfOrOwner.isMethod()) {
+            return Kind::Method;
+        }
         return Kind::ClassOrModule;
+    }
+
+    string showRaw(const core::GlobalState &gs) const {
+        switch (this->kind()) {
+            case Kind::UndeclaredField:
+                return fmt::format("UndeclaredField(owner: {}, name: {})", this->selfOrOwner.showFullName(gs),
+                                   this->name.toString(gs));
+            case Kind::StaticField:
+                return fmt::format("StaticField {}", this->selfOrOwner.showFullName(gs));
+            case Kind::ClassOrModule:
+                return fmt::format("ClassOrModule {}", this->selfOrOwner.showFullName(gs));
+            case Kind::Method:
+                return fmt::format("Method {}", this->selfOrOwner.showFullName(gs));
+        }
+        ENFORCE(false, "impossible");
     }
 
     core::SymbolRef asSymbolRef() const {
@@ -578,6 +596,11 @@ public:
         auto &gs = ctx.state;
         auto method = ctx.owner;
         auto klass = method.owner(gs);
+        // Make sure that the offsets we store here match the offsets we use
+        // in saveDefinition/saveReference.
+        auto trim = [&](core::LocOffsets loc) -> core::LocOffsets {
+            return trimColonColonPrefix(gs, core::Loc(ctx.file, loc)).offsets();
+        };
         for (auto &bb : cfg.basicBlocks) {
             for (auto &bind : bb->exprs) {
                 auto *instr = cfg::cast_instruction<cfg::Alias>(bind.value);
@@ -592,12 +615,13 @@ public:
                 }
                 if (sym == core::Symbols::Magic_undeclaredFieldStub()) {
                     ENFORCE(!bind.loc.empty());
-                    this->map.insert(
+                    this->map.insert( // no trim(...) because undeclared fields shouldn't have ::
                         {bind.bind.variable, {NamedSymbolRef::undeclaredField(klass, instr->name), bind.loc, false}});
                     continue;
                 }
                 if (sym.isStaticField(gs)) {
-                    this->map.insert({bind.bind.variable, {NamedSymbolRef::staticField(instr->what), bind.loc, false}});
+                    this->map.insert(
+                        {bind.bind.variable, {NamedSymbolRef::staticField(instr->what), trim(bind.loc), false}});
                     continue;
                 }
                 // Outside of definition contexts for classes & modules,
@@ -614,7 +638,7 @@ public:
                     if (!loc.exists() || loc.empty()) { // For special classes like Sorbet::Private::Static
                         continue;
                     }
-                    this->map.insert({bind.bind.variable, {NamedSymbolRef::classOrModule(sym), loc, false}});
+                    this->map.insert({bind.bind.variable, {NamedSymbolRef::classOrModule(sym), trim(loc), false}});
                 }
             }
         }
@@ -954,9 +978,11 @@ public:
             }
         }
         // Sort for determinism
-        fast_sort(todo, [](const SymbolWithLoc &p1, const SymbolWithLoc &p2) -> bool {
+        fast_sort(todo, [&](const SymbolWithLoc &p1, const SymbolWithLoc &p2) -> bool {
             ENFORCE(p1.second.beginPos() != p2.second.beginPos(),
-                    "Different alias instructions should correspond to different start offsets");
+                    "found alias instructions with same start offset in {}, source:\n{}\nsym1 = {}, sym2 = {}\n",
+                    file.data(gs).path(), core::Loc(file, p1.second).toString(gs), p1.first.showRaw(gs),
+                    p2.first.showRaw(gs));
             return p1.second.beginPos() < p2.second.beginPos();
         });
         // NOTE:(varun) Not 100% sure if emitting a reference here. Here's why it's written this
