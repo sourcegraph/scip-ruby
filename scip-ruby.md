@@ -57,3 +57,30 @@ file under the `test/scip/snapshots/` directory
 # View output
 ./bazel test //test/scip:update_tmp --config=dbg && cat test/scip/testdata/tmp.snapshot.rb
 ```
+
+Having the [SCIP CLI](https://github.com/sourcegraph/scip) available
+is also useful for inspecting the emitted index.
+
+## Manually testing against larger codebases
+
+Some OSS repos that can be used to exercise scip-ruby are:
+- [Homebrew/brew](https://github.com/Homebrew/brew): (150k SLOC)
+  1. Clone and run `./bin/brew typecheck` once.
+  2. Copy over the built `scip-ruby` binary:
+      ```
+      cp /path/to/scip-ruby ./Library/Homebrew/vendor/bundle/ruby/2.6.0/bin/srb
+      ```
+  3. Add a line for indexing 
+      ```
+      diff --git a/Library/Homebrew/dev-cmd/typecheck.rb b/Library/Homebrew/dev-cmd/typecheck.rb
+      index b9f00a544..aac977019 100644
+      --- a/Library/Homebrew/dev-cmd/typecheck.rb
+      +++ b/Library/Homebrew/dev-cmd/typecheck.rb
+      @@ -124,2 +124,3 @@ module Homebrew
+             end
+      +      srb_exec += ["--index-file", "index.scip", "--gem-metadata", "brew@3.5.4"]
+             success = system(*srb_exec)
+      ```
+  4. Run `./bin/brew typecheck`. An index should appear under `Library/Homebrew/`.
+  5. Go to step 2.
+
