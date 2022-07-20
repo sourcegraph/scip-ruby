@@ -356,7 +356,7 @@ TEST_CASE("SCIPTest") {
         auto workers = WorkerPool::create(0, gs.tracer());
         sorbet::core::UnfreezeSymbolTable st(gs);
 
-        trees = move(namer::Namer::run(gs, move(trees), *workers).result());
+        trees = move(namer::Namer::run(gs, move(trees), *workers, nullptr).result());
         trees = move(resolver::Resolver::run(gs, move(trees), *workers).result());
         for (auto &resolvedTree : trees) {
             sorbet::core::MutableContext ctx(gs, core::Symbols::root(), resolvedTree.file);
