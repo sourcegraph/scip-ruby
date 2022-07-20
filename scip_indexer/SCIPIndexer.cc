@@ -1,6 +1,7 @@
 // NOTE: Protobuf headers should go first since they use poisoned functions.
 #include "proto/SCIP.pb.h"
 
+#include <algorithm>
 #include <fstream>
 #include <iterator>
 #include <memory>
@@ -977,14 +978,25 @@ public:
                 todo.emplace_back(namedSym, loc);
             }
         }
+        bool foundDupes = false;
         // Sort for determinism
         fast_sort(todo, [&](const SymbolWithLoc &p1, const SymbolWithLoc &p2) -> bool {
-            ENFORCE(p1.second.beginPos() != p2.second.beginPos(),
-                    "found alias instructions with same start offset in {}, source:\n{}\nsym1 = {}, sym2 = {}\n",
-                    file.data(gs).path(), core::Loc(file, p1.second).toString(gs), p1.first.showRaw(gs),
-                    p2.first.showRaw(gs));
+            if (p1.second.beginPos() == p2.second.beginPos()) {
+                // TODO: This code path is hit when there is a module_function on top of a sig.
+                // In that case, the 'T' and 'X' in 'T::X' in a sig end up with two occurrences each.
+                // We should check if this is a Sorbet bug or deliberate.
+                ENFORCE(p1.first == p2.first,
+                        "found different symbols at same location in {}, source:\n{}\nsym1 = {}\nsym2 = {}\n",
+                        file.data(gs).path(), core::Loc(file, p1.second).toString(gs), p1.first.showRaw(gs),
+                        p2.first.showRaw(gs));
+                foundDupes = true;
+            }
             return p1.second.beginPos() < p2.second.beginPos();
         });
+        if (foundDupes) {
+            auto last = unique(todo.begin(), todo.end());
+            todo.erase(last, todo.end());
+        }
         // NOTE:(varun) Not 100% sure if emitting a reference here. Here's why it's written this
         // way right now. This code path is hit in two different kinds of situations:
         // - You have a reference to a nested class etc. inside a method body.
