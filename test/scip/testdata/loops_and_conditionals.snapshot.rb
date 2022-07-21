@@ -1,7 +1,7 @@
  # typed: true
  
  def if_elsif_else()
-#^^^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO Object#if_elsif_else().
+#^^^^^^^^^^^^^^^^^^^ definition [..] Object#if_elsif_else().
    x = 0
 #  ^ definition local 1~#2393773952
    y = 0
@@ -28,7 +28,7 @@
 #          ^ reference local 1~#2393773952
 #                      ^ reference local 1~#2393773952
 #                               ^ reference local 1~#2393773952
-#                                       ^^ reference scip-ruby gem TODO TODO Integer#==().
+#                                       ^^ reference [..] Integer#==().
        x
 #      ^ reference local 1~#2393773952
      else
@@ -44,7 +44,7 @@
  end
  
  def unless()
-#^^^^^^^^^^^^ definition scip-ruby gem TODO TODO Object#unless().
+#^^^^^^^^^^^^ definition [..] Object#unless().
    z = 0
 #  ^ definition local 1~#2827997891
    x = 1
@@ -67,7 +67,7 @@
  end
  
  def case(x, y)
-#^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO Object#case().
+#^^^^^^^^^^^^^^ definition [..] Object#case().
 #         ^ definition local 1~#2602907825
 #            ^ definition local 2~#2602907825
    case x
@@ -92,7 +92,7 @@
  end
  
  def for(xs)
-#^^^^^^^^^^^ definition scip-ruby gem TODO TODO Object#for().
+#^^^^^^^^^^^ definition [..] Object#for().
 #        ^^ definition local 1~#2901640080
    for e in xs
 #      ^ definition local 2~#2901640080
@@ -125,7 +125,7 @@
  end
  
  def while(xs)
-#^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO Object#while().
+#^^^^^^^^^^^^^ definition [..] Object#while().
 #          ^^ definition local 1~#231090382
    i = 0
 #  ^ definition local 2~#231090382
@@ -162,7 +162,7 @@
  end
  
  def until(xs)
-#^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO Object#until().
+#^^^^^^^^^^^^^ definition [..] Object#until().
 #          ^^ definition local 1~#3132432719
    i = 0
 #  ^ definition local 2~#3132432719
@@ -199,7 +199,7 @@
  end
  
  def flip_flop(xs)
-#^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO Object#flip_flop().
+#^^^^^^^^^^^^^^^^^ definition [..] Object#flip_flop().
 #              ^^ definition local 1~#2191960030
    # NOTE: flip-flops are unsupported (https://srb.help/3003)
    # Unlike redo, which somehow works, we fail to emit references
