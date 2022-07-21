@@ -4,54 +4,54 @@
  # and how they interact with inheritance: https://stackoverflow.com/a/15773671/2682729
  
  class K
-#      ^ definition scip-ruby gem TODO TODO K#
+#      ^ definition [..] K#
    def m1
-#  ^^^^^^ definition scip-ruby gem TODO TODO K#m1().
+#  ^^^^^^ definition [..] K#m1().
      @f = 0
-#    ^^ definition scip-ruby gem TODO TODO K#@f.
+#    ^^ definition [..] K#@f.
      @g = @f
-#    ^^ definition scip-ruby gem TODO TODO K#@g.
-#         ^^ reference scip-ruby gem TODO TODO K#@f.
+#    ^^ definition [..] K#@g.
+#         ^^ reference [..] K#@f.
      return
    end
    def m2
-#  ^^^^^^ definition scip-ruby gem TODO TODO K#m2().
+#  ^^^^^^ definition [..] K#m2().
      @f = @g
-#    ^^ definition scip-ruby gem TODO TODO K#@f.
-#         ^^ reference scip-ruby gem TODO TODO K#@g.
+#    ^^ definition [..] K#@f.
+#         ^^ reference [..] K#@g.
      return
    end
  end
  
  # Extended
  class K
-#      ^ definition scip-ruby gem TODO TODO K#
+#      ^ definition [..] K#
    def m3
-#  ^^^^^^ definition scip-ruby gem TODO TODO K#m3().
+#  ^^^^^^ definition [..] K#m3().
      @g = @f
-#    ^^ definition scip-ruby gem TODO TODO K#@g.
-#         ^^ reference scip-ruby gem TODO TODO K#@f.
+#    ^^ definition [..] K#@g.
+#         ^^ reference [..] K#@f.
      return
    end
  end
  
  # Class instance var
  class L
-#      ^ definition scip-ruby gem TODO TODO L#
+#      ^ definition [..] L#
    @x = 10
-#  ^^ definition scip-ruby gem TODO TODO <Class:L>#@x.
+#  ^^ definition [..] <Class:L>#@x.
    @y = 9
-#  ^^ definition scip-ruby gem TODO TODO <Class:L>#@y.
+#  ^^ definition [..] <Class:L>#@y.
    def self.m1
-#  ^^^^^^^^^^^ definition scip-ruby gem TODO TODO <Class:L>#m1().
+#  ^^^^^^^^^^^ definition [..] <Class:L>#m1().
      @y = @x
-#    ^^ definition scip-ruby gem TODO TODO <Class:L>#@y.
-#         ^^ reference scip-ruby gem TODO TODO <Class:L>#@x.
+#    ^^ definition [..] <Class:L>#@y.
+#         ^^ reference [..] <Class:L>#@x.
      return
    end
  
    def m2
-#  ^^^^^^ definition scip-ruby gem TODO TODO L#m2().
+#  ^^^^^^ definition [..] L#m2().
      # FIXME: Missing references
      self.class.y = self.class.x
      return
@@ -60,29 +60,29 @@
  
  # Class var
  class N
-#      ^ definition scip-ruby gem TODO TODO N#
+#      ^ definition [..] N#
    @@a = 0
-#  ^^^ definition scip-ruby gem TODO TODO <Class:N>#@@a.
+#  ^^^ definition [..] <Class:N>#@@a.
    @@b = 1
-#  ^^^ definition scip-ruby gem TODO TODO <Class:N>#@@b.
+#  ^^^ definition [..] <Class:N>#@@b.
    def self.m1
-#  ^^^^^^^^^^^ definition scip-ruby gem TODO TODO <Class:N>#m1().
+#  ^^^^^^^^^^^ definition [..] <Class:N>#m1().
      @@b = @@a
-#    ^^^ definition scip-ruby gem TODO TODO <Class:N>#@@b.
-#          ^^^ reference scip-ruby gem TODO TODO <Class:N>#@@a.
+#    ^^^ definition [..] <Class:N>#@@b.
+#          ^^^ reference [..] <Class:N>#@@a.
      return
    end
  
    def m2
-#  ^^^^^^ definition scip-ruby gem TODO TODO N#m2().
+#  ^^^^^^ definition [..] N#m2().
      @@b = @@a
-#    ^^^ definition scip-ruby gem TODO TODO N#@@b.
-#          ^^^ reference scip-ruby gem TODO TODO N#@@a.
+#    ^^^ definition [..] N#@@b.
+#          ^^^ reference [..] N#@@a.
      return
    end
  
    def m3
-#  ^^^^^^ definition scip-ruby gem TODO TODO N#m3().
+#  ^^^^^^ definition [..] N#m3().
      # FIXME: Missing references
      self.class.b = self.class.a
    end
@@ -90,31 +90,31 @@
  
  # Accessors
  class P
-#      ^ definition scip-ruby gem TODO TODO P#
+#      ^ definition [..] P#
    attr_accessor :a
-#  ^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO P#a=().
-#  ^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO P#a().
+#  ^^^^^^^^^^^^^^^^ definition [..] P#a=().
+#  ^^^^^^^^^^^^^^^^ definition [..] P#a().
    attr_reader :r
-#  ^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO P#r().
+#  ^^^^^^^^^^^^^^ definition [..] P#r().
    attr_writer :w
-#  ^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO P#w=().
+#  ^^^^^^^^^^^^^^ definition [..] P#w=().
  
    def init
-#  ^^^^^^^^ definition scip-ruby gem TODO TODO P#init().
+#  ^^^^^^^^ definition [..] P#init().
      self.a = self.r
-#         ^^^ reference scip-ruby gem TODO TODO P#a=().
-#                  ^ reference scip-ruby gem TODO TODO P#r().
+#         ^^^ reference [..] P#a=().
+#                  ^ reference [..] P#r().
      self.w = self.a
-#         ^^^ reference scip-ruby gem TODO TODO P#w=().
-#                  ^ reference scip-ruby gem TODO TODO P#a().
+#         ^^^ reference [..] P#w=().
+#                  ^ reference [..] P#a().
    end
  
    def wrong_init
-#  ^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO P#wrong_init().
+#  ^^^^^^^^^^^^^^ definition [..] P#wrong_init().
      # Check that 'r' is a method access but 'a' and 'w' are locals
      a = r
 #    ^ definition local 1~#1021288725
-#        ^ reference scip-ruby gem TODO TODO P#r().
+#        ^ reference [..] P#r().
      w = a
 #    ^ definition local 2~#1021288725
 #    ^^^^^ reference local 2~#1021288725
@@ -123,18 +123,18 @@
  end
  
  def useP
-#^^^^^^^^ definition scip-ruby gem TODO TODO Object#useP().
+#^^^^^^^^ definition [..] Object#useP().
    p = P.new
 #  ^ definition local 1~#2121829932
-#      ^ reference scip-ruby gem TODO TODO P#
+#      ^ reference [..] P#
    p.a = p.r
 #  ^ reference local 1~#2121829932
-#    ^^^ reference scip-ruby gem TODO TODO P#a=().
+#    ^^^ reference [..] P#a=().
 #        ^ reference local 1~#2121829932
-#          ^ reference scip-ruby gem TODO TODO P#r().
+#          ^ reference [..] P#r().
    p.w = p.a
 #  ^ reference local 1~#2121829932
-#    ^^^ reference scip-ruby gem TODO TODO P#w=().
+#    ^^^ reference [..] P#w=().
 #        ^ reference local 1~#2121829932
-#          ^ reference scip-ruby gem TODO TODO P#a().
+#          ^ reference [..] P#a().
  end

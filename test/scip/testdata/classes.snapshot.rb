@@ -4,47 +4,47 @@
 #^ definition local 1~#119448696
  
  class C1
-#      ^^ definition scip-ruby gem TODO TODO C1#
+#      ^^ definition [..] C1#
    def f()
-#  ^^^^^^^ definition scip-ruby gem TODO TODO C1#f().
+#  ^^^^^^^ definition [..] C1#f().
      _a = C1.new
 #    ^^ definition local 1~#3809224601
-#         ^^ reference scip-ruby gem TODO TODO C1#
+#         ^^ reference [..] C1#
      _b = M2::C2.new
 #    ^^ definition local 3~#3809224601
-#         ^^ reference scip-ruby gem TODO TODO M2#
-#             ^^ reference scip-ruby gem TODO TODO M2#C2#
+#         ^^ reference [..] M2#
+#             ^^ reference [..] M2#C2#
      return
    end
  end
  
  module M2
-#       ^^ definition scip-ruby gem TODO TODO M2#
+#       ^^ definition [..] M2#
    class C2
-#        ^^ definition scip-ruby gem TODO TODO M2#C2#
+#        ^^ definition [..] M2#C2#
    end
  end
  
  class M3::C3
-#      ^^ reference scip-ruby gem TODO TODO M3#
-#          ^^ definition scip-ruby gem TODO TODO M3#C3#
+#      ^^ reference [..] M3#
+#          ^^ definition [..] M3#C3#
  end
  
  def local_class()
-#^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO Object#local_class().
+#^^^^^^^^^^^^^^^^^ definition [..] Object#local_class().
    localClass = Class.new
 #  ^^^^^^^^^^ definition local 1~#552113551
-#               ^^^^^ reference scip-ruby gem TODO TODO Class#
+#               ^^^^^ reference [..] Class#
    # Technically, this is not supported by Sorbet (https://srb.help/3001),
    # but make sure we don't crash or do something weird.
    def localClass.myMethod()
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO Object#myMethod().
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] Object#myMethod().
      ":)"
    end
    _c = localClass.new
 #  ^^ definition local 3~#552113551
 #       ^^^^^^^^^^ reference local 1~#552113551
-#                  ^^^ reference scip-ruby gem TODO TODO Class#new().
+#                  ^^^ reference [..] Class#new().
    # TODO: Missing occurrence for myMethod
    _m = localClass.myMethod
 #  ^^ definition local 4~#552113551
@@ -53,53 +53,53 @@
  end
  
  module M4
-#       ^^ definition scip-ruby gem TODO TODO M4#
+#       ^^ definition [..] M4#
    K = 0
-#  ^ definition scip-ruby gem TODO TODO M4#K.
-#  ^^^^^ reference scip-ruby gem TODO TODO M4#K.
+#  ^ definition [..] M4#K.
+#  ^^^^^ reference [..] M4#K.
  end
  
  def module_access()
-#^^^^^^^^^^^^^^^^^^^ definition scip-ruby gem TODO TODO Object#module_access().
+#^^^^^^^^^^^^^^^^^^^ definition [..] Object#module_access().
    _ = M4::K
 #  ^ definition local 1~#3353511840
-#      ^^ reference scip-ruby gem TODO TODO M4#
-#          ^ reference scip-ruby gem TODO TODO M4#K.
+#      ^^ reference [..] M4#
+#          ^ reference [..] M4#K.
    return
  end
  
  module M5
-#       ^^ definition scip-ruby gem TODO TODO M5#
+#       ^^ definition [..] M5#
    module M6
-#         ^^ definition scip-ruby gem TODO TODO M5#M6#
+#         ^^ definition [..] M5#M6#
      def self.g()
-#    ^^^^^^^^^^^^ definition scip-ruby gem TODO TODO M5#<Class:M6>#g().
+#    ^^^^^^^^^^^^ definition [..] M5#<Class:M6>#g().
      end
    end
  
    def self.h()
-#  ^^^^^^^^^^^^ definition scip-ruby gem TODO TODO <Class:M5>#h().
+#  ^^^^^^^^^^^^ definition [..] <Class:M5>#h().
      M6.g()
-#    ^^ reference scip-ruby gem TODO TODO M5#M6#
-#       ^ reference scip-ruby gem TODO TODO M5#<Class:M6>#g().
+#    ^^ reference [..] M5#M6#
+#       ^ reference [..] M5#<Class:M6>#g().
      return
    end
  end
  
  class C7
-#      ^^ definition scip-ruby gem TODO TODO C7#
+#      ^^ definition [..] C7#
    module M8
-#         ^^ definition scip-ruby gem TODO TODO C7#M8#
+#         ^^ definition [..] C7#M8#
      def self.i()
-#    ^^^^^^^^^^^^ definition scip-ruby gem TODO TODO C7#<Class:M8>#i().
+#    ^^^^^^^^^^^^ definition [..] C7#<Class:M8>#i().
      end
    end
  
    def j()
-#  ^^^^^^^ definition scip-ruby gem TODO TODO C7#j().
+#  ^^^^^^^ definition [..] C7#j().
      M8.i()
-#    ^^ reference scip-ruby gem TODO TODO C7#M8#
-#       ^ reference scip-ruby gem TODO TODO C7#<Class:M8>#i().
+#    ^^ reference [..] C7#M8#
+#       ^ reference [..] C7#<Class:M8>#i().
      return
    end
  end

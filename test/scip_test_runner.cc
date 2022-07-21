@@ -171,7 +171,8 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
         return isSCIPRangeLess(occ1.range(), occ2.range());
     });
     auto formatSymbol = [](const std::string &symbol) -> string {
-        return symbol; // FIXME(varun): Add customization here!
+        // Strip out repeating information and placeholder names.
+        return absl::StrReplaceAll(symbol, {{"scip-ruby gem ", ""}, {"TODO TODO", "[..]"}});
     };
     size_t occ_i = 0;
     std::ifstream input(document.relative_path());
