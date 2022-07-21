@@ -152,7 +152,11 @@ struct SCIPRange final {
     }
 };
 
-void formatSnapshot(const scip::Document &document, std::ostream &out) {
+struct FormatOptions {
+    bool showDocs;
+};
+
+void formatSnapshot(const scip::Document &document, FormatOptions options, std::ostream &out) {
     UnorderedMap<string, scip::SymbolInformation> symbolTable{};
     symbolTable.reserve(document.symbols_size());
     for (auto &symbolInfo : document.symbols()) {
@@ -197,24 +201,23 @@ void formatSnapshot(const scip::Document &document, std::ostream &out) {
 
             ENFORCE(range.start.column < range.end.column, "We shouldn't be emitting empty ranges 🙅");
 
-            out << '#' << string(range.start.column - 1, ' ') << string(range.end.column - range.start.column, '^')
-                << ' ' << string(isDefinition ? "definition" : "reference") << ' ' << symbolRole
-                << formatSymbol(occ.symbol());
+            auto lineStart = absl::StrCat("#", string(range.start.column - 1, ' '));
+
+            out << lineStart << string(range.end.column - range.start.column, '^') << ' '
+                << string(isDefinition ? "definition" : "reference") << ' ' << symbolRole << formatSymbol(occ.symbol())
+                << '\n';
             if (!(isDefinition && symbolTable.contains(occ.symbol()))) {
-                out << '\n';
                 occ_i++;
                 continue;
             }
             auto &symbolInfo = symbolTable[occ.symbol()];
-            string prefix = "\n#" + string(range.start.column - 1, ' ');
-            for (auto &doc : symbolInfo.documentation()) {
-                out << prefix << "documentation ";
-                auto iter = std::find(doc.begin(), doc.end(), '\n');
-                if (iter != doc.end()) {
-                    // TODO: Use the constructor with two iterators with C++20.
-                    out << string_view(doc.data(), std::distance(doc.begin(), doc.end()));
-                } else {
-                    out << doc;
+            if (options.showDocs) {
+                for (auto &doc : symbolInfo.documentation()) {
+                    out << lineStart << "documentation" << '\n';
+                    auto docstream = istringstream(doc);
+                    for (string docline; getline(docstream, docline);) {
+                        out << lineStart << "| " << docline << '\n';
+                    }
                 }
             }
             relationships.clear();
@@ -226,7 +229,7 @@ void formatSnapshot(const scip::Document &document, std::ostream &out) {
                 return r1.symbol() < r2.symbol();
             });
             for (auto &rel : relationships) {
-                out << prefix << "relation " << formatSymbol(rel.symbol());
+                out << lineStart << "relation " << formatSymbol(rel.symbol());
                 if (rel.is_implementation()) {
                     out << " implementation";
                 }
@@ -236,8 +239,8 @@ void formatSnapshot(const scip::Document &document, std::ostream &out) {
                 if (rel.is_type_definition()) {
                     out << " type_definition";
                 }
+                out << '\n';
             }
-            out << '\n';
             occ_i++;
         }
     }
@@ -249,18 +252,18 @@ string snapshot_path(string rb_path) {
     return rb_path + ".snapshot.rb";
 }
 
-void updateSnapshots(const scip::Index &index, const std::filesystem::path &outputDir) {
+void updateSnapshots(const scip::Index &index, FormatOptions options, const std::filesystem::path &outputDir) {
     for (auto &doc : index.documents()) {
         auto outputFilePath = snapshot_path(doc.relative_path());
         ofstream out(outputFilePath);
         if (!out.is_open()) {
             FAIL(fmt::format("failed to open snapshot output file at {}", outputFilePath));
         }
-        formatSnapshot(doc, out);
+        formatSnapshot(doc, options, out);
     }
 }
 
-void compareSnapshots(const scip::Index &index, const std::filesystem::path &snapshotDir) {
+void compareSnapshots(const scip::Index &index, FormatOptions options, const std::filesystem::path &snapshotDir) {
     for (auto &doc : index.documents()) {
         auto filePath = snapshot_path(doc.relative_path()); // TODO: Separate out folders!
         ifstream inputStream(filePath);
@@ -271,7 +274,7 @@ void compareSnapshots(const scip::Index &index, const std::filesystem::path &sna
         input << inputStream.rdbuf();
 
         ostringstream out;
-        formatSnapshot(doc, out);
+        formatSnapshot(doc, options, out);
         auto result = out.str();
 
         CHECK_EQ_DIFF(input.str(), result,
@@ -279,16 +282,25 @@ void compareSnapshots(const scip::Index &index, const std::filesystem::path &sna
     }
 }
 
-optional<string> readGemMetadataFromComment(string_view path) {
+pair<optional<string>, FormatOptions> readMagicComments(string_view path) {
+    optional<string> gemMetadata = nullopt;
+    FormatOptions options{.showDocs = false};
     ifstream input(path);
     for (string line; getline(input, line);) {
         if (absl::StrContains(line, "# gem-metadata: ")) {
             auto s = absl::StripPrefix(line, "# gem-metadata: ");
             ENFORCE(!s.empty());
-            return string(s);
+            gemMetadata = s;
+        }
+        if (absl::StrContains(line, "# options: ")) {
+            auto s = absl::StripPrefix(line, "# options: ");
+            ENFORCE(!s.empty());
+            if (absl::StrContains(s, "showDocs")) {
+                options.showDocs = true;
+            }
         }
     }
-    return nullopt;
+    return {gemMetadata, options};
 }
 
 TEST_CASE("SCIPTest") {
@@ -296,7 +308,7 @@ TEST_CASE("SCIPTest") {
     ENFORCE(inputs.size() == 1);
     Expectations test = Expectations::getExpectations(inputs[0]);
 
-    optional<string> gemMetadata = readGemMetadataFromComment(inputs[0]);
+    auto [gemMetadata, formatOptions] = readMagicComments(inputs[0]);
 
     vector<unique_ptr<core::Error>> errors;
     auto inputPath = test.folder + test.basename;
@@ -391,9 +403,9 @@ TEST_CASE("SCIPTest") {
     index.ParseFromIstream(&indexFile);
 
     if (update) {
-        updateSnapshots(index, test.folder);
+        updateSnapshots(index, formatOptions, test.folder);
     } else {
-        compareSnapshots(index, test.folder);
+        compareSnapshots(index, formatOptions, test.folder);
     }
 
     MESSAGE("PASS");
