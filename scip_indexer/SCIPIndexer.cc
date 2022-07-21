@@ -14,6 +14,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "absl/synchronization/mutex.h"
 #include "spdlog/fmt/fmt.h"
@@ -27,6 +28,7 @@
 #include "core/Loc.h"
 #include "core/SymbolRef.h"
 #include "core/Symbols.h"
+#include "main/lsp/lsp.h"
 #include "main/pipeline/semantic_extension/SemanticExtension.h"
 #include "sorbet_version/sorbet_version.h"
 
@@ -165,6 +167,7 @@ public:
 class NamedSymbolRef final {
     core::SymbolRef selfOrOwner;
     core::NameRef name;
+    core::TypePtr type;
 
 public:
     enum class Kind {
@@ -175,7 +178,7 @@ public:
     };
 
 private:
-    NamedSymbolRef(core::SymbolRef s, core::NameRef n, Kind k) : selfOrOwner(s), name(n) {
+    NamedSymbolRef(core::SymbolRef s, core::NameRef n, core::TypePtr t, Kind k) : selfOrOwner(s), name(n), type(t) {
         switch (k) {
             case Kind::ClassOrModule:
                 ENFORCE(s.isClassOrModule());
@@ -209,19 +212,19 @@ public:
     }
 
     static NamedSymbolRef classOrModule(core::SymbolRef self) {
-        return NamedSymbolRef(self, {}, Kind::ClassOrModule);
+        return NamedSymbolRef(self, {}, {}, Kind::ClassOrModule);
     }
 
-    static NamedSymbolRef undeclaredField(core::SymbolRef owner, core::NameRef name) {
-        return NamedSymbolRef(owner, name, Kind::UndeclaredField);
+    static NamedSymbolRef undeclaredField(core::SymbolRef owner, core::NameRef name, core::TypePtr type) {
+        return NamedSymbolRef(owner, name, type, Kind::UndeclaredField);
     }
 
     static NamedSymbolRef staticField(core::SymbolRef self) {
-        return NamedSymbolRef(self, {}, Kind::StaticField);
+        return NamedSymbolRef(self, {}, {}, Kind::StaticField);
     }
 
     static NamedSymbolRef method(core::SymbolRef self) {
-        return NamedSymbolRef(self, {}, Kind::Method);
+        return NamedSymbolRef(self, {}, {}, Kind::Method);
     }
 
     Kind kind() const {
@@ -257,8 +260,61 @@ public:
         return this->selfOrOwner;
     }
 
+    vector<string> docStrings(const core::GlobalState &gs, core::Loc loc) {
+        vector<string> docs;
+        string markdown = "";
+        switch (this->kind()) {
+            case Kind::UndeclaredField: {
+                markdown = fmt::format("{} = T.let(_, {})", this->name.show(gs), this->type.show(gs));
+                break;
+            }
+            case Kind::StaticField: {
+                auto fieldRef = this->selfOrOwner.asFieldRef();
+                markdown =
+                    fmt::format("{} = T.let(_, {})", fieldRef.showFullName(gs), fieldRef.data(gs)->resultType.show(gs));
+                break;
+            }
+            case Kind::ClassOrModule: {
+                auto ref = this->selfOrOwner.asClassOrModuleRef();
+                auto classOrModule = ref.data(gs);
+                if (classOrModule->isClass()) {
+                    auto super = classOrModule->superClass();
+                    if (super.exists() && super != core::Symbols::Object()) {
+                        markdown = fmt::format("class {} < {}", ref.show(gs), super.show(gs));
+                    } else {
+                        markdown = fmt::format("class {}", ref.show(gs));
+                    }
+                } else {
+                    markdown = fmt::format("module {}", ref.show(gs));
+                }
+                break;
+            }
+            case Kind::Method: {
+                auto ref = this->selfOrOwner.asMethodRef();
+                markdown = realmain::lsp::prettyTypeForMethod(gs, ref, ref.data(gs)->owner.data(gs)->resultType,
+                                                              nullptr, nullptr);
+                // FIXME(varun): For some reason, it looks like a bunch of public methods
+                // get marked as private here. Avoid printing misleading info until we fix that.
+                // https://github.com/sourcegraph/scip-ruby/issues/33
+                markdown = absl::StrReplaceAll(markdown, {{"private def", "def"}, {"; end", ""}});
+                break;
+            }
+        }
+        if (!markdown.empty()) {
+            docs.push_back(fmt::format("```ruby\n{}\n```", markdown));
+        }
+        auto whatFile = loc.file();
+        if (whatFile.exists()) {
+            if (auto doc = realmain::lsp::findDocumentation(whatFile.data(gs).source(), loc.beginPos())) {
+                docs.push_back(doc.value());
+            }
+        }
+        return docs;
+    }
+
     // Returns OK if we were able to compute a symbol for the expression.
-    absl::Status symbolForExpr(const core::GlobalState &gs, const GemMetadata &metadata, scip::Symbol &symbol) const {
+    absl::Status symbolForExpr(const core::GlobalState &gs, const GemMetadata &metadata, scip::Symbol &symbol,
+                               optional<core::Loc> loc) const {
         // Don't set symbol.scheme and package.manager here because those are hard-coded to 'scip-ruby' and 'gem'
         // anyways.
         scip::Package package;
@@ -364,6 +420,7 @@ core::Loc trimColonColonPrefix(const core::GlobalState &gs, core::Loc baseLoc) {
 class SCIPState {
     string symbolScratchBuffer;
     UnorderedMap<NamedSymbolRef, string> symbolStringCache;
+    UnorderedMap<uint32_t, core::TypePtr> localTypes;
     GemMetadata gemMetadata;
 
 public:
@@ -408,7 +465,7 @@ public:
             status = scip::utils::emitSymbolString(*symbol, this->symbolScratchBuffer);
         } else {
             scip::Symbol symbol;
-            status = symRef.symbolForExpr(gs, this->gemMetadata, symbol);
+            status = symRef.symbolForExpr(gs, this->gemMetadata, symbol, nullopt);
             if (!status.ok()) {
                 return status;
             }
@@ -423,11 +480,14 @@ public:
 
 private:
     absl::Status saveDefinitionImpl(const core::GlobalState &gs, core::FileRef file, const string &symbolString,
-                                    core::Loc occLoc) {
+                                    core::Loc occLoc, const vector<string> &docs) {
         ENFORCE(!symbolString.empty());
         occLoc = trimColonColonPrefix(gs, occLoc);
         scip::SymbolInformation symbolInfo;
         symbolInfo.set_symbol(symbolString);
+        for (auto &doc : docs) {
+            symbolInfo.add_documentation(doc);
+        }
         this->symbolMap[file].push_back(symbolInfo);
 
         scip::Occurrence occurrence;
@@ -492,11 +552,18 @@ private:
     }
 
 public:
-    absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ) {
+    absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ, core::TypePtr type) {
         if (this->cacheOccurrence(gs, file, occ, scip::SymbolRole::Definition)) {
             return absl::OkStatus();
         }
-        return this->saveDefinitionImpl(gs, file, occ.toString(gs, file), core::Loc(file, occ.offsets));
+        vector<string> docStrings;
+        auto loc = core::Loc(file, occ.offsets);
+        if (type) {
+            auto var = loc.source(gs);
+            ENFORCE(var.has_value(), "Failed to find source text for definition of local variable");
+            docStrings.push_back(fmt::format("```ruby\n{} = T.let(_, {})\n```", var.value(), type.show(gs)));
+        }
+        return this->saveDefinitionImpl(gs, file, occ.toString(gs, file), loc, docStrings);
     }
 
     // Save definition when you have a sorbet Symbol.
@@ -506,7 +573,8 @@ public:
                                 std::optional<core::LocOffsets> loc = std::nullopt) {
         // TODO:(varun) Should we cache here too to avoid emitting duplicate definitions?
         scip::Symbol symbol;
-        auto status = symRef.symbolForExpr(gs, this->gemMetadata, symbol);
+        auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs);
+        auto status = symRef.symbolForExpr(gs, this->gemMetadata, symbol, occLoc);
         if (!status.ok()) {
             return status;
         }
@@ -515,10 +583,7 @@ public:
             return valueOrStatus.status();
         }
         string &symbolString = *valueOrStatus.value();
-
-        auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs);
-
-        return this->saveDefinitionImpl(gs, file, symbolString, occLoc);
+        return this->saveDefinitionImpl(gs, file, symbolString, occLoc, symRef.docStrings(gs, occLoc));
     }
 
     absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ, int32_t symbol_roles) {
@@ -617,7 +682,8 @@ public:
                 if (sym == core::Symbols::Magic_undeclaredFieldStub()) {
                     ENFORCE(!bind.loc.empty());
                     this->map.insert( // no trim(...) because undeclared fields shouldn't have ::
-                        {bind.bind.variable, {NamedSymbolRef::undeclaredField(klass, instr->name), bind.loc, false}});
+                        {bind.bind.variable,
+                         {NamedSymbolRef::undeclaredField(klass, instr->name, bind.bind.type), bind.loc, false}});
                     continue;
                 }
                 if (sym.isStaticField(gs)) {
@@ -685,6 +751,7 @@ class CFGTraversal final {
     // in the block.
     UnorderedMap<const cfg::BasicBlock *, UnorderedSet<cfg::LocalRef>> blockLocals;
     UnorderedMap<cfg::LocalRef, uint32_t> functionLocals;
+    UnorderedMap<uint32_t, core::TypePtr> localTypes;
     AliasMap aliasMap;
 
     // Local variable counter that is reset for every function.
@@ -697,9 +764,11 @@ public:
         : blockLocals(), functionLocals(), aliasMap(), scipState(scipState), ctx(ctx) {}
 
 private:
-    void addLocal(const cfg::BasicBlock *bb, cfg::LocalRef localRef) {
+    uint32_t addLocal(const cfg::BasicBlock *bb, cfg::LocalRef localRef) {
+        this->counter++;
         this->blockLocals[bb].insert(localRef);
-        this->functionLocals[localRef] = ++this->counter;
+        this->functionLocals[localRef] = this->counter;
+        return this->counter;
     }
 
     static core::LocOffsets lhsLocIfPresent(const cfg::Binding &binding) {
@@ -717,8 +786,10 @@ private:
     // Emit an occurrence for a local variable if applicable.
     //
     // Returns true if an occurrence was emitted.
+    //
+    // The type should be provided if we have an lvalue.
     bool emitLocalOccurrence(const cfg::CFG &cfg, const cfg::BasicBlock *bb, cfg::LocalOccurrence local,
-                             ValueCategory category) {
+                             ValueCategory category, core::TypePtr type) {
         auto localRef = local.variable;
         auto localVar = localRef.data(cfg);
         auto symRef = this->aliasMap.try_consume(localRef);
@@ -733,7 +804,9 @@ private:
                 if (!this->functionLocals.contains(localRef)) {
                     isDefinition = true; // If we're seeing this for the first time in topological order,
                                          // The current block must have a definition for the variable.
-                    this->addLocal(bb, localRef);
+                    auto id = this->addLocal(bb, localRef);
+                    ENFORCE(type, "missing type for lvalue");
+                    this->localTypes[id] = type;
                 }
                 // The variable wasn't passed in as an argument, and hasn't already been recorded
                 // as a local in the block. So this must be a definition line.
@@ -774,9 +847,14 @@ private:
             }
         } else {
             uint32_t localId = this->functionLocals[localRef];
+            auto it = this->localTypes.find(localId);
+            core::TypePtr type{};
+            if (it != this->localTypes.end()) {
+                type = it->second;
+            }
             if (isDefinition) {
                 status = this->scipState.saveDefinition(this->ctx.state, this->ctx.file,
-                                                        OwnedLocal{this->ctx.owner, localId, loc});
+                                                        OwnedLocal{this->ctx.owner, localId, loc}, type);
             } else {
                 status = this->scipState.saveReference(this->ctx.state, this->ctx.file,
                                                        OwnedLocal{this->ctx.owner, localId, loc}, referenceRole);
@@ -856,12 +934,12 @@ public:
                 if (binding.value.tag() != cfg::Tag::Alias && binding.value.tag() != cfg::Tag::ArgPresent) {
                     // Emit occurrence information for the LHS
                     auto occ = cfg::LocalOccurrence{binding.bind.variable, lhsLocIfPresent(binding)};
-                    this->emitLocalOccurrence(cfg, bb, occ, ValueCategory::LValue);
+                    this->emitLocalOccurrence(cfg, bb, occ, ValueCategory::LValue, binding.bind.type);
                 }
                 // Emit occurrence information for the RHS
                 auto emitLocal = [this, &cfg, &bb, &binding](cfg::LocalRef local) -> void {
                     (void)this->emitLocalOccurrence(cfg, bb, cfg::LocalOccurrence{local, binding.loc},
-                                                    ValueCategory::RValue);
+                                                    ValueCategory::RValue, core::TypePtr());
                 };
                 switch (binding.value.tag()) {
                     case cfg::Tag::Literal: {
@@ -879,7 +957,8 @@ public:
 
                         // Emit reference for the receiver, if present.
                         if (send->recv.loc.exists() && !send->recv.loc.empty()) {
-                            this->emitLocalOccurrence(cfg, bb, send->recv.occurrence(), ValueCategory::RValue);
+                            this->emitLocalOccurrence(cfg, bb, send->recv.occurrence(), ValueCategory::RValue,
+                                                      core::TypePtr());
                         }
 
                         // Emit reference for the method being called
@@ -919,7 +998,8 @@ public:
                             // and the first one is a write. Instead of emitting two occurrences, it'd be nice to emit
                             // a combined read-write occurrence. However, that would require complicating the code a
                             // bit, so let's leave it as-is for now.
-                            this->emitLocalOccurrence(cfg, bb, arg.occurrence(), ValueCategory::RValue);
+                            this->emitLocalOccurrence(cfg, bb, arg.occurrence(), ValueCategory::RValue,
+                                                      core::TypePtr());
                         }
 
                         break;

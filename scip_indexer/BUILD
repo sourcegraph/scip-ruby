@@ -42,6 +42,7 @@ cc_library(
         "//cfg",
         "//common",
         "//core",
+        "//main/lsp",
         "//proto",
         "//sorbet_version",
         "@com_google_absl//absl/synchronization",
