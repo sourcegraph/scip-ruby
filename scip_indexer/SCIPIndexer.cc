@@ -423,14 +423,12 @@ public:
 
 private:
     absl::Status saveDefinitionImpl(const core::GlobalState &gs, core::FileRef file, const string &symbolString,
-                                    core::Loc occLoc, bool isLocal) {
+                                    core::Loc occLoc) {
         ENFORCE(!symbolString.empty());
         occLoc = trimColonColonPrefix(gs, occLoc);
-        if (!isLocal) {
-            scip::SymbolInformation symbolInfo;
-            symbolInfo.set_symbol(symbolString);
-            this->symbolMap[file].push_back(symbolInfo);
-        }
+        scip::SymbolInformation symbolInfo;
+        symbolInfo.set_symbol(symbolString);
+        this->symbolMap[file].push_back(symbolInfo);
 
         scip::Occurrence occurrence;
         occurrence.set_symbol(symbolString);
@@ -498,8 +496,7 @@ public:
         if (this->cacheOccurrence(gs, file, occ, scip::SymbolRole::Definition)) {
             return absl::OkStatus();
         }
-        return this->saveDefinitionImpl(gs, file, occ.toString(gs, file), core::Loc(file, occ.offsets),
-                                        /*isLocal*/ true);
+        return this->saveDefinitionImpl(gs, file, occ.toString(gs, file), core::Loc(file, occ.offsets));
     }
 
     // Save definition when you have a sorbet Symbol.
@@ -521,7 +518,7 @@ public:
 
         auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs);
 
-        return this->saveDefinitionImpl(gs, file, symbolString, occLoc, /*isLocal*/ false);
+        return this->saveDefinitionImpl(gs, file, symbolString, occLoc);
     }
 
     absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ, int32_t symbol_roles) {
