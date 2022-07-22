@@ -3,6 +3,8 @@
 
 # Class doc comment
 class C1
+  extend T::Sig
+
   def m1
   end
 
@@ -50,6 +52,8 @@ module M1
 
   # This module is nested inside M1
   module M2
+    extend T::Sig
+
     # This method is inside M1::M2
     sig { returns(T::Boolean) }
     def n1
@@ -76,6 +80,8 @@ end
 
 def f3 # undocumented global function
 end
+
+extend T::Sig
 
 sig { returns(T::Integer) }
 def f4 # another undocumented global function
