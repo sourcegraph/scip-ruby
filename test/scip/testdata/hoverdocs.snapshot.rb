@@ -10,6 +10,10 @@
 #      | ```
 #      documentation
 #      | Class doc comment
+   extend T::Sig
+#         ^ reference [..] T#
+#            ^^^ reference [..] T#Sig#
+ 
    def m1
 #  ^^^^^^ definition [..] C1#m1().
 #  documentation
@@ -21,6 +25,7 @@
  
    sig { returns(T::Boolean) }
 #  ^^^ reference [..] Sorbet#Private#Static#<Class:ResolvedSig>#sig().
+#        ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #                ^ reference [..] T#
 #                   ^^^^^^^ reference [..] T#Boolean.
 #                   ^^^^^^^^^^ reference [..] Sorbet#Private#Static#ResolvedSig#
@@ -36,9 +41,11 @@
  
    sig { params(C, T::Boolean).returns(T::Boolean) }
 #  ^^^ reference [..] Sorbet#Private#Static#<Class:ResolvedSig>#sig().
+#        ^^^^^^ reference [..] T#Private#Methods#DeclBuilder#params().
 #               ^ reference [..] T.untyped#
 #                  ^ reference [..] T#
 #                     ^^^^^^^ reference [..] T#Boolean.
+#                              ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #                                      ^ reference [..] T#
 #                                         ^^^^^^^ reference [..] T#Boolean.
 #                                         ^^^^^^^^^^ reference [..] Sorbet#Private#Static#ResolvedSig#
@@ -89,6 +96,7 @@
    # ...doc comment
    sig { returns(T::Boolean) }
 #  ^^^ reference [..] Sorbet#Private#Static#<Class:ResolvedSig>#sig().
+#        ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #                ^ reference [..] T#
 #                   ^^^^^^^ reference [..] T#Boolean.
 #                   ^^^^^^^^^^ reference [..] Sorbet#Private#Static#ResolvedSig#
@@ -109,9 +117,11 @@
    # ...one more doc comment
    sig { params(C, T::Boolean).returns(T::Boolean) }
 #  ^^^ reference [..] Sorbet#Private#Static#<Class:ResolvedSig>#sig().
+#        ^^^^^^ reference [..] T#Private#Methods#DeclBuilder#params().
 #               ^ reference [..] T.untyped#
 #                  ^ reference [..] T#
 #                     ^^^^^^^ reference [..] T#Boolean.
+#                              ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #                                      ^ reference [..] T#
 #                                         ^^^^^^^ reference [..] T#Boolean.
 #                                         ^^^^^^^^^^ reference [..] Sorbet#Private#Static#ResolvedSig#
@@ -182,9 +192,14 @@
 #         | ```
 #         documentation
 #         | This module is nested inside M1
+     extend T::Sig
+#           ^ reference [..] T#
+#              ^^^ reference [..] T#Sig#
+ 
      # This method is inside M1::M2
      sig { returns(T::Boolean) }
 #    ^^^ reference [..] Sorbet#Private#Static#<Class:ResolvedSig>#sig().
+#          ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #                  ^ reference [..] T#
 #                     ^^^^^^^ reference [..] T#Boolean.
 #                     ^^^^^^^^^^ reference [..] Sorbet#Private#Static#ResolvedSig#
@@ -235,6 +250,7 @@
  # Yet another global function
  sig { returns(T::Integer) }
 #^^^ reference [..] Sorbet#Private#Static#<Class:ResolvedSig>#sig().
+#      ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #              ^ reference [..] T#
 #                 ^^^^^^^ reference [..] T.untyped#
 #                 ^^^^^^^^^^ reference [..] Sorbet#Private#Static#ResolvedSig#
@@ -259,8 +275,13 @@
 #| ```
  end
  
+ extend T::Sig
+#       ^ reference [..] T#
+#          ^^^ reference [..] T#Sig#
+ 
  sig { returns(T::Integer) }
 #^^^ reference [..] Sorbet#Private#Static#<Class:ResolvedSig>#sig().
+#      ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #              ^ reference [..] T#
 #                 ^^^^^^^ reference [..] T.untyped#
 #                 ^^^^^^^^^^ reference [..] Sorbet#Private#Static#ResolvedSig#
