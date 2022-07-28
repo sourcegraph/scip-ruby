@@ -431,9 +431,8 @@ bool ends_with(const std::string &s, const std::string &suffix) {
 int main(int argc, char *argv[]) {
     cxxopts::Options options("test_corpus_scip", "SCIP test corpus for Sorbet typechecker");
     options.allow_unrecognised_options().add_options()("output", "path to output file or directory",
-                                                       cxxopts::value<std::string>()->default_value(""),
-                                                       "path")("update-snapshots", "");
-    //("--update-snapshots", "should the snapshot files be overwritten if there are changes");
+                                                       cxxopts::value<std::string>()->default_value(""), "path")(
+        "update-snapshots", "should the snapshot files be overwritten if there are changes");
     auto res = options.parse(argc, argv);
 
     for (auto &input : res.unmatched()) {
