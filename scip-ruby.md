@@ -33,6 +33,15 @@ Updating snapshots
 ./bazel test //test/scip:update --config=dbg
 ```
 
+## Writing a new SCIP test
+
+See the existings tests under `test/scip/testdata`
+and copy the structure. One caveat is that the first time
+you add a new test, you should create matching `.snapshot.rb` files
+(which may be empty) for all new `.rb` files,
+since those are used as inputs to Bazel.
+If you know of a way to get rid of that annoyance, submit a PR.
+
 ## Manually testing against larger codebases
 
 Some OSS repos that can be used to exercise scip-ruby are:
