@@ -53,8 +53,8 @@ namespace sorbet::test {
 using namespace std;
 
 bool update;
-vector<string> inputs;
-string output;
+string inputFileOrDir;
+string outputFileOrDir;
 
 // Copied from pipeline_test_runner.cc
 class CFGCollectorAndTyper { // TODO(varun): Copy this over to scip_test_runner.cc
@@ -252,19 +252,27 @@ string snapshot_path(string rb_path) {
     rb_path.erase(rb_path.size() - 3, 3);
     return rb_path + ".snapshot.rb";
 }
+struct TestSettings {
+    optional<string> gemMetadata;
+    UnorderedMap</*root-relative path*/ string, FormatOptions> formatOptions;
+};
 
-void updateSnapshots(const scip::Index &index, FormatOptions options, const std::filesystem::path &outputDir) {
+void updateSnapshots(const scip::Index &index, const TestSettings &settings, const std::filesystem::path &outputDir) {
     for (auto &doc : index.documents()) {
         auto outputFilePath = snapshot_path(doc.relative_path());
         ofstream out(outputFilePath);
         if (!out.is_open()) {
             FAIL(fmt::format("failed to open snapshot output file at {}", outputFilePath));
         }
-        formatSnapshot(doc, options, out);
+        auto it = settings.formatOptions.find(doc.relative_path());
+        ENFORCE(it != settings.formatOptions.end(),
+                fmt::format("missing path {} as key in formatOptions map", doc.relative_path()));
+        formatSnapshot(doc, it->second, out);
     }
 }
 
-void compareSnapshots(const scip::Index &index, FormatOptions options, const std::filesystem::path &snapshotDir) {
+void compareSnapshots(const scip::Index &index, const TestSettings &settings,
+                      const std::filesystem::path &snapshotDir) {
     for (auto &doc : index.documents()) {
         auto filePath = snapshot_path(doc.relative_path()); // TODO: Separate out folders!
         ifstream inputStream(filePath);
@@ -275,7 +283,10 @@ void compareSnapshots(const scip::Index &index, FormatOptions options, const std
         input << inputStream.rdbuf();
 
         ostringstream out;
-        formatSnapshot(doc, options, out);
+        auto it = settings.formatOptions.find(doc.relative_path());
+        ENFORCE(it != settings.formatOptions.end(),
+                fmt::format("missing path {} as key in formatOptions map", doc.relative_path()));
+        formatSnapshot(doc, it->second, out);
         auto result = out.str();
 
         CHECK_EQ_DIFF(input.str(), result,
@@ -304,17 +315,11 @@ pair<optional<string>, FormatOptions> readMagicComments(string_view path) {
     return {gemMetadata, options};
 }
 
-TEST_CASE("SCIPTest") {
-    // FIXME(varun): Add support for multifile tests.
-    ENFORCE(inputs.size() == 1);
-    Expectations test = Expectations::getExpectations(inputs[0]);
-
-    auto [gemMetadata, formatOptions] = readMagicComments(inputs[0]);
-
+void test_one_gem(Expectations &test, const TestSettings &settings) {
     vector<unique_ptr<core::Error>> errors;
-    auto inputPath = test.folder + test.basename;
 
-    auto logger = spdlog::stderr_color_mt("fixtures: " + inputPath);
+    auto logger =
+        spdlog::stderr_color_mt("fixtures: " + (test.isFolderTest ? test.folder + test.basename : test.folder));
     auto errorCollector = make_shared<core::ErrorCollector>();
     auto errorQueue = make_shared<core::ErrorQueue>(*logger, *logger, errorCollector);
     core::GlobalState gs(errorQueue);
@@ -335,7 +340,7 @@ TEST_CASE("SCIPTest") {
     using Provider = pipeline::semantic_extension::SemanticExtensionProvider;
 
     auto indexFilePath = filesystem::temp_directory_path();
-    indexFilePath.append(test.basename + ".scip"); // FIXME(varun): Update for folder tests with multiple files?
+    indexFilePath.append(test.basename + ".scip");
 
     auto providers = Provider::getProviders();
     ENFORCE(providers.size() == 1);
@@ -344,10 +349,10 @@ TEST_CASE("SCIPTest") {
     cxxopts::Options options{"scip-ruby-snapshot-test"};
     scipProvider->injectOptions(options);
     std::vector<const char *> argv = {"scip-ruby-snapshot-test", "--index-file", indexFilePath.c_str()};
-    if (gemMetadata.has_value()) {
+    if (settings.gemMetadata.has_value()) {
         argv.push_back("--gem-metadata");
-        ENFORCE(!gemMetadata.value().empty());
-        argv.push_back(gemMetadata.value().data());
+        ENFORCE(!settings.gemMetadata.value().empty());
+        argv.push_back(settings.gemMetadata.value().data());
     }
     argv.push_back(nullptr);
     auto parseResult = options.parse(argv.size() - 1, argv.data());
@@ -404,12 +409,58 @@ TEST_CASE("SCIPTest") {
     index.ParseFromIstream(&indexFile);
 
     if (update) {
-        updateSnapshots(index, formatOptions, test.folder);
+        updateSnapshots(index, settings, test.folder);
     } else {
-        compareSnapshots(index, formatOptions, test.folder);
+        compareSnapshots(index, settings, test.folder);
     }
 
     MESSAGE("PASS");
+}
+
+// There are several different kinds of tests that we are potentially
+// interested in here:
+//
+// 1. Testing single files for language features.
+// 2. Testing multiple files within the same Gem to see if/when defs/refs work.
+// 3. Testing usage of the --gem-metadata flag, because not all Ruby Gems
+//    contain a .gemspec file (e.g. if it's an application), which means
+//    that we do not have a reliable way of inferring the name/version.
+// 4. Testing usage of Gem-internal RBI files.
+// 5. Testing usage of RBI files coming from external gems. This uses
+//    a standardized project structure with a sorbet/ folder.
+//    (See https://sorbet.org/docs/rbi)
+// 6. Testing usage of multiple local Gems defined within the same repo.
+//
+// Right now, the testing is set up to handle use cases 1, 2, 3, and 4.
+// It should hopefully be straightforward to extend this support for 5.
+//
+// For 6, I'd like to gather more information about project setups first
+// (the directory layout, any expectations of ordering, how Sorbet is run)
+// before setting up testing infrastructure and explicit feature support.
+TEST_CASE("SCIPTest") {
+    Expectations test = Expectations::getExpectations(inputFileOrDir);
+
+    TestSettings settings;
+    settings.gemMetadata = nullopt;
+    if (test.isFolderTest) {
+        auto argsFilePath = test.folder + "scip-ruby-args.rb";
+        if (FileOps::exists(argsFilePath)) {
+            settings.gemMetadata = readMagicComments(argsFilePath).first;
+        }
+        ENFORCE(test.sourceFiles.size() > 0);
+        for (auto &sourceFile : test.sourceFiles) {
+            auto path = test.folder + sourceFile;
+            auto [_, inserted] = settings.formatOptions.insert({path, readMagicComments(path).second});
+            ENFORCE(inserted, "duplicate source file in Expectations struct?");
+        }
+    } else {
+        ENFORCE(test.sourceFiles.size() == 1);
+        auto path = test.folder + test.sourceFiles[0];
+        auto &options = settings.formatOptions[path];
+        std::tie(settings.gemMetadata, options) = readMagicComments(path);
+    }
+
+    test_one_gem(test, settings);
 }
 
 } // namespace sorbet::test
@@ -435,17 +486,16 @@ int main(int argc, char *argv[]) {
                                                        "path")("update-snapshots", "");
     //("--update-snapshots", "should the snapshot files be overwritten if there are changes");
     auto res = options.parse(argc, argv);
+    auto unmatched = res.unmatched();
 
-    for (auto &input : res.unmatched()) {
-        if (!ends_with(input, ".rb")) {
-            printf("error: input files must have .rb extension");
-            return 1;
-        }
+    if (unmatched.size() != 1) {
+        std::fprintf(stderr, "error: runner expected single input file with .rb extension or folder");
+        return 1;
     }
 
     sorbet::test::update = res.count("update-snapshots") > 0;
-    sorbet::test::inputs = res.unmatched();
-    sorbet::test::output = res["output"].as<std::string>();
+    sorbet::test::inputFileOrDir = unmatched[0];
+    sorbet::test::outputFileOrDir = res["output"].as<std::string>();
 
     doctest::Context context(argc, argv);
     return context.run();
