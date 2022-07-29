@@ -1,0 +1,54 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'scip-ruby-v.*'
+
+jobs:
+  create-release:
+    name: 'Create release'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Release Step
+        id: create_release
+        run: gh release create "$TAG" --title "scip-ruby release $TAG"
+        env:
+          TAG: ${{ github.event.ref }}
+
+  build-and-upload-artifacts:
+    name: 'Build and upload artifacts'
+    needs: create-release
+    strategy:
+      matrix:
+        platform: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.platform }}
+    env:
+      TAG: ${{ github.event.ref }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Bazel
+        run: sudo npm install --location=global @bazel/bazelisk
+      - name: Manually evict cache entry if applicable
+        run: ACCESS_TOKEN='${{ secrets.GITHUB_TOKEN }}' python3 .github/workflows/evict.py
+      - name: Identify OS
+        run: |
+          case "$(uname -s)" in
+            Linux*)     os="linux";;
+            Darwin*)    os="darwin";;
+            *)          echo "Unhandled OS type" && exit 1;;
+          esac
+          echo "os=$os" >> "$GITHUB_ENV"
+      - name: Run debug build
+        run: bazel build //main:scip-ruby --config=dbg
+      - name: Upload debug binary
+        run: |
+          debugBinaryPath="scip-ruby-debug-$osname-$(uname -m)"
+          mv "bazel-out/$os-dbg/bin/main/scip-ruby" "$debugBinaryPath"
+          gh release upload "$TAG" "$debugBinaryPath"
+      - name: Run release build
+        run: bazel build //main:scip-ruby
+      - name: Upload release binary
+        run: |
+          releaseBinaryPath="scip-ruby-$osname-$(uname -m)"
+          mv "bazel-out/$osname-fastbuild/bin/main/scip-ruby" "$releaseBinaryPath"
+          gh release upload "$TAG" "$releaseBinaryPath"
