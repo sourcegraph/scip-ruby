@@ -1,0 +1,69 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'scip-ruby-v*'
+
+jobs:
+  create-release:
+    name: 'Create release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Create Release Step
+        id: create_release
+        run: |
+          TAG="${GITHUB_REF/refs\/tags\//}"
+          TITLE="$(echo "$TAG" | sed 's/-v/ v/')"
+          gh release create "$TAG" --title "$TITLE"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-and-upload-artifacts:
+    name: 'Build and upload artifacts'
+    needs: create-release
+    strategy:
+      matrix:
+        platform: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.platform }}
+    env:
+      TAG: ${{ github.event.ref }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Bazel
+        run: |
+          if ! which bazelisk; then
+            sudo npm install --location=global @bazel/bazelisk
+          fi
+      - name: Identify OS
+        run: |
+          case "$(uname -s)" in
+            Linux*)     os="linux";;
+            Darwin*)    os="darwin";;
+            *)          echo "Unhandled OS type" && exit 1;;
+          esac
+          echo "OS=$os" >> "$GITHUB_ENV"
+      - name: Run debug build
+        run: bazel build //main:scip-ruby --config=dbg
+      - name: Upload debug binary
+        run: |
+          ls bazel-out
+          debugBinaryPath="scip-ruby-debug-$OS-$(uname -m)"
+          builtBinaryPath="$(find bazel-out/ -type f -name 'scip-ruby')"
+          mv "$builtBinaryPath" "$debugBinaryPath"
+          gh release upload "${GITHUB_REF/refs\/tags\//}" "$debugBinaryPath"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OS: ${{ env.OS }}
+      - name: Run release build
+        run: bazel build //main:scip-ruby
+      - name: Upload release binary
+        run: |
+          ls bazel-out
+          releaseBinaryPath="scip-ruby-$OS-$(uname -m)"
+          builtBinaryPath="$(find bazel-out/ -type f -name 'scip-ruby')"
+          mv "$builtBinaryPath" "$releaseBinaryPath"
+          gh release upload "${GITHUB_REF/refs\/tags\//}" "$releaseBinaryPath"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OS: ${{ env.OS }}
