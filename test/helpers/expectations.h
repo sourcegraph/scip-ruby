@@ -19,6 +19,7 @@ struct Expectations {
     // expectations type => file => expectations for file
     UnorderedMap<std::string, UnorderedMap<std::string, std::string>> expectations;
     std::string minimizeRBI;
+    bool isFolderTest;
 
     static Expectations getExpectations(std::string singleTest);
 };
