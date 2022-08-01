@@ -702,7 +702,8 @@ public:
                 // in definition contexts) of if this is deliberate.
                 if (sym.isClassOrModule()) {
                     auto loc = bind.loc;
-                    if (!loc.exists() || loc.empty()) { // For special classes like Sorbet::Private::Static
+                    if (!loc.exists() || loc.empty() || sym == core::Symbols::root()) {
+                        // For special classes like Sorbet::Private::Static
                         continue;
                     }
                     this->map.insert({bind.bind.variable, {NamedSymbolRef::classOrModule(sym), trim(loc), false}});
@@ -1097,7 +1098,7 @@ public:
         //   when other forms like 'class M::C' are present.
         for (auto &[namedSym, loc] : todo) {
             auto status = this->scipState.saveReference(gs, file, namedSym, loc, 0);
-            ENFORCE(status.ok());
+            ENFORCE(status.ok(), "status: {}\n", status.message());
         }
     }
 };
