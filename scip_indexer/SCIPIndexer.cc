@@ -1000,6 +1000,9 @@ public:
 
                         // Emit references for arguments
                         for (auto &arg : send->args) {
+                            if (arg.loc == send->receiverLoc) { // See NOTE[implicit-arg-passing].
+                                continue;
+                            }
                             // NOTE: For constructs like a += b, the instruction sequence ends up being:
                             //   $tmp = $a
                             //   $a = $tmp.+($b)
