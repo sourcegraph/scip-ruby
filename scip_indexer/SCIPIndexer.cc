@@ -912,9 +912,17 @@ public:
                 isMethodFileStaticInit ||
                 method == gs.lookupStaticInitForClass(namedSym.asSymbolRef().asClassOrModuleRef().data(gs)->owner,
                                                       /*allowMissing*/ true);
-            ENFORCE(check);
-            auto status = this->scipState.saveDefinition(gs, file, namedSym, arg.loc);
-            ENFORCE(status.ok());
+            absl::Status status;
+            string kind;
+            if (check) {
+                status = this->scipState.saveDefinition(gs, file, namedSym, arg.loc);
+                kind = "definition";
+            } else {
+                status = this->scipState.saveReference(gs, file, namedSym, arg.loc, 0);
+                kind = "reference";
+            }
+            ENFORCE(status.ok(), "failed to save {} for {}\ncontext:\ninstruction: {}\nlocation: {}\n", kind,
+                    namedSym.showRaw(gs), binding.value.showRaw(gs, cfg), core::Loc(file, arg.loc).showRaw(gs));
             return true;
         };
 
