@@ -918,7 +918,7 @@ public:
                 status = this->scipState.saveDefinition(gs, file, namedSym, arg.loc);
                 kind = "definition";
             } else {
-                status = this->scipState.saveReference(gs, file, namedSym, arg.loc, referenceRole);
+                status = this->scipState.saveReference(gs, file, namedSym, arg.loc, 0);
                 kind = "reference";
             }
             ENFORCE(status.ok(), "failed to save {} for {}\ncontext:\ninstruction: {}\nlocation: {}\n", kind,
