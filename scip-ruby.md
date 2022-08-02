@@ -65,7 +65,7 @@ Some OSS repos that can be used to exercise scip-ruby are:
   4. Run `./bin/brew typecheck`. An index should appear under `Library/Homebrew/`.
   5. Go to step 2.
 
-## Debugging
+## Debugging with print statements
 
 So far, I've mostly been using print debugging
 (along with minimized test cases)
@@ -92,6 +92,19 @@ file under the `test/scip/snapshots/` directory
 
 Having the [SCIP CLI](https://github.com/sourcegraph/scip) available
 is also useful for inspecting the emitted index.
+
+## Debugging with LLDB
+
+Maybe there is a cleaner way to do this,
+but the following works:
+
+```
+export TEST_DIR="$PWD/test/scip/testdata"
+pushd bazel-out/darwin-dbg/bin
+lldb -- ./test/scip_test_runner "$TEST_DIR/my_test.rb" --output="$TEST_DIR/my_test.snapshot.rb"
+popd
+unset TEST_DIR
+```
 
 ## Creating PRs
 
