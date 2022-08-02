@@ -207,20 +207,26 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
             out << lineStart << string(range.end.column - range.start.column, '^') << ' '
                 << string(isDefinition ? "definition" : "reference") << ' ' << symbolRole << formatSymbol(occ.symbol())
                 << '\n';
-            if (!(isDefinition && symbolTable.contains(occ.symbol()))) {
-                occ_i++;
-                continue;
-            }
-            auto &symbolInfo = symbolTable[occ.symbol()];
-            if (options.showDocs) {
-                for (auto &doc : symbolInfo.documentation()) {
-                    out << lineStart << "documentation" << '\n';
+
+            auto printDocs = [&](auto docs, string header) -> void {
+                if (!options.showDocs)
+                    return;
+                for (auto &doc : docs) {
+                    out << lineStart << header << '\n';
                     auto docstream = istringstream(doc);
                     for (string docline; getline(docstream, docline);) {
                         out << lineStart << "| " << docline << '\n';
                     }
                 }
+            };
+            printDocs(occ.override_documentation(), "override_documentation");
+            if (!(isDefinition && symbolTable.contains(occ.symbol()))) {
+                occ_i++;
+                continue;
             }
+            auto &symbolInfo = symbolTable[occ.symbol()];
+            printDocs(symbolInfo.documentation(), "documentation");
+
             relationships.clear();
             relationships.reserve(symbolInfo.relationships_size());
             for (auto &rel : symbolInfo.relationships()) {
