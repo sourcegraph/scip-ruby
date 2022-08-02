@@ -702,8 +702,10 @@ public:
                 // in definition contexts) of if this is deliberate.
                 if (sym.isClassOrModule()) {
                     auto loc = bind.loc;
-                    if (!loc.exists() || loc.empty() || sym == core::Symbols::root()) {
-                        // For special classes like Sorbet::Private::Static
+                    if (!loc.exists() || loc.empty() || sym == core::Symbols::root() ||
+                        sym == core::Symbols::T_Sig_WithoutRuntime()) {
+                        // TODO(varun): Should we go through the list of all symbols and filter out
+                        // all the 'internal' stuff here?
                         continue;
                     }
                     this->map.insert({bind.bind.variable, {NamedSymbolRef::classOrModule(sym), trim(loc), false}});
