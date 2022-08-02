@@ -261,17 +261,24 @@ public:
     }
 
     vector<string> docStrings(const core::GlobalState &gs, core::Loc loc) {
+#define CHECK_TYPE(type, name) \
+    ENFORCE(type, "missing type for {} in file {}\n{}\n", name, loc.file().data(gs).path(), loc.toString(gs))
+
         vector<string> docs;
         string markdown = "";
         switch (this->kind()) {
             case Kind::UndeclaredField: {
-                markdown = fmt::format("{} = T.let(_, {})", this->name.show(gs), this->type.show(gs));
+                auto name = this->name.show(gs);
+                CHECK_TYPE(this->type, name);
+                markdown = fmt::format("{} = T.let(_, {})", name, this->type.show(gs));
                 break;
             }
             case Kind::StaticField: {
                 auto fieldRef = this->selfOrOwner.asFieldRef();
-                markdown =
-                    fmt::format("{} = T.let(_, {})", fieldRef.showFullName(gs), fieldRef.data(gs)->resultType.show(gs));
+                auto resultType = fieldRef.data(gs)->resultType;
+                auto name = fieldRef.showFullName(gs);
+                CHECK_TYPE(resultType, name);
+                markdown = fmt::format("{} = T.let(_, {})", name, resultType.show(gs));
                 break;
             }
             case Kind::ClassOrModule: {
@@ -291,8 +298,9 @@ public:
             }
             case Kind::Method: {
                 auto ref = this->selfOrOwner.asMethodRef();
-                markdown = realmain::lsp::prettyTypeForMethod(gs, ref, ref.data(gs)->owner.data(gs)->resultType,
-                                                              nullptr, nullptr);
+                auto resultType = ref.data(gs)->owner.data(gs)->resultType;
+                CHECK_TYPE(resultType, fmt::format("result type for {}", ref.showFullName(gs)));
+                markdown = realmain::lsp::prettyTypeForMethod(gs, ref, resultType, nullptr, nullptr);
                 // FIXME(varun): For some reason, it looks like a bunch of public methods
                 // get marked as private here. Avoid printing misleading info until we fix that.
                 // https://github.com/sourcegraph/scip-ruby/issues/33
@@ -310,6 +318,7 @@ public:
             }
         }
         return docs;
+#undef CHECK_TYPE
     }
 
     // Returns OK if we were able to compute a symbol for the expression.
