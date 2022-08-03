@@ -179,7 +179,7 @@ public:
     enum class Kind {
         ClassOrModule,
         UndeclaredField,
-        StaticField,
+        DeclaredField,
         Method,
     };
 
@@ -191,7 +191,7 @@ private:
                 ENFORCE(s.isClassOrModule());
                 ENFORCE(!n.exists());
                 return;
-            case Kind::StaticField:
+            case Kind::DeclaredField:
                 ENFORCE(s.isFieldOrStaticField());
                 ENFORCE(!n.exists());
                 return;
@@ -226,8 +226,8 @@ public:
         return NamedSymbolRef(owner, name, type, Kind::UndeclaredField);
     }
 
-    static NamedSymbolRef staticField(core::SymbolRef self, core::TypePtr type) {
-        return NamedSymbolRef(self, {}, type, Kind::StaticField);
+    static NamedSymbolRef declaredField(core::SymbolRef self, core::TypePtr type) {
+        return NamedSymbolRef(self, {}, type, Kind::DeclaredField);
     }
 
     static NamedSymbolRef method(core::SymbolRef self) {
@@ -239,7 +239,7 @@ public:
             return Kind::UndeclaredField;
         }
         if (this->selfOrOwner.isFieldOrStaticField()) {
-            return Kind::StaticField;
+            return Kind::DeclaredField;
         }
         if (this->selfOrOwner.isMethod()) {
             return Kind::Method;
@@ -252,8 +252,8 @@ public:
             case Kind::UndeclaredField:
                 return fmt::format("UndeclaredField(owner: {}, name: {})", this->selfOrOwner.showFullName(gs),
                                    this->name.toString(gs));
-            case Kind::StaticField:
-                return fmt::format("StaticField {}", this->selfOrOwner.showFullName(gs));
+            case Kind::DeclaredField:
+                return fmt::format("DeclaredField {}", this->selfOrOwner.showFullName(gs));
             case Kind::ClassOrModule:
                 return fmt::format("ClassOrModule {}", this->selfOrOwner.showFullName(gs));
             case Kind::Method:
@@ -280,7 +280,7 @@ public:
                 markdown = fmt::format("{} = T.let(_, {})", name, fieldType.show(gs));
                 break;
             }
-            case Kind::StaticField: {
+            case Kind::DeclaredField: {
                 auto fieldRef = this->selfOrOwner.asFieldRef();
                 auto name = fieldRef.showFullName(gs);
                 CHECK_TYPE(fieldType, name);
@@ -669,7 +669,7 @@ public:
             case Kind::Method:
                 break;
             case Kind::UndeclaredField:
-            case Kind::StaticField:
+            case Kind::DeclaredField:
                 if (overrideType.has_value()) {
                     overrideDocs = symRef.docStrings(gs, overrideType.value(), core::Loc(file, occLoc));
                 }
@@ -760,10 +760,11 @@ public:
                          {NamedSymbolRef::undeclaredField(klass, instr->name, bind.bind.type), bind.loc, false}});
                     continue;
                 }
-                if (sym.isStaticField(gs)) {
+                if (sym.isFieldOrStaticField()) {
+                    ENFORCE(!bind.loc.empty());
                     this->map.insert(
                         {bind.bind.variable,
-                         {NamedSymbolRef::staticField(instr->what, bind.bind.type), trim(bind.loc), false}});
+                         {NamedSymbolRef::declaredField(instr->what, bind.bind.type), trim(bind.loc), false}});
                     continue;
                 }
                 // Outside of definition contexts for classes & modules,
@@ -797,6 +798,16 @@ public:
         auto &[namedSym, loc, emitted] = it->second;
         emitted = true;
         return {{namedSym, loc}};
+    }
+
+    string showRaw(const core::GlobalState &gs, core::FileRef file, const cfg::CFG &cfg) const {
+        return map_to_string(this->map, [&](const cfg::LocalRef &local, auto &data) -> string {
+            auto symRef = get<0>(data);
+            auto offsets = get<1>(data);
+            auto emitted = get<2>(data);
+            return fmt::format("(local: {}) -> (symRef: {}, emitted: {}, loc: {})", local.toString(gs, cfg),
+                               symRef.showRaw(gs), emitted ? "true" : "false", core::Loc(file, offsets).showRaw(gs));
+        });
     }
 
     void extract(Impl &out) {
@@ -947,7 +958,8 @@ private:
         } else {
             uint32_t localId = this->functionLocals[localRef];
             auto it = this->localDefinitionType.find(localId);
-            ENFORCE(it != this->localDefinitionType.end());
+            ENFORCE(it != this->localDefinitionType.end(), "file:{}, code:\n{}\naliasMap: {}\n", file.data(gs).path(),
+                    core::Loc(file, loc).toString(gs), this->aliasMap.showRaw(gs, file, cfg));
             auto overrideType = computeOverrideType(it->second, type);
             if (isDefinition) {
                 status = this->scipState.saveDefinition(gs, file, OwnedLocal{this->ctx.owner, localId, loc}, type);
