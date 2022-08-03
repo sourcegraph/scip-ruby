@@ -167,9 +167,15 @@ public:
 class NamedSymbolRef final {
     core::SymbolRef selfOrOwner;
     core::NameRef name;
-    core::TypePtr type;
 
 public:
+    // The type of the original definition, if applicable.
+    //
+    // Note that references to this symbol may have a different type,
+    // because you can change the type of a field, including within
+    // the same basic block.
+    core::TypePtr definitionType;
+
     enum class Kind {
         ClassOrModule,
         UndeclaredField,
@@ -178,7 +184,8 @@ public:
     };
 
 private:
-    NamedSymbolRef(core::SymbolRef s, core::NameRef n, core::TypePtr t, Kind k) : selfOrOwner(s), name(n), type(t) {
+    NamedSymbolRef(core::SymbolRef s, core::NameRef n, core::TypePtr t, Kind k)
+        : selfOrOwner(s), name(n), definitionType(t) {
         switch (k) {
             case Kind::ClassOrModule:
                 ENFORCE(s.isClassOrModule());
@@ -219,8 +226,8 @@ public:
         return NamedSymbolRef(owner, name, type, Kind::UndeclaredField);
     }
 
-    static NamedSymbolRef staticField(core::SymbolRef self) {
-        return NamedSymbolRef(self, {}, {}, Kind::StaticField);
+    static NamedSymbolRef staticField(core::SymbolRef self, core::TypePtr type) {
+        return NamedSymbolRef(self, {}, type, Kind::StaticField);
     }
 
     static NamedSymbolRef method(core::SymbolRef self) {
@@ -260,7 +267,7 @@ public:
         return this->selfOrOwner;
     }
 
-    vector<string> docStrings(const core::GlobalState &gs, core::Loc loc) {
+    vector<string> docStrings(const core::GlobalState &gs, core::TypePtr fieldType, core::Loc loc) {
 #define CHECK_TYPE(type, name) \
     ENFORCE(type, "missing type for {} in file {}\n{}\n", name, loc.file().data(gs).path(), loc.toString(gs))
 
@@ -269,16 +276,15 @@ public:
         switch (this->kind()) {
             case Kind::UndeclaredField: {
                 auto name = this->name.show(gs);
-                CHECK_TYPE(this->type, name);
-                markdown = fmt::format("{} = T.let(_, {})", name, this->type.show(gs));
+                CHECK_TYPE(fieldType, name);
+                markdown = fmt::format("{} = T.let(_, {})", name, fieldType.show(gs));
                 break;
             }
             case Kind::StaticField: {
                 auto fieldRef = this->selfOrOwner.asFieldRef();
-                auto resultType = fieldRef.data(gs)->resultType;
                 auto name = fieldRef.showFullName(gs);
-                CHECK_TYPE(resultType, name);
-                markdown = fmt::format("{} = T.let(_, {})", name, resultType.show(gs));
+                CHECK_TYPE(fieldType, name);
+                markdown = fmt::format("{} = T.let(_, {})", name, fieldType.show(gs));
                 break;
             }
             case Kind::ClassOrModule: {
@@ -426,6 +432,11 @@ core::Loc trimColonColonPrefix(const core::GlobalState &gs, core::Loc baseLoc) {
     return core::Loc(baseLoc.file(), {.beginLoc = newBeginLoc, .endLoc = baseLoc.endPos()});
 }
 
+enum class Emitted {
+    Now,
+    Earlier,
+};
+
 class SCIPState {
     string symbolScratchBuffer;
     UnorderedMap<NamedSymbolRef, string> symbolStringCache;
@@ -434,7 +445,15 @@ class SCIPState {
 
 public:
     UnorderedMap<core::FileRef, vector<scip::Occurrence>> occurrenceMap;
+
+    // Set containing symbols that have been emitted.
+    //
+    // For every (f, s) in emittedSymbols, symbolMap[f] = SymbolInfo{s, ... other stuff}
+    // and vice-versa. This is present to avoid emitting multiple SymbolInfos
+    // for the same local variable if there are multiple definitions.
+    UnorderedSet<std::pair<core::FileRef, std::string>> emittedSymbols;
     UnorderedMap<core::FileRef, vector<scip::SymbolInformation>> symbolMap;
+
     // Cache of occurrences for locals that have been emitted in this function.
     //
     // Note that the SymbolRole is a part of the key too, because we can
@@ -488,22 +507,39 @@ public:
     }
 
 private:
-    absl::Status saveDefinitionImpl(const core::GlobalState &gs, core::FileRef file, const string &symbolString,
-                                    core::Loc occLoc, const vector<string> &docs) {
-        ENFORCE(!symbolString.empty());
-        occLoc = trimColonColonPrefix(gs, occLoc);
+    Emitted saveSymbolInfo(core::FileRef file, const string &symbolString, const vector<string> &docs) {
+        if (this->emittedSymbols.contains({file, symbolString})) {
+            return Emitted::Earlier;
+        }
         scip::SymbolInformation symbolInfo;
         symbolInfo.set_symbol(symbolString);
         for (auto &doc : docs) {
             symbolInfo.add_documentation(doc);
         }
         this->symbolMap[file].push_back(symbolInfo);
+        return Emitted::Now;
+    }
 
+    absl::Status saveDefinitionImpl(const core::GlobalState &gs, core::FileRef file, const string &symbolString,
+                                    core::Loc occLoc, const vector<string> &docs) {
+        ENFORCE(!symbolString.empty());
+
+        auto emitted = this->saveSymbolInfo(file, symbolString, docs);
+
+        occLoc = trimColonColonPrefix(gs, occLoc);
         scip::Occurrence occurrence;
         occurrence.set_symbol(symbolString);
         occurrence.set_symbol_roles(scip::SymbolRole::Definition);
         for (auto val : sorbet::scip_indexer::fromSorbetLoc(gs, occLoc)) {
             occurrence.add_range(val);
+        }
+        switch (emitted) {
+            case Emitted::Now:
+                break;
+            case Emitted::Earlier:
+                for (auto &doc : docs) {
+                    *occurrence.add_override_documentation() = doc;
+                }
         }
         this->occurrenceMap[file].push_back(occurrence);
         // TODO(varun): When should we fill out the diagnostics and override_docs fields?
@@ -511,7 +547,8 @@ private:
     }
 
     absl::Status saveReferenceImpl(const core::GlobalState &gs, core::FileRef file, const string &symbolString,
-                                   core::LocOffsets occLocOffsets, int32_t symbol_roles) {
+                                   const vector<string> &overrideDocs, core::LocOffsets occLocOffsets,
+                                   int32_t symbol_roles) {
         ENFORCE(!symbolString.empty());
         auto occLoc = trimColonColonPrefix(gs, core::Loc(file, occLocOffsets));
         scip::Occurrence occurrence;
@@ -519,6 +556,9 @@ private:
         occurrence.set_symbol_roles(symbol_roles);
         for (auto val : sorbet::scip_indexer::fromSorbetLoc(gs, occLoc)) {
             occurrence.add_range(val);
+        }
+        for (auto &doc : overrideDocs) {
+            occurrence.add_override_documentation(doc);
         }
         this->occurrenceMap[file].push_back(occurrence);
         // TODO(varun): When should we fill out the diagnostics field?
@@ -592,25 +632,50 @@ public:
             return valueOrStatus.status();
         }
         string &symbolString = *valueOrStatus.value();
-        return this->saveDefinitionImpl(gs, file, symbolString, occLoc, symRef.docStrings(gs, occLoc));
+        return this->saveDefinitionImpl(gs, file, symbolString, occLoc,
+                                        symRef.docStrings(gs, symRef.definitionType, occLoc));
     }
 
-    absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ, int32_t symbol_roles) {
+    absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ,
+                               optional<core::TypePtr> overrideType, int32_t symbol_roles) {
         if (this->cacheOccurrence(gs, file, occ, symbol_roles)) {
             return absl::OkStatus();
         }
-        return this->saveReferenceImpl(gs, file, occ.toString(gs, file), occ.offsets, symbol_roles);
+        vector<string> overrideDocs;
+        auto loc = core::Loc(file, occ.offsets);
+        if (overrideType.has_value()) {
+            ENFORCE(overrideType.value(), "forgot to fold type to nullopt earlier: {}\n{}\n", file.data(gs).path(),
+                    core::Loc(file, occ.offsets).toString(gs));
+            auto var = loc.source(gs);
+            ENFORCE(var.has_value(), "Failed to find source text for definition of local variable");
+            overrideDocs.push_back(fmt::format("```ruby\n{} = T.let(_, {})\n```", var.value(), overrideType->show(gs)));
+        }
+        return this->saveReferenceImpl(gs, file, occ.toString(gs, file), overrideDocs, occ.offsets, symbol_roles);
     }
 
     absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, NamedSymbolRef symRef,
-                               core::LocOffsets occLoc, int32_t symbol_roles) {
+                               optional<core::TypePtr> overrideType, core::LocOffsets occLoc, int32_t symbol_roles) {
         // TODO:(varun) Should we cache here to to avoid emitting duplicate references?
         absl::StatusOr<string *> valueOrStatus(this->saveSymbolString(gs, symRef, nullptr));
         if (!valueOrStatus.ok()) {
             return valueOrStatus.status();
         }
         string &symbolString = *valueOrStatus.value();
-        return this->saveReferenceImpl(gs, file, symbolString, occLoc, symbol_roles);
+
+        vector<string> overrideDocs{};
+        using Kind = NamedSymbolRef::Kind;
+        switch (symRef.kind()) {
+            case Kind::ClassOrModule:
+            case Kind::Method:
+                break;
+            case Kind::UndeclaredField:
+            case Kind::StaticField:
+                if (overrideType.has_value()) {
+                    overrideDocs = symRef.docStrings(gs, overrideType.value(), core::Loc(file, occLoc));
+                }
+        }
+
+        return this->saveReferenceImpl(gs, file, symbolString, overrideDocs, occLoc, symbol_roles);
     }
 
     void saveDocument(const core::GlobalState &gs, const core::FileRef file) {
@@ -697,7 +762,8 @@ public:
                 }
                 if (sym.isStaticField(gs)) {
                     this->map.insert(
-                        {bind.bind.variable, {NamedSymbolRef::staticField(instr->what), trim(bind.loc), false}});
+                        {bind.bind.variable,
+                         {NamedSymbolRef::staticField(instr->what, bind.bind.type), trim(bind.loc), false}});
                     continue;
                 }
                 // Outside of definition contexts for classes & modules,
@@ -738,6 +804,21 @@ public:
     }
 };
 
+optional<core::TypePtr> computeOverrideType(core::TypePtr definitionType, core::TypePtr newType) {
+    if (!newType ||
+        // newType can be empty if an assignment is unreachable.
+        // Normally, someone would not commit unreachable code (because Sorbet would
+        // flag it as a hard error in CI), but it is better to be more permissive here.
+        definitionType == newType
+        // For definitions, this can happen if a variable is initialized to different
+        // types along different code paths. For references, this can happen through
+        // type-changing assignment.
+    ) {
+        return nullopt;
+    }
+    return {newType};
+}
+
 class CFGTraversal final {
     // A map from each basic block to the locals in it.
     //
@@ -763,7 +844,11 @@ class CFGTraversal final {
     // in the block.
     UnorderedMap<const cfg::BasicBlock *, UnorderedSet<cfg::LocalRef>> blockLocals;
     UnorderedMap<cfg::LocalRef, uint32_t> functionLocals;
-    UnorderedMap<uint32_t, core::TypePtr> localTypes;
+
+    // Map for storing the type at the original site of definition for a local variable.
+    //
+    // NOTE: Subsequent references may have different types.
+    UnorderedMap<uint32_t, core::TypePtr> localDefinitionType;
     AliasMap aliasMap;
 
     // Local variable counter that is reset for every function.
@@ -817,8 +902,7 @@ private:
                     isDefinition = true; // If we're seeing this for the first time in topological order,
                                          // The current block must have a definition for the variable.
                     auto id = this->addLocal(bb, localRef);
-                    ENFORCE(type, "missing type for lvalue");
-                    this->localTypes[id] = type;
+                    this->localDefinitionType[id] = type;
                 }
                 // The variable wasn't passed in as an argument, and hasn't already been recorded
                 // as a local in the block. So this must be a definition line.
@@ -850,26 +934,26 @@ private:
         ENFORCE(this->functionLocals.contains(localRef), "should've added local earlier if it was missing");
         absl::Status status;
         auto loc = local.loc;
+        auto &gs = this->ctx.state;
+        auto file = this->ctx.file;
         if (symRef.has_value()) {
             auto [namedSym, _] = symRef.value();
             if (isDefinition) {
-                status = this->scipState.saveDefinition(this->ctx.state, this->ctx.file, namedSym, loc);
+                status = this->scipState.saveDefinition(gs, file, namedSym, loc);
             } else {
-                status = this->scipState.saveReference(this->ctx.state, this->ctx.file, namedSym, loc, referenceRole);
+                auto overrideType = computeOverrideType(namedSym.definitionType, type);
+                status = this->scipState.saveReference(gs, file, namedSym, overrideType, loc, referenceRole);
             }
         } else {
             uint32_t localId = this->functionLocals[localRef];
-            auto it = this->localTypes.find(localId);
-            core::TypePtr type{};
-            if (it != this->localTypes.end()) {
-                type = it->second;
-            }
+            auto it = this->localDefinitionType.find(localId);
+            ENFORCE(it != this->localDefinitionType.end());
+            auto overrideType = computeOverrideType(it->second, type);
             if (isDefinition) {
-                status = this->scipState.saveDefinition(this->ctx.state, this->ctx.file,
-                                                        OwnedLocal{this->ctx.owner, localId, loc}, type);
+                status = this->scipState.saveDefinition(gs, file, OwnedLocal{this->ctx.owner, localId, loc}, type);
             } else {
-                status = this->scipState.saveReference(this->ctx.state, this->ctx.file,
-                                                       OwnedLocal{this->ctx.owner, localId, loc}, referenceRole);
+                status = this->scipState.saveReference(gs, file, OwnedLocal{this->ctx.owner, localId, loc},
+                                                       overrideType, referenceRole);
             }
         }
 
@@ -930,7 +1014,7 @@ public:
                 status = this->scipState.saveDefinition(gs, file, namedSym, arg.loc);
                 kind = "definition";
             } else {
-                status = this->scipState.saveReference(gs, file, namedSym, arg.loc, 0);
+                status = this->scipState.saveReference(gs, file, namedSym, nullopt, arg.loc, 0);
                 kind = "reference";
             }
             ENFORCE(status.ok(), "failed to save {} for {}\ncontext:\ninstruction: {}\nlocation: {}\n", kind,
@@ -959,7 +1043,7 @@ public:
                 // Emit occurrence information for the RHS
                 auto emitLocal = [this, &cfg, &bb, &binding](cfg::LocalRef local) -> void {
                     (void)this->emitLocalOccurrence(cfg, bb, cfg::LocalOccurrence{local, binding.loc},
-                                                    ValueCategory::RValue, core::TypePtr());
+                                                    ValueCategory::RValue, binding.bind.type);
                 };
                 switch (binding.value.tag()) {
                     case cfg::Tag::Literal: {
@@ -978,7 +1062,7 @@ public:
                         // Emit reference for the receiver, if present.
                         if (send->recv.loc.exists() && !send->recv.loc.empty()) {
                             this->emitLocalOccurrence(cfg, bb, send->recv.occurrence(), ValueCategory::RValue,
-                                                      core::TypePtr());
+                                                      send->recv.type);
                         }
 
                         // Emit reference for the method being called
@@ -1003,7 +1087,7 @@ public:
                                     // matches a known operator (e.g. []=), and emit an appropriate 'WriteAccess'
                                     // symbol role for it.
                                     auto status = this->scipState.saveReference(
-                                        gs, file, NamedSymbolRef::method(funSym), send->funLoc, 0);
+                                        gs, file, NamedSymbolRef::method(funSym), nullopt, send->funLoc, 0);
                                     ENFORCE(status.ok());
                                 }
                             }
@@ -1021,8 +1105,7 @@ public:
                             // and the first one is a write. Instead of emitting two occurrences, it'd be nice to emit
                             // a combined read-write occurrence. However, that would require complicating the code a
                             // bit, so let's leave it as-is for now.
-                            this->emitLocalOccurrence(cfg, bb, arg.occurrence(), ValueCategory::RValue,
-                                                      core::TypePtr());
+                            this->emitLocalOccurrence(cfg, bb, arg.occurrence(), ValueCategory::RValue, arg.type);
                         }
 
                         break;
@@ -1111,7 +1194,7 @@ public:
         //   Specifically, Go to Definition for modules seems to go to 'module M' even
         //   when other forms like 'class M::C' are present.
         for (auto &[namedSym, loc] : todo) {
-            auto status = this->scipState.saveReference(gs, file, namedSym, loc, 0);
+            auto status = this->scipState.saveReference(gs, file, namedSym, nullopt, loc, 0);
             ENFORCE(status.ok(), "status: {}\n", status.message());
         }
     }

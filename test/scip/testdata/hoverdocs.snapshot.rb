@@ -327,6 +327,10 @@
 #    | @@y = T.let(_, T.untyped)
 #    | ```
 #    ^^^^^^^^ reference [..] K1#@@y.
+#    override_documentation
+#    | ```ruby
+#    | @@y = T.let(_, Integer(10))
+#    | ```
    end
  
    # lorem ipsum, you get it
@@ -346,6 +350,10 @@
 #    | @z = T.let(_, T.untyped)
 #    | ```
 #    ^^^^^^^ reference [..] <Class:K1>#@z.
+#    override_documentation
+#    | ```ruby
+#    | @z = T.let(_, Integer(10))
+#    | ```
    end
  end
  
@@ -402,5 +410,9 @@
 #    ^^ reference (write) [..] K2#@z.
 #    ^^^^^^^^ reference [..] K2#@z.
 #          ^^ reference [..] K2#@x.
+#          override_documentation
+#          | ```ruby
+#          | @x = T.let(_, Integer(20))
+#          | ```
    end
  end
