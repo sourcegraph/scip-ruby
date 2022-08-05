@@ -24,11 +24,11 @@ jobs:
         with:
           path: ~/.cache/bazel
           key: bazel
+      - name: Test OSS repos
+        run: bazel test //test/scip/repos --test_env GITHUB_ACTIONS=1 --test_env PATH="$PATH" --explain log --verbose_explanations --test_output=errors --config=dbg
       - name: Test
         run: bazel test //test/scip --test_env GITHUB_ACTIONS=1 --explain log --verbose_explanations --test_output=errors --config=dbg
       - name: Print bazel log
         run: cat log && rm log
-      - name: Test OSS repos
-        run: bazel test //test/scip/repos --test_env GITHUB_ACTIONS=1 --explain log --verbose_explanations --test_output=errors --config=dbg
       - name: Print bazel log for repo tests
         run: cat log
