@@ -253,11 +253,13 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
     }
 }
 
-string snapshot_path(string rb_path) {
-    ENFORCE(absl::EndsWith(rb_path, ".rb"));
-    rb_path.erase(rb_path.size() - 3, 3);
-    return rb_path + ".snapshot.rb";
+string snapshot_path(string source_file_path) {
+    ENFORCE(absl::EndsWith(source_file_path, ".rb") || absl::EndsWith(source_file_path, ".rbi"));
+    auto dot_pos = source_file_path.rfind('.');
+    source_file_path.insert(dot_pos, ".snapshot");
+    return source_file_path;
 }
+
 struct TestSettings {
     optional<string> gemMetadata;
     UnorderedMap</*root-relative path*/ string, FormatOptions> formatOptions;

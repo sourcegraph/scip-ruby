@@ -77,7 +77,8 @@ bool addToExpectations(Expectations &exp, string_view filePath, bool isDirectory
         exp.minimizeRBI = filePath;
         return true;
     } else if (absl::EndsWith(filePath, ".rb") || absl::EndsWith(filePath, ".rbi")) {
-        if (!absl::EndsWith(filePath, ".snapshot.rb") && !absl::EndsWith(filePath, "scip-ruby-args.rb")) {
+        if (!absl::EndsWith(filePath, ".snapshot.rb") && !absl::EndsWith(filePath, ".snapshot.rbi") &&
+            !absl::EndsWith(filePath, "scip-ruby-args.rb")) {
             exp.sourceFiles.emplace_back(filePath);
             return true;
         }
