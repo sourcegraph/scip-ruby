@@ -5,6 +5,7 @@ _data = [
         "tag": "3.5.7",
         "git_sha": "ce8ef89ec0cfe875c48c3a83a843af9074c05930",
         "cmd": ("pushd Library/Homebrew"
+          + " && gem install bundler"
           + " && BUNDLE_WITH='sorbet' bundle install"
           + " && cp $${TEST_DIR}/$(location //main:scip-ruby) $$(bundle exec which srb)"
           + " && popd"

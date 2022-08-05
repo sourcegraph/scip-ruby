@@ -15,9 +15,6 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '2.7'
-      - name: Update Bundler
-        run: |
-          bundle update --bundler
       - name: Install Bazel
         run: sudo npm install --location=global @bazel/bazelisk
       - name: Manually evict cache entry if applicable
