@@ -553,9 +553,8 @@ private:
         return absl::OkStatus();
     }
 
-    absl::Status saveReferenceImpl(const core::GlobalState &gs, core::FileRef file, const string &symbolString,
-                                   const vector<string> &overrideDocs, core::LocOffsets occLocOffsets,
-                                   int32_t symbol_roles) {
+    void saveReferenceImpl(const core::GlobalState &gs, core::FileRef file, const string &symbolString,
+                           const vector<string> &overrideDocs, core::LocOffsets occLocOffsets, int32_t symbol_roles) {
         ENFORCE(!symbolString.empty());
         auto occLoc = trimColonColonPrefix(gs, core::Loc(file, occLocOffsets));
         scip::Occurrence occurrence;
@@ -569,7 +568,6 @@ private:
         }
         this->occurrenceMap[file].push_back(occurrence);
         // TODO(varun): When should we fill out the diagnostics field?
-        return absl::OkStatus();
     }
 
     // Returns true if there was a cache hit.
@@ -657,7 +655,8 @@ public:
             ENFORCE(var.has_value(), "Failed to find source text for definition of local variable");
             overrideDocs.push_back(fmt::format("```ruby\n{} = T.let(_, {})\n```", var.value(), overrideType->show(gs)));
         }
-        return this->saveReferenceImpl(gs, file, occ.toString(gs, file), overrideDocs, occ.offsets, symbol_roles);
+        this->saveReferenceImpl(gs, file, occ.toString(gs, file), overrideDocs, occ.offsets, symbol_roles);
+        return absl::OkStatus();
     }
 
     absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, NamedSymbolRef symRef,
@@ -681,8 +680,8 @@ public:
                     overrideDocs = symRef.docStrings(gs, overrideType.value(), core::Loc(file, occLoc));
                 }
         }
-
-        return this->saveReferenceImpl(gs, file, symbolString, overrideDocs, occLoc, symbol_roles);
+        this->saveReferenceImpl(gs, file, symbolString, overrideDocs, occLoc, symbol_roles);
+        return absl::OkStatus();
     }
 
     void saveDocument(const core::GlobalState &gs, const core::FileRef file) {
