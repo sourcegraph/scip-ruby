@@ -9,9 +9,9 @@ _data = [
           + " && popd"
           + " && ./bin/brew typecheck"),
         "run_cmd": ("pushd Library/Homebrew"
-          + " && SRB_BINARIES=\"$$(find . -name srb -type f)\""
-          + " && for file in \"$${SRB_BINARIES//\\\\n/ }\" ; do cp $${TEST_DIR}/$(location //main:scip-ruby) \"$$file\" ; done"
-          + " && popd")
+          + " && $$(find . -name srb -type f) | while IFS= read -r line ; do cp $${TEST_DIR}/$(location //main:scip-ruby) $$line ; done"
+          + " && popd"
+          + " && ./bin/brew typecheck")
     }
 ]
 
