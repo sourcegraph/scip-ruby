@@ -25,11 +25,11 @@ jobs:
           path: ~/.cache/bazel
           key: bazel
       - name: Test
-        run: bazel test //test/scip --test_env GITHUB_ACTIONS=1 --explain log --verbose_explanations --test_output=errors --config=dbg
+        run: bazel test //test/scip --explain log --verbose_explanations --test_output=errors --config=dbg
       - name: Print bazel log
         run: cat log && rm log
       - name: Test OSS repos
-        run: bazel test //test/scip/repos --test_env GITHUB_ACTIONS=1 --test_env PATH="$PATH" --explain log --verbose_explanations --test_output=errors --config=dbg --spawn_strategy=local
+        run: bazel test //test/scip/repos --test_env GITHUB_ACTIONS=1 --test_env PATH="$PATH" --test_env HOME="$HOME" --explain log --verbose_explanations --test_output=errors --config=dbg --spawn_strategy=local
           # Turn off sandboxing because Homebrew needs to write
           # to directories outside the sandbox. 🙄
       - name: Print bazel log for repo tests
