@@ -5,7 +5,7 @@ def dirname(p):
     return p.rpartition("/")[0]
 
 def split_extension(p):
-    (before, _, ext) = basename(p).rpartition(".")
+    (before, _, ext) = p.rpartition(".")
     if before == "":
         (before, ext) = (ext, "")
     return (before, ext)
@@ -54,11 +54,11 @@ def scip_multifile_test(dir, filepaths):
     args = ["$(location {})".format(dir), "--output=$(location {})".format(dir)]
     data = ["//test:scip_test_runner", "//test/scip:{}".format(dir)]
     for filepath in filepaths:
-        if filepath.endswith(".rb") and not filepath.endswith(".snapshot.rb"):
-            # args.append("$(location {})".format(path))
+        path_without_ext, ext = split_extension(filepath)
+        if (ext == "rb" or ext == "rbi") and not path_without_ext.endswith(".snapshot"):
             data.append(filepath)
             if not filepath.endswith("scip-ruby-args.rb"): # Special file for reading Gem-level args.
-                data.append(filepath[:-3] + ".snapshot.rb")
+                data.append(path_without_ext + ".snapshot." + ext)
     if not dir.startswith("testdata/multifile/"):
         fail("Expected directory to be under multifile/")
     dir = dir[len("testdata/multifile/"):]
