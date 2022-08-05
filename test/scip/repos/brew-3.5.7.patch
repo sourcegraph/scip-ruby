@@ -1,0 +1,41 @@
+diff --git a/Library/Homebrew/dev-cmd/typecheck.rb b/Library/Homebrew/dev-cmd/typecheck.rb
+index b9f00a544..b343bce05 100644
+--- a/Library/Homebrew/dev-cmd/typecheck.rb
++++ b/Library/Homebrew/dev-cmd/typecheck.rb
+@@ -105,7 +105,7 @@ module Homebrew
+         return
+       end
+ 
+-      srb_exec = %w[bundle exec srb tc]
++      srb_exec = %w[bundle exec srb]
+ 
+       srb_exec << "--quiet" if args.quiet?
+ 
+@@ -122,6 +122,7 @@ module Homebrew
+         srb_exec += ["--file", "../#{args.file}"] if args.file
+         srb_exec += ["--dir", "../#{args.dir}"] if args.dir
+       end
++      srb_exec += ["--index-file", "brew.scip", "--gem-metadata", "brew@3.5.7"]
+       success = system(*srb_exec)
+       return if success
+ 
+diff --git a/Library/Homebrew/version/null.rb b/Library/Homebrew/version/null.rb
+index 08616aa2f..b27e0074d 100644
+--- a/Library/Homebrew/version/null.rb
++++ b/Library/Homebrew/version/null.rb
+@@ -68,12 +68,12 @@ class Version
+       NULL_TOKEN
+     end
+ 
+-    sig { override.returns(Version) }
++    sig { override.returns(T.self_type) }
+     def major_minor
+       self
+     end
+ 
+-    sig { override.returns(Version) }
++    sig { override.returns(T.self_type) }
+     def major_minor_patch
+       self
+     end
+

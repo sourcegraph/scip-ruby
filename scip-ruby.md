@@ -23,15 +23,25 @@ scip-ruby myfile.rb --index-file index.scip
 
 ## Running SCIP tests
 
+Run snapshot tests, which are self-contained:
+
 ```
 ./bazel test //test/scip --config=dbg
 ```
 
-Updating snapshots
+Updating snapshots:
 
 ```
 ./bazel test //test/scip:update --config=dbg
 ```
+
+Check that there are no crashes on indexing OSS repos:
+
+```
+./bazel test //test/scip/repos --config=dbg
+```
+
+This may take a few minutes to run.
 
 ## Writing a new SCIP test
 
@@ -42,28 +52,28 @@ you add a new test, you should create matching `.snapshot.rb` files
 since those are used as inputs to Bazel.
 If you know of a way to get rid of that annoyance, submit a PR.
 
-## Manually testing against larger codebases
+## Writing a new repo test
 
-Some OSS repos that can be used to exercise scip-ruby are:
-- [Homebrew/brew](https://github.com/Homebrew/brew): (150k SLOC)
-  1. Clone and run `./bin/brew typecheck` once.
-  2. Copy over the built `scip-ruby` binary:
-      ```
-      cp /path/to/scip-ruby ./Library/Homebrew/vendor/bundle/ruby/2.6.0/bin/srb
-      ```
-  3. Add a line for indexing 
-      ```
-      diff --git a/Library/Homebrew/dev-cmd/typecheck.rb b/Library/Homebrew/dev-cmd/typecheck.rb
-      index b9f00a544..aac977019 100644
-      --- a/Library/Homebrew/dev-cmd/typecheck.rb
-      +++ b/Library/Homebrew/dev-cmd/typecheck.rb
-      @@ -124,2 +124,3 @@ module Homebrew
-             end
-      +      srb_exec += ["--index-file", "index.scip", "--gem-metadata", "brew@3.5.4"]
-             success = system(*srb_exec)
-      ```
-  4. Run `./bin/brew typecheck`. An index should appear under `Library/Homebrew/`.
-  5. Go to step 2.
+First, clone the repo using Sorbet locally
+and check if you can index it.
+Typically, the commands will be something like:
+
+```
+BUNDLE_WITH=sorbet bundle install
+
+# Replace srb binary with scip-ruby binary
+cp /path/to/scip-ruby "$(find . -name 'srb' -type f | head -n 1)"
+bundle exec srb --index-file index.scip --gem-metadata "name@version"
+```
+
+In case there are any type errors, create a patch and save it:
+```
+git diff > /path/to/test/scip/repos/name-version.patch
+```
+
+Once you're able to successfully index the code,
+modify the [scip_repos_test.bzl](test/scip/repos/scip_repos_test.bzl)
+file to include the relevant data.
 
 ## Debugging with print statements
 
