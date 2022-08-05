@@ -4,13 +4,14 @@ _data = [
         "clone_url": "https://github.com/Homebrew/brew.git",
         "tag": "3.5.7",
         "git_sha": "ce8ef89ec0cfe875c48c3a83a843af9074c05930",
-        "cmd": ("set -x && pushd Library/Homebrew"
+        "prep_cmd": ("set -x && pushd Library/Homebrew"
           + " && gem install bundler:1.17.3"
-          + " && BUNDLE_WITH='sorbet' bundle install"
-          + " && cp $${TEST_DIR}/$(location //main:scip-ruby) $$(bundle exec which srb)"
-          + " && ls -R ."
           + " && popd"
-          + " && ./bin/brew typecheck && set +x")
+          + " && ./bin/brew typecheck"),
+        "run_cmd": ("pushd Library/Homebrew"
+          + " && find . -name srb -type f"
+          + " && cp $${TEST_DIR}/$(location //main:scip-ruby) $$(bundle exec which srb)"
+          + " && popd")
     }
 ]
 
@@ -38,7 +39,8 @@ def scip_repos_test_suite(patch_paths):
           testdata["clone_url"],
           testdata["tag"],
           testdata["git_sha"],
-          "'{}'".format(testdata["cmd"]),
+          "'{}'".format(testdata["prep_cmd"]),
+          "'{}'".format(testdata["run_cmd"]),
         ] + patch_arg,
       )
       test_names.append(test_name)

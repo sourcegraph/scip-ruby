@@ -16,14 +16,15 @@ print_time_elapsed() {
 }
 trap print_time_elapsed DEBUG
 
-if [ "$#" -lt 5 ] || [ "$#" -gt 6 ]; then
+if [ "$#" -lt 6 ] || [ "$#" -gt 7 ]; then
   echo "Expected 5-6 arguments: got $#"
   echo "1. Test name"
   echo "2. Clone URL"
   echo "3. git tag to use"
   echo "4. git SHA for double-checking"
-  echo "5. Command to run for type-checking"
-  echo "6. (optional) absolute path to patch to apply"
+  echo "5. Prep command to run before applying the patch"
+  echo "6. Command to run for type-checking"
+  echo "7. (optional) absolute path to patch to apply"
   exit 1
 fi
 
@@ -33,7 +34,8 @@ TEST_NAME="$1"
 CLONE_URL="$2"
 GIT_TAG="$3"
 GIT_SHA="$4"
-CMD="$5"
+PREP_CMD="$5"
+RUN_CMD="$6"
 PATCH_ABSPATH=""
 TEST_DIR="$PWD"
 if [ "$#" -eq 6 ]; then
@@ -56,12 +58,14 @@ if [ "$(git rev-parse HEAD)" -ne "$GIT_SHA" ]; then
   exit 1
 fi
 
+eval "$PREP_CMD"
+
 if [ ! -z "$PATCH_ABSPATH" ]; then
   git apply "$PATCH_ABSPATH"
   git diff -U0
 fi
 
-eval "$CMD"
+eval "$RUN_CMD"
 
 popd
 rm -rf repo
