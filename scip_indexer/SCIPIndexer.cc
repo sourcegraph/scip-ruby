@@ -437,10 +437,23 @@ enum class Emitted {
     Earlier,
 };
 
+using OccurrenceCache = UnorderedMap<std::pair<core::LocOffsets, /*SymbolRole*/ int32_t>, uint32_t>;
+
 class SCIPState {
     string symbolScratchBuffer;
     UnorderedMap<NamedSymbolRef, string> symbolStringCache;
-    UnorderedMap<uint32_t, core::TypePtr> localTypes;
+
+    // Cache of occurrences for locals that have been emitted in this function.
+    //
+    // Note that the SymbolRole is a part of the key too, because we can
+    // have a read-reference and write-reference at the same location
+    // (we don't merge those for now).
+    //
+    // The 'value' in the map is purely for sanity-checking. It's a bit
+    // cumbersome to conditionalize the type to be a set in non-debug and
+    // map in debug, so keeping it a map.
+    UnorderedMap<std::pair<core::LocOffsets, /*SymbolRole*/ int32_t>, uint32_t> localOccurrenceCache;
+
     GemMetadata gemMetadata;
 
 public:
@@ -454,16 +467,6 @@ public:
     UnorderedSet<std::pair<core::FileRef, std::string>> emittedSymbols;
     UnorderedMap<core::FileRef, vector<scip::SymbolInformation>> symbolMap;
 
-    // Cache of occurrences for locals that have been emitted in this function.
-    //
-    // Note that the SymbolRole is a part of the key too, because we can
-    // have a read-reference and write-reference at the same location
-    // (we don't merge those for now).
-    //
-    // The 'value' in the map is purely for sanity-checking. It's a bit
-    // cumbersome to conditionalize the type to be a set in non-debug and
-    // map in debug, so keeping it a map.
-    UnorderedMap<std::pair<core::LocOffsets, /*SymbolRole*/ int32_t>, uint32_t> localOccurrenceCache;
     vector<scip::Document> documents;
     vector<scip::SymbolInformation> externalSymbols;
 
@@ -475,6 +478,10 @@ public:
     // Make move-only to avoid accidental copy of large Documents/maps.
     SCIPState(const SCIPState &) = delete;
     SCIPState &operator=(const SCIPState &other) = delete;
+
+    void clearFunctionLocalCaches() {
+        this->localOccurrenceCache.clear();
+    }
 
     // If the returned value is as success, the pointer is non-null.
     //
@@ -1348,8 +1355,10 @@ public:
         // specific to a range, so directly using that would lead to recomputing local variable
         // information repeatedly for each occurrence.
 
-        sorbet::scip_indexer::CFGTraversal traversal(*scipState.get(), core::Context(gs, methodDef.symbol, file));
+        auto &scipStateRef = *scipState.get();
+        sorbet::scip_indexer::CFGTraversal traversal(scipStateRef, core::Context(gs, methodDef.symbol, file));
         traversal.traverse(cfg);
+        scipStateRef.clearFunctionLocalCaches();
     }
 
     virtual unique_ptr<SemanticExtension> deepCopy(const core::GlobalState &from, core::GlobalState &to) override {
