@@ -6,27 +6,24 @@ sidebar_label: Generics
 
 Sorbet has syntax for creating generic methods, classes, and interfaces.
 
-## Implementation status
+## How to use generics well
 
-Generics are the most poorly supported feature within Sorbet, by far. Their
-implementation has many known, complicated-to-fix bugs which substantially limit
-their utility.
+Despite many improvements made to Sorbet's support for generics over the years,
+it is unfortunately easy to both:
 
-We track known bugs in Sorbet's support for generics in the [Generics milestone]
-on Sorbet's issue tracker. Feel free to peruse the existing bugs, as well as
-report new bugs.
+1.  Use generics incorrectly, and not be told as much by Sorbet
+1.  Use generics "correctly," only to realize that the abstractions you've built
+    are not easy to use.
 
-Unfortunately, this abundance of bugs makes implementing sophisticated, generic
-abstractions in Sorbet exceedingly brittle.
+It is therefore important to thoroughly test abstractions making use of Sorbet
+generics.
 
-It is imperative to thoroughly test abstractions making use of Sorbet generics.
+The tests you'll need to write look materially different from other Ruby tests
+you may be accustomed to writing, because the tests need to deal with what code
+should or should not typecheck, rather than what code should or should not run
+correctly.
 
-The tests you'll need to write look substantially different from other Ruby
-tests you may be accustomed to writing, because the tests need to deal with what
-code should or should not typecheck, rather than code that should or should not
-run correctly.
-
-- Many things that shouldn't type check **do type check anyways**.
+- Sometimes, something that shouldn't type check **does type check anyways**.
 
   This is bad because the generic abstraction being built will not necessarily
   provide the guarantees it should. This can give users of the generic
@@ -45,27 +42,31 @@ run correctly.
   Sorbet indeed reports errors.)
 
   It can also be helpful to use `T.reveal_type` and/or `T.assert_type!` to
-  inspect the types of intermediate values to see if `T.untyped` has silently
-  snuck in somewhere.
+  inspect the types of **intermediate values** to see if `T.untyped` has
+  silently snuck in somewhere. If `T.untyped` has snuck into the implementation
+  somewhere, things will type check, but it won't mean much.
 
-- Many things **don't type check when they should**.
+- Sometimes, something **doesn't type check when it should**.
 
-  This is bad because it causes confusion and frustration for people attempting
-  to use the generic abstraction, not for the person who implemented the
-  abstraction. This is especially painful for those who are new to Sorbet (or
-  even Ruby), as well as those those who are not intimately familiar with the
-  limitations of Sorbet's generics.
+  Most of these kinds of bugs in Sorbet were fixed as of July 2022, but some
+  remain.
+
+  These kinds of problems are bad because they cause confusion and frustration
+  for people attempting to **use** the generic abstraction, not for the person
+  who implemented the abstraction. This is especially painful for those who are
+  new to Sorbet (or even Ruby), as well as those those who are not intimately
+  familiar with the limitations of Sorbet's generics.
 
   To mitigate this, "test drive" the abstraction being built. Don't assume that
-  if the implementation type checks that it will work for downstream consumers.
-  Get creative and write code as a user would use the abstraction. Encountering
-  these errors is not only frustrating for you, but also frustrating for others,
-  and incurs a real risk of making people's first experience with Sorbet unduly
-  negative.
+  if the implementation type checks that it will work for downstream users. Get
+  creative and write code as a user would.
 
-Both of these outcomes are bad, and both are unfortunately quite common. When
-building new generics abstractions, please keep these in mind. We apologize for
-the inconvenience this causes.
+  Encountering these errors is not only frustrating for you, but also
+  frustrating for others, and incurs a real risk of making people's first
+  experience with Sorbet unduly negative.
+
+By avoiding both of these kinds of outcomes, you will be able to build generic
+abstractions that work better overall.
 
 As with all bugs in Sorbet, when you encounter them [please report
 them][issues]. See the list of known bugs here:
@@ -104,6 +105,8 @@ int_box.val += 1
 
 [→ View on sorbet.run](https://sorbet.run/#%23%20typed%3A%20strict%0A%0Aclass%20Box%0A%20%20extend%20T%3A%3ASig%0A%20%20extend%20T%3A%3AGeneric%20%23%20Provides%20%60type_member%60%20helper%0A%0A%20%20Elem%20%3D%20type_member%20%23%20Makes%20the%20%60Box%60%20class%20generic%0A%0A%20%20%23%20References%20the%20class-level%20generic%20%60Elem%60%0A%20%20sig%20%7Bparams%28val%3A%20Elem%29.void%7D%0A%20%20def%20initialize%28val%3A%29%3B%20%40val%20%3D%20val%3B%20end%0A%20%20sig%20%7Breturns%28Elem%29%7D%0A%20%20def%20val%3B%20%40val%3B%20end%0A%20%20sig%20%7Bparams%28val%3A%20Elem%29.returns%28Elem%29%7D%0A%20%20def%20val%3D%28val%29%3B%20%40val%20%3D%20val%3B%20end%0Aend%0A%0Aint_box%20%3D%20Box%5BInteger%5D.new%28val%3A%200%29%0AT.reveal_type%28int_box%29%20%23%20%60Box%5BInteger%5D%60%0A%0AT.reveal_type%28int_box.val%29%20%23%20%60Integer%60%0A%0Aint_box.val%20%2B%3D%201)
 
+The basic syntax for function generics in Sorbet looks like this:
+
 ```ruby
 # typed: true
 extend T::Sig
@@ -112,7 +115,8 @@ sig do
   # `extend T::Generic` is not required just to use `type_parameters`
   type_parameters(:U)
     .params(
-      # The block can return anything
+      # The block can return any value, and the type of
+      # that value defines type_parameter(:U)
       blk: T.proc.returns(T.type_parameter(:U))
     )
     # The method returns whatever the block returns
@@ -479,7 +483,7 @@ instances).
 At the call site, both `wants_at_least_child` and `wants_at_least_parent`
 satisfy the contract that `takes_func` is asking for. In particular, the
 `wants_at_least_parent` is fine being given **any** instance, as long as it's
-okay to call of `parnet.on_parent` (because of inheritance, both `Child` and
+okay to call `parent.on_parent` (because of inheritance, both `Child` and
 `GrandChild` have this method). Since `takes_func` guarantees that it will
 always provide a `Child` instance, the thing provided will always have an
 `on_parent` method defined.
@@ -998,58 +1002,10 @@ by inventing an entirely new value.
 
 ### Shortcomings of generic methods
 
-The [implementation status](#implementation-status) disclaimer at the top of
-this doc mentioned that generics are quite buggy. Generic methods are one of the
-biggest areas where people run into bugs and/or missing features.
-
 Most commonly, when there is something wrong with Sorbet's support for generic
-methods, the error message mentions something about `<top>`. Here is an example:
-
-```ruby
-sig do
-  type_parameters(:U)
-    .params(
-      xs: T::Array[T.type_parameter(:U)],
-      blk: T.proc.params(arg0: T.type_parameter(:U)).void
-    )
-    .void
-end
-def yield_each_item(xs, &blk)
-  xs.each do |x|
-    yield x
-  end
-end
-
-yield_each_item([1, 2, 3]) do |item|
-  T.reveal_type(item)
-  item.even?
-end
-```
-
-[→ View on sorbet.run](https://sorbet.run/#%23%20typed%3A%20true%0Aextend%20T%3A%3ASig%0A%0Asig%20do%0A%20%20type_parameters%28%3AU%29%0A%20%20%20%20.params%28%0A%20%20%20%20%20%20xs%3A%20T%3A%3AArray%5BT.type_parameter%28%3AU%29%5D%2C%0A%20%20%20%20%20%20blk%3A%20T.proc.params%28arg0%3A%20T.type_parameter%28%3AU%29%29.void%0A%20%20%20%20%29%0A%20%20%20%20.void%0Aend%0Adef%20yield_each_item%28xs%2C%20%26blk%29%0A%20%20xs.each%20do%20%7Cx%7C%0A%20%20%20%20yield%20x%0A%20%20end%0Aend%0A%0Ayield_each_item%28%5B1%2C%202%2C%203%5D%29%20do%20%7Citem%7C%0A%20%20T.reveal_type%28item%29%0A%20%20item.even%3F%0Aend)
-
-In this example, the output as of the time of writing looks like this:
-
-```
-editor.rb:19: Revealed type: `<top>` https://srb.help/7014
-    19 |  T.reveal_type(item)
-          ^^^^^^^^^^^^^^^^^^^
-  Got <top> originating from:
-    editor.rb:18:
-    18 |yield_each_item([1, 2, 3]) do |item|
-                                       ^^^^
-
-editor.rb:20: Method `even?` does not exist on `<top>` https://srb.help/7003
-    20 |  item.even?
-               ^^^^^
-  Got `<top>` originating from:
-    editor.rb:18:
-    18 |yield_each_item([1, 2, 3]) do |item|
-                                       ^^^^
-Errors: 2
-```
-
-Whenever you see `<top>` in an error message, one of two things is happening:
+methods, the error message mentions something about `<top>`, or something about
+unreachable code. Whenever you see `<top>` in an error message, one of two
+things is happening:
 
 - There is a valid error, because the method's input type was not properly
   constrained. Double check the previous section on

@@ -1312,7 +1312,7 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                 auto key = cast_type_nonnull<NamedLiteralType>(keyType);
                 auto underlying = key.underlying(gs);
                 ClassOrModuleRef klass = cast_type_nonnull<ClassType>(underlying).symbol;
-                if (klass == Symbols::Symbol() && consumed.find(key.asName()) != consumed.end()) {
+                if (klass == Symbols::Symbol() && consumed.contains(key.asName())) {
                     continue;
                 }
                 NameRef arg = key.asName();
@@ -1808,6 +1808,16 @@ public:
         res.returnType = make_type<MetaType>(Types::untypedUntracked());
     }
 } T_attached_class;
+
+class T_type_parameter : public IntrinsicMethod {
+public:
+    void apply(const GlobalState &gs, const DispatchArgs &args, DispatchResult &res) const override {
+        // Proper typing of this should have been in builder_walk by translating `T.type_parameter`
+        // calls to `Alias` instructions. This just makes it so that e.g. sigs that use
+        // `T.type_parameter(:U)` can be used at `# typed: strong`
+        res.returnType = make_type<MetaType>(Types::untypedUntracked());
+    }
+} T_type_parameter;
 
 class T_must : public IntrinsicMethod {
 public:
@@ -4010,6 +4020,7 @@ const vector<Intrinsic> intrinsics{
     {Symbols::T(), Intrinsic::Kind::Singleton, Names::classOf(), &T_class_of},
     {Symbols::T(), Intrinsic::Kind::Singleton, Names::selfType(), &T_self_type},
     {Symbols::T(), Intrinsic::Kind::Singleton, Names::attachedClass(), &T_attached_class},
+    {Symbols::T(), Intrinsic::Kind::Singleton, Names::typeParameter(), &T_type_parameter},
 
     {Symbols::T(), Intrinsic::Kind::Singleton, Names::proc(), &T_proc},
     {Symbols::DeclBuilderForProcs(), Intrinsic::Kind::Singleton, Names::params(), &T_proc_params},
