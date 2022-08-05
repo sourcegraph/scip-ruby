@@ -5,7 +5,7 @@ _data = [
         "tag": "3.5.7",
         "git_sha": "ce8ef89ec0cfe875c48c3a83a843af9074c05930",
         "cmd": ("pushd Library/Homebrew && BUNDLE_WITH='sorbet' bundle install && popd"
-          + " && cp $${TEST_DIR}/$(location //main:scip-ruby) ./Library/Homebrew/vendor/bundle/ruby/2.6.0/bin/srb"
+          + " && cp $${TEST_DIR}/$(location //main:scip-ruby) $$(bundle exec which srb)"
           + " && ./bin/brew typecheck")
     }
 ]
