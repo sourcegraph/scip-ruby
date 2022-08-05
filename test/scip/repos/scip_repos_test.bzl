@@ -4,12 +4,13 @@ _data = [
         "clone_url": "https://github.com/Homebrew/brew.git",
         "tag": "3.5.7",
         "git_sha": "ce8ef89ec0cfe875c48c3a83a843af9074c05930",
-        "cmd": ("pushd Library/Homebrew"
+        "cmd": ("set -x && pushd Library/Homebrew"
           + " && gem install bundler:1.17.3"
           + " && BUNDLE_WITH='sorbet' bundle install"
           + " && cp $${TEST_DIR}/$(location //main:scip-ruby) $$(bundle exec which srb)"
+          + " && ls -R ."
           + " && popd"
-          + " && ./bin/brew typecheck")
+          + " && ./bin/brew typecheck && set +x")
     }
 ]
 
