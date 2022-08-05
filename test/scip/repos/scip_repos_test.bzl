@@ -4,13 +4,13 @@ _data = [
         "clone_url": "https://github.com/Homebrew/brew.git",
         "tag": "3.5.7",
         "git_sha": "ce8ef89ec0cfe875c48c3a83a843af9074c05930",
-        "prep_cmd": ("set -x && pushd Library/Homebrew"
+        "prep_cmd": ("pushd Library/Homebrew"
           + " && gem install bundler:1.17.3"
           + " && popd"
           + " && ./bin/brew typecheck"),
         "run_cmd": ("pushd Library/Homebrew"
-          + " && find . -name srb -type f"
-          + " && cp $${TEST_DIR}/$(location //main:scip-ruby) $$(bundle exec which srb)"
+          + " && SRB_BINARIES=\"$$(find . -name srb -type f)\""
+          + " && for file in \"$${SRB_BINARIES//\\\\n/ }\" ; do cp $${TEST_DIR}/$(location //main:scip-ruby) \"$$file\" ; done"
           + " && popd")
     }
 ]
