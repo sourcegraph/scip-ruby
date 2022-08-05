@@ -15,6 +15,8 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '2.7'
+      - name: Update Bundler
+        run: bundle update --bundler
       - name: Install Bazel
         run: sudo npm install --location=global @bazel/bazelisk
       - name: Manually evict cache entry if applicable
@@ -24,10 +26,10 @@ jobs:
         with:
           path: ~/.cache/bazel
           key: bazel
-      - name: Test OSS repos
-        run: bazel test //test/scip/repos --test_env GITHUB_ACTIONS=1 --test_env PATH="$PATH" --explain log --verbose_explanations --test_output=errors --config=dbg
       - name: Test
         run: bazel test //test/scip --test_env GITHUB_ACTIONS=1 --explain log --verbose_explanations --test_output=errors --config=dbg
+      - name: Test OSS repos
+        run: bazel test //test/scip/repos --test_env GITHUB_ACTIONS=1 --test_env PATH="$PATH" --explain log --verbose_explanations --test_output=errors --config=dbg
       - name: Print bazel log
         run: cat log && rm log
       - name: Print bazel log for repo tests
