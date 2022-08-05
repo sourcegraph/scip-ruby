@@ -1,4 +1,5 @@
 #include "main/lsp/requests/document_symbol.h"
+#include "ast/treemap/treemap.h"
 #include "core/lsp/QueryResponse.h"
 #include "main/lsp/json_types.h"
 #include "main/lsp/lsp.h"
@@ -8,10 +9,15 @@
 using namespace std;
 
 namespace sorbet::realmain::lsp {
+namespace {
 std::unique_ptr<DocumentSymbol> symbolRef2DocumentSymbol(const core::GlobalState &gs, core::SymbolRef symRef,
-                                                         core::FileRef filter);
+                                                         core::FileRef filter,
+                                                         const UnorderedMap<core::SymbolRef, core::Loc> &defMapping,
+                                                         const UnorderedSet<core::SymbolRef> &forced);
 
 void symbolRef2DocumentSymbolWalkMembers(const core::GlobalState &gs, core::SymbolRef sym, core::FileRef filter,
+                                         const UnorderedMap<core::SymbolRef, core::Loc> &defMapping,
+                                         const UnorderedSet<core::SymbolRef> &forced,
                                          vector<unique_ptr<DocumentSymbol>> &out) {
     if (!sym.isClassOrModule()) {
         return;
@@ -22,9 +28,11 @@ void symbolRef2DocumentSymbolWalkMembers(const core::GlobalState &gs, core::Symb
             continue;
         }
         if (!absl::c_any_of(mem.second.locs(gs), [&filter](const auto &loc) { return loc.file() == filter; })) {
-            continue;
+            if (!forced.contains(mem.second)) {
+                continue;
+            }
         }
-        auto inner = symbolRef2DocumentSymbol(gs, mem.second, filter);
+        auto inner = symbolRef2DocumentSymbol(gs, mem.second, filter, defMapping, forced);
         if (inner) {
             out.push_back(move(inner));
         }
@@ -32,7 +40,9 @@ void symbolRef2DocumentSymbolWalkMembers(const core::GlobalState &gs, core::Symb
 }
 
 std::unique_ptr<DocumentSymbol> symbolRef2DocumentSymbol(const core::GlobalState &gs, core::SymbolRef symRef,
-                                                         core::FileRef filter) {
+                                                         core::FileRef filter,
+                                                         const UnorderedMap<core::SymbolRef, core::Loc> &defMapping,
+                                                         const UnorderedSet<core::SymbolRef> &forced) {
     if (!symRef.exists()) {
         return nullptr;
     }
@@ -41,8 +51,14 @@ std::unique_ptr<DocumentSymbol> symbolRef2DocumentSymbol(const core::GlobalState
         return nullptr;
     }
     auto kind = symbolRef2SymbolKind(gs, symRef);
-    // TODO: this range should cover body. Currently it doesn't.
-    auto range = Range::fromLoc(gs, loc);
+    auto it = defMapping.find(symRef);
+    unique_ptr<Range> range;
+    if (it != defMapping.end()) {
+        range = Range::fromLoc(gs, it->second);
+    }
+    if (range == nullptr) {
+        range = Range::fromLoc(gs, loc);
+    }
     auto selectionRange = Range::fromLoc(gs, loc);
     if (range == nullptr || selectionRange == nullptr) {
         return nullptr;
@@ -63,16 +79,50 @@ std::unique_ptr<DocumentSymbol> symbolRef2DocumentSymbol(const core::GlobalState
     result->detail = "";
 
     vector<unique_ptr<DocumentSymbol>> children;
-    symbolRef2DocumentSymbolWalkMembers(gs, symRef, filter, children);
+    symbolRef2DocumentSymbolWalkMembers(gs, symRef, filter, defMapping, forced, children);
     if (symRef.isClassOrModule()) {
         auto singleton = symRef.asClassOrModuleRef().data(gs)->lookupSingletonClass(gs);
         if (singleton.exists()) {
-            symbolRef2DocumentSymbolWalkMembers(gs, singleton, filter, children);
+            symbolRef2DocumentSymbolWalkMembers(gs, singleton, filter, defMapping, forced, children);
         }
     }
     result->children = move(children);
     return result;
 }
+
+// Document symbols in the LSP spec include two different ranges: one that covers
+// the entire extent of the definition and one that covers just what should be
+// shown when the symbol is selected.  Sorbet's loc for a symbol covers the latter.
+// We do store the former, but that loc lives in the AST, not in the symbol table,
+// so we build a separate temporary mapping with this tree walker.
+class DefinitionLocSaver {
+public:
+    core::FileRef fref;
+    UnorderedMap<core::SymbolRef, core::Loc> &mapping;
+
+    DefinitionLocSaver(core::FileRef fref, UnorderedMap<core::SymbolRef, core::Loc> &mapping)
+        : fref(fref), mapping(mapping) {}
+
+    void postTransformClassDef(core::Context ctx, ast::ExpressionPtr &expr) {
+        auto &klass = ast::cast_tree_nonnull<ast::ClassDef>(expr);
+        if (!klass.symbol.exists()) {
+            return;
+        }
+
+        mapping[klass.symbol] = core::Loc{fref, klass.loc};
+    }
+
+    void postTransformMethodDef(core::Context ctx, ast::ExpressionPtr &expr) {
+        auto &method = ast::cast_tree_nonnull<ast::MethodDef>(expr);
+        if (!method.symbol.exists()) {
+            return;
+        }
+
+        mapping[method.symbol] = core::Loc{fref, method.loc};
+    }
+};
+
+} // namespace
 
 DocumentSymbolTask::DocumentSymbolTask(const LSPConfiguration &config, MessageId id,
                                        std::unique_ptr<DocumentSymbolParams> params)
@@ -95,6 +145,11 @@ unique_ptr<ResponseMessage> DocumentSymbolTask::runRequest(LSPTypecheckerInterfa
     vector<unique_ptr<DocumentSymbol>> result;
     string_view uri = params->textDocument->uri;
     auto fref = config.uri2FileRef(gs, uri);
+    if (!fref.exists()) {
+        response->result = std::move(result);
+        return response;
+    }
+
     vector<pair<core::SymbolRef::Kind, uint32_t>> symbolTypes = {
         {core::SymbolRef::Kind::ClassOrModule, gs.classAndModulesUsed()},
         {core::SymbolRef::Kind::Method, gs.methodsUsed()},
@@ -118,11 +173,7 @@ unique_ptr<ResponseMessage> DocumentSymbolTask::runRequest(LSPTypecheckerInterfa
                 continue;
             }
 
-            for (auto definitionLocation : ref.locs(gs)) {
-                if (definitionLocation.file() != fref) {
-                    continue;
-                }
-
+            if (absl::c_any_of(ref.locs(gs), [&fref](const auto &loc) { return loc.file() == fref; })) {
                 candidates.emplace_back(ref);
             }
         }
@@ -142,11 +193,30 @@ unique_ptr<ResponseMessage> DocumentSymbolTask::runRequest(LSPTypecheckerInterfa
     // To avoid that case, we need to walk the ownership chains of each symbol to
     // deduplicate the candidate list.
     UnorderedSet<core::SymbolRef> deduplicatedCandidates(candidates.begin(), candidates.end());
+
+    // We may wind up in a situation where we have something like:
+    //
+    // A::B::C::D::E
+    //
+    // B and E are candidates, but neither C nor D have locs in the current
+    // file.  We'll eliminate E from candidacy, but then when we go to get
+    // children for B, we find that C doesn't appear in the current file, so
+    // we won't walk C's children.  Which means we'll never walk D's children
+    // and therefore E won't appear in the list of document symbols.
+    //
+    // So we need to ensure that both C and D are displayed; this set records
+    // symbols that appear in an ownership chain between two candidates.
+    UnorderedSet<core::SymbolRef> forced;
     for (auto ref : candidates) {
         auto owner = ref.owner(gs);
         while (owner != core::Symbols::root()) {
             if (deduplicatedCandidates.contains(owner)) {
                 deduplicatedCandidates.erase(ref);
+                auto forcedOwner = ref.owner(gs);
+                while (forcedOwner != owner) {
+                    forced.insert(forcedOwner);
+                    forcedOwner = forcedOwner.owner(gs);
+                }
                 break;
             }
 
@@ -158,8 +228,14 @@ unique_ptr<ResponseMessage> DocumentSymbolTask::runRequest(LSPTypecheckerInterfa
                        [&deduplicatedCandidates](const auto ref) { return !deduplicatedCandidates.contains(ref); }),
         candidates.end());
 
+    UnorderedMap<core::SymbolRef, core::Loc> defMapping;
+    DefinitionLocSaver saver{fref, defMapping};
+    core::Context ctx{gs, core::Symbols::root(), fref};
+    auto resolved = typechecker.getResolved({fref});
+    ast::TreeWalk::apply(ctx, saver, resolved[0].tree);
+
     for (auto ref : candidates) {
-        auto data = symbolRef2DocumentSymbol(gs, ref, fref);
+        auto data = symbolRef2DocumentSymbol(gs, ref, fref, defMapping, forced);
         if (data) {
             result.push_back(move(data));
         }

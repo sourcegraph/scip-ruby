@@ -63,7 +63,8 @@ public:
     void preTransformMethodDef(core::Context ctx, ast::ExpressionPtr &tree) {
         auto &m = ast::cast_tree_nonnull<ast::MethodDef>(tree);
 
-        if (m.symbol.data(ctx)->flags.isOverloaded) {
+        if (m.symbol.data(ctx)->flags.isOverloaded ||
+            (m.symbol.data(ctx)->flags.isAbstract && ctx.file.data(ctx).compiledLevel != core::CompiledLevel::True)) {
             return;
         }
         auto cfg = cfg::CFGBuilder::buildFor(ctx.withOwner(m.symbol), m);
@@ -739,7 +740,7 @@ TEST_CASE("PerPhaseTest") { // NOLINT
                 fmt::memory_buffer buf;
                 for (const auto &file : files) {
                     string editedSource;
-                    if (toWrite.find(file) != toWrite.end()) {
+                    if (toWrite.contains(file)) {
                         editedSource = toWrite[file];
                     } else {
                         editedSource = file.data(*gs).source();
