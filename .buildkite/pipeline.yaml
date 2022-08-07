@@ -1,0 +1,24 @@
+# Loosely based off .sorbet-buildkite/pipeline.yaml
+
+steps:
+
+# Basic Phase - Run super fast things and things that commonly catch bugs
+  - label: ":linux: linters.sh"
+    command: .buildkite/linters.sh
+    <<: &stateless
+      agents:
+        os: linux
+        queue: stateless
+
+  - label: ":linux: test-indexer.sh"
+    command: .buildkite/test-indexer.sh
+    artifact_paths: _out_/profile.json
+    <<: *stateless
+
+  - wait: ~
+
+# Success Phase - Allow the PR to be merged
+  - label: "All tests and builds succeeded"
+    command: .buildkite/all-succeeded.sh
+
+  - wait: ~
