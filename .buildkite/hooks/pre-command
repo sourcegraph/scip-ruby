@@ -3,17 +3,30 @@
 set -e
 
 if echo "$BUILDKITE_PLUGINS" | grep "cache-buildkite-plugin"; then
-  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-  unzip awscliv2.zip
-  sudo ./aws/install
+  if ! which aws; then
+    echo "pwd: $PWD"
+    ls
 
-  # From https://sourcegraph.sourcegraph.com/github.com/sourcegraph/sourcegraph/-/blob/enterprise/cmd/server/pre-build.sh?L40-47
-  AWS_CONFIG_DIR_PATH="/buildkite/.aws"
-  mkdir -p "$AWS_CONFIG_DIR_PATH"
-  AWS_CONFIG_FILE="$AWS_CONFIG_DIR_PATH/config"
-  export AWS_CONFIG_FILE
-  AWS_SHARED_CREDENTIALS_FILE="/buildkite/.aws/credentials"
-  export AWS_SHARED_CREDENTIALS_FILE
-  aws configure set aws_access_key_id "$BUILDKITE_HMAC_KEY" --profile buildkite
-  aws configure set aws_secret_access_key "$BUILDKITE_HMAC_SECRET" --profile buildkite
+    AWS_TEMPDIR="$(mktemp -d -t '-awscli')"
+    pushd AWS_TEMPDIR
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    unzip awscliv2.zip
+    sudo ./aws/install
+    ls
+    popd
+    rm -rf "$AWS_TEMPDIR"
+
+    echo "pwd: $PWD"
+    ls
+  
+    # From https://sourcegraph.sourcegraph.com/github.com/sourcegraph/sourcegraph/-/blob/enterprise/cmd/server/pre-build.sh?L40-47
+    AWS_CONFIG_DIR_PATH="/buildkite/.aws"
+    mkdir -p "$AWS_CONFIG_DIR_PATH"
+    AWS_CONFIG_FILE="$AWS_CONFIG_DIR_PATH/config"
+    export AWS_CONFIG_FILE
+    AWS_SHARED_CREDENTIALS_FILE="/buildkite/.aws/credentials"
+    export AWS_SHARED_CREDENTIALS_FILE
+    aws configure set aws_access_key_id "$BUILDKITE_HMAC_KEY" --profile buildkite
+    aws configure set aws_secret_access_key "$BUILDKITE_HMAC_SECRET" --profile buildkite
+  fi
 fi
