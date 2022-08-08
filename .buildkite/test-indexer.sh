@@ -34,7 +34,7 @@ mkdir -p _out_
 # must come after `-c opt` because `-c opt` will define NDEBUG on its own
 test_args=(
   "//test/scip"
-  "//test/scip/long"
+  "//test/scip/repos"
   "-c"
   "opt"
   "--config=forcedebug"
