@@ -77,7 +77,7 @@ test_args=(
   --test_output=errors \
   "${test_args[@]}" || err=$?
 
-echo "+++ Installing Ruby"
+echo "--- Installing Ruby"
 
 # From https://github.com/asdf-vm/asdf-ruby/issues/125#issuecomment-958941354
 rm -rf .asdf/shims
