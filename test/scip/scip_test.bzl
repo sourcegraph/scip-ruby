@@ -42,7 +42,7 @@ def scip_test_suite(paths, multifile_paths):
     )
 
 def scip_test(path):
-    if not path.endswith(".rb")  or path.endswith(".snapshot.rb"):
+    if not path.endswith(".rb") or path.endswith(".snapshot.rb"):
         return None
     test_name = basename(path)[:-3]
     snapshot_path = path[:-3] + ".snapshot.rb"
@@ -57,7 +57,7 @@ def scip_multifile_test(dir, filepaths):
         path_without_ext, ext = split_extension(filepath)
         if (ext == "rb" or ext == "rbi") and not path_without_ext.endswith(".snapshot"):
             data.append(filepath)
-            if not filepath.endswith("scip-ruby-args.rb"): # Special file for reading Gem-level args.
+            if not filepath.endswith("scip-ruby-args.rb"):  # Special file for reading Gem-level args.
                 data.append(path_without_ext + ".snapshot." + ext)
     if not dir.startswith("testdata/multifile/"):
         fail("Expected directory to be under multifile/")
