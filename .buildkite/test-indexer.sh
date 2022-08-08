@@ -35,8 +35,7 @@ mkdir -p _out_
 build_args=(
   "//main:scip-ruby"
   "//test:scip_test_runner"
-  "-c"
-  "opt"
+  "-c" "opt"
   "--config=forcedebug"
   "--spawn_strategy=local"
 )
@@ -48,8 +47,7 @@ build_args=(
 
 test_args=(
   "//test/scip"
-  "-c"
-  "opt"
+  "-c" "opt"
   "--config=forcedebug"
   "--spawn_strategy=local"
 )
@@ -63,11 +61,10 @@ test_args=(
 
 test_args=(
   "//test/scip/repos"
-  "-c"
-  "opt"
-  "--test_env GITHUB_ACTIONS=1"
-  "--test_env PATH=${PATH}"
-  "--test_env HOME=${HOME}"
+  "-c" "opt"
+  "--test_env" "GITHUB_ACTIONS=1"
+  "--test_env" "PATH=${PATH}"
+  "--test_env" "HOME=${HOME}"
   "--config=forcedebug"
   "--spawn_strategy=local"
 )
