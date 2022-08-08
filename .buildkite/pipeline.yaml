@@ -23,15 +23,17 @@ bazel-repo-cache: &bazel-repo-cache
   key: "bazel-repos-{{ checksum WORKSPACE }}"
   restore-keys:
     - "bazel-repos-{{ checksum WORKSPACE }}"
+    - "bazel-repos-"
   paths:
     - /usr/local/var/bazelcache/repos
   <<: *s3-settings
 
 bazel-build-cache: &bazel-build-cache
   id: bazel-build
-  key: "bazel-build"
+  key: "bazel-build-{{ env.BUILDKITE_COMMIT }}"
   restore-keys:
-    - "bazel-build"
+    - "bazel-build-{{ env.BUILDKITE_COMMIT }}"
+    - "bazel-build-"
   paths:
     - /usr/local/var/bazelcache/build
   <<: *s3-settings
