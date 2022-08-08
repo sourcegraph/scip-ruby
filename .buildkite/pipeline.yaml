@@ -38,12 +38,17 @@ bazel-build-cache: &bazel-build-cache
     - /usr/local/var/bazelcache/build
   <<: *s3-settings
 
+aws-envvars: &aws-envvars
+  AWS_CONFIG_FILE: /buildkite/.aws/config
+  AWS_SHARED_CREDENTIALS_FILE: /buildkite/.aws/credentials
+
 steps:
   - label: ":linux: linters.sh"
     command: .buildkite/linters.sh
-    <<: &stateless
-      agents:
-        queue: stateless
+    agents:
+      queue: stateless
+    env:
+      <<: *aws-envvars
     plugins:
     - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *bazel-full-cache
 
@@ -51,7 +56,10 @@ steps:
     command: .buildkite/test-indexer.sh
     artifact_paths:
       - "_out_/profile*.json"
-    <<: *stateless
+    agents:
+      queue: stateless
+    env:
+      <<: *aws-envvars
     plugins:
     - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *bazel-repo-cache
     - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *bazel-build-cache
