@@ -7,7 +7,7 @@ if echo "$BUILDKITE_PLUGINS" | grep "cache-buildkite-plugin"; then
     echo "pwd: $PWD"
     ls
 
-    AWS_TEMPDIR="$(mktemp -d -t "_awscli")"
+    AWS_TEMPDIR="$(mktemp -d -t "awscli-XXXXXXXX")"
     pushd AWS_TEMPDIR
     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     unzip awscliv2.zip
