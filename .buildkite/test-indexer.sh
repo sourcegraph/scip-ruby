@@ -2,6 +2,22 @@
 
 # Largely based off test-compiler.sh from the Sorbet buildkite config.
 
+get_date() {
+  date '+%s'
+}
+PREV_TIME="$(get_date)"
+PREV_CMD=""
+print_time_elapsed() {
+  CUR_TIME="$(get_date)"
+  local DELTA=$(( CUR_TIME - PREV_TIME ))
+  if [ "$DELTA" -ne 0 ]; then
+    echo "Ran in ${DELTA}s: $PREV_CMD\n"
+  fi
+  PREV_CMD="$BASH_COMMAND"
+  PREV_TIME="$CUR_TIME"
+}
+trap print_time_elapsed DEBUG
+
 set -euo pipefail
 
 unameOut="$(uname -s)"
@@ -62,12 +78,13 @@ test_args=(
 test_args=(
   "//test/scip/repos"
   "-c" "opt"
-  "--test_env" "GITHUB_ACTIONS=1"
   "--test_env" "PATH=${PATH}"
   "--test_env" "HOME=${HOME}"
   "--config=forcedebug"
   "--spawn_strategy=local"
 )
+
+OPENSSL_CFLAGS=-Wno-error=implicit-function-declaration asdf install ruby
 
 ./bazel test \
   --experimental_generate_json_trace_profile \
