@@ -23,7 +23,11 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.cache/bazel
-          key: bazel
+          key: bazel-${{ env.GITHUB_REF_NAME }}-${{ env.GITHUB_SHA }}
+          restore-keys: |
+            bazel-${{ env.GITHUB_REF_NAME }}-${{ env.GITHUB_SHA }}
+            bazel-${{ env.GITHUB_REF_NAME }}-
+            bazel-
       - name: Test
         run: bazel test //test/scip --explain log --verbose_explanations --test_output=errors --config=dbg
       - name: Print bazel log
