@@ -59,13 +59,6 @@ if ! ./tools/scripts/lint_sh.sh -t &> lint_sh; then
     buildkite-agent annotate --context tools/scripts/lint_sh.sh --style error --append < lint_sh
 fi
 
-echo "~~~ Checking markdown formatting"
-if ! ./tools/scripts/format_website.sh -t &> format_website; then
-    globalErr=1
-    echo "^^^ +++"
-    buildkite-agent annotate --context tools/scripts/format_website.sh --style error --append < format_website
-fi
-
 echo "~~~"
 if [ "$globalErr" -ne 0 ]; then
     exit $globalErr
