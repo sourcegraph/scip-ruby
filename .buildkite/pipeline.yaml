@@ -11,7 +11,8 @@ steps:
 
   - label: ":linux: test-indexer.sh"
     command: .buildkite/test-indexer.sh
-    artifact_paths: _out_/profile.json
+    artifact_paths:
+      - "_out_/profile*.json"
     <<: *stateless
 
   - wait: ~

@@ -32,9 +32,22 @@ mkdir -p _out_
 # `-c opt` is required, otherwise the tests are too slow
 # forcedebug is really the ~only thing in `--config=dbg` we care about.
 # must come after `-c opt` because `-c opt` will define NDEBUG on its own
+build_args=(
+  "//main:scip-ruby"
+  "//test:scip_test_runner"
+  "-c"
+  "opt"
+  "--config=forcedebug"
+  "--spawn_strategy=local"
+)
+
+./bazel build \
+  --experimental_generate_json_trace_profile \
+  --profile=_out_/profile_build.json \
+  "${build_args[@]}" || err=$?
+
 test_args=(
   "//test/scip"
-  "//test/scip/repos"
   "-c"
   "opt"
   "--config=forcedebug"
@@ -43,7 +56,25 @@ test_args=(
 
 ./bazel test \
   --experimental_generate_json_trace_profile \
-  --profile=_out_/profile.json \
+  --profile=_out_/profile_snapshot_tests.json \
+  --test_summary=terse \
+  --test_output=errors \
+  "${test_args[@]}" || err=$?
+
+test_args=(
+  "//test/scip/repos"
+  "-c"
+  "opt"
+  "--test_env GITHUB_ACTIONS=1"
+  "--test_env PATH=${PATH}"
+  "--test_env HOME=${HOME}"
+  "--config=forcedebug"
+  "--spawn_strategy=local"
+)
+
+./bazel test \
+  --experimental_generate_json_trace_profile \
+  --profile=_out_/profile_repo_tests.json \
   --test_summary=terse \
   --test_output=errors \
   "${test_args[@]}" || err=$?
