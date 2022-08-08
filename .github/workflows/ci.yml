@@ -23,12 +23,15 @@ jobs:
         run: env
       - name: Mount bazel cache
         uses: actions/cache@v3
+        env:
+          GH_HEAD_REF: ${{ env.GITHUB_HEAD_REF }}
         with:
           path: ~/.cache/bazel
-          key: bazel-${{ env.GITHUB_REF_NAME }}-${{ env.GITHUB_SHA }}
+          key: bazel-${{ env.GH_HEAD_REF }}-${{ env.GITHUB_SHA }}
           restore-keys: |
-            bazel-${{ env.GITHUB_REF_NAME }}-${{ env.GITHUB_SHA }}
-            bazel-${{ env.GITHUB_REF_NAME }}-
+            bazel-${{ env.GH_HEAD_REF }}-${{ env.GITHUB_SHA }}
+            bazel-${{ env.GITHUB_HEAD_REF }}
+            bazel-${{ env.GH_HEAD_REF }}-
             bazel-
       # - name: Test
       #   run: bazel test //test/scip --explain log --verbose_explanations --test_output=errors --config=dbg
