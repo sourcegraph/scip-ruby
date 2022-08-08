@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+set -e
+
+if echo "$BUILDKITE_PLUGINS" | grep "cache-buildkite-plugin"; then
+  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+  unzip awscliv2.zip
+  sudo ./aws/install
+fi
