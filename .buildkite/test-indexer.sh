@@ -82,7 +82,7 @@ echo "--- Installing Ruby"
 # From https://github.com/asdf-vm/asdf-ruby/issues/125#issuecomment-958941354
 rm -rf .asdf/shims
 OPENSSL_CFLAGS=-Wno-error=implicit-function-declaration asdf install ruby
-asdf reshim ruby 2.7.0
+asdf reshim ruby
 
 echo "+++ Running repo tests"
 
