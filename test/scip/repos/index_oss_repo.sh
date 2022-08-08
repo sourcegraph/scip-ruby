@@ -52,7 +52,7 @@ mkdir repo
 pushd repo
 
 git clone -q "$CLONE_URL" . --branch "$GIT_TAG" --depth=1
-if [ "$(git rev-parse HEAD)" -ne "$GIT_SHA" ]; then
+if [ "$(git rev-parse HEAD)" != "$GIT_SHA" ]; then
   echo "Expected SHA: $GIT_SHA"
   echo "Obtained SHA: $(git rev-parse HEAD)"
   exit 1
@@ -60,7 +60,7 @@ fi
 
 eval "$PREP_CMD"
 
-if [ ! -z "$PATCH_ABSPATH" ]; then
+if [ -n "$PATCH_ABSPATH" ]; then
   git apply "$PATCH_ABSPATH"
   git diff -U0
 fi
