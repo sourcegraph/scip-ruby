@@ -1,0 +1,22 @@
+name: Lint
+on:
+  push:
+    branches:
+      - scip-ruby/master
+  pull_request:
+    branches:
+      - scip-ruby/master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '>=1.19'
+      - name: Format Bazel files
+        run: |
+          set -e
+          GOBIN="$PWD" go install github.com/bazelbuild/buildtools/buildifier@latest
+          git ls-files -- '**.bzl' '**/BUILD' WORKSPACE | xargs ./buildifier -mode=diff
