@@ -4,14 +4,14 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//main/pipeline/semantic_extension:interface",
-    ]
+    ],
 )
 
 cc_library(
     name = "scip_utils",
     srcs = [
-        "SCIPUtils.h",
         "SCIPUtils.cc",
+        "SCIPUtils.h",
     ],
     linkstatic = select({
         "@com_stripe_ruby_typer//tools/config:linkshared": 0,
@@ -45,9 +45,9 @@ cc_library(
         "//main/lsp",
         "//proto",
         "//sorbet_version",
-        "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/synchronization",
         "@cxxopts",
         "@spdlog",
     ],
