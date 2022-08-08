@@ -9,15 +9,6 @@ s3-settings: &s3-settings
     region: us-central1
   tarball: {}
 
-bazel-full-cache: &bazel-full-cache
-  id: bazel-full
-  key: "bazel-full"
-  restore-keys:
-    - "bazel-full"
-  paths:
-    - /usr/local/var/bazelcache
-  <<: *s3-settings
-
 bazel-repo-cache: &bazel-repo-cache
   id: bazel-repos
   key: "bazel-repos-{{ checksum WORKSPACE }}"
@@ -38,20 +29,7 @@ bazel-build-cache: &bazel-build-cache
     - /usr/local/var/bazelcache/build
   <<: *s3-settings
 
-aws-envvars: &aws-envvars
-  AWS_CONFIG_FILE: /buildkite/.aws/config
-  AWS_SHARED_CREDENTIALS_FILE: /buildkite/.aws/credentials
-
 steps:
-  - label: ":linux: linters.sh"
-    command: .buildkite/linters.sh
-    agents:
-      queue: stateless
-    env:
-      <<: *aws-envvars
-    plugins:
-    - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *bazel-full-cache
-
   - label: ":linux: test-indexer.sh"
     command: .buildkite/test-indexer.sh
     artifact_paths:
@@ -59,7 +37,8 @@ steps:
     agents:
       queue: stateless
     env:
-      <<: *aws-envvars
+      AWS_CONFIG_FILE: /buildkite/.aws/config
+      AWS_SHARED_CREDENTIALS_FILE: /buildkite/.aws/credentials
     plugins:
     - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *bazel-repo-cache
     - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *bazel-build-cache
