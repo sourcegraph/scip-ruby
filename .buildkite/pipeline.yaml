@@ -7,7 +7,6 @@ steps:
     command: .buildkite/linters.sh
     <<: &stateless
       agents:
-        os: linux
         queue: stateless
 
   - label: ":linux: test-indexer.sh"
