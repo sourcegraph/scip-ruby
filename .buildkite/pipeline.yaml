@@ -1,19 +1,58 @@
 # Loosely based off .sorbet-buildkite/pipeline.yaml
 
-steps:
+s3-settings: &s3-settings
+  backend: s3
+  s3:
+    bucket: sourcegraph_buildkite_cache
+    endpoint: https://storage.googleapis.com
+    profile: buildkite
+    region: us-central1
+  tarball: {}
 
-# Basic Phase - Run super fast things and things that commonly catch bugs
+bazel-full-cache: &bazel-full-cache
+  id: bazel-full
+  key: "bazel-full"
+  restore-keys:
+    - "bazel-full"
+  paths:
+    - /usr/local/var/bazelcache
+  <<: *s3-settings
+
+bazel-repo-cache: &bazel-repo-cache
+  id: bazel-repos
+  key: "bazel-repos-{{ checksum WORKSPACE }}"
+  restore-keys:
+    - "bazel-repos-{{ checksum WORKSPACE }}"
+  paths:
+    - /usr/local/var/bazelcache/repos
+  <<: *s3-settings
+
+bazel-build-cache: &bazel-build-cache
+  id: bazel-build
+  key: "bazel-build"
+  restore-keys:
+    - "bazel-build"
+  paths:
+    - /usr/local/var/bazelcache/build
+  <<: *s3-settings
+
+steps:
   - label: ":linux: linters.sh"
     command: .buildkite/linters.sh
     <<: &stateless
       agents:
         queue: stateless
+    plugins:
+    - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *bazel-full-cache
 
   - label: ":linux: test-indexer.sh"
     command: .buildkite/test-indexer.sh
     artifact_paths:
       - "_out_/profile*.json"
     <<: *stateless
+    plugins:
+    - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *bazel-repo-cache
+    - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *bazel-build-cache
 
   - wait: ~
 
