@@ -41,7 +41,7 @@ source .buildkite/tools/setup-bazel.sh
 
 err=0
 
-echo "+++ running tests"
+echo "--- Building"
 
 mkdir -p _out_
 
@@ -61,6 +61,8 @@ build_args=(
   --profile=_out_/profile_build.json \
   "${build_args[@]}" || err=$?
 
+echo "+++ Running snapshot tests"
+
 test_args=(
   "//test/scip"
   "-c" "opt"
@@ -75,6 +77,15 @@ test_args=(
   --test_output=errors \
   "${test_args[@]}" || err=$?
 
+echo "+++ Installing Ruby"
+
+# From https://github.com/asdf-vm/asdf-ruby/issues/125#issuecomment-958941354
+rm -rf .asdf/shims
+OPENSSL_CFLAGS=-Wno-error=implicit-function-declaration asdf install ruby
+asdf reshim ruby 2.7.0
+
+echo "+++ Running repo tests"
+
 test_args=(
   "//test/scip/repos"
   "-c" "opt"
@@ -83,8 +94,6 @@ test_args=(
   "--config=forcedebug"
   "--spawn_strategy=local"
 )
-
-OPENSSL_CFLAGS=-Wno-error=implicit-function-declaration asdf install ruby
 
 ./bazel test \
   --experimental_generate_json_trace_profile \
