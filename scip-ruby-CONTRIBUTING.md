@@ -6,7 +6,7 @@
 ./bazel build //main:scip-ruby --config=dbg
 ```
 
-For more information about configurations, see the main [README](./README.md).
+For more information about configurations, see the [Sorbet README](./sorbet-README.md).
 
 <details>
   <summary>Known build issues</summary>
@@ -43,7 +43,7 @@ For more information about configurations, see the main [README](./README.md).
 
 ## IDE Integration
 
-Generate `compile_commands.json` as per the main [README](./README.md),
+Generate `compile_commands.json` as per the [Sorbet README](./sorbet-README.md),
 and point your editor to it.
 
 ## Generating a SCIP index
@@ -68,7 +68,7 @@ Updating snapshots:
 ./bazel test //test/scip:update --config=dbg
 ```
 
-Check that there are no crashes on indexing OSS repos:
+Run repo tests, to check that there are no crashes on indexing OSS repos:
 
 ```
 ./bazel test //test/scip/repos --config=dbg
@@ -76,7 +76,7 @@ Check that there are no crashes on indexing OSS repos:
 
 This may take a few minutes to run.
 
-## Writing a new SCIP test
+## Writing a new snapshot test
 
 See the existings tests under `test/scip/testdata`
 and copy the structure. One caveat is that the first time
@@ -163,5 +163,6 @@ This will correctly use the `scip-ruby/master` branch as the target.
 
 ## Cutting a release
 
-Push a tag of the form `scip-ruby-v*` to `scip-ruby/master`.
+Push a tag matching `scip-ruby-v*` to `scip-ruby/master`.
+A CI job should automatically trigger a release.
 See the [release workflow](/.github/workflows/release.yml) for details.
