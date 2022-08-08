@@ -1,0 +1,1 @@
+../.sorbet-buildkite/all-succeeded.sh

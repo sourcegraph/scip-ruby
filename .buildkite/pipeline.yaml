@@ -1,0 +1,52 @@
+# Loosely based off .sorbet-buildkite/pipeline.yaml
+
+s3-settings: &s3-settings
+  backend: s3
+  s3:
+    bucket: sourcegraph_buildkite_cache
+    endpoint: https://storage.googleapis.com
+    profile: buildkite
+    region: us-central1
+  tarball: {}
+
+bazel-repo-cache: &bazel-repo-cache
+  id: bazel-repos
+  key: "bazel-repos-{{ checksum WORKSPACE }}"
+  restore-keys:
+    - "bazel-repos-{{ checksum WORKSPACE }}"
+    - "bazel-repos-"
+  paths:
+    - /usr/local/var/bazelcache/repos
+  <<: *s3-settings
+
+bazel-build-cache: &bazel-build-cache
+  id: bazel-build
+  key: "bazel-build-{{ env.BUILDKITE_COMMIT }}"
+  restore-keys:
+    - "bazel-build-{{ env.BUILDKITE_COMMIT }}"
+    - "bazel-build-"
+  paths:
+    - /usr/local/var/bazelcache/build
+  <<: *s3-settings
+
+steps:
+  - label: ":linux: test-indexer.sh"
+    command: .buildkite/test-indexer.sh
+    artifact_paths:
+      - "_out_/profile*.json"
+    agents:
+      queue: stateless
+    env:
+      AWS_CONFIG_FILE: /buildkite/.aws/config
+      AWS_SHARED_CREDENTIALS_FILE: /buildkite/.aws/credentials
+    plugins:
+    - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *bazel-repo-cache
+    - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *bazel-build-cache
+
+  - wait: ~
+
+# Success Phase - Allow the PR to be merged
+  - label: "All tests and builds succeeded"
+    command: .buildkite/all-succeeded.sh
+
+  - wait: ~

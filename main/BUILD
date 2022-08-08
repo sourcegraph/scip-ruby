@@ -60,8 +60,8 @@ cc_binary(
     visibility = ["//visibility:public"],
     deps = [
         "realmain",
-        "//scip_indexer:scip_indexer",
         "//payload",
+        "//scip_indexer",
     ],
 )
 
