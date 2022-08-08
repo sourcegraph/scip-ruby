@@ -103,7 +103,7 @@ pair<LocalRef, bool> unresolvedIdent2Local(CFGContext cctx, const ast::Unresolve
         }
         return {fnd->second.variable, hasError && isAssign};
     } else {
-      return {global2Local(cctx, sym, id.loc), false};
+        return {global2Local(cctx, sym, id.loc), false};
     }
 }
 
