@@ -331,13 +331,16 @@ ExpressionPtr symbol2Proc(DesugarContext dctx, ExpressionPtr expr) {
     Literal *lit = cast_tree<Literal>(expr);
     ENFORCE(lit && lit->isSymbol());
 
-    // &:foo => {|temp| temp.foo() }
+    // &:foo => {|*temp| (temp[0]).foo(*tmp[1, LONG_MAX]) }
     core::NameRef name = core::cast_type_nonnull<core::NamedLiteralType>(lit->value).asName();
     // `temp` does not refer to any specific source text, so give it a 0-length Loc so LSP ignores it.
     auto zeroLengthLoc = loc.copyWithZeroLength();
-    ExpressionPtr recv = MK::Local(zeroLengthLoc, temp);
-    ExpressionPtr body = MK::Send0(loc, std::move(recv), name, zeroLengthLoc);
-    return MK::Block1(loc, std::move(body), MK::Local(zeroLengthLoc, temp));
+    auto recv = MK::Send1(zeroLengthLoc, MK::Local(zeroLengthLoc, temp), core::Names::squareBrackets(), zeroLengthLoc,
+                          MK::Int(zeroLengthLoc, 0));
+    auto sliced = MK::Send2(zeroLengthLoc, MK::Local(zeroLengthLoc, temp), core::Names::squareBrackets(), zeroLengthLoc,
+                            MK::Int(zeroLengthLoc, 1), MK::Int(zeroLengthLoc, LONG_MAX));
+    auto body = MK::CallWithSplat(loc, std::move(recv), name, zeroLengthLoc, MK::Splat(zeroLengthLoc, move(sliced)));
+    return MK::Block1(loc, std::move(body), MK::RestArg(zeroLengthLoc, MK::Local(zeroLengthLoc, temp)));
 }
 
 ExpressionPtr unsupportedNode(DesugarContext dctx, parser::Node *node) {
@@ -783,8 +786,7 @@ ExpressionPtr node2TreeImpl(DesugarContext dctx, unique_ptr<parser::Node> what) 
                     }
 
                     auto kwargs = node2TreeImpl(dctx, std::move(kwArray));
-                    auto method = MK::Literal(
-                        loc, core::make_type<core::NamedLiteralType>(core::Symbols::Symbol(), send->method));
+                    auto method = MK::Symbol(locZeroLen, send->method);
 
                     if (auto *array = cast_tree<Array>(kwargs)) {
                         DuplicateHashKeyCheck::checkSendArgs(dctx, 0, array->elems);
@@ -797,7 +799,7 @@ ExpressionPtr node2TreeImpl(DesugarContext dctx, unique_ptr<parser::Node> what) 
                     sendargs.emplace_back(std::move(kwargs));
                     ExpressionPtr res;
                     if (block == nullptr && !anonymousBlockPass) {
-                        res = MK::Send(loc, MK::Magic(loc), core::Names::callWithSplat(), locZeroLen, 4,
+                        res = MK::Send(loc, MK::Magic(loc), core::Names::callWithSplat(), send->methodLoc, 4,
                                        std::move(sendargs), flags);
                     } else {
                         ExpressionPtr convertedBlock;
