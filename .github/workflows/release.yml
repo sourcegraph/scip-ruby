@@ -28,13 +28,14 @@ jobs:
     strategy:
       matrix:
         platform: [ubuntu-latest, macos-latest]
+        config: ['debug', 'release']
     runs-on: ${{ matrix.platform }}
     env:
       TAG: ${{ github.event.ref }}
     steps:
       - uses: actions/checkout@v3
       - name: "🚀 Mount Bazel build cache"
-        if: ${{ runner.os }} == 'Linux'
+        if: ${{ runner.os == 'Linux' }}
         uses: actions/cache@v3
         with:
           path: ~/bazelcache/build
@@ -43,57 +44,43 @@ jobs:
             bazel-build-
       - name: "🚀 Mount Bazel repo cache"
         uses: actions/cache@v3
-        if: ${{ runner.os }} == 'Linux'
+        if: ${{ runner.os == 'Linux' }}
         with:
           path: ~/bazelcache/repos
           key: bazel-repos-${{ runner.os }}
           restore-keys: |
             bazel-repos-
-      - name: "⚙️  Setup Bazel"
+      - name: "⚙️ Setup Bazel"
         run: .github/workflows/setup-bazel.sh
       - name: "🔎 Identify OS"
+        run: echo "OS=$(uname -s | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+      - name: ${{ format('🏗 Build ({0})', matrix.config) }}
         run: |
-          case "$(uname -s)" in
-            Linux*)     os="linux";;
-            Darwin*)    os="darwin";;
-            *)          echo "Unhandled OS type" && exit 1;;
-          esac
-          echo "OS=$os" >> "$GITHUB_ENV"
-      - name: "🏗 Build (debug)"
-        run: ./bazel build //main:scip-ruby --config=dbg --execution_log_binary_file=log
+          CONFIG="dbg"
+          if [ "$CFG" == "release" ]; then
+            CONFIG="release-${OS/darwin/mac}"
+          fi
+          ./bazel build //main:scip-ruby --config="$CONFIG" --execution_log_binary_file=log
+        env:
+          OS: ${{ env.OS }}
+          CFG: ${{ matrix.config }}
       - name: "🪵 Upload log"
         uses: actions/upload-artifact@v3
         with:
-          name: debug-build-log
+          name: ${{ matrix.config }}-build-log
           path: log
-      - name: "📦 Upload debug binary"
+      - name: ${{ format('📦 Upload binary ({0})', matrix.config) }}
         run: |
-          rm log
           ls bazel-out
-          debugBinaryPath="scip-ruby-debug-$OS-$(uname -m)"
+          BASE_NAME="scip-ruby-debug"
+          if [ "$CFG" == "release" ]; then
+            BASE_NAME="scip-ruby"
+          fi
+          outBinaryPath="$BASE_NAME-$OS-$(uname -m)"
           builtBinaryPath="$(find bazel-out/ -type f -name 'scip-ruby')"
-          mv "$builtBinaryPath" "$debugBinaryPath"
-          gh release upload "${GITHUB_REF/refs\/tags\//}" "$debugBinaryPath"
+          mv "$builtBinaryPath" "$outBinaryPath"
+          gh release upload "${GITHUB_REF/refs\/tags\//}" "$outBinaryPath"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OS: ${{ env.OS }}
-      - name: "🏗 Build (release)"
-        run: ./bazel build //main:scip-ruby --config=release-$OS --execution_log_binary_file=log
-        env:
-          OS: ${{ env.OS }}
-      - name: "🪵 Upload log"
-        uses: actions/upload-artifact@v3
-        with:
-          name: release-build-log
-          path: log
-      - name: "📦 Upload release binary"
-        run: |
-          rm log
-          ls bazel-out
-          releaseBinaryPath="scip-ruby-$OS-$(uname -m)"
-          builtBinaryPath="$(find bazel-out/ -type f -name 'scip-ruby')"
-          mv "$builtBinaryPath" "$releaseBinaryPath"
-          gh release upload "${GITHUB_REF/refs\/tags\//}" "$releaseBinaryPath"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OS: ${{ env.OS }}
+          CFG: ${{ matrix.config }}

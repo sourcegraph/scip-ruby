@@ -31,7 +31,7 @@ jobs:
           key: bazel-repos-${{ runner.os }}
           restore-keys: |
             bazel-repos-
-      - name: "⚙️  Setup Bazel"
+      - name: "⚙️ Setup Bazel"
         run: .github/workflows/setup-bazel.sh
       - name: "🏗 Build"
         run: ./bazel build //main:scip-ruby //test:scip_test_runner --config=dbg --execution_log_binary_file=log
