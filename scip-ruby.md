@@ -8,11 +8,12 @@
 
 For more information about configurations, see the main [README](./README.md).
 
-While the `CC` variable is technically supported to pick the C compiler,
-we recommend using GCC instead of Clang on Linux. Otherwise, you may run into an error:
+NOTE: In some Ubuntu instances (Ubuntu 22.04 image on Google Cloud),
+there is a known build error with m4.
+This problem doesn't happen with Ubuntu 20.04.
 
 <details>
-  <summary>M4 build error due to VLA in struct</summary>
+  <summary>M4 build error due to sysconf not being defined</summary>
   
   ```
   external/m4_v1.4.18/gnulib/lib/c-stack.c:55:26: error: function-like macro 'sysconf' is not defined
