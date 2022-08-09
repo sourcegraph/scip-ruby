@@ -59,6 +59,7 @@ build_args=(
 ./bazel build \
   --experimental_generate_json_trace_profile \
   --profile=_out_/profile_build.json \
+  --experimental_execution_log_file=_out_/build.log \
   "${build_args[@]}" || err=$?
 
 echo "+++ Running snapshot tests"
@@ -73,6 +74,7 @@ test_args=(
 ./bazel test \
   --experimental_generate_json_trace_profile \
   --profile=_out_/profile_snapshot_tests.json \
+  --experimental_execution_log_file=_out_/snapshot_test.log \
   --test_summary=terse \
   --test_output=errors \
   "${test_args[@]}" || err=$?
@@ -98,6 +100,7 @@ test_args=(
 ./bazel test \
   --experimental_generate_json_trace_profile \
   --profile=_out_/profile_repo_tests.json \
+  --experimental_execution_log_file=_out_/repo_test.log \
   --test_summary=terse \
   --test_output=errors \
   "${test_args[@]}" || err=$?

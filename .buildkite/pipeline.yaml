@@ -34,6 +34,7 @@ steps:
     command: .buildkite/test-indexer.sh
     artifact_paths:
       - "_out_/profile*.json"
+      - "_out_/*.log"
     agents:
       queue: stateless
     env:
