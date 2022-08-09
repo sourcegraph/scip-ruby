@@ -74,7 +74,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OS: ${{ env.OS }}
       - name: "🏗 Build (release)"
-        run: bazel build //main:scip-ruby --explain log --verbose_explanations
+        run: ./bazel build //main:scip-ruby --explain log --verbose_explanations
       - name: "🪵 Print log"
         run: cat log && rm log
       - name: "📦 Upload release binary"
