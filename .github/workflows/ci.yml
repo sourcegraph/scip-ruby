@@ -17,8 +17,6 @@ jobs:
           ruby-version: '2.7'
       - name: Manually evict cache entry if applicable
         run: ACCESS_TOKEN='${{ secrets.GITHUB_TOKEN }}' python3 .github/workflows/evict.py
-      - name: "⚙️  Setup Bazel"
-        run: .github/workflows/setup-bazel.sh
       - name: "🚀 Mount Bazel build cache"
         uses: actions/cache@v3
         with:
@@ -35,6 +33,8 @@ jobs:
           restore-keys: |
             bazel-repos-${{ runner.os }}
             bazel-repos-
+      - name: "⚙️  Setup Bazel"
+        run: .github/workflows/setup-bazel.sh
       - name: "🏗 Build"
         run: ./bazel build //main:scip-ruby //test:scip_test_runner --config=dbg --explain log --verbose_explanations
       - name: Print bazel log
