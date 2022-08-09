@@ -39,7 +39,6 @@ jobs:
           path: ~/bazelcache/build
           key: bazel-build-${{ runner.os }}
           restore-keys: |
-            bazel-build-${{ runner.os }}
             bazel-build-
       - name: "🚀 Mount Bazel repo cache"
         uses: actions/cache@v3
@@ -47,7 +46,6 @@ jobs:
           path: ~/bazelcache/repos
           key: bazel-repos-${{ runner.os }}
           restore-keys: |
-            bazel-repos-${{ runner.os }}
             bazel-repos-
       - name: "⚙️  Setup Bazel"
         run: .github/workflows/setup-bazel.sh
