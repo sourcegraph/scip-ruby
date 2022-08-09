@@ -60,11 +60,15 @@ jobs:
           esac
           echo "OS=$os" >> "$GITHUB_ENV"
       - name: "🏗 Build (debug)"
-        run: ./bazel build //main:scip-ruby --config=dbg --explain log --verbose_explanations
-      - name: "🪵 Print log"
-        run: cat log && rm log
+        run: ./bazel build //main:scip-ruby --config=dbg --execution_log_binary_file=log
+      - name: "🪵 Upload log"
+        uses: actions/upload-artifact@v3
+        with:
+          name: debug-build-log
+          path: log
       - name: "📦 Upload debug binary"
         run: |
+          rm log
           ls bazel-out
           debugBinaryPath="scip-ruby-debug-$OS-$(uname -m)"
           builtBinaryPath="$(find bazel-out/ -type f -name 'scip-ruby')"
@@ -74,11 +78,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OS: ${{ env.OS }}
       - name: "🏗 Build (release)"
-        run: ./bazel build //main:scip-ruby --explain log --verbose_explanations
-      - name: "🪵 Print log"
-        run: cat log && rm log
+        run: ./bazel build //main:scip-ruby --config=release-$OS --execution_log_binary_file=log
+        env:
+          OS: ${{ env.OS }}
+      - name: "🪵 Upload log"
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-build-log
+          path: log
       - name: "📦 Upload release binary"
         run: |
+          rm log
           ls bazel-out
           releaseBinaryPath="scip-ruby-$OS-$(uname -m)"
           builtBinaryPath="$(find bazel-out/ -type f -name 'scip-ruby')"
