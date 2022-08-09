@@ -24,9 +24,10 @@ ruby-cache: &ruby-cache
 
 bazel-repo-cache: &bazel-repo-cache
   id: bazel-repos
-  key: "bazel-repos-{{ checksum WORKSPACE }}"
+  key: "bazel-repos-{{ env.BUILDKITE_BRANCH }}-{{ env.BUILDKITE_COMMIT }}"
   restore-keys:
-    - "bazel-repos-{{ checksum WORKSPACE }}"
+    - "bazel-repos-{{ env.BUILDKITE_BRANCH }}-{{ env.BUILDKITE_COMMIT }}"
+    - "bazel-repos-{{ env.BUILDKITE_BRANCH }}-"
     - "bazel-repos-"
   paths:
     - /usr/local/var/bazelcache/repos
@@ -34,9 +35,10 @@ bazel-repo-cache: &bazel-repo-cache
 
 bazel-build-cache: &bazel-build-cache
   id: bazel-build
-  key: "bazel-build-{{ env.BUILDKITE_COMMIT }}"
+  key: "bazel-build-{{ env.BUILDKITE_BRANCH }}-{{ env.BUILDKITE_COMMIT }}"
   restore-keys:
-    - "bazel-build-{{ env.BUILDKITE_COMMIT }}"
+    - "bazel-build-{{ env.BUILDKITE_BRANCH }}-{{ env.BUILDKITE_COMMIT }}"
+    - "bazel-build-{{ env.BUILDKITE_BRANCH }}-"
     - "bazel-build-"
   paths:
     - /usr/local/var/bazelcache/build
