@@ -1,6 +1,6 @@
 # Loosely based off .sorbet-buildkite/pipeline.yaml
 
-s3-settings: &s3-settings
+common-cache-settings: &common-cache-settings
   backend: s3
   s3:
     bucket: sourcegraph_buildkite_cache
@@ -8,6 +8,9 @@ s3-settings: &s3-settings
     profile: buildkite
     region: us-central1
   tarball: {}
+  compress: true
+  compress-program: pigz
+  max: 7
 
 ruby-cache: &ruby-cache
   id: ruby-cache
@@ -17,7 +20,7 @@ ruby-cache: &ruby-cache
     - "ruby-cache-"
   paths:
     - /root/.asdf/installs/ruby/2.7.0
-  <<: *s3-settings
+  <<: *common-cache-settings
 
 bazel-repo-cache: &bazel-repo-cache
   id: bazel-repos
@@ -27,7 +30,7 @@ bazel-repo-cache: &bazel-repo-cache
     - "bazel-repos-"
   paths:
     - /usr/local/var/bazelcache/repos
-  <<: *s3-settings
+  <<: *common-cache-settings
 
 bazel-build-cache: &bazel-build-cache
   id: bazel-build
@@ -37,7 +40,7 @@ bazel-build-cache: &bazel-build-cache
     - "bazel-build-"
   paths:
     - /usr/local/var/bazelcache/build
-  <<: *s3-settings
+  <<: *common-cache-settings
 
 steps:
   - label: ":linux: test-indexer.sh"
