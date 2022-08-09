@@ -33,8 +33,6 @@ jobs:
       TAG: ${{ github.event.ref }}
     steps:
       - uses: actions/checkout@v3
-      - name: "⚙️  Setup Bazel"
-        run: .github/workflows/setup-bazel.sh
       - name: "🚀 Mount Bazel build cache"
         uses: actions/cache@v3
         with:
@@ -51,6 +49,8 @@ jobs:
           restore-keys: |
             bazel-repos-${{ runner.os }}
             bazel-repos-
+      - name: "⚙️  Setup Bazel"
+        run: .github/workflows/setup-bazel.sh
       - name: "🔎 Identify OS"
         run: |
           case "$(uname -s)" in
