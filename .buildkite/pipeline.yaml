@@ -9,6 +9,16 @@ s3-settings: &s3-settings
     region: us-central1
   tarball: {}
 
+ruby-cache: &ruby-cache
+  id: ruby-cache
+  key: "ruby-cache-{{ checksum .tool-versions }}"
+  restore-keys:
+    - "ruby-cache-{{ checksum .tool-versions }}"
+    - "ruby-cache-"
+  paths:
+    - /root/.asdf/installs/ruby/2.7.0
+  <<: *s3-settings
+
 bazel-repo-cache: &bazel-repo-cache
   id: bazel-repos
   key: "bazel-repos-{{ checksum WORKSPACE }}"
@@ -41,6 +51,7 @@ steps:
       AWS_CONFIG_FILE: /buildkite/.aws/config
       AWS_SHARED_CREDENTIALS_FILE: /buildkite/.aws/credentials
     plugins:
+    - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *ruby-cache
     - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *bazel-repo-cache
     - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *bazel-build-cache
 
