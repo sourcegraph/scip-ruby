@@ -1,6 +1,8 @@
 // NOTE: Protobuf headers should go first since they use poisoned functions.
 #include "proto/SCIP.pb.h"
 
+// Placeholder comment
+
 #include <algorithm>
 #include <fstream>
 #include <iterator>
