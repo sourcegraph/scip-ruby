@@ -15,7 +15,10 @@ jobs:
         run: |
           TAG="${GITHUB_REF/refs\/tags\//}"
           TITLE="$(echo "$TAG" | sed 's/-v/ v/')"
-          gh release create "$TAG" --title "$TITLE"
+          cat .github/workflows/release-template.md \
+            | sed -e "s/TAG_PLACEHOLDER/$TAG/" \
+            > notes
+          gh release create "$TAG" --title "$TITLE" --notes-file notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -30,12 +33,25 @@ jobs:
       TAG: ${{ github.event.ref }}
     steps:
       - uses: actions/checkout@v3
-      - name: Install Bazel
-        run: |
-          if ! which bazelisk; then
-            sudo npm install --location=global @bazel/bazelisk
-          fi
-      - name: Identify OS
+      - name: "⚙️  Setup Bazel"
+        run: .github/workflows/setup-bazel.sh
+      - name: "🚀 Mount Bazel build cache"
+        uses: actions/cache@v3
+        with:
+          path: ~/bazelcache/build
+          key: bazel-build-${{ runner.os }}
+          restore-keys: |
+            bazel-build-${{ runner.os }}
+            bazel-build-
+      - name: "🚀 Mount Bazel repo cache"
+        uses: actions/cache@v3
+        with:
+          path: ~/bazelcache/repos
+          key: bazel-repos-${{ runner.os }}
+          restore-keys: |
+            bazel-repos-${{ runner.os }}
+            bazel-repos-
+      - name: "🔎 Identify OS"
         run: |
           case "$(uname -s)" in
             Linux*)     os="linux";;
@@ -43,9 +59,11 @@ jobs:
             *)          echo "Unhandled OS type" && exit 1;;
           esac
           echo "OS=$os" >> "$GITHUB_ENV"
-      - name: Run debug build
-        run: bazel build //main:scip-ruby --config=dbg
-      - name: Upload debug binary
+      - name: "🏗 Build (debug)"
+        run: ./bazel build //main:scip-ruby --config=dbg --explain log --verbose_explanations
+      - name: "🪵 Print log"
+        run: cat log && rm log
+      - name: "📦 Upload debug binary"
         run: |
           ls bazel-out
           debugBinaryPath="scip-ruby-debug-$OS-$(uname -m)"
@@ -55,9 +73,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OS: ${{ env.OS }}
-      - name: Run release build
-        run: bazel build //main:scip-ruby
-      - name: Upload release binary
+      - name: "🏗 Build (release)"
+        run: bazel build //main:scip-ruby --explain log --verbose_explanations
+      - name: "🪵 Print log"
+        run: cat log && rm log
+      - name: "📦 Upload release binary"
         run: |
           ls bazel-out
           releaseBinaryPath="scip-ruby-$OS-$(uname -m)"

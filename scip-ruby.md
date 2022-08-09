@@ -148,3 +148,8 @@ gh pr create -R sourcegraph/scip-ruby
 ```
 
 This will correctly use the `scip-ruby/master` branch as the target.
+
+## Cutting a release
+
+Push a tag of the form `scip-ruby-v*` to `scip-ruby/master`.
+See the [release workflow](/.github/workflows/release.yml) for details.
