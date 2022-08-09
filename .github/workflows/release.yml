@@ -34,6 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: "🚀 Mount Bazel build cache"
+        if: ${{ runner.os }} == 'Linux'
         uses: actions/cache@v3
         with:
           path: ~/bazelcache/build
@@ -42,6 +43,7 @@ jobs:
             bazel-build-
       - name: "🚀 Mount Bazel repo cache"
         uses: actions/cache@v3
+        if: ${{ runner.os }} == 'Linux'
         with:
           path: ~/bazelcache/repos
           key: bazel-repos-${{ runner.os }}
