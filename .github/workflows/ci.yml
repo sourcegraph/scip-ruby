@@ -15,25 +15,34 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '2.7'
-      - name: Install Bazel
-        run: sudo npm install --location=global @bazel/bazelisk
       - name: Manually evict cache entry if applicable
         run: ACCESS_TOKEN='${{ secrets.GITHUB_TOKEN }}' python3 .github/workflows/evict.py
-      - name: Mount bazel cache
+      - name: "⚙️  Setup Bazel"
+        run: .github/workflows/setup-bazel.sh
+      - name: "🚀 Mount Bazel build cache"
         uses: actions/cache@v3
         with:
-          path: ~/.cache/bazel
-          key: bazel-${{ env.GITHUB_REF_NAME }}-${{ env.GITHUB_SHA }}
+          path: ~/bazelcache/build
+          key: bazel-build-${{ runner.os }}
           restore-keys: |
-            bazel-${{ env.GITHUB_REF_NAME }}-${{ env.GITHUB_SHA }}
-            bazel-${{ env.GITHUB_REF_NAME }}-
-            bazel-
-      - name: Test
-        run: bazel test //test/scip --explain log --verbose_explanations --test_output=errors --config=dbg
+            bazel-build-${{ runner.os }}
+            bazel-build-
+      - name: "🚀 Mount Bazel repo cache"
+        uses: actions/cache@v3
+        with:
+          path: ~/bazelcache/repos
+          key: bazel-repos-${{ runner.os }}
+          restore-keys: |
+            bazel-repos-${{ runner.os }}
+            bazel-repos-
+      - name: "🏗 Build"
+        run: ./bazel build //main:scip-ruby //test:scip_test_runner --config=dbg --explain log --verbose_explanations
       - name: Print bazel log
         run: cat log && rm log
-      - name: Test OSS repos
-        run: bazel test //test/scip/repos --test_env GITHUB_ACTIONS=1 --test_env PATH="$PATH" --test_env HOME="$HOME" --explain log --verbose_explanations --test_output=errors --config=dbg --spawn_strategy=local
+      - name: "🧐 Run snapshot tests"
+        run: ./bazel test //test/scip --config=dbg
+      - name: "🧐 Run repo tests"
+        run: ./bazel test //test/scip/repos --test_env GITHUB_ACTIONS=1 --test_env PATH="$PATH" --test_env HOME="$HOME" --config=dbg --spawn_strategy=local --explain log --verbose_explanations
           # Turn off sandboxing because Homebrew needs to write
           # to directories outside the sandbox. 🙄
       - name: Print bazel log for repo tests
