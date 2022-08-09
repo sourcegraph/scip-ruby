@@ -8,6 +8,26 @@
 
 For more information about configurations, see the main [README](./README.md).
 
+While the `CC` variable is technically supported to pick the C compiler,
+we recommend using GCC instead of Clang on Linux. Otherwise, you may run into an error:
+
+<details>
+  <summary>M4 build error due to VLA in struct</summary>
+  
+  ```
+  external/m4_v1.4.18/gnulib/lib/c-stack.c:55:26: error: function-like macro 'sysconf' is not defined
+  #elif HAVE_LIBSIGSEGV && SIGSTKSZ < 16384
+                         ^
+  /usr/include/x86_64-linux-gnu/bits/sigstksz.h:28:19: note: expanded from macro 'SIGSTKSZ'
+  # define SIGSTKSZ sysconf (_SC_SIGSTKSZ)
+                  ^
+  external/m4_v1.4.18/gnulib/lib/c-stack.c:139:8: error: fields must have a constant size: 'variable length array in structure' extension will never be   supported
+    char buffer[SIGSTKSZ];
+         ^
+  2 errors generated.
+  ```
+</details>
+
 ## IDE Integration
 
 Generate `compile_commands.json` as per the main [README](./README.md),
