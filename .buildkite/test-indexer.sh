@@ -81,10 +81,11 @@ test_args=(
 
 echo "--- Installing Ruby"
 
-# From https://github.com/asdf-vm/asdf-ruby/issues/125#issuecomment-958941354
-rm -rf .asdf/shims
-OPENSSL_CFLAGS=-Wno-error=implicit-function-declaration asdf install ruby
-asdf global ruby 2.7.0
+if (! file /root/.asdf/installs/ruby/2.7.0) || (! asdf global ruby 2.7.0); then
+  rm -rf .asdf/shims
+  OPENSSL_CFLAGS=-Wno-error=implicit-function-declaration asdf install ruby
+  asdf global ruby 2.7.0
+fi
 
 echo "+++ Running repo tests"
 
