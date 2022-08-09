@@ -88,7 +88,7 @@ target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16
 @"ic_==" = internal global %struct.FunctionInlineCache zeroinitializer
 @ic_puts = internal global %struct.FunctionInlineCache zeroinitializer
 @ic_puts.1 = internal global %struct.FunctionInlineCache zeroinitializer
-@"stackFramePrecomputed_func_<root>.17<static-init>$153" = internal unnamed_addr global %struct.rb_iseq_struct* null, align 8
+@"stackFramePrecomputed_func_<root>.13<static-init>" = internal unnamed_addr global %struct.rb_iseq_struct* null, align 8
 @ic_new = internal global %struct.FunctionInlineCache zeroinitializer
 @ic_initialize = internal global %struct.FunctionInlineCache zeroinitializer
 @ic_delegate = internal global %struct.FunctionInlineCache zeroinitializer
@@ -183,7 +183,7 @@ allocRubyIds:
   %rubyId_puts = load i64, i64* getelementptr inbounds ([11 x i64], [11 x i64]* @sorbet_moduleIDTable, i64 0, i64 3), align 8, !dbg !15, !invariant.load !5
   tail call void (%struct.FunctionInlineCache*, i64, i32, i32, i32, ...) @sorbet_setupFunctionInlineCache(%struct.FunctionInlineCache* noundef @ic_puts, i64 %rubyId_puts, i32 noundef 20, i32 noundef 1, i32 noundef 0), !dbg !15
   tail call void (%struct.FunctionInlineCache*, i64, i32, i32, i32, ...) @sorbet_setupFunctionInlineCache(%struct.FunctionInlineCache* noundef @ic_puts.1, i64 %rubyId_puts, i32 noundef 20, i32 noundef 1, i32 noundef 0), !dbg !16
-  tail call fastcc void @"Constr_stackFramePrecomputed_func_<root>.17<static-init>$153"(i64 %realpath)
+  tail call fastcc void @"Constr_stackFramePrecomputed_func_<root>.13<static-init>"(i64 %realpath)
   %rubyId_new = load i64, i64* getelementptr inbounds ([11 x i64], [11 x i64]* @sorbet_moduleIDTable, i64 0, i64 5), align 8, !dbg !17, !invariant.load !5
   tail call void (%struct.FunctionInlineCache*, i64, i32, i32, i32, ...) @sorbet_setupFunctionInlineCache(%struct.FunctionInlineCache* noundef @ic_new, i64 %rubyId_new, i32 noundef 16, i32 noundef 0, i32 noundef 0), !dbg !17
   %rubyId_initialize = load i64, i64* getelementptr inbounds ([11 x i64], [11 x i64]* @sorbet_moduleIDTable, i64 0, i64 6), align 8, !dbg !17, !invariant.load !5
@@ -246,10 +246,10 @@ entryInitializers:
 }
 
 ; Function Attrs: nounwind sspreq uwtable
-define internal fastcc void @"func_<root>.17<static-init>$153"(i64 %selfRaw, %struct.rb_control_frame_struct* %cfp) unnamed_addr #5 !dbg !18 {
+define internal fastcc void @"func_<root>.13<static-init>"(i64 %selfRaw, %struct.rb_control_frame_struct* %cfp) unnamed_addr #5 !dbg !18 {
 functionEntryInitializers:
   %positional_table.i = alloca i64, align 8, !dbg !26
-  %stackFrame = load %struct.rb_iseq_struct*, %struct.rb_iseq_struct** @"stackFramePrecomputed_func_<root>.17<static-init>$153", align 8
+  %stackFrame = load %struct.rb_iseq_struct*, %struct.rb_iseq_struct** @"stackFramePrecomputed_func_<root>.13<static-init>", align 8
   %0 = load %struct.rb_execution_context_struct*, %struct.rb_execution_context_struct** @ruby_current_execution_context_ptr, align 8, !tbaa !20
   %1 = getelementptr inbounds %struct.rb_execution_context_struct, %struct.rb_execution_context_struct* %0, i64 0, i32 2
   %2 = load %struct.rb_control_frame_struct*, %struct.rb_control_frame_struct** %1, align 8, !tbaa !29
@@ -387,14 +387,14 @@ afterNew:                                         ; preds = %fastNew, %slowNew
 }
 
 ; Function Attrs: ssp
-define internal fastcc void @"Constr_stackFramePrecomputed_func_<root>.17<static-init>$153"(i64 %realpath) unnamed_addr #6 {
+define internal fastcc void @"Constr_stackFramePrecomputed_func_<root>.13<static-init>"(i64 %realpath) unnamed_addr #6 {
 entryInitializers:
   %"rubyId_<top (required)>" = load i64, i64* getelementptr inbounds ([11 x i64], [11 x i64]* @sorbet_moduleIDTable, i64 0, i64 4), align 8, !invariant.load !5
   %"rubyStr_<top (required)>" = load i64, i64* getelementptr inbounds ([7 x i64], [7 x i64]* @sorbet_moduleRubyStringTable, i64 0, i64 4), align 8, !invariant.load !5
   %"rubyStr_test/testdata/compiler/custom_plus.rb" = load i64, i64* getelementptr inbounds ([7 x i64], [7 x i64]* @sorbet_moduleRubyStringTable, i64 0, i64 1), align 8, !invariant.load !5
   %locals = alloca i64, i32 0, align 8
   %0 = call %struct.rb_iseq_struct* @sorbet_allocateRubyStackFrame(i64 %"rubyStr_<top (required)>", i64 %"rubyId_<top (required)>", i64 %"rubyStr_test/testdata/compiler/custom_plus.rb", i64 %realpath, %struct.rb_iseq_struct* noundef null, i32 noundef 0, i32 noundef 6, %struct.SorbetLineNumberInfo* noundef @fileLineNumberInfo, i64* noundef nonnull %locals, i32 noundef 0, i32 noundef 4)
-  store %struct.rb_iseq_struct* %0, %struct.rb_iseq_struct** @"stackFramePrecomputed_func_<root>.17<static-init>$153", align 8
+  store %struct.rb_iseq_struct* %0, %struct.rb_iseq_struct** @"stackFramePrecomputed_func_<root>.13<static-init>", align 8
   ret void
 }
 
@@ -409,7 +409,7 @@ entry:
   %3 = load %struct.rb_execution_context_struct*, %struct.rb_execution_context_struct** @ruby_current_execution_context_ptr, align 8, !tbaa !20
   %4 = getelementptr inbounds %struct.rb_execution_context_struct, %struct.rb_execution_context_struct* %3, i64 0, i32 2
   %5 = load %struct.rb_control_frame_struct*, %struct.rb_control_frame_struct** %4, align 8, !tbaa !29
-  tail call fastcc void @"func_<root>.17<static-init>$153"(i64 %2, %struct.rb_control_frame_struct* %5) #11
+  tail call fastcc void @"func_<root>.13<static-init>"(i64 %2, %struct.rb_control_frame_struct* %5) #11
   ret void
 }
 
@@ -506,7 +506,7 @@ attributes #12 = { nounwind allocsize(0,1) }
 !15 = !DILocation(line: 16, column: 5, scope: !11)
 !16 = !DILocation(line: 18, column: 5, scope: !11)
 !17 = !DILocation(line: 12, column: 5, scope: !18)
-!18 = distinct !DISubprogram(name: "<root>.<static-init>", linkageName: "func_<root>.17<static-init>$153", scope: null, file: !4, line: 6, type: !12, scopeLine: 6, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !3, retainedNodes: !5)
+!18 = distinct !DISubprogram(name: "<root>.<static-init>", linkageName: "func_<root>.13<static-init>", scope: null, file: !4, line: 6, type: !12, scopeLine: 6, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !3, retainedNodes: !5)
 !19 = !DILocation(line: 22, column: 1, scope: !18)
 !20 = !{!21, !21, i64 0}
 !21 = !{!"any pointer", !8, i64 0}

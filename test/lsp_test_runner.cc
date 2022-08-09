@@ -86,6 +86,8 @@ void validateDocumentSymbol(unique_ptr<DocumentSymbol> &sym) {
     REQUIRE(sym->selectionRange->start != nullptr);
     REQUIRE(sym->selectionRange->end != nullptr);
 
+    INFO(fmt::format("Checking range {} contains selectionRange {}", sym->range->toJSON(false),
+                     sym->selectionRange->toJSON(false)));
     REQUIRE(sym->range->contains(*sym->selectionRange));
 
     if (sym->children.has_value()) {
@@ -574,8 +576,8 @@ TEST_CASE("LSPTest") {
             lspWrapper = MultiThreadedLSPWrapper::create("", move(opts));
         } else {
             // Set to a number that is reasonable large for tests, but small enough that we can have a test to handle
-            // this edge case. If you change this number, update the `lsp/fast_path/too_many_files` and
-            // `not_enough_files` tests.
+            // this edge case. If you change this number, `fast_path/{too_many_files,not_enough_files,initialize}` will
+            // need to be changed as well.
             opts->lspMaxFilesOnFastPath = 10;
             lspWrapper = SingleThreadedLSPWrapper::create("", move(opts));
         }

@@ -86,7 +86,7 @@ target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16
 @fileLineNumberInfo = internal global %struct.SorbetLineNumberInfo zeroinitializer
 @ic_inspect = internal global %struct.FunctionInlineCache zeroinitializer
 @ic_puts = internal global %struct.FunctionInlineCache zeroinitializer
-@"stackFramePrecomputed_func_<root>.17<static-init>$153" = internal unnamed_addr global %struct.rb_iseq_struct* null, align 8
+@"stackFramePrecomputed_func_<root>.13<static-init>" = internal unnamed_addr global %struct.rb_iseq_struct* null, align 8
 @ic_take_arguments = internal global %struct.FunctionInlineCache zeroinitializer
 @ic_take_arguments.1 = internal global %struct.FunctionInlineCache zeroinitializer
 @ic_take_arguments.2 = internal global %struct.FunctionInlineCache zeroinitializer
@@ -199,7 +199,7 @@ allocRubyIds:
   tail call void (%struct.FunctionInlineCache*, i64, i32, i32, i32, ...) @sorbet_setupFunctionInlineCache(%struct.FunctionInlineCache* noundef @ic_inspect, i64 %rubyId_inspect, i32 noundef 16, i32 noundef 0, i32 noundef 0), !dbg !10
   %rubyId_puts = load i64, i64* getelementptr inbounds ([14 x i64], [14 x i64]* @sorbet_moduleIDTable, i64 0, i64 6), align 8, !dbg !15, !invariant.load !5
   tail call void (%struct.FunctionInlineCache*, i64, i32, i32, i32, ...) @sorbet_setupFunctionInlineCache(%struct.FunctionInlineCache* noundef @ic_puts, i64 %rubyId_puts, i32 noundef 20, i32 noundef 1, i32 noundef 0), !dbg !15
-  tail call fastcc void @"Constr_stackFramePrecomputed_func_<root>.17<static-init>$153"(i64 %realpath)
+  tail call fastcc void @"Constr_stackFramePrecomputed_func_<root>.13<static-init>"(i64 %realpath)
   %rubyId_take_arguments = load i64, i64* getelementptr inbounds ([14 x i64], [14 x i64]* @sorbet_moduleIDTable, i64 0, i64 0), align 8, !dbg !16, !invariant.load !5
   %rubyId_d = load i64, i64* getelementptr inbounds ([14 x i64], [14 x i64]* @sorbet_moduleIDTable, i64 0, i64 2), align 8, !dbg !16, !invariant.load !5
   tail call void (%struct.FunctionInlineCache*, i64, i32, i32, i32, ...) @sorbet_setupFunctionInlineCache(%struct.FunctionInlineCache* noundef @ic_take_arguments, i64 %rubyId_take_arguments, i32 noundef 68, i32 noundef 8, i32 noundef 1, i64 %rubyId_d), !dbg !16
@@ -443,14 +443,14 @@ entryInitializers:
 }
 
 ; Function Attrs: ssp
-define internal fastcc void @"Constr_stackFramePrecomputed_func_<root>.17<static-init>$153"(i64 %realpath) unnamed_addr #8 {
+define internal fastcc void @"Constr_stackFramePrecomputed_func_<root>.13<static-init>"(i64 %realpath) unnamed_addr #8 {
 entryInitializers:
   %"rubyId_<top (required)>" = load i64, i64* getelementptr inbounds ([14 x i64], [14 x i64]* @sorbet_moduleIDTable, i64 0, i64 7), align 8, !invariant.load !5
   %"rubyStr_<top (required)>" = load i64, i64* getelementptr inbounds ([3 x i64], [3 x i64]* @sorbet_moduleRubyStringTable, i64 0, i64 2), align 8, !invariant.load !5
   %"rubyStr_test/testdata/compiler/all_arguments.rb" = load i64, i64* getelementptr inbounds ([3 x i64], [3 x i64]* @sorbet_moduleRubyStringTable, i64 0, i64 1), align 8, !invariant.load !5
   %locals = alloca i64, i32 0, align 8
   %0 = call %struct.rb_iseq_struct* @sorbet_allocateRubyStackFrame(i64 %"rubyStr_<top (required)>", i64 %"rubyId_<top (required)>", i64 %"rubyStr_test/testdata/compiler/all_arguments.rb", i64 %realpath, %struct.rb_iseq_struct* noundef null, i32 noundef 0, i32 noundef 4, %struct.SorbetLineNumberInfo* noundef @fileLineNumberInfo, i64* noundef nonnull %locals, i32 noundef 0, i32 noundef 11)
-  store %struct.rb_iseq_struct* %0, %struct.rb_iseq_struct** @"stackFramePrecomputed_func_<root>.17<static-init>$153", align 8
+  store %struct.rb_iseq_struct* %0, %struct.rb_iseq_struct** @"stackFramePrecomputed_func_<root>.13<static-init>", align 8
   ret void
 }
 
@@ -471,7 +471,7 @@ entry:
   call void @llvm.lifetime.start.p0i8(i64 32, i8* nonnull %6)
   %7 = bitcast i64* %keyword_table.i to i8*
   call void @llvm.lifetime.start.p0i8(i64 24, i8* nonnull %7)
-  %stackFrame.i = load %struct.rb_iseq_struct*, %struct.rb_iseq_struct** @"stackFramePrecomputed_func_<root>.17<static-init>$153", align 8
+  %stackFrame.i = load %struct.rb_iseq_struct*, %struct.rb_iseq_struct** @"stackFramePrecomputed_func_<root>.13<static-init>", align 8
   %8 = getelementptr inbounds %struct.rb_control_frame_struct, %struct.rb_control_frame_struct* %5, i64 0, i32 2
   store %struct.rb_iseq_struct* %stackFrame.i, %struct.rb_iseq_struct** %8, align 8, !tbaa !73
   %9 = getelementptr inbounds %struct.rb_control_frame_struct, %struct.rb_control_frame_struct* %5, i64 0, i32 4
@@ -544,16 +544,16 @@ entry:
   %54 = load i16, i16* %16, align 8, !dbg !59
   %55 = and i16 %54, 32, !dbg !59
   %56 = icmp eq i16 %55, 0, !dbg !59
-  br i1 %56, label %"func_<root>.17<static-init>$153.exit", label %57, !dbg !59
+  br i1 %56, label %"func_<root>.13<static-init>.exit", label %57, !dbg !59
 
 57:                                               ; preds = %entry
   %58 = add nsw i32 %51, 1, !dbg !59
   %59 = getelementptr inbounds i8, i8* %15, i64 52, !dbg !59
   %60 = bitcast i8* %59 to i32*, !dbg !59
   store i32 %58, i32* %60, align 4, !dbg !59, !tbaa !87
-  br label %"func_<root>.17<static-init>$153.exit", !dbg !59
+  br label %"func_<root>.13<static-init>.exit", !dbg !59
 
-"func_<root>.17<static-init>$153.exit":           ; preds = %entry, %57
+"func_<root>.13<static-init>.exit":               ; preds = %entry, %57
   %61 = tail call noalias nonnull i8* @ruby_xmalloc2(i64 noundef 3, i64 noundef 8) #14, !dbg !59
   call void @llvm.memcpy.p0i8.p0i8.i64(i8* nocapture nonnull writeonly align 1 %61, i8* nocapture noundef nonnull readonly align 8 dereferenceable(24) %7, i64 noundef 24, i1 noundef false) #12, !dbg !59
   %62 = getelementptr inbounds i8, i8* %15, i64 56, !dbg !59
@@ -970,7 +970,7 @@ attributes #14 = { nounwind allocsize(0,1) }
 !14 = !DIBasicType(name: "VALUE", size: 64, encoding: DW_ATE_signed)
 !15 = !DILocation(line: 5, column: 5, scope: !11)
 !16 = !DILocation(line: 8, column: 1, scope: !17)
-!17 = distinct !DISubprogram(name: "<root>.<static-init>", linkageName: "func_<root>.17<static-init>$153", scope: null, file: !4, line: 4, type: !12, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !3, retainedNodes: !5)
+!17 = distinct !DISubprogram(name: "<root>.<static-init>", linkageName: "func_<root>.13<static-init>", scope: null, file: !4, line: 4, type: !12, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !3, retainedNodes: !5)
 !18 = !DILocation(line: 9, column: 1, scope: !17)
 !19 = !DILocation(line: 10, column: 1, scope: !17)
 !20 = !DILocation(line: 11, column: 1, scope: !17)
