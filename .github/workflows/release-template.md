@@ -8,6 +8,4 @@ curl -L "$RELEASE_URL/scip-ruby-$OS-x86_64" -o scip-ruby && \
 chmod +x scip-ruby
 ```
 
-NOTE: The `-debug*` binaries are meant for debugging issues
-(for example, if you run into a crash with `scip-ruby`),
-and are not recommended for general use.
+NOTE: The `-debug*` binaries are meant for debugging issues (for example, if you run into a crash with `scip-ruby`), and are not recommended for general use.
