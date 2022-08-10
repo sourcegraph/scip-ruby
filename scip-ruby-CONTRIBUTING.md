@@ -1,4 +1,20 @@
-# scip-ruby
+# Working on scip-ruby
+
+- [Building](#building)
+- [IDE integration](#ide-integration)
+- [Writing a new snapshot test](#writing-a-new-snapshot-test)
+- [Writing a new repo test](#writing-a-new-snapshot-test)
+- [Debugging with print statements](#debugging-with-print-statements)
+- [Debugging with LLDB](#debugging-with-lldb)
+- [Creating PRs](#creating-prs)
+- [Cutting a release](#cutting-a-release)
+- Troubleshooting
+  - [Known build issues][]
+  - [Known Ruby installation issues][]
+  - [Known RubyGems related issues](#known-rubygems-related-issues)
+
+[Known build issues]: #known-build-issues
+[Known Ruby installation issues]: #known-ruby-installation-issues
 
 ## Building
 
@@ -6,40 +22,7 @@
 ./bazel build //main:scip-ruby --config=dbg
 ```
 
-For more information about configurations, see the [Sorbet README](./sorbet-README.md).
-
-<details>
-  <summary>Known build issues</summary>
-
-  1. In some Ubuntu instances (Ubuntu 22.04 image on Google Cloud),
-      there is a known build error with m4.
-      This problem doesn't happen with Ubuntu 20.04.
-      ```
-      external/m4_v1.4.18/gnulib/lib/c-stack.c:55:26: error: function-like macro 'sysconf' is not defined
-      #elif HAVE_LIBSIGSEGV && SIGSTKSZ < 16384
-                               ^
-      /usr/include/x86_64-linux-gnu/bits/sigstksz.h:28:19: note: expanded from macro 'SIGSTKSZ'
-      # define SIGSTKSZ sysconf (_SC_SIGSTKSZ)
-                        ^
-      external/m4_v1.4.18/gnulib/lib/c-stack.c:139:8: error: fields must have a constant size: 'variable length array in structure' extension will never be   supported
-        char buffer[SIGSTKSZ];
-               ^
-      2 errors generated.
-      ```
-  2. A release build (`--config=release-mac`) fails on Apple Silicon Macs,
-     which (I think) is related to this upstream
-     [jemalloc issue](https://github.com/jemalloc/jemalloc/issues/1997),
-     which is mentioned to be caused due to a QEMU bug. It manifests as an error:
-     ```
-     include/jemalloc/internal/rtree.h:118:3: error: constant expression evaluates to -12 which cannot be narrowed to type 'unsigned int' [-Wc++11-narrowing]
-        {RTREE_NSB, RTREE_NHIB + RTREE_NSB}
-         ^~~~~~~~~
-      include/jemalloc/internal/rtree.h:22:19: note: expanded from macro 'RTREE_NSB'
-        #define RTREE_NSB (LG_VADDR - RTREE_NLIB)
-                  ^~~~~~~~~~~~~~~~~~~~~~~
-     ```
-
-</details>
+For more information about configurations, see the [Sorbet README](./sorbet-README.md). If you run into a build issue, check if it matches one of the [Known build issues][]; you may need to change your configuration.
 
 ## IDE Integration
 
@@ -80,16 +63,7 @@ Run repo tests, to check that there are no crashes on indexing OSS repos:
 
 This may take a few minutes to run.
 
-<details>
-  <summary>Known testing issues</summary>
-
-  1. On macOS, Ruby 2.7.x may fail to install due to a combination of `-Werror`
-     and a warning in OpenSSL. As a workaround, you can use the following asdf invocation:
-     ```
-     OPENSSL_CFLAGS=-Wno-error=implicit-function-declaration asdf install ruby 2.7.2
-     ```
-     This works with 2.7.2, but not with 2.7.0.
-</details>
+**NOTE:** The repo tests require a system Ruby installation that is not covered by the Bazel dependencies. If you run into an issue when installing Ruby (we recommend using asdf), check the [Known Ruby installation issues][].
 
 ## Writing a new snapshot test
 
@@ -181,3 +155,63 @@ This will correctly use the `scip-ruby/master` branch as the target.
 Push a tag matching `scip-ruby-v*` to `scip-ruby/master`.
 A CI job should automatically trigger a release.
 See the [release workflow](/.github/workflows/release.yml) for details.
+
+## Troubleshooting
+
+### Known build issues
+
+1. On some Ubuntu instances (Ubuntu 22.04 image on Google Cloud),
+    there is a known build error with m4.
+    This problem doesn't happen with Ubuntu 20.04.
+    ```
+    external/m4_v1.4.18/gnulib/lib/c-stack.c:55:26: error: function-like macro 'sysconf' is not defined
+    #elif HAVE_LIBSIGSEGV && SIGSTKSZ < 16384
+                             ^
+    /usr/include/x86_64-linux-gnu/bits/sigstksz.h:28:19: note: expanded from macro 'SIGSTKSZ'
+    # define SIGSTKSZ sysconf (_SC_SIGSTKSZ)
+                      ^
+    external/m4_v1.4.18/gnulib/lib/c-stack.c:139:8: error: fields must have a constant size: 'variable length array in structure' extension will never be   supported
+      char buffer[SIGSTKSZ];
+             ^
+    2 errors generated.
+    ```
+2. A release build (`--config=release-mac`) fails on Apple Silicon Macs,
+   which (I think) is related to this upstream
+   [jemalloc issue](https://github.com/jemalloc/jemalloc/issues/1997),
+   which is mentioned to be caused due to a QEMU bug. It manifests as an error:
+   ```
+   include/jemalloc/internal/rtree.h:118:3: error: constant expression evaluates to -12 which cannot be narrowed to type 'unsigned int' [-Wc++11-narrowing]
+      {RTREE_NSB, RTREE_NHIB + RTREE_NSB}
+       ^~~~~~~~~
+    include/jemalloc/internal/rtree.h:22:19: note: expanded from macro 'RTREE_NSB'
+      #define RTREE_NSB (LG_VADDR - RTREE_NLIB)
+                ^~~~~~~~~~~~~~~~~~~~~~~
+   ```
+
+### Known Ruby installation issues
+
+1. On macOS, Ruby 2.7.x may fail to install due to a combination of `-Werror`
+   and a warning in OpenSSL. As a workaround, you can use the following asdf invocation:
+   ```
+   OPENSSL_CFLAGS=-Wno-error=implicit-function-declaration asdf install ruby 2.7.2
+   ```
+   This works with 2.7.2, but not with 2.7.0.
+
+### Known RubyGems related issues
+
+1. If you're trying to run `bundle install` for a gem
+   which you're trying to test,
+   you may run into an error which looks like:
+   ```
+   Could not fetch specs from https://rubygems.org/
+   ```
+   despite retrying a few times, with not much more information.
+
+   According to [this StackOverflow Q&A](https://stackoverflow.com/questions/15194481/bundle-install-could-not-fetch-specs-from-https-rubygems-org),
+   the problem is due to an IPv6 issue with RubyGems.
+   (IIUC, it is somewhat flaky, not totally unsupported.)
+
+   On macOS, you can change this in your Wi-Fi settings:
+   Network Preferences > Advanced > TCP/IP >
+   Configure IPv6: set to Link-local only.
+   You need to Apply the settings after changing that field.
