@@ -410,7 +410,7 @@ public:
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs = 0) const;
 };
-CheckSize(Send, 48, 8);
+CheckSize(Send, 56, 8);
 
 INSN(Return) : public Instruction {
 public:
@@ -421,7 +421,7 @@ public:
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs = 0) const;
 };
-CheckSize(Return, 24, 8);
+CheckSize(Return, 32, 8);
 
 INSN(BlockReturn) : public Instruction {
 public:
@@ -432,7 +432,7 @@ public:
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs = 0) const;
 };
-CheckSize(BlockReturn, 24, 8);
+CheckSize(BlockReturn, 32, 8);
 
 INSN(LoadSelf) : public Instruction {
 public:
@@ -531,7 +531,7 @@ public:
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs = 0) const;
 };
-CheckSize(YieldLoadArg, 24, 8);
+CheckSize(YieldLoadArg, 32, 8);
 
 INSN(Cast) : public Instruction {
 public:
@@ -549,7 +549,7 @@ public:
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs = 0) const;
 };
-CheckSize(Cast, 40, 8);
+CheckSize(Cast, 48, 8);
 
 INSN(TAbsurd) : public Instruction {
 public:
@@ -563,7 +563,7 @@ public:
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs = 0) const;
 };
-CheckSize(TAbsurd, 16, 8);
+CheckSize(TAbsurd, 24, 8);
 
 INSN(KeepAlive) : public Instruction {
 public:

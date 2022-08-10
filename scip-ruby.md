@@ -8,25 +8,37 @@
 
 For more information about configurations, see the main [README](./README.md).
 
-NOTE: In some Ubuntu instances (Ubuntu 22.04 image on Google Cloud),
-there is a known build error with m4.
-This problem doesn't happen with Ubuntu 20.04.
-
 <details>
-  <summary>M4 build error due to sysconf not being defined</summary>
-  
-  ```
-  external/m4_v1.4.18/gnulib/lib/c-stack.c:55:26: error: function-like macro 'sysconf' is not defined
-  #elif HAVE_LIBSIGSEGV && SIGSTKSZ < 16384
-                         ^
-  /usr/include/x86_64-linux-gnu/bits/sigstksz.h:28:19: note: expanded from macro 'SIGSTKSZ'
-  # define SIGSTKSZ sysconf (_SC_SIGSTKSZ)
-                  ^
-  external/m4_v1.4.18/gnulib/lib/c-stack.c:139:8: error: fields must have a constant size: 'variable length array in structure' extension will never be   supported
-    char buffer[SIGSTKSZ];
-         ^
-  2 errors generated.
-  ```
+  <summary>Known build issues</summary>
+
+  1. In some Ubuntu instances (Ubuntu 22.04 image on Google Cloud),
+      there is a known build error with m4.
+      This problem doesn't happen with Ubuntu 20.04.
+      ```
+      external/m4_v1.4.18/gnulib/lib/c-stack.c:55:26: error: function-like macro 'sysconf' is not defined
+      #elif HAVE_LIBSIGSEGV && SIGSTKSZ < 16384
+                               ^
+      /usr/include/x86_64-linux-gnu/bits/sigstksz.h:28:19: note: expanded from macro 'SIGSTKSZ'
+      # define SIGSTKSZ sysconf (_SC_SIGSTKSZ)
+                        ^
+      external/m4_v1.4.18/gnulib/lib/c-stack.c:139:8: error: fields must have a constant size: 'variable length array in structure' extension will never be   supported
+        char buffer[SIGSTKSZ];
+               ^
+      2 errors generated.
+      ```
+  2. A release build (`--config=release-mac`) fails on Apple Silicon Macs,
+     which (I think) is related to this upstream
+     [jemalloc issue](https://github.com/jemalloc/jemalloc/issues/1997),
+     which is mentioned to be caused due to a QEMU bug. It manifests as an error:
+     ```
+     include/jemalloc/internal/rtree.h:118:3: error: constant expression evaluates to -12 which cannot be narrowed to type 'unsigned int' [-Wc++11-narrowing]
+        {RTREE_NSB, RTREE_NHIB + RTREE_NSB}
+         ^~~~~~~~~
+      include/jemalloc/internal/rtree.h:22:19: note: expanded from macro 'RTREE_NSB'
+        #define RTREE_NSB (LG_VADDR - RTREE_NLIB)
+                  ^~~~~~~~~~~~~~~~~~~~~~~
+     ```
+
 </details>
 
 ## IDE Integration
