@@ -4,7 +4,7 @@ Download the binary for your platform using:
 TAG=TAG_PLACEHOLDER \
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')" \
 RELEASE_URL="https://github.com/sourcegraph/scip-ruby/releases/download/$TAG" \
-curl -L "$RELEASE_URL/scip-ruby-$OS-x86_64" -o scip-ruby && \
+curl -L "$RELEASE_URL/scip-ruby-x86_64-$OS" -o scip-ruby && \
 chmod +x scip-ruby
 ```
 
