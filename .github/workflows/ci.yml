@@ -46,6 +46,4 @@ jobs:
       - name: "🏋️‍♂️ Run snapshot tests"
         run: rm log && ./bazel test //test/scip --config=dbg
       - name: "🏋️‍♂️ Run repo tests"
-        run: ./bazel test //test/scip/repos --test_env GITHUB_ACTIONS=1 --test_env PATH="$PATH" --test_env HOME="$HOME" --config=dbg --spawn_strategy=local
-          # Turn off sandboxing because Homebrew needs to write
-          # to directories outside the sandbox. 🙄
+        run: ./bazel test //test/scip/repos --test_env GITHUB_ACTIONS=1 --test_env GEM_PATH="$(dirname "$(which gem)")" --config=dbg

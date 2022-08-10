@@ -71,10 +71,25 @@ Updating snapshots:
 Run repo tests, to check that there are no crashes on indexing OSS repos:
 
 ```
-./bazel test //test/scip/repos --config=dbg
+# If Ruby was installed via asdf (recommended to avoid dependency on system Ruby on macOS)
+./bazel test --test_env GEM_PATH="$HOME/.asdf/installs/ruby/2.7.2/bin" //test/scip/repos --config=dbg
+
+# Otherwise, I think this might work.
+./bazel test --test_env GEM_PATH="$(dirname "$(which gem)")" //test/scip/repos --config=dbg
 ```
 
 This may take a few minutes to run.
+
+<details>
+  <summary>Known testing issues</summary>
+
+  1. On macOS, Ruby 2.7.x may fail to install due to a combination of `-Werror`
+     and a warning in OpenSSL. As a workaround, you can use the following asdf invocation:
+     ```
+     OPENSSL_CFLAGS=-Wno-error=implicit-function-declaration asdf install ruby 2.7.2
+     ```
+     This works with 2.7.2, but not with 2.7.0.
+</details>
 
 ## Writing a new snapshot test
 

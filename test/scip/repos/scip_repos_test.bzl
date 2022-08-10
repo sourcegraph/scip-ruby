@@ -9,7 +9,7 @@ _data = [
                      " && popd" +
                      " && ./bin/brew typecheck"),
         "run_cmd": ("pushd Library/Homebrew" +
-                    " && $$(find . -name srb -type f) | while IFS= read -r line ; do cp $${TEST_DIR}/$(location //main:scip-ruby) $$line ; done" +
+                    " && find . -name srb -type f -exec cp $${TEST_DIR}/$(location //main:scip-ruby) {} \\;" +
                     " && popd" +
                     " && ./bin/brew typecheck"),
     },
