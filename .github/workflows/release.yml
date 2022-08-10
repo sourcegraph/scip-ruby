@@ -77,16 +77,24 @@ jobs:
           path: log
       - name: ${{ format('📦 Upload binary ({0})', matrix.config) }}
         run: |
-          ls bazel-out
-          BASE_NAME="scip-ruby-debug"
+          SUFFIX="-debug"
           if [ "$CFG" == "release" ]; then
-            BASE_NAME="scip-ruby"
+            SUFFIX=""
           fi
-          outBinaryPath="$BASE_NAME-$OS-$(uname -m)"
-          builtBinaryPath="$(find bazel-out/ -type f -name 'scip-ruby')"
-          mv "$builtBinaryPath" "$outBinaryPath"
+          outBinaryPath="$scip-ruby-$OS-$(uname -m)${SUFFIX}"
+          cp bazel-bin/main/scip-ruby "$outBinaryPath"
           gh release upload "${GITHUB_REF/refs\/tags\//}" "$outBinaryPath"
+          echo "suffix=$SUFFIX" >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OS: ${{ env.OS }}
           CFG: ${{ matrix.config }}
+      - name: ${{ format('💎 Build Gem(s) ({0})', matrix.config) }}
+        run: |
+          NAME="scip-ruby${{ env.suffix }}" \
+          VERSION="${GITHUB_REF/refs\/tags\/scip-ruby-v/}" \
+          .github/workflows/build-gems.sh
+      - name: ${{ format('📦 Upload Gem(s) to GitHub ({0})', matrix.config) }}
+        run: gh release upload "${GITHUB_REF/refs\/tags\//}" gems/scip-ruby/*.gem
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
