@@ -1,5 +1,23 @@
 #!/usr/bin/env bash
 
+# Some tests populate caches based on $HOME. To avoid polluting
+# the outside env, such as on a dev machine, use the current
+# directory, as this script is invoked inside a temporary
+# test directory by Bazel.
+export HOME="$PWD"
+
+# GEM_PATH should be provided from outside:
+#
+#   ./bazel test --test_env GEM_PATH="$(dirname "$(which gem)")" <blah>
+#
+# Avoid passing --test_env PATH="$PATH" to reduce risk of
+# dependencies on random stuff in a dev environment.
+if [ -z "$GEM_PATH" ]; then
+  echo '$GEM_PATH environment variable was not set.'
+  exit 1
+fi
+export PATH="$GEM_PATH:$PATH"
+
 get_date() {
   date '+%s'
 }
@@ -38,8 +56,8 @@ PREP_CMD="$5"
 RUN_CMD="$6"
 PATCH_ABSPATH=""
 TEST_DIR="$PWD"
-if [ "$#" -eq 6 ]; then
-  PATCH_ABSPATH="$TEST_DIR/$6"
+if [ "$#" -eq 7 ]; then
+  PATCH_ABSPATH="$TEST_DIR/$7"
 fi
 
 if [ -n "${GITHUB_ACTIONS:-}" ]; then
@@ -51,7 +69,7 @@ rm -rf repo
 mkdir repo
 pushd repo
 
-git clone -q "$CLONE_URL" . --branch "$GIT_TAG" --depth=1
+git -c advice.detachedHead=false clone "$CLONE_URL" . --branch "$GIT_TAG" --depth=1
 if [ "$(git rev-parse HEAD)" != "$GIT_SHA" ]; then
   echo "Expected SHA: $GIT_SHA"
   echo "Obtained SHA: $(git rev-parse HEAD)"
