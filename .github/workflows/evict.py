@@ -20,8 +20,9 @@
 # a cache entry from a non-default branch (on an LRU basis). That should create
 # enough space for a new cache entry.
 
-import datetime
+from datetime import datetime
 import requests
+import operator
 import os
 
 DEFAULT_BRANCH_NAME = 'scip-ruby/master'
@@ -75,24 +76,25 @@ def default_main():
         return
 
     entries_and_times = [
-        (x, datetime.fromisoformat(x['last_accessed_at']))
+        (x, datetime.strptime(x['last_accessed_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
         for x in other_branch_cache_entries
     ]
 
-    # Sort descending based on timestamps, and evict the oldest one.
-    sorted(entries_and_times, key=itemgetter(1))
-    earliest_entry = entries_and_times[0]
+    # Sort descending based on timestamps, and evict the oldest two.
+    sorted(entries_and_times, key=operator.itemgetter(1))
+    earliest_entries = entries_and_times[0:2][0]
 
-    if os.getenv('DRY_RUN'):
-        print('dry run: Will evict:\n{}'.format(earliest_entry))
-        return
+    for early_entry in earliest_entries:
+       if os.getenv('DRY_RUN'):
+           print('dry run: Will evict:\n{}'.format(early_entry))
+           continue
 
-    print('requesting deletion of cache entry:\n{}'.format(earliest_entry))
+       print('requesting deletion of cache entry:\n{}'.format(early_entry))
 
-    entry_url = '{}/{}'.format(CACHES_URL, earliest_entry['id'])
+       entry_url = '{}/{}'.format(CACHES_URL, early_entry['id'])
 
-    res = requests.delete(entry_url, headers=headers)
-    print('cache deletion status: {}', res.status_code)
+       res = requests.delete(entry_url, headers=headers)
+       print('cache deletion status: {}', res.status_code)
 
 if __name__ == '__main__':
     default_main()

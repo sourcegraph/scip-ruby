@@ -34,21 +34,27 @@ jobs:
       TAG: ${{ github.event.ref }}
     steps:
       - uses: actions/checkout@v3
+      # Keep in sync with ci.yml
+      - name: Manually evict cache entry if applicable
+        if: ${{ runner.os == 'Linux' }}
+        run: ACCESS_TOKEN='${{ secrets.GITHUB_TOKEN }}' python3 .github/workflows/evict.py
       - name: "🚀 Mount Bazel build cache"
         if: ${{ runner.os == 'Linux' }}
         uses: actions/cache@v3
         with:
           path: ~/bazelcache/build
-          key: bazel-build-${{ runner.os }}
+          key: bazel-build-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
+            bazel-build-${{ runner.os }}-
             bazel-build-
       - name: "🚀 Mount Bazel repo cache"
         uses: actions/cache@v3
         if: ${{ runner.os == 'Linux' }}
         with:
           path: ~/bazelcache/repos
-          key: bazel-repos-${{ runner.os }}
+          key: bazel-repos-${{ runner.os }}-${{ hashFiles('WORKSPACE') }}
           restore-keys: |
+            bazel-repos-${{ runner.os }}-
             bazel-repos-
       - name: "⚙️ Setup Bazel"
         run: .github/workflows/setup-bazel.sh
