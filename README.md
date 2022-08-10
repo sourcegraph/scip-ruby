@@ -86,7 +86,7 @@ chmod +x scip-ruby
 # If using in CI with 'set -e', make sure to wrap the
 # scip-ruby invocation in 'set +e' followed by 'set -e'
 # so that indexing failures are non-blocking.
-./scip-ruby --index-file index.scip --gem-metadata "my-gem-name@vM.N.P"
+./scip-ruby --index-file index.scip --gem-metadata "my-gem-name@M.N.P"
 ```
 
 The generated index can be uploaded to a Sourcegraph instance
