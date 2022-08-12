@@ -57,7 +57,7 @@ jobs:
             bazel-repos-${{ runner.os }}-
             bazel-repos-
       - name: "⚙️ Setup Bazel"
-        run: .github/workflows/setup-bazel.sh
+        run: VERSION="${GITHUB_REF/refs\/tags\/scip-ruby-v/}" .github/workflows/setup-bazel.sh
       - name: "🔎 Identify OS"
         run: echo "OS=$(uname -s | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
       - name: ${{ format('🏗 Build ({0})', matrix.config) }}
@@ -67,6 +67,7 @@ jobs:
             CONFIG="release-${OS/darwin/mac}"
           fi
           ./bazel build //main:scip-ruby --config="$CONFIG" --execution_log_binary_file=log
+          echo "config=$CONFIG" >> "$GITHUB_ENV"
         env:
           OS: ${{ env.OS }}
           CFG: ${{ matrix.config }}
@@ -90,10 +91,7 @@ jobs:
           OS: ${{ env.OS }}
           CFG: ${{ matrix.config }}
       - name: ${{ format('💎 Build Gem(s) ({0})', matrix.config) }}
-        run: |
-          NAME="scip-ruby${{ env.suffix }}" \
-          VERSION="${GITHUB_REF/refs\/tags\/scip-ruby-v/}" \
-          .github/workflows/build-gems.sh
+        run: ./bazel build //gems/scip-ruby --config="${{ env.config }}"
       - name: ${{ format('📦 Upload Gem(s) to GitHub ({0})', matrix.config) }}
         run: gh release upload "${GITHUB_REF/refs\/tags\//}" gems/scip-ruby/*.gem
         env:

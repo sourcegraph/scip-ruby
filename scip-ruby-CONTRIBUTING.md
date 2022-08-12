@@ -22,7 +22,19 @@
 ./bazel build //main:scip-ruby --config=dbg
 ```
 
+The generated binary is located at `bazel-bin/main/scip-ruby`.
+
 For more information about configurations, see the [Sorbet README](./sorbet-README.md). If you run into a build issue, check if it matches one of the [Known build issues][]; you may need to change your configuration.
+
+### Building Gems
+
+```
+./bazel build //gems/scip-ruby --config=dbg
+```
+
+The generated gems are located in `bazel-bin/gems/scip-ruby`.
+The gems have a version of `0.0.0`.
+To use a different version, pass `--//gem/scip-ruby:version=M.N.P`.
 
 ## IDE Integration
 

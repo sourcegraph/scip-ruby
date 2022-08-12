@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#!/usr/bin/env ruby
+
+=begin 2>/dev/null
+
+# START Bash
+
+# This is both a Ruby script and a Bash script similar to srb.
+# Unlike srb, I'm mixing languages because it didn't seem terribly
+# useful to spend time figuring out how to write this in Ruby.
+#
+# We don't care about perf here similar to srb; as you can see below,
+# I'm spawning a bunch of processes. And that's OK, because we don't
+# expect someone to keep invoking the indexer repeatedly (unlike say,
+# the type-checker which may be invoked through something like entr).
+
+set -euo pipefail
+
+if [ -n "${DEBUG:-}" ]; then
+  set -x
+fi
+
+if [ -z "${BUNDLE_GEMFILE:-}" ]; then
+  echo "Expected to be invoke through bundle exec scip-ruby"
+  echo "Did you invoke this binary directly?"
+  exit 1
+fi
+
+if grep -q -e "scip-ruby-debug" "$BUNDLE_GEMFILE"; then
+  SCIP_RUBY="scip-ruby-debug"
+elif grep -q -e "scip-ruby" "$BUNDLE_GEMFILE"; then
+  SCIP_RUBY="scip-ruby"
+elif grep -q -e "scip-ruby-debug" "$(dirname "$BUNDLE_GEMFILE")"/*.gemspec; then
+  SCIP_RUBY="scip-ruby-debug"
+else
+  SCIP_RUBY="scip-ruby"
+fi
+
+GEM_INSTALL_PATH="$(bundle info "$SCIP_RUBY" | grep 'Path: ' | sed -E 's/^\s+Path: //')"
+
+chmod +x "$GEM_INSTALL_PATH/native/scip-ruby"
+exec "$GEM_INSTALL_PATH/native/scip-ruby" "$@"
+
+# END Bash
+=end
+
+exec(__FILE__, *ARGV)
