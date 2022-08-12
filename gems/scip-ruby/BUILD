@@ -7,6 +7,7 @@ version(
 
 build_gems(
     name = "scip-ruby",
+    visibility = ["//visibility:public"],
     srcs = [
         "bin/scip-ruby",
         "scip-ruby.template.gemspec",

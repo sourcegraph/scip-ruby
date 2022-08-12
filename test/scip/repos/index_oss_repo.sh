@@ -48,13 +48,14 @@ fi
 
 set -eu
 
-TEST_NAME="$1"
-CLONE_URL="$2"
-GIT_TAG="$3"
-GIT_SHA="$4"
-PREP_CMD="$5"
-RUN_CMD="$6"
-PATCH_ABSPATH=""
+ENV_VARS=("TEST_NAME" "CLONE_URL" "GIT_TAG" "GIT_SHA", "PREP_CMD", "RUN_CMD", "PATCH_ABSPATH")
+for ENV_VAR in "${ENV_VARS[@]}"; do
+  if eval "[ -z $(printf '${%s:-}' $ENV_VAR) ]"; then
+    echo "Missing definition for $ENV_VAR environment variable"
+    exit 1
+  fi
+done
+
 TEST_DIR="$PWD"
 if [ "$#" -eq 7 ]; then
   PATCH_ABSPATH="$TEST_DIR/$7"
