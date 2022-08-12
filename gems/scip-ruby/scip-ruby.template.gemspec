@@ -7,8 +7,8 @@ Gem::Specification.new do |spec|
   spec.description = 'Wrapper for the scip-ruby binary'
   spec.authors     = ['Sourcegraph']
   spec.email       = 'code-intel@sourcegraph.com'
-  spec.files       = ['bin/scip-ruby'] # Populated by build-gems.sh
-  spec.executables = []
+  spec.files       = ['native/scip-ruby'] # Populated by build-gems.sh
+  spec.executables = ['scip-ruby'] # Wrapper script
   spec.license     = 'Apache-2.0'
   spec.homepage    = 'https://github.com/sourcegraph/scip-ruby'
   spec.metadata = {
