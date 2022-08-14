@@ -1,27 +1,17 @@
 #!/usr/bin/env bash
 
-# Based on build-static-release.sh
+# See also: NOTE[repo-test-structure]
 
 set -eu
 
-exit_fail() {
-  echo 'This is likely a bug in the bazel code running the build'
-  exit 1
-}
-
-if [ -z "${VERSION:-}" ]; then
-  echo 'Missing value for VERSION environment variable'
-  exit_fail
-elif [ -z "${NAME:-}" ]; then
-  echo 'Missing value for NAME environment variable'
-  exit_fail
-elif [ -z "${SCIP_RUBY_BINARY:-}" ]; then
-  echo 'Missing value for SCIP_RUBY_BINARY environment variable'
-  exit_fail
-elif [ -z "${OUT_DIR:-}" ]; then
-  echo 'Missing value for OUT_DIR environment variable'
-  exit_fail
-fi
+ENV_VARS=("VERSION" "NAME" "SCIP_RUBY_BINARY" "OUT_DIR")
+for ENV_VAR in "${ENV_VARS[@]}"; do
+  if eval "[ -z \"$(printf '${%s:-}' $ENV_VAR)\" ]"; then
+    echo "Missing definition for $ENV_VAR environment variable"
+    echo 'This is likely a bug in the bazel code running the build'
+    exit 1
+  fi
+done
 
 cp -R gems/scip-ruby out
 mkdir -p out/native

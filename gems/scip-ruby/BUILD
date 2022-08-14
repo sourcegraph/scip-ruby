@@ -1,8 +1,13 @@
-load(":build_gems.bzl", "build_gems", "version")
+load(":build_gems.bzl", "build_gems", "setup_standalone_ruby", "version")
 
 version(
     name = "version",
     build_setting_default = "0.0.0",
+)
+
+setup_standalone_ruby(
+    name = "standalone-ruby",
+    visibility = ["//visibility:public"],
 )
 
 build_gems(
@@ -20,4 +25,5 @@ build_gems(
         "//tools/config:darwin": "darwin",
     }),
     scip_ruby_target = "//main:scip-ruby",
+    visibility = ["//visibility:public"],
 )

@@ -1,0 +1,24 @@
+diff --git a/Gemfile.lock b/Gemfile.lock
+index 9fef6a6..54db244 100644
+--- a/Gemfile.lock
++++ b/Gemfile.lock
+@@ -81,2 +81,3 @@ GEM
+     ruby-progressbar (1.11.0)
++    scip-ruby-debug (0.0.0-x86_64-linux)
+     securerandom (0.2.0)
+@@ -125,2 +126,3 @@ PLATFORMS
+   arm64-darwin-21
++  ruby
+   x86_64-linux
+@@ -136,2 +138,3 @@ DEPENDENCIES
+   rubocop-sorbet
++  scip-ruby-debug
+   shopify_api!
+diff --git a/shopify_api.gemspec b/shopify_api.gemspec
+index da77b24..93fba5c 100644
+--- a/shopify_api.gemspec
++++ b/shopify_api.gemspec
+@@ -51,2 +51,3 @@ Gem::Specification.new do |s|
+   s.add_development_dependency("tapioca")
++  s.add_development_dependency("scip-ruby-debug")
+ end

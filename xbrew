@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+if [ "$1" == "where" ]; then
+  set -e
+  echo "$($HOME/.homebrew-x86_64/bin/brew --prefix)/bin/$2"
+  exit 0
+fi
+exec arch -x86_64 "$HOME/.homebrew-x86_64/bin/brew" "$@"

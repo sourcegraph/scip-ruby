@@ -31,7 +31,7 @@ def _build_gems(ctx):
         outputs = output_files,
         inputs = inputs,
         mnemonic = "BuildGems",
-        executable = ctx.attr._build_script.files.to_list()[0],
+        executable = ctx.file._build_script,
         env = {
             "NAME": name,
             "DARWIN_VERSIONS": " ".join([str(dv) for dv in darwin_versions]),
@@ -40,13 +40,48 @@ def _build_gems(ctx):
             "OUT_DIR": output_files[0].dirname,
         },
     )
-    return [DefaultInfo(files = depset(output_files))]
+    runfiles = ctx.runfiles(files = output_files)
+    return [DefaultInfo(files = depset(output_files), runfiles = runfiles)]
+
+def _setup_standalone_ruby(ctx):
+    ruby_archive = ctx.actions.declare_file("cache/ruby.tgz")
+    inputs = [ctx.file._ruby_version]
+    outputs = [ruby_archive]
+    ctx.actions.run(
+        outputs = outputs,
+        inputs = inputs,
+        mnemonic = "StandaloneRuby",
+        executable = ctx.file._install_script,
+        env = {
+            # Ideally, we would also pass in a C compiler here, but 🤷🏽
+            "SCIP_RUBY_RBENV_EXE": ctx.var["SCIP_RUBY_RBENV_EXE"],
+            "SCIP_RUBY_CACHE_RUBY_DIR": ctx.var["SCIP_RUBY_CACHE_RUBY_DIR"],
+            "RUBY_VERSION_FILE": ctx.file._ruby_version.path,
+            "OUT_TGZ_PATH": ruby_archive.path,
+        },
+    )
+    runfiles = ctx.runfiles(files = outputs)
+    return [DefaultInfo(files = depset(outputs), runfiles = runfiles)]
+
+setup_standalone_ruby = rule(
+    implementation = _setup_standalone_ruby,
+    attrs = {
+        "_ruby_version": attr.label(default = "//:.ruby-version", allow_single_file = True),
+        "_install_script": attr.label(default = "install_ruby.sh", allow_single_file = True),
+    },
+    doc = """
+        Creates a standalone ruby installation using rbenv that is only for test use,
+        without interfering with any system Ruby. We are not using bazelruby/rules_ruby here
+        because it seems largely oriented towards *building* Ruby code, whereas what we
+        want to do is install dependencies in a way that mimics common usage (through Bundler).
+        """,
+)
 
 build_gems = rule(
     implementation = _build_gems,
     attrs = {
         "_version": attr.label(default = ":version"),
-        "_build_script": attr.label(default = "build.sh", allow_files = True),
+        "_build_script": attr.label(default = "build.sh", allow_single_file = True),
         "srcs": attr.label_list(allow_files = True),
         "scip_ruby_target": attr.label(),
         "gem_name": attr.string(),

@@ -1,5 +1,13 @@
 # Working on scip-ruby
 
+This document covers the day-to-day aspects of `scip-ruby`.
+For questions on why certain things are the way they are,
+see the [Design Decisions doc][] doc.
+
+[Design Decisions doc]: DESIGN.md
+
+- [Install dependencies](#install-dependencies)
+- [Configuring Ruby (optional)](#configuring-ruby-optional)
 - [Building](#building)
 - [IDE integration](#ide-integration)
 - [Writing a new snapshot test](#writing-a-new-snapshot-test)
@@ -10,11 +18,58 @@
 - [Cutting a release](#cutting-a-release)
 - Troubleshooting
   - [Known build issues][]
-  - [Known Ruby installation issues][]
   - [Known RubyGems related issues](#known-rubygems-related-issues)
+  - [Known testing issues](#known-testing-issues)
 
 [Known build issues]: #known-build-issues
-[Known Ruby installation issues]: #known-ruby-installation-issues
+
+## Install dependencies
+
+1. C++ toolchain (gcc or clang): Used for bootstrapping.
+2. [rbenv][]: (optional) This is used for [Configuring Ruby](#configuring-ruby-optional).
+
+[rbenv]: https://github.com/rbenv/rbenv#installation
+
+## Configuring Ruby (optional)
+
+If you're going to be running the repository tests or building the
+scip-ruby gem locally, follow these steps before building stuff.
+
+### macOS pre-requisites
+
+arm64 macOS builds aren't supported yet,
+so it is simpler to have a consistent set of tools
+where Homebrew is running under Rosetta too.
+
+```
+mkdir ~/.homebrew-x86_64
+curl -L https://github.com/Homebrew/brew/tarball/master | tar xz --strip 1 -C ~/.homebrew-x86_64
+./xbrew --version # check that it works
+```
+
+**WARNING:** Do not put this `brew` on your PATH!
+That may lead to confusing errors when working on other projects.
+
+### rbenv setup
+
+#### Linux
+
+Install [rbenv][] as per the official instructions. Then run:
+
+```bash
+echo "build --define SCIP_RUBY_CACHE_RUBY_DIR='$PWD/.cache_ruby' --define SCIP_RUBY_RBENV_EXE='$(which rbenv)'" >> .bazelrc.local
+```
+
+#### macOS
+
+```bash
+./xbrew install rbenv
+echo "build --define SCIP_RUBY_CACHE_RUBY_DIR='$PWD/.cache_ruby' --define SCIP_RUBY_RBENV_EXE='$(./xbrew where rbenv)'" >> .bazelrc.local
+```
+
+If you're wondering why we have this separate kind of caching,
+instead of having everything happen through the Magic of Bazel (TM),
+see the [Design Decisions doc][].
 
 ## Building
 
@@ -92,7 +147,7 @@ First, clone the repo using Sorbet locally
 and check if you can index it.
 Typically, the commands will be something like:
 
-```
+```bash
 BUNDLE_WITH=sorbet bundle install
 
 # Replace srb binary with scip-ruby binary
@@ -101,7 +156,7 @@ bundle exec srb --index-file index.scip --gem-metadata "name@version"
 ```
 
 In case there are any type errors, create a patch and save it:
-```
+```bash
 git diff > /path/to/test/scip/repos/name-version.patch
 ```
 
@@ -200,15 +255,6 @@ See the [release workflow](/.github/workflows/release.yml) for details.
                 ^~~~~~~~~~~~~~~~~~~~~~~
    ```
 
-### Known Ruby installation issues
-
-1. On macOS, Ruby 2.7.x may fail to install due to a combination of `-Werror`
-   and a warning in OpenSSL. As a workaround, you can use the following asdf invocation:
-   ```
-   OPENSSL_CFLAGS=-Wno-error=implicit-function-declaration asdf install ruby 2.7.2
-   ```
-   This works with 2.7.2, but not with 2.7.0.
-
 ### Known RubyGems related issues
 
 1. If you're trying to run `bundle install` for a gem
@@ -227,3 +273,13 @@ See the [release workflow](/.github/workflows/release.yml) for details.
    Network Preferences > Advanced > TCP/IP >
    Configure IPv6: set to Link-local only.
    You need to Apply the settings after changing that field.
+
+### Known testing issues
+
+I can't quite figure out why, but with some of the custom rules,
+the executable script being modified doesn't trigger a rebuild.
+If you're seeing stale results, try something like:
+
+```bash
+rm -rf .cache_ruby/ && cd bazel-bin && find . -name '*.tgz' -type f | xargs rm -f && cd -
+```
