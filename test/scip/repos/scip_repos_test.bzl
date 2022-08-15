@@ -14,6 +14,12 @@ def _scip_repo_test_cache_rule(ctx):
             len(target_zip_list),
             ctx.attr.target,
         ))
+
+    # In CI, the gem build needs to use the same 'gem' as this task, so before
+    # we delete/overwrite, let that job finish.
+    if ctx.var["SCIP_RUBY_RBENV_EXE"] == "RUNNING_IN_CI_RBENV_NOT_NEEDED":
+        inputs += ctx.attrs._scip_ruby_gems.files.to_list()
+
     ctx.actions.run(
         outputs = outputs,
         inputs = inputs,
@@ -39,6 +45,7 @@ scip_repo_test_cache_rule = rule(
         "_standalone_ruby_tgz": attr.label(default = "//gems/scip-ruby:standalone-ruby", allow_single_file = True),
         "_bundle_cache_script": attr.label(default = ":bundle_cache.sh", allow_single_file = True),
         "_ruby_version": attr.label(default = "//:.ruby-version", allow_single_file = True),
+        "_scip_ruby_gems": attr.label(default = "//gems/scip-ruby"),
         "target": attr.label(mandatory = True),
         "strip_prefix": attr.string(mandatory = True),
         "subdir": attr.string(mandatory = True),

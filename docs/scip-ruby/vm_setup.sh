@@ -24,6 +24,8 @@ rm -rf ruby-build
 
 curl -fsSL https://github.com/rbenv/rbenv-installer/raw/main/bin/rbenv-doctor | bash
 
+MAKE_OPTS="-j $(getconf _NPROCESSORS_ONLN)" rbenv install 2.7.2
+
 git clone https://github.com/sourcegraph/scip-ruby.git
 cd scip-ruby
 
@@ -35,5 +37,5 @@ mkdir -p "$CACHE_DIR/output-bases/${JOB_NAME}" "$CACHE_DIR/build" "$CACHE_DIR/re
   echo "startup --output_base=$CACHE_DIR/output-bases/${JOB_NAME}"
   echo "build  --disk_cache=$CACHE_DIR/build --repository_cache=$CACHE_DIR/repos"
   echo "test   --disk_cache=$CACHE_DIR/build --repository_cache=$CACHE_DIR/repos"
-  echo "build --define SCIP_RUBY_CACHE_RUBY_DIR='$PWD/.cache_ruby' --define SCIP_RUBY_RBENV_EXE='$(which rbenv)'"
+  echo "build --define SCIP_RUBY_CACHE_RUBY_DIR='$PWD/.cache_ruby' --define SCIP_RUBY_RBENV_EXE='$(which rbenv)' --define EXTERNAL_GEM_EXE='$(which gem)"
 } > .bazelrc.local

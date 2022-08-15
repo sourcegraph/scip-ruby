@@ -4,7 +4,7 @@
 
 set -eu
 
-ENV_VARS=("PRISTINE_TOOLCHAIN_TGZ_PATH" "SCIP_RUBY_CACHE_RUBY_DIR" "RUBY_VERSION_FILE" "VERSION" "NAME" "SCIP_RUBY_BINARY" "OUT_DIR")
+ENV_VARS=("EXTERNAL_GEM_EXE" "NAME" "VERSION" "DARWIN_VERSIONS" "SCIP_RUBY_BINARY" "OUT_DIR")
 for ENV_VAR in "${ENV_VARS[@]}"; do
   if eval "[ -z \"$(printf '${%s:-}' $ENV_VAR)\" ]"; then
     echo "Missing definition for $ENV_VAR environment variable"
@@ -24,19 +24,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-rm -rf "$SCIP_RUBY_CACHE_RUBY_DIR"
-mkdir -p "$SCIP_RUBY_CACHE_RUBY_DIR"
-tar -xzf "$PRISTINE_TOOLCHAIN_TGZ_PATH" -C "$SCIP_RUBY_CACHE_RUBY_DIR"
-
-SCIP_RUBY_SPECIFIC_RUBY_ROOT="$SCIP_RUBY_CACHE_RUBY_DIR"
-if [ -d "$SCIP_RUBY_SPECIFIC_RUBY_ROOT/versions" ]; then
-  # rbenv creates an extra versions subdirectory, which doesn't apply in CI.
-  # This is to avoid finding the 'gem' from shims/
-  SCIP_RUBY_SPECIFIC_RUBY_ROOT="$SCIP_RUBY_SPECIFIC_RUBY_ROOT/versions"
+if [ ! -f "$EXTERNAL_GEM_EXE" ]; then
+  echo "error: Didn't find 'gem' executable at $EXTERNAL_GEM_EXE"
+  exit 1
 fi
-SCIP_RUBY_SPECIFIC_RUBY_ROOT="$SCIP_RUBY_SPECIFIC_RUBY_ROOT/$(< "$RUBY_VERSION_FILE")"
 
-GEM_EXE="$(find "$SCIP_RUBY_SPECIFIC_RUBY_ROOT" -name 'gem' -type f)"
+GEM_EXE="$EXTERNAL_GEM_EXE"
 file "$GEM_EXE"
 
 pushd out
