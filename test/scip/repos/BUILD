@@ -1,3 +1,8 @@
-load(":scip_repos_test.bzl", "scip_repos_test_suite")
+load(":scip_repos_test.bzl", "register_scip_repo_test_caches", "scip_repos_test_suite")
 
-scip_repos_test_suite(patch_paths = glob(["*.patch"]))
+register_scip_repo_test_caches()
+
+scip_repos_test_suite(
+    name = "repos",
+    patch_paths = glob(["*.patch"]),
+)

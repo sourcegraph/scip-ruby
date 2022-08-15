@@ -1,20 +1,99 @@
 # Working on scip-ruby
 
+This document covers the day-to-day aspects of `scip-ruby`.
+For questions on why certain things are the way they are,
+see the [Design Decisions doc][] doc.
+
+[Design Decisions doc]: DESIGN.md
+
+- [Install dependencies](#install-dependencies)
+- [Configuring Ruby (optional)](#configuring-ruby-optional)
 - [Building](#building)
 - [IDE integration](#ide-integration)
 - [Writing a new snapshot test](#writing-a-new-snapshot-test)
 - [Writing a new repo test](#writing-a-new-snapshot-test)
 - [Debugging with print statements](#debugging-with-print-statements)
 - [Debugging with LLDB](#debugging-with-lldb)
+- [Debugging build issues](#debugging-build-issues)
+  - [Debugging Bazel](#debugging-bazel)
+  - [Debugging on Linux](#debugging-on-linux)
 - [Creating PRs](#creating-prs)
 - [Cutting a release](#cutting-a-release)
 - Troubleshooting
   - [Known build issues][]
-  - [Known Ruby installation issues][]
   - [Known RubyGems related issues](#known-rubygems-related-issues)
+  - [Known testing issues](#known-testing-issues)
 
 [Known build issues]: #known-build-issues
-[Known Ruby installation issues]: #known-ruby-installation-issues
+
+## Install dependencies
+
+1. C++ toolchain (gcc or clang): Used for bootstrapping.
+2. [rbenv][]: (optional) This is used for [Configuring Ruby](#configuring-ruby-optional).
+
+[rbenv]: https://github.com/rbenv/rbenv#installation
+
+## Configuring Ruby (optional)
+
+If you're going to be running the repository tests or building the
+scip-ruby gem locally, follow these steps before building stuff.
+
+### macOS pre-requisites
+
+arm64 macOS builds aren't supported yet,
+so it is simpler to have a consistent set of tools
+where Homebrew is running under Rosetta too.
+
+```
+mkdir ~/.homebrew-x86_64
+curl -L https://github.com/Homebrew/brew/tarball/master | tar xz --strip 1 -C ~/.homebrew-x86_64
+./xbrew --version # check that it works
+```
+
+**WARNING:** Do not put this `brew` on your PATH!
+That may lead to confusing errors when working on other projects.
+
+### rbenv setup
+
+#### Linux
+
+Install [rbenv][] as per the official instructions. For `ruby-build`,
+do NOT install it as a plugin.
+
+<details>
+<summary>Why not install `ruby-build` as a plugin?</summary>
+
+The `RBENV_ROOT` variable does double-duty;
+it serves as the location to install the tools, and it is also used to
+locate plugins (like `ruby-build` -- if you install it as a plugin).
+However, in our case, since we are using a different tool path,
+`rbenv` will be unable to use the `install` plugin.
+
+To mimic the configuration on macOS, I recommend
+installing `ruby-build` next to the `rbenv` binary.
+</details>
+
+```
+git clone https://github.com/rbenv/ruby-build.git --depth=1
+# Assuming you installed rbenv through git as is recommended in the README.
+PREFIX="$HOME/.rbenv" ./ruby-build/install.sh
+rm -rf ruby-build
+```
+
+```bash
+echo "build --define SCIP_RUBY_CACHE_RUBY_DIR='$PWD/.cache_ruby' --define SCIP_RUBY_RBENV_EXE='$(which rbenv)'" >> .bazelrc.local
+```
+
+#### macOS
+
+```bash
+./xbrew install rbenv
+echo "build --define SCIP_RUBY_CACHE_RUBY_DIR='$PWD/.cache_ruby' --define SCIP_RUBY_RBENV_EXE='$(./xbrew where rbenv)'" >> .bazelrc.local
+```
+
+If you're wondering why we have this separate kind of caching,
+instead of having everything happen through the Magic of Bazel (TM),
+see the [Design Decisions doc][].
 
 ## Building
 
@@ -92,7 +171,7 @@ First, clone the repo using Sorbet locally
 and check if you can index it.
 Typically, the commands will be something like:
 
-```
+```bash
 BUNDLE_WITH=sorbet bundle install
 
 # Replace srb binary with scip-ruby binary
@@ -101,7 +180,7 @@ bundle exec srb --index-file index.scip --gem-metadata "name@version"
 ```
 
 In case there are any type errors, create a patch and save it:
-```
+```bash
 git diff > /path/to/test/scip/repos/name-version.patch
 ```
 
@@ -149,6 +228,51 @@ lldb -- ./test/scip_test_runner "$TEST_DIR/my_test.rb" --output="$TEST_DIR/my_te
 popd
 unset TEST_DIR
 ```
+
+## Debugging build issues
+
+### Debugging Bazel
+
+See Keith Smiley's blog post [Debugging bazel actions](https://www.smileykeith.com/2022/03/02/debugging-bazel-actions/). ([archive link](https://web.archive.org/web/20220711000725/https://www.smileykeith.com/2022/03/02/debugging-bazel-actions/))
+
+One KEY thing to keep in mind is that some problems only manifest
+inside the sandbox but not outside because Bazel sandbox changes
+the binaries available at certain paths to use non-system tools.
+
+For example, `uname -m` on an M1 Mac would normally return `arm64`
+but inside an x86_64 Bazel environment (currently the default)
+it will return `x86_64`.
+
+For compiler issues inside a sandbox,
+it helpful to test a small code snippet first.
+
+```bash
+{
+  echo '--- Try compiling some simple stuff ---'
+  {
+    echo '#include <stdio.h>'
+    echo ''
+    echo 'int main() {'
+    echo '  printf("Hello %s\n", "World!");'
+    echo '  return 0;'
+    echo '}'
+  } > tmp.c
+  gcc tmp.c
+  ./a.out
+  rm tmp.c ./a.out
+  echo '--------------------------------------'
+} >&2
+```
+
+### Debugging on Linux
+
+Debugging a build issue in GitHub Actions can get emotionally draining quickly.
+
+If you work at Sourcegraph, set up a GCP VM.
+You may find the companion [VM setup script](./vm_setup.sh) helpful.
+It is not tested in CI, so you may need to tweak it a bit.
+
+Don't forget to delete the instance after you're done investigating!
 
 ## Creating PRs
 
@@ -200,15 +324,6 @@ See the [release workflow](/.github/workflows/release.yml) for details.
                 ^~~~~~~~~~~~~~~~~~~~~~~
    ```
 
-### Known Ruby installation issues
-
-1. On macOS, Ruby 2.7.x may fail to install due to a combination of `-Werror`
-   and a warning in OpenSSL. As a workaround, you can use the following asdf invocation:
-   ```
-   OPENSSL_CFLAGS=-Wno-error=implicit-function-declaration asdf install ruby 2.7.2
-   ```
-   This works with 2.7.2, but not with 2.7.0.
-
 ### Known RubyGems related issues
 
 1. If you're trying to run `bundle install` for a gem
@@ -227,3 +342,13 @@ See the [release workflow](/.github/workflows/release.yml) for details.
    Network Preferences > Advanced > TCP/IP >
    Configure IPv6: set to Link-local only.
    You need to Apply the settings after changing that field.
+
+### Known testing issues
+
+I can't quite figure out why, but with some of the custom rules,
+the executable script being modified doesn't trigger a rebuild.
+If you're seeing stale results, try something like:
+
+```bash
+rm -rf .cache_ruby/ && (cd bazel-bin && find . -name '*.tgz' -type f -delete)
+```
