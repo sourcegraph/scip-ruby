@@ -35,7 +35,7 @@ echo "BUNDLER_VERSION = $_BUNDLER_VERSION"
 "$GEM_EXE" install "bundler:$_BUNDLER_VERSION"
 
 pushd "$TEST_GEM_ZIP_PREFIX/$TEST_GEM_SUBDIR"
-git init -b main
+git init -q
 git add .
 GIT_AUTHOR_DATE=1993-05-16T15:04:05Z GIT_COMMITTER_DATE=1993-05-16T15:04:05Z \
   git -c user.name='iu' -c user.email='i@u' commit -a -m '(^_^)' --quiet
@@ -45,7 +45,9 @@ if ! "$BUNDLE_EXE" cache --quiet 2> >(tee stderr.log >&2); then
   err="$(< stderr.log)"
   while IFS= read -r line; do
     if [[ "$line" == *"lib/ruby/gems"*"mkmf.log" ]]; then
+      echo "----------- Printing likely bad mkmf.log -----------"
       cat "$line"
+      echo "----------------------------------------------------"
     fi
   done <<< "$err"
   exit 1

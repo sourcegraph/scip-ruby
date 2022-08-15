@@ -15,9 +15,6 @@ export MAKE_OPTS="-j ${NUM_CPUS:-4}"
 
 mkdir -p "$SCIP_RUBY_CACHE_RUBY_DIR"
 
-# Make ruby-build available to rbenv.
-export PATH="$(dirname "$SCIP_RUBY_RBENV_EXE"):$PATH"
-
 # Debugging tip: If there is a failure in this step, replace it with:
 #
 #   CC="$SCIP_RUBY_CACHE_RUBY_DIR/cc_wrapper" "$SCIP_RUBY_RBENV_EXE" install --keep --force
@@ -32,6 +29,8 @@ export PATH="$(dirname "$SCIP_RUBY_RBENV_EXE"):$PATH"
 # can be replayed for faster triage.
 
 if [[ "$SCIP_RUBY_RBENV_EXE" != "RUNNING_IN_CI_RBENV_NOT_NEEDED" ]]; then
+  # Make ruby-build available to rbenv.
+  export PATH="$(dirname "$SCIP_RUBY_RBENV_EXE"):$PATH"
   RBENV_ROOT="$SCIP_RUBY_CACHE_RUBY_DIR" "$SCIP_RUBY_RBENV_EXE" install --skip-existing
 fi
 

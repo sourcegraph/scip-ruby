@@ -14,6 +14,9 @@ see the [Design Decisions doc][] doc.
 - [Writing a new repo test](#writing-a-new-snapshot-test)
 - [Debugging with print statements](#debugging-with-print-statements)
 - [Debugging with LLDB](#debugging-with-lldb)
+- [Debugging build issues](#debugging-build-issues)
+  - [Debugging Bazel](#debugging-bazel)
+  - [Debugging on Linux](#debugging-on-linux)
 - [Creating PRs](#creating-prs)
 - [Cutting a release](#cutting-a-release)
 - Troubleshooting
@@ -54,7 +57,28 @@ That may lead to confusing errors when working on other projects.
 
 #### Linux
 
-Install [rbenv][] as per the official instructions. Then run:
+Install [rbenv][] as per the official instructions. For `ruby-build`,
+do NOT install it as a plugin.
+
+<details>
+<summary>Why not install `ruby-build` as a plugin?</summary>
+
+The `RBENV_ROOT` variable does double-duty;
+it serves as the location to install the tools, and it is also used to
+locate plugins (like `ruby-build` -- if you install it as a plugin).
+However, in our case, since we are using a different tool path,
+`rbenv` will be unable to use the `install` plugin.
+
+To mimic the configuration on macOS, I recommend
+installing `ruby-build` next to the `rbenv` binary.
+</details>
+
+```
+git clone https://github.com/rbenv/ruby-build.git --depth=1
+# Assuming you installed rbenv through git as is recommended in the README.
+PREFIX="$HOME/.rbenv" ./ruby-build/install.sh
+rm -rf ruby-build
+```
 
 ```bash
 echo "build --define SCIP_RUBY_CACHE_RUBY_DIR='$PWD/.cache_ruby' --define SCIP_RUBY_RBENV_EXE='$(which rbenv)'" >> .bazelrc.local
@@ -205,6 +229,22 @@ popd
 unset TEST_DIR
 ```
 
+## Debugging build issues
+
+### Debugging Bazel
+
+See Keith Smiley's blog post [Debugging bazel actions](https://www.smileykeith.com/2022/03/02/debugging-bazel-actions/). ([archive link](https://web.archive.org/web/20220711000725/https://www.smileykeith.com/2022/03/02/debugging-bazel-actions/))
+
+### Debugging on Linux
+
+Debugging a build issue in GitHub Actions can get emotionally draining quickly.
+
+If you work at Sourcegraph, set up a GCP VM.
+You may find the companion [VM setup script](./vm_setup.sh) helpful.
+It is not tested in CI, so you may need to tweak it a bit.
+
+Don't forget to delete the instance after you're done investigating!
+
 ## Creating PRs
 
 PRs created through the GitHub UI default to being made
@@ -281,5 +321,5 @@ the executable script being modified doesn't trigger a rebuild.
 If you're seeing stale results, try something like:
 
 ```bash
-rm -rf .cache_ruby/ && cd bazel-bin && find . -name '*.tgz' -type f | xargs rm -f && cd -
+rm -rf .cache_ruby/ && (cd bazel-bin && find . -name '*.tgz' -type f -delete)
 ```
