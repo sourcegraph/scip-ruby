@@ -1,3 +1,37 @@
+def _setup_standalone_ruby(ctx):
+    ruby_archive = ctx.actions.declare_file("cache/ruby.tgz")
+    inputs = [ctx.file._ruby_version]
+    outputs = [ruby_archive]
+    ctx.actions.run(
+        outputs = outputs,
+        inputs = inputs,
+        mnemonic = "StandaloneRuby",
+        executable = ctx.file._install_script,
+        env = {
+            # Ideally, we would also pass in a C compiler here, but 🤷🏽
+            "SCIP_RUBY_RBENV_EXE": ctx.var["SCIP_RUBY_RBENV_EXE"],
+            "SCIP_RUBY_CACHE_RUBY_DIR": ctx.var["SCIP_RUBY_CACHE_RUBY_DIR"],
+            "RUBY_VERSION_FILE": ctx.file._ruby_version.path,
+            "OUT_TGZ_PATH": ruby_archive.path,
+        },
+    )
+    runfiles = ctx.runfiles(files = outputs)
+    return [DefaultInfo(files = depset(outputs), runfiles = runfiles)]
+
+setup_standalone_ruby = rule(
+    implementation = _setup_standalone_ruby,
+    attrs = {
+        "_ruby_version": attr.label(default = "//:.ruby-version", allow_single_file = True),
+        "_install_script": attr.label(default = "install_standalone_ruby.sh", allow_single_file = True),
+    },
+    doc = """
+        Creates a standalone ruby installation using rbenv that is only for test use,
+        without interfering with any system Ruby. We are not using bazelruby/rules_ruby here
+        because it seems largely oriented towards *building* Ruby code, whereas what we
+        want to do is install dependencies in a way that mimics common usage (through Bundler).
+        """,
+)
+
 VersionProvider = provider(fields = ["version"])
 
 def _version(ctx):
@@ -24,66 +58,49 @@ def _build_gems(ctx):
     output_files = [ctx.actions.declare_file(out) for out in outs]
 
     inputs = ctx.attr._build_script.files.to_list()
-    for src in (ctx.attr.srcs + [ctx.attr.scip_ruby_target]):
+    for src in ctx.attr.srcs:
         inputs += src.files.to_list()
+    inputs.append(ctx.file._scip_ruby_binary)
+    inputs.append(ctx.file._ruby_version)
+
+    # Upside of depending on our Ruby installation:
+    # - Reduce risk of funky issues caused due to having two Ruby toolchains.
+    # Downside of depending on our Ruby installation:
+    # - The build is more serialized:
+    #     setup standalone ruby -> build gems -> run tests
+    #   Instead of build gems running in parallel with the ruby setup
+    #   (due to an environmental 'gem' command)
+    # We could potentially revisit this...
+    inputs.append(ctx.file._standalone_ruby_tgz)
 
     ctx.actions.run(
         outputs = output_files,
         inputs = inputs,
-        mnemonic = "BuildGems",
+        mnemonic = "BuildSCIPRubyGems",
         executable = ctx.file._build_script,
         env = {
+            "SCIP_RUBY_CACHE_RUBY_DIR": ctx.var["SCIP_RUBY_CACHE_RUBY_DIR"],
+            "RUBY_VERSION_FILE": ctx.file._ruby_version.path,
+            "PRISTINE_TOOLCHAIN_TGZ_PATH": ctx.file._standalone_ruby_tgz.path,
             "NAME": name,
             "DARWIN_VERSIONS": " ".join([str(dv) for dv in darwin_versions]),
             "VERSION": version,
-            "SCIP_RUBY_BINARY": ctx.attr.scip_ruby_target.files.to_list()[0].path,
+            "SCIP_RUBY_BINARY": ctx.file._scip_ruby_binary.path,
             "OUT_DIR": output_files[0].dirname,
         },
     )
     runfiles = ctx.runfiles(files = output_files)
     return [DefaultInfo(files = depset(output_files), runfiles = runfiles)]
 
-def _setup_standalone_ruby(ctx):
-    ruby_archive = ctx.actions.declare_file("cache/ruby.tgz")
-    inputs = [ctx.file._ruby_version]
-    outputs = [ruby_archive]
-    ctx.actions.run(
-        outputs = outputs,
-        inputs = inputs,
-        mnemonic = "StandaloneRuby",
-        executable = ctx.file._install_script,
-        env = {
-            # Ideally, we would also pass in a C compiler here, but 🤷🏽
-            "SCIP_RUBY_RBENV_EXE": ctx.var["SCIP_RUBY_RBENV_EXE"],
-            "SCIP_RUBY_CACHE_RUBY_DIR": ctx.var["SCIP_RUBY_CACHE_RUBY_DIR"],
-            "RUBY_VERSION_FILE": ctx.file._ruby_version.path,
-            "OUT_TGZ_PATH": ruby_archive.path,
-        },
-    )
-    runfiles = ctx.runfiles(files = outputs)
-    return [DefaultInfo(files = depset(outputs), runfiles = runfiles)]
-
-setup_standalone_ruby = rule(
-    implementation = _setup_standalone_ruby,
-    attrs = {
-        "_ruby_version": attr.label(default = "//:.ruby-version", allow_single_file = True),
-        "_install_script": attr.label(default = "install_ruby.sh", allow_single_file = True),
-    },
-    doc = """
-        Creates a standalone ruby installation using rbenv that is only for test use,
-        without interfering with any system Ruby. We are not using bazelruby/rules_ruby here
-        because it seems largely oriented towards *building* Ruby code, whereas what we
-        want to do is install dependencies in a way that mimics common usage (through Bundler).
-        """,
-)
-
 build_gems = rule(
     implementation = _build_gems,
     attrs = {
         "_version": attr.label(default = ":version"),
-        "_build_script": attr.label(default = "build.sh", allow_single_file = True),
+        "_build_script": attr.label(default = "build_scip_ruby_gems.sh", allow_single_file = True),
         "srcs": attr.label_list(allow_files = True),
-        "scip_ruby_target": attr.label(),
+        "_scip_ruby_binary": attr.label(default = "//main:scip-ruby", allow_single_file = True),
+        "_ruby_version": attr.label(default = "//:.ruby-version", allow_single_file = True),
+        "_standalone_ruby_tgz": attr.label(default = "//gems/scip-ruby:standalone-ruby", allow_single_file = True),
         "gem_name": attr.string(),
         "gem_target_os": attr.string(),
     },

@@ -24,6 +24,5 @@ build_gems(
         "//tools/config:linux": "linux",
         "//tools/config:darwin": "darwin",
     }),
-    scip_ruby_target = "//main:scip-ruby",
     visibility = ["//visibility:public"],
 )
