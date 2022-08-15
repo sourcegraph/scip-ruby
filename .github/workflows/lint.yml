@@ -20,3 +20,7 @@ jobs:
           set -e
           GOBIN="$PWD" go install github.com/bazelbuild/buildtools/buildifier@latest
           git ls-files -- '**.bzl' '**/BUILD' WORKSPACE | xargs ./buildifier -mode=diff
+      - name: Lint workflow files
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@latest
+          actionlint .github/workflows/*.yml
