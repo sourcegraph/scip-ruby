@@ -81,14 +81,16 @@ rm -rf ruby-build
 ```
 
 ```bash
-echo "build --define SCIP_RUBY_CACHE_RUBY_DIR='$PWD/.cache_ruby' --define SCIP_RUBY_RBENV_EXE='$(which rbenv)'" >> .bazelrc.local
+# Set up a global installation because that helps parallelize the build.
+rbenv install
+echo "build --define SCIP_RUBY_CACHE_RUBY_DIR='$PWD/.cache_ruby' --define SCIP_RUBY_RBENV_EXE='$(which rbenv)' --define EXTERNAL_GEM_EXE='$(which gem)'" >> .bazelrc.local
 ```
 
 #### macOS
 
 ```bash
 ./xbrew install rbenv
-echo "build --define SCIP_RUBY_CACHE_RUBY_DIR='$PWD/.cache_ruby' --define SCIP_RUBY_RBENV_EXE='$(./xbrew where rbenv)'" >> .bazelrc.local
+echo "build --define SCIP_RUBY_CACHE_RUBY_DIR='$PWD/.cache_ruby' --define SCIP_RUBY_RBENV_EXE='$(./xbrew where rbenv)' --define EXTERNAL_GEM_EXE=/usr/bin/gem" >> .bazelrc.local
 ```
 
 If you're wondering why we have this separate kind of caching,
