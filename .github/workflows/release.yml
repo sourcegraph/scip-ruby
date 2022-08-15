@@ -5,26 +5,8 @@ on:
       - 'scip-ruby-v*'
 
 jobs:
-  create-release:
-    name: 'Create release'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Create Release Step
-        id: create_release
-        run: |
-          TAG="${GITHUB_REF/refs\/tags\//}"
-          TITLE="$(echo "$TAG" | sed 's/-v/ v/')"
-          cat .github/workflows/release-template.md \
-            | sed -e "s/TAG_PLACEHOLDER/$TAG/" \
-            > notes
-          gh release create "$TAG" --title "$TITLE" --notes-file notes
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   build-and-upload-artifacts:
     name: 'Build and upload artifacts'
-    needs: create-release
     strategy:
       matrix:
         platform: [ubuntu-latest, macos-latest]
@@ -77,7 +59,7 @@ jobs:
         with:
           name: ${{ matrix.config }}-build-log
           path: log
-      - name: ${{ format('📦 Upload binary ({0})', matrix.config) }}
+      - name: ${{ format('🪄 Rename binary ({0})', matrix.config) }}
         run: |
           SUFFIX="-debug"
           if [ "$CFG" == "release" ]; then
@@ -85,15 +67,42 @@ jobs:
           fi
           outBinaryPath="scip-ruby${SUFFIX}-$(uname -m)-$OS"
           cp bazel-bin/main/scip-ruby "$outBinaryPath"
-          gh release upload "${GITHUB_REF/refs\/tags\//}" "$outBinaryPath"
+          echo "outBinaryPath=$outBinaryPath" >> "$GITHUB_ENV"
           echo "suffix=$SUFFIX" >> "$GITHUB_ENV"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OS: ${{ env.OS }}
           CFG: ${{ matrix.config }}
+      - name: ${{ format('📦 Store binary ({0})', matrix.config) }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.platform }}-${{ matrix.config }}-release-artifacts
+          path: ${{ env.outBinaryPath }}
       - name: ${{ format('💎 Build Gem(s) ({0})', matrix.config) }}
         run: ./bazel build //gems/scip-ruby --config="${{ env.config }}"
-      - name: ${{ format('📦 Upload Gem(s) to GitHub ({0})', matrix.config) }}
-        run: gh release upload "${GITHUB_REF/refs\/tags\//}" gems/scip-ruby/*.gem
+      - name: ${{ format('📦 Store Gem(s) to GitHub ({0})', matrix.config) }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.platform }}-${{ matrix.config }}-release-artifacts
+          path: bazel-bin/gems/scip-ruby/*.gem
+
+  create-release:
+    name: 'Create release'
+    needs: build-and-upload-artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Create Release
+        run: |
+          TAG="${GITHUB_REF/refs\/tags\//}"
+          TITLE="${TAG/-v/ v}"
+          TEMPLATE="$(< .github/workflows/release-template.md)"
+          echo "${TEMPLATE//TAG_PLACEHOLDER/$TAG}" > notes
+          gh release create "$TAG" --title "$TITLE" --notes-file notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Download everything to avoid spelling out the different
+      # platforms here.
+      - name: '📥 Download all artifacts'
+        uses: actions/download-artifact@v3
+      - name: '📤 Upload artifacts for release'
+        run: gh release upload "${GITHUB_REF/refs\/tags\//}" ./*-release-artifacts/*
