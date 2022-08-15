@@ -4,6 +4,8 @@
 
 set -eu
 
+set -x
+
 ENV_VARS=("PRISTINE_TOOLCHAIN_TGZ_PATH" "SCIP_RUBY_CACHE_RUBY_DIR" "RUBY_VERSION_FILE" "VERSION" "NAME" "SCIP_RUBY_BINARY" "OUT_DIR")
 for ENV_VAR in "${ENV_VARS[@]}"; do
   if eval "[ -z \"$(printf '${%s:-}' $ENV_VAR)\" ]"; then
@@ -24,9 +26,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
+echo "---------- Before deletion contents ------------"
+ls -R "$SCIP_RUBY_CACHE_RUBY_DIR" | head -n 20
+echo "------------------------------------------------"
+
 rm -rf "$SCIP_RUBY_CACHE_RUBY_DIR"
 mkdir -p "$SCIP_RUBY_CACHE_RUBY_DIR"
 tar -xzf "$PRISTINE_TOOLCHAIN_TGZ_PATH" -C "$SCIP_RUBY_CACHE_RUBY_DIR"
+
+tar -tf "$PRISTINE_TOOLCHAIN_TGZ_PATH" | head -n 20
+
+echo "---------- After extraction contents ------------"
+ls -R "$SCIP_RUBY_CACHE_RUBY_DIR" | head -n 20
+echo "-------------------------------------------------"
 
 SCIP_RUBY_SPECIFIC_RUBY_ROOT="$SCIP_RUBY_CACHE_RUBY_DIR"
 if [ -d "$SCIP_RUBY_SPECIFIC_RUBY_ROOT/versions" ]; then
