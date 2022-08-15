@@ -41,7 +41,13 @@ GIT_AUTHOR_DATE=1993-05-16T15:04:05Z GIT_COMMITTER_DATE=1993-05-16T15:04:05Z \
   git -c user.name='iu' -c user.email='i@u' commit -a -m '(^_^)' --quiet
 set +e
 
-if ! "$BUNDLE_EXE" cache --quiet 2> >(tee stderr.log >&2); then
+# For reasons that are unclear to me, the 'env -' usage works around
+# a gcc problem which manifests as 'cc1' not being executable when invoked
+# as 'gcc blah' and 'ld' not being found when invoked as '/usr/bin/gcc'.
+#
+# This seems specific to some Sorbet configuration; I have not been
+# able to reproduce this weirdness with a minimal configuration outside.
+if ! env - PATH="$PATH" PWD="$PWD" "$BUNDLE_EXE" cache --quiet 2> >(tee stderr.log >&2); then
   err="$(< stderr.log)"
   while IFS= read -r line; do
     if [[ "$line" == *"lib/ruby/gems"*"mkmf.log" ]]; then

@@ -235,6 +235,35 @@ unset TEST_DIR
 
 See Keith Smiley's blog post [Debugging bazel actions](https://www.smileykeith.com/2022/03/02/debugging-bazel-actions/). ([archive link](https://web.archive.org/web/20220711000725/https://www.smileykeith.com/2022/03/02/debugging-bazel-actions/))
 
+One KEY thing to keep in mind is that some problems only manifest
+inside the sandbox but not outside because Bazel sandbox changes
+the binaries available at certain paths to use non-system tools.
+
+For example, `uname -m` on an M1 Mac would normally return `arm64`
+but inside an x86_64 Bazel environment (currently the default)
+it will return `x86_64`.
+
+For compiler issues inside a sandbox,
+it helpful to test a small code snippet first.
+
+```bash
+{
+  echo '--- Try compiling some simple stuff ---'
+  {
+    echo '#include <stdio.h>'
+    echo ''
+    echo 'int main() {'
+    echo '  printf("Hello %s\n", "World!");'
+    echo '  return 0;'
+    echo '}'
+  } > tmp.c
+  gcc tmp.c
+  ./a.out
+  rm tmp.c ./a.out
+  echo '--------------------------------------'
+} >&2
+```
+
 ### Debugging on Linux
 
 Debugging a build issue in GitHub Actions can get emotionally draining quickly.
