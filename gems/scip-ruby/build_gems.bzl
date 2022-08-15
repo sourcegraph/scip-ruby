@@ -61,17 +61,6 @@ def _build_gems(ctx):
     for src in ctx.attr.srcs:
         inputs += src.files.to_list()
     inputs.append(ctx.file._scip_ruby_binary)
-    inputs.append(ctx.file._ruby_version)
-
-    # Upside of depending on our Ruby installation:
-    # - Reduce risk of funky issues caused due to having two Ruby toolchains.
-    # Downside of depending on our Ruby installation:
-    # - The build is more serialized:
-    #     setup standalone ruby -> build gems -> run tests
-    #   Instead of build gems running in parallel with the ruby setup
-    #   (due to an environmental 'gem' command)
-    # We could potentially revisit this...
-    inputs.append(ctx.file._standalone_ruby_tgz)
 
     ctx.actions.run(
         outputs = output_files,
@@ -79,12 +68,10 @@ def _build_gems(ctx):
         mnemonic = "BuildSCIPRubyGems",
         executable = ctx.file._build_script,
         env = {
-            "SCIP_RUBY_CACHE_RUBY_DIR": ctx.var["SCIP_RUBY_CACHE_RUBY_DIR"],
-            "RUBY_VERSION_FILE": ctx.file._ruby_version.path,
-            "PRISTINE_TOOLCHAIN_TGZ_PATH": ctx.file._standalone_ruby_tgz.path,
+            "EXTERNAL_GEM_EXE": ctx.var["EXTERNAL_GEM_EXE"],
             "NAME": name,
-            "DARWIN_VERSIONS": " ".join([str(dv) for dv in darwin_versions]),
             "VERSION": version,
+            "DARWIN_VERSIONS": " ".join([str(dv) for dv in darwin_versions]),
             "SCIP_RUBY_BINARY": ctx.file._scip_ruby_binary.path,
             "OUT_DIR": output_files[0].dirname,
         },
