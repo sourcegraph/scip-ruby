@@ -46,9 +46,9 @@ jobs:
       - name: "🏋️‍♂️ Run repo tests"
         run: |
           sudo apt-get install --reinstall build-essential
-          ls "$(dirname "$(which gcc)")"
+          ls "$(dirname "$(command -v gcc)")"
           echo "$PATH"
           ls /usr/bin /usr/local/bin /bin
           # Technically, this is for Ruby 2.7.0 but it's probably fine.
           sudo apt-get install ruby2.7-dev
-          ./bazel test //test/scip/repos --test_env GITHUB_ACTIONS=1 --test_env GEM_PATH="$(dirname "$(which gem)")" --config=dbg
+          ./bazel test //test/scip/repos --test_env GITHUB_ACTIONS=1 --test_env GEM_PATH="$(dirname "$(command -v gem)")" --config=dbg
