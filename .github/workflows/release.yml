@@ -35,6 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       # Keep in sync with ci.yml
+      - uses: actions/setup-ruby@v1
       - name: Manually evict cache entry if applicable
         if: ${{ runner.os == 'Linux' }}
         run: ACCESS_TOKEN='${{ secrets.GITHUB_TOKEN }}' python3 .github/workflows/evict.py

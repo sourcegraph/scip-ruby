@@ -94,4 +94,4 @@ using the [Sourcegraph CLI](https://github.com/sourcegraph/src-cli).
 
 ## Contributing
 
-See the [Contributing docs](./scip-ruby-CONTRIBUTING.md).
+See the [Contributing docs](./docs/scip-ruby/CONTRIBUTING.md).

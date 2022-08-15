@@ -1,4 +1,5 @@
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
+load("//third_party:test_gem_data.bzl", "gem_build_info")
 
 # We define our externals here instead of directly in WORKSPACE
 def register_sorbet_dependencies():
@@ -356,3 +357,12 @@ def register_sorbet_dependencies():
         strip_prefix = "rbs-23daeea3f8075170788b24daba0cddd51488c54f",
         build_file = "@com_stripe_ruby_typer//third_party:rbs_parser.BUILD",
     )
+
+
+def register_scip_ruby_dependencies():
+    for data in gem_build_info:
+        http_file(
+            name = data["repo_name"] + "_zip",
+            urls = [data["archive_url"]],
+            sha256 = data["archive_sha256"],
+        )

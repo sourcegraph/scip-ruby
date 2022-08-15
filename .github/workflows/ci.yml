@@ -13,8 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '2.7'
       # Keep in sync with release.yml
       - name: Manually evict cache entry if applicable
         run: ACCESS_TOKEN='${{ secrets.GITHUB_TOKEN }}' python3 .github/workflows/evict.py
@@ -46,4 +44,11 @@ jobs:
       - name: "🏋️‍♂️ Run snapshot tests"
         run: rm log && ./bazel test //test/scip --config=dbg
       - name: "🏋️‍♂️ Run repo tests"
-        run: ./bazel test //test/scip/repos --test_env GITHUB_ACTIONS=1 --test_env GEM_PATH="$(dirname "$(which gem)")" --config=dbg
+        run: |
+          sudo apt-get install --reinstall build-essential
+          ls "$(dirname "$(which gcc)")"
+          echo "$PATH"
+          ls /usr/bin /usr/local/bin /bin
+          # Technically, this is for Ruby 2.7.0 but it's probably fine.
+          sudo apt-get install ruby2.7-dev
+          ./bazel test //test/scip/repos --test_env GITHUB_ACTIONS=1 --test_env GEM_PATH="$(dirname "$(which gem)")" --config=dbg

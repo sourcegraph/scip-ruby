@@ -20,15 +20,24 @@ if [ -n "${DEBUG:-}" ]; then
   set -x
 fi
 
-if [ -z "${BUNDLE_GEMFILE:-}" ]; then
-  echo "Expected to be invoke through bundle exec scip-ruby"
+die() {
+  echo "Expected to be invoked as 'bundle exec scip-ruby'"
   echo "Did you invoke this binary directly?"
   exit 1
+}
+
+if [ -z "${BUNDLE_GEMFILE:-}" ]; then
+  echo "Missing BUNDLE_GEMFILE environment variable"
+  die
+elif [ -z "${BUNDLE_BIN_PATH:-}" ]; then
+  echo "Missing BUNDLE_BIN_PATH environment variable"
+  die
 fi
 
-if grep -q -e "scip-ruby-debug" "$BUNDLE_GEMFILE"; then
+GEMFILE_CONTENTS="$(< "$BUNDLE_GEMFILE")"
+if [ "$GEMFILE_CONTENTS" == *"scip-ruby-debug"* ]; then
   SCIP_RUBY="scip-ruby-debug"
-elif grep -q -e "scip-ruby" "$BUNDLE_GEMFILE"; then
+elif [ "$GEMFILE_CONTENTS" == *"scip-ruby"* ]; then
   SCIP_RUBY="scip-ruby"
 elif grep -q -e "scip-ruby-debug" "$(dirname "$BUNDLE_GEMFILE")"/*.gemspec; then
   SCIP_RUBY="scip-ruby-debug"
@@ -36,7 +45,26 @@ else
   SCIP_RUBY="scip-ruby"
 fi
 
-GEM_INSTALL_PATH="$(bundle info "$SCIP_RUBY" | grep 'Path: ' | sed -E 's/^\s+Path: //')"
+# Calling the bundle in BUNDLE_BIN_PATH tries to mess with system directories.
+if [[ "$BUNDLE_BIN_PATH" =~ (.*)/lib/ruby/gems/.* ]]; then
+  BUNDLE_BIN_PATH="${BASH_REMATCH[1]}/bin/bundle"
+  file "$BUNDLE_BIN_PATH" > /dev/null || (echo "scip-ruby: warning: bundle not found at $BUNDLE_BIN_PATH, this may lead to errors")
+else
+  echo "scip-ruby: warning: unexpected BUNDLE_BIN_PATH = $BUNDLE_BIN_PATH"
+  echo "scip-ruby: warning: this may lead to further errors"
+fi
+
+# Careful about trying to "optimize" the regex here.
+# I tried to use -E but that doesn't match with BSD sed.
+GEM_INSTALL_PATH="$("$BUNDLE_BIN_PATH" info "$SCIP_RUBY" | grep 'Path:' | sed -e 's/\s*Path://')"
+# From https://stackoverflow.com/a/3352015/2682729
+trim() {
+    local var="$*"
+    var="${var#"${var%%[![:space:]]*}"}"
+    var="${var%"${var##*[![:space:]]}"}"
+    printf '%s' "$var"
+}
+GEM_INSTALL_PATH="$(trim "$GEM_INSTALL_PATH")"
 
 chmod +x "$GEM_INSTALL_PATH/native/scip-ruby"
 exec "$GEM_INSTALL_PATH/native/scip-ruby" "$@"

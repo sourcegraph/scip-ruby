@@ -1,6 +1,8 @@
 /bazel-*
 /.bazelrc.local
+/.cache_ruby
 /compile_commands.json
+/.homebrew-x86_64
 /.gdb_history
 /tags
 

@@ -3,3 +3,5 @@ filegroup(
     srcs = [".clang-tidy"],
     visibility = ["//visibility:public"],
 )
+
+exports_files([".ruby-version"])
