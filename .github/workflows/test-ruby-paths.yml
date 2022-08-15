@@ -1,0 +1,31 @@
+name: 'Test Ruby Path'
+on:
+  push:
+    branches:
+      - scip-ruby/master
+  pull_request:
+    branches:
+      - scip-ruby/master
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        platform: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ruby/setup-ruby@v1
+      - name: 'Check paths'
+        run: |
+          pwd
+          ls
+          set +e
+          which ruby
+          which gem
+          which bundle
+          if [ "$(uname -s)" == "Linux" ]; then
+            find /opt/hostedtoolcache -maxdepth 3 | head -n 20
+          else
+            find /Users/runner/hostedtoolcache -maxdepth 3 | head -n 20
+          fi
