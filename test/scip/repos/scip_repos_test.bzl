@@ -2,39 +2,38 @@ load("//third_party:test_gem_data.bzl", "gem_build_info")
 
 # For more context, see NOTE[repo-test-structure]
 
-def _scip_repo_test_cache_rule(ctx):
-    target_zip_list = ctx.attr.target.files.to_list()
-    inputs = target_zip_list + [ctx.file._standalone_ruby_tgz]
-    gem_name = ctx.label.name
-    toolchain_cache = ctx.actions.declare_file("cache/{}/ruby-post-bundle-cache.tgz".format(gem_name))
-    gem_with_vendor_cache = ctx.actions.declare_file("cache/{}/gem-post-vendor.tgz".format(gem_name))
-    outputs = [toolchain_cache, gem_with_vendor_cache]
-    if len(target_zip_list) != 1:
-        fail("Expected exactly 1 zip file in filegroup but found {} for {}".format(
-            len(target_zip_list),
-            ctx.attr.target,
-        ))
+def _assert(cond, msg):
+    if not cond:
+        fail(msg)
 
-    # In CI, the gem build needs to use the same 'gem' as this task, so before
-    # we delete/overwrite, let that job finish.
-    if ctx.var["SCIP_RUBY_RBENV_EXE"] == "RUNNING_IN_CI_RBENV_NOT_NEEDED":
-        inputs += ctx.attrs._scip_ruby_gems.files.to_list()
+def _scip_repo_test_cache_rule(ctx):
+    args = []
+    inputs = [ctx.file._standalone_ruby_tgz]
+    toolchain_cache = ctx.actions.declare_file("cache/ruby-post-bundle-cache.tgz")
+    outputs = [toolchain_cache]
+    for target, gem_name in ctx.attr.target.items():
+        target_zip_list = target.files.to_list()
+        _assert(len(target_zip_list) == 1, "Expected single element in target_zip_list but found: {}".format(target_zip_list))
+        target_zip = target_zip_list[0]
+        inputs.append(target_zip)
+        strip_prefix = ctx.attr.strip_prefix[gem_name]
+        subdir = ctx.attr.subdir[gem_name]
+        gem_with_vendor_cache = ctx.actions.declare_file("cache/{}/gem-post-vendor.tgz".format(gem_name))
+        outputs.append(gem_with_vendor_cache)
+        args.append("zip={}:prefix={}:subdir={}:out={}".format(target_zip.path, strip_prefix, subdir, gem_with_vendor_cache.path))
 
     ctx.actions.run(
         outputs = outputs,
         inputs = inputs,
-        mnemonic = "BundleCache",
+        mnemonic = "AllBundleCache",
         executable = ctx.file._bundle_cache_script,
+        arguments = args,
         env = {
             # Ideally, we would pass in a C compiler here too, but 🤷🏽
             "SCIP_RUBY_CACHE_RUBY_DIR": ctx.var["SCIP_RUBY_CACHE_RUBY_DIR"],
             "RUBY_VERSION_FILE": ctx.file._ruby_version.path,
             "PRISTINE_TOOLCHAIN_TGZ_PATH": ctx.file._standalone_ruby_tgz.path,
-            "TEST_GEM_ZIP": target_zip_list[0].path,
-            "TEST_GEM_ZIP_PREFIX": ctx.attr.strip_prefix,
-            "TEST_GEM_SUBDIR": ctx.attr.subdir,
             "OUT_MODIFIED_TOOLCHAIN_TGZ_PATH": toolchain_cache.path,
-            "OUT_GEM_WITH_VENDOR_TGZ_PATH": gem_with_vendor_cache.path,
         },
     )
     return [DefaultInfo(files = depset(outputs), runfiles = ctx.runfiles(files = outputs))]
@@ -45,23 +44,20 @@ scip_repo_test_cache_rule = rule(
         "_standalone_ruby_tgz": attr.label(default = "//gems/scip-ruby:standalone-ruby", allow_single_file = True),
         "_bundle_cache_script": attr.label(default = ":bundle_cache.sh", allow_single_file = True),
         "_ruby_version": attr.label(default = "//:.ruby-version", allow_single_file = True),
-        "_scip_ruby_gems": attr.label(default = "//gems/scip-ruby"),
-        "target": attr.label(mandatory = True),
-        "strip_prefix": attr.string(mandatory = True),
-        "subdir": attr.string(mandatory = True),
+        "target": attr.label_keyed_string_dict(mandatory = True),
+        "strip_prefix": attr.string_dict(mandatory = True),
+        "subdir": attr.string_dict(mandatory = True),
     },
     doc = "Intermediate cache archives for gems after running 'bundle cache'.",
 )
 
 def register_scip_repo_test_caches():
-    for gem_data in gem_build_info:
-        gem_name = gem_data["repo_name"]
-        scip_repo_test_cache_rule(
-            name = "prep_{}".format(gem_name),
-            target = "@{}_zip//file".format(gem_name),
-            strip_prefix = gem_data["strip_prefix"],
-            subdir = gem_data["gem_subdir"],
-        )
+    scip_repo_test_cache_rule(
+        name = "cache_all_deps",
+        target = {"@{}_zip//file".format(g["repo_name"]): g["repo_name"] for g in gem_build_info},
+        strip_prefix = {g["repo_name"]: g["strip_prefix"] for g in gem_build_info},
+        subdir = {g["repo_name"]: g["gem_subdir"] for g in gem_build_info},
+    )
 
 def scip_repos_test_suite(name, patch_paths):
     available_patches = {p: None for p in patch_paths}
@@ -77,12 +73,12 @@ def scip_repos_test_suite(name, patch_paths):
             candidates = [patch_basename + ".patch"]
             if "linux" in os:
                 candidates.append(patch_basename + "-linux.patch")
-                gem_dep[os] = "//gems/scip-ruby/scip-ruby-debug-0.0.0-x86_64-linux.gem"
+                gem_dep[os] = "//gems/scip-ruby/scip-ruby-debug-1993.5.16-x86_64-linux.gem"
             else:
                 candidates.append(patch_basename + "-darwin.patch")
 
                 # NOTE: Keep in sync with index_gem.sh.
-                gem_dep[os] = "//gems/scip-ruby/scip-ruby-debug-0.0.0-universal-darwin-20.gem"
+                gem_dep[os] = "//gems/scip-ruby/scip-ruby-debug-1993.5.16-universal-darwin-20.gem"
             extra_deps[os] = []
             for patch_path in candidates:
                 if patch_path in available_patches:
@@ -92,7 +88,7 @@ def scip_repos_test_suite(name, patch_paths):
                     if "linux" in patch_path or "darwin" in patch_path:
                         available_patches.pop(patch_path, None)
 
-        prep_target = ":prep_{}".format(gem_name)
+        prep_target = ":cache_all_deps"
         data = [prep_target, "//gems/scip-ruby", "//:.ruby-version"]
 
         test_name = gem_name

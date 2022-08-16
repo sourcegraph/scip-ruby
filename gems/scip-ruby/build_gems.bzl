@@ -18,6 +18,7 @@ def _setup_standalone_ruby(ctx):
     runfiles = ctx.runfiles(files = outputs)
     return [DefaultInfo(files = depset(outputs), runfiles = runfiles)]
 
+# Not a genrule because we do not want PATH to propagate by default.
 setup_standalone_ruby = rule(
     implementation = _setup_standalone_ruby,
     attrs = {

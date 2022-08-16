@@ -2,7 +2,7 @@
 
 This document covers the day-to-day aspects of `scip-ruby`.
 For questions on why certain things are the way they are,
-see the [Design Decisions doc][] doc.
+see the [Design Decisions doc][].
 
 [Design Decisions doc]: DESIGN.md
 
@@ -114,9 +114,8 @@ For more information about configurations, see the [Sorbet README](./sorbet-READ
 ```
 
 The generated gems are located in `bazel-bin/gems/scip-ruby`.
-The gems have a version of `0.0.0`.
-To use a different version, pass `--//gem/scip-ruby:version=M.N.P`.
-
+For testing in local builds and CI, the gems use a hard-coded version `1993.5.16`.
+To build a different version, pass `--//gem/scip-ruby:version=M.N.P`.
 ## IDE Integration
 
 Generate `compile_commands.json` as per the [Sorbet README](./sorbet-README.md),
