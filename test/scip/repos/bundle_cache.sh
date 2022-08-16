@@ -10,6 +10,10 @@ for ENV_VAR in "${ENV_VARS[@]}"; do
   fi
 done
 
+rm -rf "$SCIP_RUBY_CACHE_RUBY_DIR"
+mkdir -p "$SCIP_RUBY_CACHE_RUBY_DIR"
+tar -xzf "$PRISTINE_TOOLCHAIN_TGZ_PATH" -C "$SCIP_RUBY_CACHE_RUBY_DIR"
+
 SCIP_RUBY_SPECIFIC_RUBY_ROOT="$SCIP_RUBY_CACHE_RUBY_DIR"
 if [ -d "$SCIP_RUBY_SPECIFIC_RUBY_ROOT/versions" ]; then
   # rbenv creates an extra versions subdirectory, which doesn't apply in CI.
@@ -17,10 +21,6 @@ if [ -d "$SCIP_RUBY_SPECIFIC_RUBY_ROOT/versions" ]; then
   SCIP_RUBY_SPECIFIC_RUBY_ROOT="$SCIP_RUBY_SPECIFIC_RUBY_ROOT/versions"
 fi
 SCIP_RUBY_SPECIFIC_RUBY_ROOT="$SCIP_RUBY_SPECIFIC_RUBY_ROOT/$(< "$RUBY_VERSION_FILE")"
-
-rm -rf "$SCIP_RUBY_CACHE_RUBY_DIR"
-mkdir -p "$SCIP_RUBY_CACHE_RUBY_DIR"
-tar -xzf "$PRISTINE_TOOLCHAIN_TGZ_PATH" -C "$SCIP_RUBY_CACHE_RUBY_DIR"
 
 GEM_EXE="$(find "$SCIP_RUBY_SPECIFIC_RUBY_ROOT" -name 'gem' -type f)"
 BUNDLE_EXE="$(dirname "$GEM_EXE")/bundle"
