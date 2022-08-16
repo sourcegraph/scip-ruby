@@ -106,3 +106,5 @@ jobs:
         uses: actions/download-artifact@v3
       - name: '📤 Upload artifacts for release'
         run: gh release upload "${GITHUB_REF/refs\/tags\//}" ./*-release-artifacts/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
