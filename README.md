@@ -18,18 +18,15 @@ Supported platforms:
 - x86_64 macOS
 - arm64 macOS (via Rosetta)
 
-<!-- Temporarily comment out below as we haven't published the Gem yet. -->
-<!-- We also need to get the Gem detection working with tests. -->
-<!--
-
 ## Quick Start
 
-This section covers the easiest way to use `scip-ruby`: as a gem.
-The gem will install the platform-specific `scip-ruby` binary
-lazily on first use and use it for indexing.
+This section covers the easiest way to use `scip-ruby`: as a gem,
+which includes a platform-specific `scip-ruby` binary
+and uses that for indexing.
 
 Alternately, you can follow the instructions under
-[Install and Index](#install-and-index).
+[Download binary and index](#download-binary-and-index)
+if you'd like to use a binary directly.
 
 ### First-time setup
 
@@ -47,30 +44,30 @@ Otherwise, add this line to your `Gemfile`:
 ```
 gem 'scip-ruby', require: false, :group => :development
 ```
+After either of those steps, run `bundle install`
+to download and install fetch `scip-ruby`.
+
+After either of those steps, run `bundle install`
+to download and install fetch `scip-ruby`.
 
 ### Generate an index
 
-If you have a `.gemspec` file, run:
+Run `scip-ruby` along with some information about your gem.
 
+<!-- TODO: Add support for defaulting. -->
+
+```bash
+# Uses the latest revision as the version - prefer this if you will index every commit
+bundle exec scip-ruby --index-file index.scip --gem-metadata "my-gem-name@$(git rev-parse HEAD)"
+
+# Uses the latest tag as the version - prefer this if you're only indexing specific tags
+bundle exec scip-ruby --index-file index.scip --gem-metadata "my-gem-name@$(git describe --tags --abbrev=0)"
 ```
-bundle exec scip-ruby
-```
 
-Otherwise, explicitly specify your Gem's name and current version:
-
-```
-# Uses the latest tag as the version
-bundle exec scip-ruby --gem-metadata "my-gem-name@$(git describe --tags --abbrev=0)"
-```
-
-If you don't use release tags, you can use a Git SHA instead.
-
-The generated index (named `index.scip` by default) can be uploaded
+The generated `index.scip` file can be uploaded
 to a Sourcegraph instance using the [Sourcegraph CLI](https://github.com/sourcegraph/src-cli).
 
--->
-
-## Install and Index
+## Download binary and index
 
 You can download a
 [release binary](https://github.com/sourcegraph/scip-ruby/releases)
