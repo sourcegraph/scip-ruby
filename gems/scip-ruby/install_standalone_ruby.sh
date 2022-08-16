@@ -34,6 +34,17 @@ if [[ "$SCIP_RUBY_RBENV_EXE" != "RUNNING_IN_CI_RBENV_NOT_NEEDED" ]]; then
   RBENV_ROOT="$SCIP_RUBY_CACHE_RUBY_DIR" "$SCIP_RUBY_RBENV_EXE" install --skip-existing
 fi
 
+compress_deterministic() {
+  if [[ "$(tar --version)" == *"GNU"* ]]; then
+    tar -czf - -C "$1" . --sort=name --owner=root:0 --group=root:0 --mtime='UTC 1993-05-16'
+  else
+    (cd "$1" && find . -print0 \
+      | sort -z \
+      | tar -czf - -T - --no-recursion --null --options='!timestamp')
+  fi
+}
+
 mkdir -p "$(dirname "$OUT_TGZ_PATH")"
 rm -f "$OUT_TGZ_PATH"
-tar -czf "$OUT_TGZ_PATH" -C "$SCIP_RUBY_CACHE_RUBY_DIR" .
+
+compress_deterministic "$SCIP_RUBY_CACHE_RUBY_DIR" > "$OUT_TGZ_PATH"

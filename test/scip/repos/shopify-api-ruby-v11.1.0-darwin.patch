@@ -4,7 +4,7 @@ index 9fef6a6..4b720c0 100644
 +++ b/Gemfile.lock
 @@ -81,2 +81,3 @@ GEM
      ruby-progressbar (1.11.0)
-+    scip-ruby-debug (0.0.0-universal-darwin-21)
++    scip-ruby-debug (1993.5.16-universal-darwin-20)
      securerandom (0.2.0)
 @@ -125,2 +126,3 @@ PLATFORMS
    arm64-darwin-21

@@ -39,15 +39,31 @@ if [ -n "${GITHUB_ACTIONS:-}" ]; then
 fi
 
 CACHED_TGZS_ARRAY=($CACHED_TGZS)
-TGZ_CACHE_DIR="$(dirname ${CACHED_TGZS_ARRAY[0]})"
+for CACHED_TGZ in "${CACHED_TGZS_ARRAY[@]}"; do
+  if [[ "$CACHED_TGZ" == *"/ruby-post-bundle-cache.tgz" ]]; then
+    rm -rf "$SCIP_RUBY_CACHE_RUBY_DIR"
+    mkdir -p "$SCIP_RUBY_CACHE_RUBY_DIR"
+    tar -xzf "$CACHED_TGZ" -C "$SCIP_RUBY_CACHE_RUBY_DIR"
+    FOUND_TOOLCHAIN_TGZ=1
+  else [[ "$CACHED_TGZ" == *"/$REPO_NAME/"* ]];
+    rm -rf repo
+    mkdir repo
+    tar -xzf "$CACHED_TGZ" -C repo
+    FOUND_REPO_TGZ=1
+  fi
+done
 
-rm -rf "$SCIP_RUBY_CACHE_RUBY_DIR"
-mkdir -p "$SCIP_RUBY_CACHE_RUBY_DIR"
-tar -xzf "$TGZ_CACHE_DIR/ruby-post-bundle-cache.tgz" -C "$SCIP_RUBY_CACHE_RUBY_DIR"
-
-rm -rf repo
-mkdir repo
-tar -xzf "$TGZ_CACHE_DIR/gem-post-vendor.tgz" -C repo
+if [[ -z "${FOUND_TOOLCHAIN_TGZ:-}" ]]; then
+  echo 'error: Did not find toolchain tgz in arguments; was it packaged?'
+  HAD_ERROR=1
+fi
+if [[ -z "${FOUND_REPO_TGZ:-}" ]]; then
+  echo 'error: Did not find toolchain tgz in arguments; was it packaged?'
+  HAD_ERROR=1
+fi
+if [[ -n "${HAD_ERROR:-}" ]]; then
+  exit 1
+fi
 
 SCIP_RUBY_GEMS_ARRAY=($SCIP_RUBY_GEMS)
 for SCIP_RUBY_GEM in "${SCIP_RUBY_GEMS_ARRAY[@]}"; do
@@ -73,8 +89,9 @@ pushd repo
 git diff --exit-code # No changes should've been made before applying the patch
 git apply "../$PATCH_PATH"
 
+"$BUNDLE_EXE" --version >&2
 "$BUNDLE_EXE" exec 'echo $PATH'
-"$BUNDLE_EXE" install -j "$(getconf _NPROCESSORS_ONLN)" --local
+"$BUNDLE_EXE" install --local
 
 set +e
 _INFO="$("$BUNDLE_EXE" info scip-ruby-debug)"
@@ -103,17 +120,13 @@ trim() {
 }
 GEM_INSTALL_PATH="$(trim "$GEM_INSTALL_PATH")"
 
-echo "GEM_INSTALL_PATH = $GEM_INSTALL_PATH"
-echo "Calling shim"
-
 {
-echo "Shim @ $GEM_INSTALL_PATH/bin/scip-ruby:"
-echo "-----------------------------------"
-cat "$GEM_INSTALL_PATH/bin/scip-ruby"
-echo "-----------------------------------"
-echo "This is for debugging/reproduction; I was seeing stale shims earlier, not sure why"
+  echo "Calling shim @ $GEM_INSTALL_PATH/bin/scip-ruby:"
+  echo "-----------------------------------"
+  cat "$GEM_INSTALL_PATH/bin/scip-ruby"
+  echo "-----------------------------------"
+  echo "This is for debugging/reproduction; I was seeing stale shims earlier, not sure why"
 } >&2
-
 
 # Call the shim, not the native binary, to test that the shim works.
 DEBUG=1 "$BUNDLE_EXE" exec "$GEM_INSTALL_PATH/bin/scip-ruby" --index-file index.scip --gem-metadata "$REPO_NAME@99.99.99"
