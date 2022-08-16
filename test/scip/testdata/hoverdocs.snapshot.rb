@@ -59,12 +59,12 @@
 #         ^ definition local 1~#2519626513
 #         documentation
 #         | ```ruby
-#         | c = T.let(_, T.untyped)
+#         | c (T.untyped)
 #         | ```
 #            ^ definition local 2~#2519626513
 #            documentation
 #            | ```ruby
-#            | b = T.let(_, T.untyped)
+#            | b (T.untyped)
 #            | ```
      c.m2 || b
 #    ^ reference local 1~#2519626513
@@ -86,7 +86,7 @@
 #         ^^ definition local 1~#2536404132
 #         documentation
 #         | ```ruby
-#         | xs = T.let(_, T.untyped)
+#         | xs (T.untyped)
 #         | ```
      xs[0]
 #    ^^ reference local 1~#2536404132
@@ -138,12 +138,12 @@
 #         ^ definition local 1~#2569959370
 #         documentation
 #         | ```ruby
-#         | c = T.let(_, T.untyped)
+#         | c (T.untyped)
 #         | ```
 #            ^ definition local 2~#2569959370
 #            documentation
 #            | ```ruby
-#            | b = T.let(_, T.untyped)
+#            | b (T.untyped)
 #            | ```
      c.m2 || b
 #    ^ reference local 1~#2569959370
@@ -318,18 +318,18 @@
 #    ^^ definition [..] K1#@x.
 #    documentation
 #    | ```ruby
-#    | @x = T.let(_, T.untyped)
+#    | @x (T.untyped)
 #    | ```
      @@y = 10
 #    ^^^ definition [..] K1#@@y.
 #    documentation
 #    | ```ruby
-#    | @@y = T.let(_, T.untyped)
+#    | @@y (T.untyped)
 #    | ```
 #    ^^^^^^^^ reference [..] K1#@@y.
 #    override_documentation
 #    | ```ruby
-#    | @@y = T.let(_, Integer(10))
+#    | @@y (Integer(10))
 #    | ```
    end
  
@@ -347,12 +347,12 @@
 #    ^^ definition [..] <Class:K1>#@z.
 #    documentation
 #    | ```ruby
-#    | @z = T.let(_, T.untyped)
+#    | @z (T.untyped)
 #    | ```
 #    ^^^^^^^ reference [..] <Class:K1>#@z.
 #    override_documentation
 #    | ```ruby
-#    | @z = T.let(_, Integer(10))
+#    | @z (Integer(10))
 #    | ```
    end
  end
@@ -378,7 +378,7 @@
 #  ^^ definition [..] <Class:K2>#@z.
 #  documentation
 #  | ```ruby
-#  | @z = T.let(_, T.untyped)
+#  | @z (T.untyped)
 #  | ```
 #  documentation
 #  | doc comment on class var ooh
@@ -397,13 +397,13 @@
 #    ^^ definition [..] K2#@x.
 #    documentation
 #    | ```ruby
-#    | @x = T.let(_, T.untyped)
+#    | @x (T.untyped)
 #    | ```
      @@y = 20
 #    ^^^ definition [..] K2#@@y.
 #    documentation
 #    | ```ruby
-#    | @@y = T.let(_, T.untyped)
+#    | @@y (T.untyped)
 #    | ```
      @z += @x
 #    ^^ reference [..] K2#@z.
@@ -412,7 +412,7 @@
 #          ^^ reference [..] K2#@x.
 #          override_documentation
 #          | ```ruby
-#          | @x = T.let(_, Integer(20))
+#          | @x (Integer(20))
 #          | ```
    end
  end

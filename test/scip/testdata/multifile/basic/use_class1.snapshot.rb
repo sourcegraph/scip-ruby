@@ -7,7 +7,7 @@
 #^ definition local 2~#119448696
 #documentation
 #| ```ruby
-#| b = T.let(_, T::Boolean)
+#| b (T::Boolean)
 #| ```
 #    ^^ reference [..] C1#
 #           ^^ reference [..] C1#m1().

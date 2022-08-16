@@ -5,25 +5,25 @@
 #^ definition [..] X.
 #documentation
 #| ```ruby
-#| ::X = T.let(_, T.untyped)
+#| ::X (T.untyped)
 #| ```
  Y = 'Y'.freeze
 #^ definition [..] Y.
 #documentation
 #| ```ruby
-#| ::Y = T.let(_, T.untyped)
+#| ::Y (T.untyped)
 #| ```
  A = %w[X Y].freeze
 #^ definition [..] A.
 #documentation
 #| ```ruby
-#| ::A = T.let(_, T.untyped)
+#| ::A (T.untyped)
 #| ```
  B = %W[#{X} Y].freeze
 #^ definition [..] B.
 #documentation
 #| ```ruby
-#| ::B = T.let(_, T.untyped)
+#| ::B (T.untyped)
 #| ```
 #         ^ reference [..] X.
  
@@ -37,19 +37,19 @@
 #  ^ definition [..] M#Z.
 #  documentation
 #  | ```ruby
-#  | ::M::Z = T.let(_, T.untyped)
+#  | ::M::Z (T.untyped)
 #  | ```
    A = %w[X Y Z].freeze
 #  ^ definition [..] M#A.
 #  documentation
 #  | ```ruby
-#  | ::M::A = T.let(_, T.untyped)
+#  | ::M::A (T.untyped)
 #  | ```
    B = %W[#{X} Y Z].freeze
 #  ^ definition [..] M#B.
 #  documentation
 #  | ```ruby
-#  | ::M::B = T.let(_, T.untyped)
+#  | ::M::B (T.untyped)
 #  | ```
 #           ^ reference [..] X.
  end
