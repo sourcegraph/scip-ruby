@@ -1,0 +1,24 @@
+name: Publish
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (scip-ruby-vM.N.P)'
+        type: string
+
+jobs:
+  download-and-publish-gems:
+    name: 'Download and publish gems'
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: 'Download release artifacts'
+        run: gh release download ${{ env.TAG }} --pattern '*.gem' --repo sourcegraph/scip-ruby
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 'Publish gems'
+        run: |
+          for g in *.gem; do
+            GEM_HOST_API_KEY=${{ secrets.RUBYGEMS_API_KEY }} gem push "$g"
+          done
