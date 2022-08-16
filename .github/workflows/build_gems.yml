@@ -37,7 +37,7 @@ jobs:
             bazel-repos-${{ runner.os }}-
             bazel-repos-
       - name: "⚙️ Setup Bazel"
-        run: VERSION="1993.16.5" .github/workflows/setup-bazel.sh
+        run: .github/workflows/setup-bazel.sh
       - name: "🔎 Identify OS"
         run: echo "OS=$(uname -s | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
       - name: ${{ format('🏗 Build ({0})', matrix.config) }}

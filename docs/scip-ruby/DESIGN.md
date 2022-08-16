@@ -4,6 +4,10 @@
 
 <!-- DEF NOTE[repo-test-structure] -->
 
+WARNING: Right now, the repo tests are broken/disabled,
+so this information is a bit inaccurate. We should fix
+this once the repo tests are fixed.
+
 The repo tests have a couple of unusual things:
 #. Tests are broken up into 3 stages,
    instead of being a simple script that does clone

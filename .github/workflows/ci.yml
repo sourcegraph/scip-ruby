@@ -55,3 +55,23 @@ jobs:
       #     # Technically, this is for Ruby 2.7.0 but it's probably fine.
       #     sudo apt-get install ruby2.7-dev
       #     ./bazel test //test/scip/repos --test_env GITHUB_ACTIONS=1 --test_env GEM_PATH="$(dirname "$(command -v gem)")" --config=dbg
+      #
+      # Blocked on a bundler bug in 2.3.4. I get a crash trace like this when running locally.
+      #
+      # NoMethodError: undefined method `metadata' for nil:NilClass
+      #   /Users/varun/Code/scip-ruby/.cache_ruby/versions/2.7.2/lib/ruby/gems/2.7.0/gems/bundler-2.3.4/lib/bundler/cli/common.rb:22:in `block in output_fund_metadata_summary'
+      #   /Users/varun/Code/scip-ruby/.cache_ruby/versions/2.7.2/lib/ruby/gems/2.7.0/gems/bundler-2.3.4/lib/bundler/cli/common.rb:22:in `count'
+      #   /Users/varun/Code/scip-ruby/.cache_ruby/versions/2.7.2/lib/ruby/gems/2.7.0/gems/bundler-2.3.4/lib/bundler/cli/common.rb:22:in `output_fund_metadata_summary'
+      #   /Users/varun/Code/scip-ruby/.cache_ruby/versions/2.7.2/lib/ruby/gems/2.7.0/gems/bundler-2.3.4/lib/bundler/cli/install.rb:87:in `run'
+      #
+      # This is the method in question:
+      #
+      # def self.output_fund_metadata_summary
+      #   definition = Bundler.definition
+      #   current_dependencies = definition.requested_dependencies
+      #   current_specs = definition.specs
+      #
+      #   count = current_dependencies.count {|dep| current_specs[dep.name].first.metadata.key?("funding_uri") }
+      #                                                                          ^ boom!
+      # We should probably file a bug against bundler but I haven't been able to repro
+      # the issue outside of a Bazel sandbox yet.
