@@ -11,21 +11,21 @@
 #                              ^ definition local 1~#3317016627
 #                              documentation
 #                              | ```ruby
-#                              | b = T.let(_, T.untyped)
+#                              | b (T.untyped)
 #                              | ```
    if b
      x = 1
 #    ^ definition local 2~#3317016627
 #    documentation
 #    | ```ruby
-#    | x = T.let(_, Integer(1))
+#    | x (Integer(1))
 #    | ```
    else
      x = nil
 #    ^ definition local 2~#3317016627
 #    documentation
 #    | ```ruby
-#    | x = T.let(_, Integer(1))
+#    | x (Integer(1))
 #    | ```
    end
    return
@@ -41,27 +41,27 @@
 #                              ^ definition local 1~#2122680152
 #                              documentation
 #                              | ```ruby
-#                              | b = T.let(_, T.untyped)
+#                              | b (T.untyped)
 #                              | ```
    x = 'foo'
 #  ^ definition local 2~#2122680152
 #  documentation
 #  | ```ruby
-#  | x = T.let(_, String("foo"))
+#  | x (String("foo"))
 #  | ```
    if b
      x = 1
 #    ^ reference (write) local 2~#2122680152
 #    override_documentation
 #    | ```ruby
-#    | x = T.let(_, Integer(1))
+#    | x (Integer(1))
 #    | ```
    else
      x = nil
 #    ^ reference (write) local 2~#2122680152
 #    override_documentation
 #    | ```ruby
-#    | x = T.let(_, NilClass)
+#    | x (NilClass)
 #    | ```
    end
    return
@@ -77,19 +77,19 @@
 #                     ^^ definition local 1~#4057334513
 #                     documentation
 #                     | ```ruby
-#                     | bs = T.let(_, T.untyped)
+#                     | bs (T.untyped)
 #                     | ```
    x = nil
 #  ^ definition local 2~#4057334513
 #  documentation
 #  | ```ruby
-#  | x = T.let(_, NilClass)
+#  | x (NilClass)
 #  | ```
    for b in bs
 #      ^ definition local 3~#4057334513
 #      documentation
 #      | ```ruby
-#      | b = T.let(_, T.untyped)
+#      | b (T.untyped)
 #      | ```
 #           ^^ reference local 1~#4057334513
      puts x
@@ -99,24 +99,24 @@
 #      ^ reference (write) local 2~#4057334513
 #      override_documentation
 #      | ```ruby
-#      | x = T.let(_, T.untyped)
+#      | x (T.untyped)
 #      | ```
 #      ^^^^^ reference local 2~#4057334513
 #      override_documentation
 #      | ```ruby
-#      | x = 1 = T.let(_, T.untyped)
+#      | x = 1 (T.untyped)
 #      | ```
      else
        x = 's'
 #      ^ reference (write) local 2~#4057334513
 #      override_documentation
 #      | ```ruby
-#      | x = T.let(_, T.untyped)
+#      | x (T.untyped)
 #      | ```
 #      ^^^^^^^ reference local 2~#4057334513
 #      override_documentation
 #      | ```ruby
-#      | x = 's' = T.let(_, T.untyped)
+#      | x = 's' (T.untyped)
 #      | ```
      end
    end
@@ -133,7 +133,7 @@
 #  ^^ definition [..] <Class:C>#@k.
 #  documentation
 #  | ```ruby
-#  | @k = T.let(_, T.untyped)
+#  | @k (T.untyped)
 #  | ```
  
    def change_type(b)
@@ -146,73 +146,73 @@
 #                  ^ definition local 1~#2066187318
 #                  documentation
 #                  | ```ruby
-#                  | b = T.let(_, T.untyped)
+#                  | b (T.untyped)
 #                  | ```
      @f = nil
 #    ^^ definition [..] C#@f.
 #    documentation
 #    | ```ruby
-#    | @f = T.let(_, T.untyped)
+#    | @f (T.untyped)
 #    | ```
      @@g = nil
 #    ^^^ definition [..] C#@@g.
 #    documentation
 #    | ```ruby
-#    | @@g = T.let(_, T.untyped)
+#    | @@g (T.untyped)
 #    | ```
      @k = nil
 #    ^^ definition [..] C#@k.
 #    documentation
 #    | ```ruby
-#    | @k = T.let(_, T.untyped)
+#    | @k (T.untyped)
 #    | ```
      if b
        @f = 1
 #      ^^ reference (write) [..] C#@f.
 #      override_documentation
 #      | ```ruby
-#      | @f = T.let(_, Integer(1))
+#      | @f (Integer(1))
 #      | ```
        @@g = 1
 #      ^^^ reference (write) [..] C#@@g.
 #      override_documentation
 #      | ```ruby
-#      | @@g = T.let(_, Integer(1))
+#      | @@g (Integer(1))
 #      | ```
        @k = 1
 #      ^^ reference (write) [..] C#@k.
 #      override_documentation
 #      | ```ruby
-#      | @k = T.let(_, Integer(1))
+#      | @k (Integer(1))
 #      | ```
 #      ^^^^^^ reference [..] C#@k.
 #      override_documentation
 #      | ```ruby
-#      | @k = T.let(_, Integer(1))
+#      | @k (Integer(1))
 #      | ```
      else
        @f = 'f'
 #      ^^ reference (write) [..] C#@f.
 #      override_documentation
 #      | ```ruby
-#      | @f = T.let(_, String("f"))
+#      | @f (String("f"))
 #      | ```
        @@g = 'g'
 #      ^^^ reference (write) [..] C#@@g.
 #      override_documentation
 #      | ```ruby
-#      | @@g = T.let(_, String("g"))
+#      | @@g (String("g"))
 #      | ```
        @k = 'k'
 #      ^^ reference (write) [..] C#@k.
 #      override_documentation
 #      | ```ruby
-#      | @k = T.let(_, String("k"))
+#      | @k (String("k"))
 #      | ```
 #      ^^^^^^^^ reference [..] C#@k.
 #      override_documentation
 #      | ```ruby
-#      | @k = T.let(_, String("k"))
+#      | @k (String("k"))
 #      | ```
      end
    end
@@ -239,7 +239,7 @@
 #                  ^ definition local 1~#2066187318
 #                  documentation
 #                  | ```ruby
-#                  | b = T.let(_, T.untyped)
+#                  | b (T.untyped)
 #                  | ```
      if !b
 #        ^ reference local 1~#2066187318
@@ -247,48 +247,48 @@
 #      ^^ definition [..] D#@f.
 #      documentation
 #      | ```ruby
-#      | @f = T.let(_, T.untyped)
+#      | @f (T.untyped)
 #      | ```
        @@g = 1
 #      ^^^ definition [..] D#@@g.
 #      documentation
 #      | ```ruby
-#      | @@g = T.let(_, T.untyped)
+#      | @@g (T.untyped)
 #      | ```
        @k = 1
 #      ^^ definition [..] D#@k.
 #      documentation
 #      | ```ruby
-#      | @k = T.let(_, T.untyped)
+#      | @k (T.untyped)
 #      | ```
 #      ^^^^^^ reference [..] D#@k.
 #      override_documentation
 #      | ```ruby
-#      | @k = T.let(_, Integer(1))
+#      | @k (Integer(1))
 #      | ```
      else
        @f = 'f'
 #      ^^ definition [..] D#@f.
 #      documentation
 #      | ```ruby
-#      | @f = T.let(_, T.untyped)
+#      | @f (T.untyped)
 #      | ```
        @@g = 'g'
 #      ^^^ definition [..] D#@@g.
 #      documentation
 #      | ```ruby
-#      | @@g = T.let(_, T.untyped)
+#      | @@g (T.untyped)
 #      | ```
        @k = 'k'
 #      ^^ definition [..] D#@k.
 #      documentation
 #      | ```ruby
-#      | @k = T.let(_, T.untyped)
+#      | @k (T.untyped)
 #      | ```
 #      ^^^^^^^^ reference [..] D#@k.
 #      override_documentation
 #      | ```ruby
-#      | @k = T.let(_, String("k"))
+#      | @k (String("k"))
 #      | ```
      end
    end

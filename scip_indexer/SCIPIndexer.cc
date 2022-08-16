@@ -277,14 +277,14 @@ public:
             case Kind::UndeclaredField: {
                 auto name = this->name.show(gs);
                 CHECK_TYPE(fieldType, name);
-                markdown = fmt::format("{} = T.let(_, {})", name, fieldType.show(gs));
+                markdown = fmt::format("{} ({})", name, fieldType.show(gs));
                 break;
             }
             case Kind::DeclaredField: {
                 auto fieldRef = this->selfOrOwner.asFieldRef();
                 auto name = fieldRef.showFullName(gs);
                 CHECK_TYPE(fieldType, name);
-                markdown = fmt::format("{} = T.let(_, {})", name, fieldType.show(gs));
+                markdown = fmt::format("{} ({})", name, fieldType.show(gs));
                 break;
             }
             case Kind::ClassOrModule: {
@@ -615,7 +615,7 @@ public:
         if (type) {
             auto var = loc.source(gs);
             ENFORCE(var.has_value(), "Failed to find source text for definition of local variable");
-            docStrings.push_back(fmt::format("```ruby\n{} = T.let(_, {})\n```", var.value(), type.show(gs)));
+            docStrings.push_back(fmt::format("```ruby\n{} ({})\n```", var.value(), type.show(gs)));
         }
         return this->saveDefinitionImpl(gs, file, occ.toString(gs, file), loc, docStrings);
     }
@@ -653,7 +653,7 @@ public:
                     core::Loc(file, occ.offsets).toString(gs));
             auto var = loc.source(gs);
             ENFORCE(var.has_value(), "Failed to find source text for definition of local variable");
-            overrideDocs.push_back(fmt::format("```ruby\n{} = T.let(_, {})\n```", var.value(), overrideType->show(gs)));
+            overrideDocs.push_back(fmt::format("```ruby\n{} ({})\n```", var.value(), overrideType->show(gs)));
         }
         this->saveReferenceImpl(gs, file, occ.toString(gs, file), overrideDocs, occ.offsets, symbol_roles);
         return absl::OkStatus();
