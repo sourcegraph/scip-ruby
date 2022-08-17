@@ -1,29 +1,29 @@
 # scip-ruby
 
-Experimental [SCIP](https://github.com/sourcegraph/scip) indexer for Ruby.
+Experimental [SCIP](https://github.com/sourcegraph/scip) indexer for Ruby,
+enabling precise code navigation for Ruby —
+Go to definition, Find references, hover docs etc. –
+in Sourcegraph.
+
+![Example showing cross-file Find references for a type type from the shopify-api-ruby codebase](https://user-images.githubusercontent.com/93103176/185077342-77172ac8-a363-49e4-9d7a-babb541281b1.png)
 
 If you have any questions, bug reports, feature requests or feedback,
-please [file an issue](https://github.com/sourcegraph/scip-ruby/issues).
+please [file an issue](https://github.com/sourcegraph/scip-ruby/issues/new/choose).
 
 ## Supported Configurations
 
-scip-ruby piggybacks on top of
+scip-ruby builds on top of
 the [Sorbet](https://github.com/sorbet/sorbet) type-checker.
 If you use Sorbet in your project, follow the instructions below.
-
 Projects which do not use Sorbet are not supported.
 
-Supported platforms:
-- x86_64 Linux
-- x86_64 macOS
-- arm64 macOS (via Rosetta)
+Currently, we have gems and binaries available for x86\_64 Linux and x86\_64 macOS (supported on arm64 macOS via Rosetta).
 
 ## Quick Start
 
 This section covers the easiest way to use `scip-ruby`: as a gem,
 which includes a platform-specific `scip-ruby` binary
 and uses that for indexing.
-
 Alternately, you can follow the instructions under
 [Download binary and index](#download-binary-and-index)
 if you'd like to use a binary directly.
@@ -32,7 +32,7 @@ if you'd like to use a binary directly.
 
 If you have a `.gemspec` file, use `add_development_dependency`:
 
-```
+```ruby
 Gem::Specification.new do |spec|
   # ... other stuff ...
   spec.add_development_dependency("scip-ruby")
@@ -41,12 +41,9 @@ end
 
 Otherwise, add this line to your `Gemfile`:
 
-```
+```ruby
 gem 'scip-ruby', require: false, :group => :development
 ```
-After either of those steps, run `bundle install`
-to download and install fetch `scip-ruby`.
-
 After either of those steps, run `bundle install`
 to download and install fetch `scip-ruby`.
 
@@ -73,12 +70,10 @@ You can download a
 [release binary](https://github.com/sourcegraph/scip-ruby/releases)
 and run it directly, similar to invoking Sorbet.
 
-```
+```bash
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')" \
 RELEASE_URL="https://github.com/sourcegraph/scip-ruby/releases/latest/download" \
 curl -L "$RELEASE_URL/scip-ruby-x86_64-$OS" -o scip-ruby && chmod +x scip-ruby
-
-chmod +x scip-ruby
 
 # If using in CI with 'set -e', make sure to wrap the
 # scip-ruby invocation in 'set +e' followed by 'set -e'
