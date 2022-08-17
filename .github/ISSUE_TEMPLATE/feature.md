@@ -1,23 +1,38 @@
 ---
 name: Request a feature
-about: To propose and discuss problems that Sorbet cannot currently solve.
+about: To propose and discuss problems that scip-ruby cannot currently solve.
 labels: enhancement, unconfirmed
 ---
 
-<!--
-    Thanks for requesting a feature in Sorbet!
-
-    Know that we only have so much time to split between maintaining existing
-    features and developing new ones. From time to time, we close issues that we
-    don't think we'll be able to complete in the short to medium term, even if
-    we'd like to support it in the long term.
--->
-
 ### Problem
 
-<!-- TODO: Please describe the problem you are trying to solve, NOT the solution you would like. -->
+<!--
+TODO: Please describe the problem you are trying to solve,
+      NOT the solution you would like.
+-->
 
-### Proposed solution
+### (Optional) Suggested solution
 
-<!-- TODO: If you have a suggestion in mind for how to solve the above problem, feel free to include it here. -->
+<!--
+TODO: If you have a suggestion in mind
+      for how to solve the above problem,
+      feel free to include it here.
+-->
+
+### (Optional) Compared to other tools
+
+<!--
+TODO: Are there editor/IDE plugins (or native functionality)
+      which do not suffer from this problem?
+      If so, mention those as examples here.
+-->
+
+### (Optional) OSS Examples
+
+<!--
+TODO: Are there any OSS repos which are similar to your code
+      in terms of repo structure and/or dependencies
+      (such as using a specific framework),
+      and would likely run into the same problem you're running into?
+-->
 
