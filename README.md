@@ -1,6 +1,11 @@
 # scip-ruby
 
-Experimental [SCIP](https://github.com/sourcegraph/scip) indexer for Ruby.
+Experimental [SCIP](https://github.com/sourcegraph/scip) indexer for Ruby,
+enabling precise code navigation
+(Go to definition, Find references, Hover documentation etc.)
+in Sourcegraph.
+
+![Example showing cross-file Find references for a type type from the shopify-api-ruby codebase](https://user-images.githubusercontent.com/93103176/185077342-77172ac8-a363-49e4-9d7a-babb541281b1.png)
 
 If you have any questions, bug reports, feature requests or feedback,
 please [file an issue](https://github.com/sourcegraph/scip-ruby/issues).
