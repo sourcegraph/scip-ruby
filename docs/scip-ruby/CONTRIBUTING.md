@@ -9,14 +9,20 @@ see the [Design Decisions doc][].
 - [Install dependencies](#install-dependencies)
 - [Configuring Ruby (optional)](#configuring-ruby-optional)
 - [Building](#building)
+  - [Building gems](#building-gems)
 - [IDE integration](#ide-integration)
-- [Writing a new snapshot test](#writing-a-new-snapshot-test)
-- [Writing a new repo test](#writing-a-new-snapshot-test)
-- [Debugging with print statements](#debugging-with-print-statements)
-- [Debugging with LLDB](#debugging-with-lldb)
-- [Debugging build issues](#debugging-build-issues)
-  - [Debugging Bazel](#debugging-bazel)
-  - [Debugging on Linux](#debugging-on-linux)
+- [Generating a SCIP index](#generating-a-scip-index)
+- [Testing](#testing)
+  - [Running tests](#running-tests)
+  - [Writing tests](#writing-tests)
+    - [Writing a new snapshot test](#writing-a-new-snapshot-test)
+    - [Writing a new repo test](#writing-a-new-snapshot-test)
+- [Debugging](#debugging)
+  - [Debugging with print statements](#debugging-with-print-statements)
+  - [Debugging with LLDB](#debugging-with-lldb)
+  - [Debugging build issues](#debugging-build-issues)
+    - [Debugging Bazel](#debugging-bazel)
+    - [Debugging on Linux](#debugging-on-linux)
 - [Creating PRs](#creating-prs)
 - [Cutting a release](#cutting-a-release)
 - Troubleshooting
@@ -103,23 +109,29 @@ see the [Design Decisions doc][].
 ./bazel build //main:scip-ruby --config=dbg
 ```
 
-The generated binary is located at `bazel-bin/main/scip-ruby`.
+The generated binary is located at `./bazel-bin/main/scip-ruby`.
 
 For more information about configurations, see the [Sorbet README](./sorbet-README.md). If you run into a build issue, check if it matches one of the [Known build issues][]; you may need to change your configuration.
 
-### Building Gems
+### Building gems
 
-```
+```bash
 ./bazel build //gems/scip-ruby --config=dbg
 ```
 
-The generated gems are located in `bazel-bin/gems/scip-ruby`.
+The generated gems are located in `./bazel-bin/gems/scip-ruby`.
 For testing in local builds and CI, the gems use a hard-coded version `1993.5.16`.
 To build a different version, pass `--//gem/scip-ruby:version=M.N.P`.
+
 ## IDE Integration
 
 Generate `compile_commands.json` as per the [Sorbet README](./sorbet-README.md),
-and point your editor to it.
+and point your editor to it. In case you see an error in VS Code saying that
+`clangd` could not be found at a path under `bazel-sorbet/`, create a symlink:
+
+```bash
+ln -s bazel-scip-ruby bazel-sorbet
+```
 
 ## Generating a SCIP index
 
@@ -129,7 +141,9 @@ NOTE: The binary will be somewhere under `bazel-out` depending on the exact conf
 scip-ruby myfile.rb --index-file index.scip
 ```
 
-## Running SCIP tests
+## Testing
+
+### Running tests
 
 Run snapshot tests, which are self-contained:
 
@@ -143,21 +157,21 @@ Updating snapshots:
 ./bazel test //test/scip:update --config=dbg
 ```
 
-Run repo tests, to check that there are no crashes on indexing OSS repos:
+WARNING: Repo tests are kinda' broken right now; they're disabled
+in CI (see ci.yml), and may or may not work on your machine.
 
-```
+If you want to run repo tests, first complete the
+[Configuring Ruby](#configuring-ruby-optional) steps.
+Then run the tests using:
+
+```bash
 # If Ruby was installed via asdf (recommended to avoid dependency on system Ruby on macOS)
-./bazel test --test_env GEM_PATH="$HOME/.asdf/installs/ruby/2.7.2/bin" //test/scip/repos --config=dbg
-
-# Otherwise, I think this might work.
-./bazel test --test_env GEM_PATH="$(dirname "$(which gem)")" //test/scip/repos --config=dbg
+./bazel test //test/scip/repos --config=dbg
 ```
 
 This may take a few minutes to run.
 
-**NOTE:** The repo tests require a system Ruby installation that is not covered by the Bazel dependencies. If you run into an issue when installing Ruby (we recommend using asdf), check the [Known Ruby installation issues][].
-
-## Writing a new snapshot test
+### Writing a new snapshot test
 
 See the existings tests under `test/scip/testdata`
 and copy the structure. One caveat is that the first time
@@ -166,7 +180,7 @@ you add a new test, you should create matching `.snapshot.rb` files
 since those are used as inputs to Bazel.
 If you know of a way to get rid of that annoyance, submit a PR.
 
-## Writing a new repo test
+### Writing a new repo test
 
 First, clone the repo using Sorbet locally
 and check if you can index it.
@@ -189,7 +203,9 @@ Once you're able to successfully index the code,
 modify the [scip_repos_test.bzl](test/scip/repos/scip_repos_test.bzl)
 file to include the relevant data.
 
-## Debugging with print statements
+## Debugging
+
+### Debugging with print statements
 
 So far, I've mostly been using print debugging
 (along with minimized test cases)
@@ -207,7 +223,7 @@ Alternately, it may be useful to create a `tmp.rb`
 file under the `test/scip/snapshots/` directory
 (it will be gitignored) and run:
 
-```
+```bash
 # Check
 ./bazel test //test/scip:tmp --config=dbg
 # View output
@@ -217,12 +233,12 @@ file under the `test/scip/snapshots/` directory
 Having the [SCIP CLI](https://github.com/sourcegraph/scip) available
 is also useful for inspecting the emitted index.
 
-## Debugging with LLDB
+### Debugging with LLDB
 
 Maybe there is a cleaner way to do this,
 but the following works:
 
-```
+```bash
 export TEST_DIR="$PWD/test/scip/testdata"
 pushd bazel-out/darwin-dbg/bin
 lldb -- ./test/scip_test_runner "$TEST_DIR/my_test.rb" --output="$TEST_DIR/my_test.snapshot.rb"
@@ -230,9 +246,9 @@ popd
 unset TEST_DIR
 ```
 
-## Debugging build issues
+### Debugging build issues
 
-### Debugging Bazel
+#### Debugging Bazel
 
 See Keith Smiley's blog post [Debugging bazel actions](https://www.smileykeith.com/2022/03/02/debugging-bazel-actions/). ([archive link](https://web.archive.org/web/20220711000725/https://www.smileykeith.com/2022/03/02/debugging-bazel-actions/))
 
@@ -265,7 +281,7 @@ it helpful to test a small code snippet first.
 } >&2
 ```
 
-### Debugging on Linux
+#### Debugging on Linux
 
 Debugging a build issue in GitHub Actions can get emotionally draining quickly.
 
@@ -281,7 +297,7 @@ PRs created through the GitHub UI default to being made
 against the upstream Sorbet repo. It is less error-prone
 to use the [GitHub CLI](https://cli.github.com/) instead.
 
-```
+```bash
 gh pr create -R sourcegraph/scip-ruby
 ```
 
@@ -300,7 +316,7 @@ See the [release workflow](/.github/workflows/release.yml) for details.
 1. On some Ubuntu instances (Ubuntu 22.04 image on Google Cloud),
     there is a known build error with m4.
     This problem doesn't happen with Ubuntu 20.04.
-    ```
+    ```txt
     external/m4_v1.4.18/gnulib/lib/c-stack.c:55:26: error: function-like macro 'sysconf' is not defined
     #elif HAVE_LIBSIGSEGV && SIGSTKSZ < 16384
                              ^
@@ -316,7 +332,7 @@ See the [release workflow](/.github/workflows/release.yml) for details.
    which (I think) is related to this upstream
    [jemalloc issue](https://github.com/jemalloc/jemalloc/issues/1997),
    which is mentioned to be caused due to a QEMU bug. It manifests as an error:
-   ```
+   ```txt
    include/jemalloc/internal/rtree.h:118:3: error: constant expression evaluates to -12 which cannot be narrowed to type 'unsigned int' [-Wc++11-narrowing]
       {RTREE_NSB, RTREE_NHIB + RTREE_NSB}
        ^~~~~~~~~
@@ -330,7 +346,7 @@ See the [release workflow](/.github/workflows/release.yml) for details.
 1. If you're trying to run `bundle install` for a gem
    which you're trying to test,
    you may run into an error which looks like:
-   ```
+   ```txt
    Could not fetch specs from https://rubygems.org/
    ```
    despite retrying a few times, with not much more information.
