@@ -66,6 +66,7 @@ struct Printers {
     PrinterConfig ASTRaw;
     PrinterConfig CFG;
     PrinterConfig CFGText;
+    PrinterConfig CFGTextLoc;
     PrinterConfig CFGRaw;
     PrinterConfig TypedSource;
     PrinterConfig SymbolTable;
