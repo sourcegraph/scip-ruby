@@ -215,8 +215,8 @@ along with the control flow graph all at once.
 Typically, I'll copy over the minimized code
 to the root and run:
 
-```
-./bazel build //main:scip-ruby --config=dbg && ./bazel-out/darwin-dbg/bin/main/scip-ruby tmp.rb -p cfg-text --index-file /dev/null
+```bash
+./bazel build //main:scip-ruby --config=dbg && ./bazel-out/darwin-dbg/bin/main/scip-ruby tmp.rb -p cfg-text-loc --index-file /dev/null
 ```
 
 Alternately, it may be useful to create a `tmp.rb`

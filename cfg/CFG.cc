@@ -238,7 +238,7 @@ string CFG::toString(const core::GlobalState &gs) const {
     return to_string(buf);
 }
 
-string CFG::toTextualString(const core::GlobalState &gs) const {
+string CFG::toTextualString(const core::GlobalState &gs, optional<core::FileRef> file) const {
     fmt::memory_buffer buf;
     string symbolName = this->symbol.showFullName(gs);
     fmt::format_to(std::back_inserter(buf), "method {} {{\n\n", symbolName);
@@ -251,7 +251,7 @@ string CFG::toTextualString(const core::GlobalState &gs) const {
             }
         }
 
-        fmt::format_to(std::back_inserter(buf), "{}\n", basicBlock->toTextualString(gs, *this));
+        fmt::format_to(std::back_inserter(buf), "{}\n", basicBlock->toTextualString(gs, file, *this));
     }
     fmt::format_to(std::back_inserter(buf), "}}");
     return to_string(buf);
@@ -366,7 +366,7 @@ string BasicBlock::toString(const core::GlobalState &gs, const CFG &cfg) const {
     return to_string(buf);
 }
 
-string BasicBlock::toTextualString(const core::GlobalState &gs, const CFG &cfg) const {
+string BasicBlock::toTextualString(const core::GlobalState &gs, optional<core::FileRef> file, const CFG &cfg) const {
     fmt::memory_buffer buf;
     fmt::format_to(std::back_inserter(buf), "bb{}[rubyRegionId={}, firstDead={}]({}):\n", this->id, this->rubyRegionId,
                    this->firstDeadInstructionIdx,
@@ -377,7 +377,21 @@ string BasicBlock::toTextualString(const core::GlobalState &gs, const CFG &cfg) 
         fmt::format_to(std::back_inserter(buf), "    # outerLoops: {}\n", this->outerLoops);
     }
     for (const Binding &exp : this->exprs) {
-        fmt::format_to(std::back_inserter(buf), "    {} = {}\n", exp.bind.toString(gs, cfg),
+        string positionText = "";
+        if (file) {
+            if (exp.loc.exists() && !exp.loc.empty()) {
+                auto lineCol = core::Loc(file.value(), exp.loc).position(gs);
+                positionText =
+                    lineCol.first.line == lineCol.second.line
+                        ? fmt::format(" @ {}:{}-{}", lineCol.first.line, lineCol.first.column, lineCol.second.column)
+                        : fmt::format(" @ {}:{}-{}:{}", lineCol.first.line, lineCol.first.column, lineCol.second.line,
+                                      lineCol.second.column);
+            } else {
+                positionText = " @ <>";
+            }
+        }
+
+        fmt::format_to(std::back_inserter(buf), "    {}{} = {}\n", exp.bind.toString(gs, cfg), positionText,
                        exp.value.toString(gs, cfg));
     }
 

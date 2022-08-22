@@ -105,7 +105,7 @@ public:
     std::optional<BlockExitCondInfo> maybeGetUpdateKnowledgeReceiver(const cfg::CFG &inWhat) const;
 
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
-    std::string toTextualString(const core::GlobalState &gs, const CFG &cfg) const;
+    std::string toTextualString(const core::GlobalState &gs, std::optional<core::FileRef> file, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg) const;
 };
 
@@ -166,7 +166,7 @@ public:
     // Abbreviated debug output in dot format, useful if you already know what you're looking at
     std::string toString(const core::GlobalState &gs) const;
     // As above, but without dot annotations
-    std::string toTextualString(const core::GlobalState &gs) const;
+    std::string toTextualString(const core::GlobalState &gs, std::optional<core::FileRef> = std::nullopt) const;
     // Verbose debug output
     std::string showRaw(core::Context ctx) const;
 
