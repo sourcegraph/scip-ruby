@@ -24,9 +24,8 @@ Currently, we have gems and binaries available for x86\_64 Linux and x86\_64 mac
 This section covers the easiest way to use `scip-ruby`: as a gem,
 which includes a platform-specific `scip-ruby` binary
 and uses that for indexing.
-Alternately, you can follow the instructions under
-[Download binary and index](#download-binary-and-index)
-if you'd like to use a binary directly.
+Alternately, you can
+[directly download a binary and index your code](#download-binary-and-index).
 
 ### First-time setup
 
