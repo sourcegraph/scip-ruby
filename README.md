@@ -81,7 +81,14 @@ curl -L "$RELEASE_URL/scip-ruby-x86_64-$OS" -o scip-ruby && chmod +x scip-ruby
 ```
 
 The generated index can be uploaded to a Sourcegraph instance
-using the [Sourcegraph CLI](https://github.com/sourcegraph/src-cli).
+using the [Sourcegraph CLI](https://github.com/sourcegraph/src-cli) (v3.43.0 or newer).
+Typically, the command looks like:
+
+```bash
+SRC_ACCESS_TOKEN="your token" SRC_ENDPOINT="url for Sourcegraph instance" src code-intel upload -file=/path/to/index.scip
+```
+
+For more details, see the Sourcegraph CLI docs.
 
 ## Contributing
 
