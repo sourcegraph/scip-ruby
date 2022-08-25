@@ -54,10 +54,10 @@ Run `scip-ruby` along with some information about your gem.
 
 ```bash
 # Uses the latest revision as the version - prefer this if you will index every commit
-bundle exec scip-ruby --index-file index.scip --gem-metadata "my-gem-name@$(git rev-parse HEAD)"
+bundle exec scip-ruby --index-file index.scip --gem-metadata "my-gem-name@$(git rev-parse HEAD)" .
 
 # Uses the latest tag as the version - prefer this if you're only indexing specific tags
-bundle exec scip-ruby --index-file index.scip --gem-metadata "my-gem-name@$(git describe --tags --abbrev=0)"
+bundle exec scip-ruby --index-file index.scip --gem-metadata "my-gem-name@$(git describe --tags --abbrev=0)" .
 ```
 
 The generated `index.scip` file can be uploaded
@@ -75,7 +75,7 @@ curl -L "https://github.com/sourcegraph/scip-ruby/releases/latest/download/scip-
 # If using in CI with 'set -e', make sure to wrap the
 # scip-ruby invocation in 'set +e' followed by 'set -e'
 # so that indexing failures are non-blocking.
-./scip-ruby --index-file index.scip --gem-metadata "my-gem-name@M.N.P"
+./scip-ruby --index-file index.scip --gem-metadata "my-gem-name@M.N.P" .
 ```
 
 The generated index can be uploaded to a Sourcegraph instance
