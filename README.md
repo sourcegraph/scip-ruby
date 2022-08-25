@@ -70,9 +70,7 @@ You can download a
 and run it directly, similar to invoking Sorbet.
 
 ```bash
-OS="$(uname -s | tr '[:upper:]' '[:lower:]')" \
-RELEASE_URL="https://github.com/sourcegraph/scip-ruby/releases/latest/download" \
-curl -L "$RELEASE_URL/scip-ruby-x86_64-$OS" -o scip-ruby && chmod +x scip-ruby
+curl -L "https://github.com/sourcegraph/scip-ruby/releases/latest/download/scip-ruby-x86_64-$(uname -s | tr '[:upper:]' '[:lower:]')" -o scip-ruby && chmod +x scip-ruby
 
 # If using in CI with 'set -e', make sure to wrap the
 # scip-ruby invocation in 'set +e' followed by 'set -e'
