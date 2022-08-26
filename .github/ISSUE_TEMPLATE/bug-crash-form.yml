@@ -1,0 +1,76 @@
+name: "Report a crash"
+description: This is for crashes encountered in scip-ruby.
+labels: [bug, crash, unconfirmed]
+body:
+  - type: textarea
+    attributes:
+      label: Input
+      description: |
+        (Optional) Please paste your anonymized, preferably minimal code snippet.
+        Skipping this step is OK, but may make it harder to triage your issue.
+
+        If you're sharing a link to a git repo, please mention the git SHA!
+      value: |
+        ```ruby
+        # Your code here
+        ```
+  - type: textarea
+    validations:
+      required: true
+    attributes:
+      label: Sorbet type-checking output
+      value: |
+        I ran `bundle exec srb tc` and got this<!-- anonymized --> output:
+
+        ```txt
+        ```
+  - type: textarea
+    validations:
+      required: true
+    attributes:
+      label: scip-ruby indexing output
+      value: |
+        I ran `bundle exec scip-ruby <paste args here>`
+        and got this<!-- anonymized --> output:
+
+        ```txt
+        ```
+  - type: textarea
+    attributes:
+      label: scip-ruby-debug indexing output
+      description: |
+        (Optional) Temporarily replace the 'scip-ruby' in your gemspec or Gemfile
+        with a dependency on the same version of scip-ruby-debug instead
+        (by editing your gemspec or Gemfile) and re-run the indexing step.
+
+        If you see a crash (e.g. an assertion being hit), please report it below.
+      value: |
+        After replacing `scip-ruby` with `scip-ruby-debug` in my Gemfile/gemspec,
+        and running `bundle install`, I re-ran `bundle exec scip-ruby <paste args>`
+        <!-- and that completed successfully without crashing. -->
+        and got this<!-- anonymized --> crash output:
+        ```txt
+        ```
+  - type: textarea
+    attributes:
+      label: Configuration
+      description: |
+        (Optional) Output of running
+        ```bash
+        ruby --version
+        bundle --version
+        bundle info sorbet
+        bundle info scip-ruby
+        ```
+      value: |
+        ```txt
+        ```
+  - type: textarea
+    attributes:
+      label: Additional info
+      description: |
+        (Optional) Any additional information you'd like to share. For example,
+        if you're using a tool other than bundler for managing code.
+  - type: markdown
+    attributes:
+      value: THANK YOU for taking the time to fill out this bug report! 🙌🏽
