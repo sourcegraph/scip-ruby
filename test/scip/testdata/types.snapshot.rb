@@ -11,8 +11,8 @@
 #       ^ definition [..] M#
    module_function
    sig { returns(T::Boolean) }
-#  ^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
-#  ^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
+#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
+#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #                ^ reference [..] T#
 #                   ^^^^^^^ reference [..] T#Boolean.
 #                   ^^^^^^^ reference [..] T#Boolean.
@@ -20,7 +20,7 @@
 #                   ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
    def b
 #  ^^^^^ definition [..] M#b().
-#  ^^^^^ definition [..] <Class:M>#b().
+#  ^^^^^ definition [..] `<Class:M>`#b().
      true
    end
  end

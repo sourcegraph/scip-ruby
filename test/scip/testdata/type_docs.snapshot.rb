@@ -12,7 +12,7 @@
 #            ^^^ reference [..] T#Sig#
  
    sig { params(x: Integer, y: String).returns(String) }
-#  ^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
+#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#Static#
 #                  ^^^^^^^ reference [..] Integer#
 #                              ^^^^^^ reference [..] String#
