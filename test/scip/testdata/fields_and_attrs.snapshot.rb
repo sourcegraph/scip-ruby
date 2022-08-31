@@ -8,17 +8,17 @@
    def m1
 #  ^^^^^^ definition [..] K#m1().
      @f = 0
-#    ^^ definition [..] K#@f.
+#    ^^ definition [..] K#`@f`.
      @g = @f
-#    ^^ definition [..] K#@g.
-#         ^^ reference [..] K#@f.
+#    ^^ definition [..] K#`@g`.
+#         ^^ reference [..] K#`@f`.
      return
    end
    def m2
 #  ^^^^^^ definition [..] K#m2().
      @f = @g
-#    ^^ definition [..] K#@f.
-#         ^^ reference [..] K#@g.
+#    ^^ definition [..] K#`@f`.
+#         ^^ reference [..] K#`@g`.
      return
    end
  end
@@ -29,8 +29,8 @@
    def m3
 #  ^^^^^^ definition [..] K#m3().
      @g = @f
-#    ^^ definition [..] K#@g.
-#         ^^ reference [..] K#@f.
+#    ^^ definition [..] K#`@g`.
+#         ^^ reference [..] K#`@f`.
      return
    end
  end
@@ -39,14 +39,14 @@
  class L
 #      ^ definition [..] L#
    @x = 10
-#  ^^ definition [..] <Class:L>#@x.
+#  ^^ definition [..] `<Class:L>`#`@x`.
    @y = 9
-#  ^^ definition [..] <Class:L>#@y.
+#  ^^ definition [..] `<Class:L>`#`@y`.
    def self.m1
-#  ^^^^^^^^^^^ definition [..] <Class:L>#m1().
+#  ^^^^^^^^^^^ definition [..] `<Class:L>`#m1().
      @y = @x
-#    ^^ definition [..] <Class:L>#@y.
-#         ^^ reference [..] <Class:L>#@x.
+#    ^^ definition [..] `<Class:L>`#`@y`.
+#         ^^ reference [..] `<Class:L>`#`@x`.
      return
    end
  
@@ -62,22 +62,22 @@
  class N
 #      ^ definition [..] N#
    @@a = 0
-#  ^^^ definition [..] <Class:N>#@@a.
+#  ^^^ definition [..] `<Class:N>`#`@@a`.
    @@b = 1
-#  ^^^ definition [..] <Class:N>#@@b.
+#  ^^^ definition [..] `<Class:N>`#`@@b`.
    def self.m1
-#  ^^^^^^^^^^^ definition [..] <Class:N>#m1().
+#  ^^^^^^^^^^^ definition [..] `<Class:N>`#m1().
      @@b = @@a
-#    ^^^ definition [..] <Class:N>#@@b.
-#          ^^^ reference [..] <Class:N>#@@a.
+#    ^^^ definition [..] `<Class:N>`#`@@b`.
+#          ^^^ reference [..] `<Class:N>`#`@@a`.
      return
    end
  
    def m2
 #  ^^^^^^ definition [..] N#m2().
      @@b = @@a
-#    ^^^ definition [..] N#@@b.
-#          ^^^ reference [..] N#@@a.
+#    ^^^ definition [..] N#`@@b`.
+#          ^^^ reference [..] N#`@@a`.
      return
    end
  
@@ -92,20 +92,20 @@
  class P
 #      ^ definition [..] P#
    attr_accessor :a
-#  ^^^^^^^^^^^^^^^^ definition [..] P#a=().
+#  ^^^^^^^^^^^^^^^^ definition [..] P#`a=`().
 #  ^^^^^^^^^^^^^^^^ definition [..] P#a().
    attr_reader :r
 #  ^^^^^^^^^^^^^^ definition [..] P#r().
    attr_writer :w
-#  ^^^^^^^^^^^^^^ definition [..] P#w=().
+#  ^^^^^^^^^^^^^^ definition [..] P#`w=`().
  
    def init
 #  ^^^^^^^^ definition [..] P#init().
      self.a = self.r
-#         ^^^ reference [..] P#a=().
+#         ^^^ reference [..] P#`a=`().
 #                  ^ reference [..] P#r().
      self.w = self.a
-#         ^^^ reference [..] P#w=().
+#         ^^^ reference [..] P#`w=`().
 #                  ^ reference [..] P#a().
    end
  
@@ -129,12 +129,12 @@
 #      ^ reference [..] P#
    p.a = p.r
 #  ^ reference local 1~#2121829932
-#    ^^^ reference [..] P#a=().
+#    ^^^ reference [..] P#`a=`().
 #        ^ reference local 1~#2121829932
 #          ^ reference [..] P#r().
    p.w = p.a
 #  ^ reference local 1~#2121829932
-#    ^^^ reference [..] P#w=().
+#    ^^^ reference [..] P#`w=`().
 #        ^ reference local 1~#2121829932
 #          ^ reference [..] P#a().
  end

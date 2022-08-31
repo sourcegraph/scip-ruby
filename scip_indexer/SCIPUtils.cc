@@ -1,6 +1,8 @@
 #include <string>
 
 #include "absl/status/status.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_replace.h"
 
 #include "proto/SCIP.pb.h"
 
@@ -8,28 +10,69 @@ namespace scip::utils {
 
 using namespace std;
 
+void addEscaped(string &out, const string &in) {
+    bool needsEscape = false;
+    bool needsBacktickEscape = false;
+    for (auto &c : in) {
+        if (('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9') || c == '+' || c == '-' ||
+            c == '$' || c == '_') {
+            continue;
+        }
+        needsBacktickEscape = c == '`';
+        needsEscape = true;
+    }
+    if (needsEscape) {
+        if (needsBacktickEscape) {
+            absl::StrAppend(&out, "`", absl::StrReplaceAll(in, {{"`", "``"}}), "`");
+            return;
+        }
+        absl::StrAppend(&out, "`", in, "`");
+        return;
+    }
+    out.append(in);
+}
+
+void addSpaceEscaped(string &out, const string &in) {
+    if (absl::StrContains(in, " ")) {
+        out.append(absl::StrReplaceAll(in, {{" ", "  "}}));
+        return;
+    }
+    out.append(in);
+}
+
 absl::Status emitDescriptorString(const scip::Descriptor &descriptor, string &out) {
     switch (descriptor.suffix()) {
         case scip::Descriptor::Namespace: // module
-            absl::StrAppend(&out, descriptor.name(), "/");
+            addEscaped(out, descriptor.name());
+            out.push_back('/');
             return absl::OkStatus();
         case scip::Descriptor::Type:
-            absl::StrAppend(&out, descriptor.name(), "#");
+            addEscaped(out, descriptor.name());
+            out.push_back('#');
             return absl::OkStatus();
         case scip::Descriptor::Term:
-            absl::StrAppend(&out, descriptor.name(), ".");
+            addEscaped(out, descriptor.name());
+            out.push_back('.');
             return absl::OkStatus();
         case scip::Descriptor::Meta:
-            absl::StrAppend(&out, descriptor.name(), ":");
+            addEscaped(out, descriptor.name());
+            out.push_back(':');
             return absl::OkStatus();
         case scip::Descriptor::Method:
-            absl::StrAppend(&out, descriptor.name(), "(", descriptor.disambiguator(), ").");
+            addEscaped(out, descriptor.name());
+            out.push_back('(');
+            addEscaped(out, descriptor.disambiguator());
+            out.append(").");
             return absl::OkStatus();
         case scip::Descriptor::TypeParameter:
-            absl::StrAppend(&out, "[", descriptor.name(), "]");
+            out.push_back('[');
+            addEscaped(out, descriptor.name());
+            out.push_back(']');
             return absl::OkStatus();
         case scip::Descriptor::Parameter:
-            absl::StrAppend(&out, "(", descriptor.name(), ")");
+            out.push_back('(');
+            addEscaped(out, descriptor.name());
+            out.push_back(')');
             return absl::OkStatus();
         default:
             return absl::InvalidArgumentError(
@@ -42,12 +85,14 @@ absl::Status emitSymbolString(const scip::Symbol &symbol, string &out) {
     if (symbol.has_package()) {
         auto &package = symbol.package();
         if (!package.name().empty()) {
-            absl::StrAppend(&out, package.name(), " "); // FIXME(varun): handle escaping
+            addSpaceEscaped(out, package.name());
+            out.push_back(' ');
         } else {
             out.append(". ");
         }
         if (!package.version().empty()) {
-            absl::StrAppend(&out, package.version(), " "); // FIXME(varun): handle escaping
+            addSpaceEscaped(out, package.version());
+            out.push_back(' ');
         } else {
             out.append(". ");
         }

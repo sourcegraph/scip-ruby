@@ -73,15 +73,15 @@
    module M6
 #         ^^ definition [..] M5#M6#
      def self.g()
-#    ^^^^^^^^^^^^ definition [..] M5#<Class:M6>#g().
+#    ^^^^^^^^^^^^ definition [..] M5#`<Class:M6>`#g().
      end
    end
  
    def self.h()
-#  ^^^^^^^^^^^^ definition [..] <Class:M5>#h().
+#  ^^^^^^^^^^^^ definition [..] `<Class:M5>`#h().
      M6.g()
 #    ^^ reference [..] M5#M6#
-#       ^ reference [..] M5#<Class:M6>#g().
+#       ^ reference [..] M5#`<Class:M6>`#g().
      return
    end
  end
@@ -91,7 +91,7 @@
    module M8
 #         ^^ definition [..] C7#M8#
      def self.i()
-#    ^^^^^^^^^^^^ definition [..] C7#<Class:M8>#i().
+#    ^^^^^^^^^^^^ definition [..] C7#`<Class:M8>`#i().
      end
    end
  
@@ -99,7 +99,7 @@
 #  ^^^^^^^ definition [..] C7#j().
      M8.i()
 #    ^^ reference [..] C7#M8#
-#       ^ reference [..] C7#<Class:M8>#i().
+#       ^ reference [..] C7#`<Class:M8>`#i().
      return
    end
  end
