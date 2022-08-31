@@ -130,7 +130,7 @@
 #      | class C
 #      | ```
    @k = nil
-#  ^^ definition [..] <Class:C>#@k.
+#  ^^ definition [..] `<Class:C>`#`@k`.
 #  documentation
 #  | ```ruby
 #  | @k (T.untyped)
@@ -149,67 +149,67 @@
 #                  | b (T.untyped)
 #                  | ```
      @f = nil
-#    ^^ definition [..] C#@f.
+#    ^^ definition [..] C#`@f`.
 #    documentation
 #    | ```ruby
 #    | @f (T.untyped)
 #    | ```
      @@g = nil
-#    ^^^ definition [..] C#@@g.
+#    ^^^ definition [..] C#`@@g`.
 #    documentation
 #    | ```ruby
 #    | @@g (T.untyped)
 #    | ```
      @k = nil
-#    ^^ definition [..] C#@k.
+#    ^^ definition [..] C#`@k`.
 #    documentation
 #    | ```ruby
 #    | @k (T.untyped)
 #    | ```
      if b
        @f = 1
-#      ^^ reference (write) [..] C#@f.
+#      ^^ reference (write) [..] C#`@f`.
 #      override_documentation
 #      | ```ruby
 #      | @f (Integer(1))
 #      | ```
        @@g = 1
-#      ^^^ reference (write) [..] C#@@g.
+#      ^^^ reference (write) [..] C#`@@g`.
 #      override_documentation
 #      | ```ruby
 #      | @@g (Integer(1))
 #      | ```
        @k = 1
-#      ^^ reference (write) [..] C#@k.
+#      ^^ reference (write) [..] C#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (Integer(1))
 #      | ```
-#      ^^^^^^ reference [..] C#@k.
+#      ^^^^^^ reference [..] C#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (Integer(1))
 #      | ```
      else
        @f = 'f'
-#      ^^ reference (write) [..] C#@f.
+#      ^^ reference (write) [..] C#`@f`.
 #      override_documentation
 #      | ```ruby
 #      | @f (String("f"))
 #      | ```
        @@g = 'g'
-#      ^^^ reference (write) [..] C#@@g.
+#      ^^^ reference (write) [..] C#`@@g`.
 #      override_documentation
 #      | ```ruby
 #      | @@g (String("g"))
 #      | ```
        @k = 'k'
-#      ^^ reference (write) [..] C#@k.
+#      ^^ reference (write) [..] C#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (String("k"))
 #      | ```
-#      ^^^^^^^^ reference [..] C#@k.
+#      ^^^^^^^^ reference [..] C#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (String("k"))
@@ -244,48 +244,48 @@
      if !b
 #        ^ reference local 1~#2066187318
        @f = 1
-#      ^^ definition [..] D#@f.
+#      ^^ definition [..] D#`@f`.
 #      documentation
 #      | ```ruby
 #      | @f (T.untyped)
 #      | ```
        @@g = 1
-#      ^^^ definition [..] D#@@g.
+#      ^^^ definition [..] D#`@@g`.
 #      documentation
 #      | ```ruby
 #      | @@g (T.untyped)
 #      | ```
        @k = 1
-#      ^^ definition [..] D#@k.
+#      ^^ definition [..] D#`@k`.
 #      documentation
 #      | ```ruby
 #      | @k (T.untyped)
 #      | ```
-#      ^^^^^^ reference [..] D#@k.
+#      ^^^^^^ reference [..] D#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (Integer(1))
 #      | ```
      else
        @f = 'f'
-#      ^^ definition [..] D#@f.
+#      ^^ definition [..] D#`@f`.
 #      documentation
 #      | ```ruby
 #      | @f (T.untyped)
 #      | ```
        @@g = 'g'
-#      ^^^ definition [..] D#@@g.
+#      ^^^ definition [..] D#`@@g`.
 #      documentation
 #      | ```ruby
 #      | @@g (T.untyped)
 #      | ```
        @k = 'k'
-#      ^^ definition [..] D#@k.
+#      ^^ definition [..] D#`@k`.
 #      documentation
 #      | ```ruby
 #      | @k (T.untyped)
 #      | ```
-#      ^^^^^^^^ reference [..] D#@k.
+#      ^^^^^^^^ reference [..] D#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (String("k"))

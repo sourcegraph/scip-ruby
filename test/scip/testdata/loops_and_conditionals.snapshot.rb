@@ -28,7 +28,7 @@
 #          ^ reference local 1~#2393773952
 #                      ^ reference local 1~#2393773952
 #                               ^ reference local 1~#2393773952
-#                                       ^^ reference [..] Integer#==().
+#                                       ^^ reference [..] Integer#`==`().
        x
 #      ^ reference local 1~#2393773952
      else

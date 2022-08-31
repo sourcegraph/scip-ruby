@@ -25,6 +25,6 @@
 #        ^ definition local 1~#3809224601
 #           ^ definition local 2~#3809224601
      super
-#    ^^^^^ reference [..] <Class:<Magic>>#<call-with-block>().
+#    ^^^^^ reference [..] `<Class:<Magic>>`#`<call-with-block>`().
    end
  end

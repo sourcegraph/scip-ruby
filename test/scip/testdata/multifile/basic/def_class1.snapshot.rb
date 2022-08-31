@@ -7,7 +7,7 @@
 #            ^^^ reference [..] T#Sig#
  
    sig { returns(T::Boolean) }
-#  ^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
+#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #        ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #                ^ reference [..] T#
 #                   ^^^^^^^ reference [..] T#Boolean.

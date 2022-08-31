@@ -7,7 +7,7 @@
 #            ^^^ reference [..] T#Sig#
  
    sig { params(a: T::Boolean).void }
-#  ^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
+#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #        ^^^^^^ reference [..] T#Private#Methods#DeclBuilder#params().
 #                  ^ reference [..] T#
 #                     ^^^^^^^ reference [..] T#Boolean.
@@ -17,21 +17,21 @@
 #  ^^^^^^^^^^^^^^ definition [..] Z1#write_f().
 #              ^ definition local 1~#1000661517
      @f = a
-#    ^^ definition [..] Z1#@f.
-#    ^^^^^^ reference [..] Z1#@f.
+#    ^^ definition [..] Z1#`@f`.
+#    ^^^^^^ reference [..] Z1#`@f`.
 #         ^ reference local 1~#1000661517
    end
  
    sig { returns(T::Boolean) }
-#  ^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
+#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #        ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #                ^ reference [..] T#
 #                   ^^^^^^^ reference [..] T#Boolean.
 #                   ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
    def read_f?
-#  ^^^^^^^^^^^ definition [..] Z1#read_f?().
+#  ^^^^^^^^^^^ definition [..] Z1#`read_f?`().
      @f
-#    ^^ reference [..] Z1#@f.
+#    ^^ reference [..] Z1#`@f`.
    end
  end
  
@@ -42,19 +42,19 @@
 #            ^^^ reference [..] T#Sig#
  
    sig { returns(T::Boolean) }
-#  ^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
+#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #        ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #                ^ reference [..] T#
 #                   ^^^^^^^ reference [..] T#Boolean.
 #                   ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
    def read_f?
-#  ^^^^^^^^^^^ definition [..] Z2#read_f?().
+#  ^^^^^^^^^^^ definition [..] Z2#`read_f?`().
      @f
-#    ^^ reference [..] Z2#@f.
+#    ^^ reference [..] Z2#`@f`.
    end
  
    sig { params(a: T::Boolean).void }
-#  ^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
+#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #        ^^^^^^ reference [..] T#Private#Methods#DeclBuilder#params().
 #                  ^ reference [..] T#
 #                     ^^^^^^^ reference [..] T#Boolean.
@@ -64,8 +64,8 @@
 #  ^^^^^^^^^^^^^^ definition [..] Z2#write_f().
 #              ^ definition local 1~#1000661517
      @f = a
-#    ^^ definition [..] Z2#@f.
-#    ^^^^^^ reference [..] Z2#@f.
+#    ^^ definition [..] Z2#`@f`.
+#    ^^^^^^ reference [..] Z2#`@f`.
 #         ^ reference local 1~#1000661517
    end
  end
@@ -78,15 +78,15 @@
 #            ^^^ reference [..] T#Sig#
  
    sig { returns(T::Boolean) }
-#  ^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
+#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #        ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #                ^ reference [..] T#
 #                   ^^^^^^^ reference [..] T#Boolean.
 #                   ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
    def read_f_plus_1?
-#  ^^^^^^^^^^^^^^^^^^ definition [..] Z3#read_f_plus_1?().
+#  ^^^^^^^^^^^^^^^^^^ definition [..] Z3#`read_f_plus_1?`().
      @f + 1
-#    ^^ reference [..] Z3#@f.
+#    ^^ reference [..] Z3#`@f`.
    end
  end
  
@@ -98,7 +98,7 @@
 #            ^^^ reference [..] T#Sig#
  
    sig { params(a: T::Boolean).void }
-#  ^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
+#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #        ^^^^^^ reference [..] T#Private#Methods#DeclBuilder#params().
 #                  ^ reference [..] T#
 #                     ^^^^^^^ reference [..] T#Boolean.
@@ -110,8 +110,8 @@
      write_f(a)
 #            ^ reference local 1~#3337417690
      @f = read_f_plus_1?
-#    ^^ definition [..] Z4#@f.
-#    ^^^^^^^^^^^^^^^^^^^ reference [..] Z4#@f.
+#    ^^ definition [..] Z4#`@f`.
+#    ^^^^^^^^^^^^^^^^^^^ reference [..] Z4#`@f`.
    end
  end
  

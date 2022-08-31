@@ -24,7 +24,7 @@
    end
  
    sig { returns(T::Boolean) }
-#  ^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
+#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #        ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #                ^ reference [..] T#
 #                   ^^^^^^^ reference [..] T#Boolean.
@@ -40,9 +40,9 @@
    end
  
    sig { params(C, T::Boolean).returns(T::Boolean) }
-#  ^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
+#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #        ^^^^^^ reference [..] T#Private#Methods#DeclBuilder#params().
-#               ^ reference [..] T.untyped#
+#               ^ reference [..] `T.untyped`#
 #                  ^ reference [..] T#
 #                     ^^^^^^^ reference [..] T#Boolean.
 #                              ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
@@ -95,7 +95,7 @@
    # Yet another..
    # ...doc comment
    sig { returns(T::Boolean) }
-#  ^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
+#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #        ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #                ^ reference [..] T#
 #                   ^^^^^^^ reference [..] T#Boolean.
@@ -116,9 +116,9 @@
    # And...
    # ...one more doc comment
    sig { params(C, T::Boolean).returns(T::Boolean) }
-#  ^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
+#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #        ^^^^^^ reference [..] T#Private#Methods#DeclBuilder#params().
-#               ^ reference [..] T.untyped#
+#               ^ reference [..] `T.untyped`#
 #                  ^ reference [..] T#
 #                     ^^^^^^^ reference [..] T#Boolean.
 #                              ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
@@ -198,7 +198,7 @@
  
      # This method is inside M1::M2
      sig { returns(T::Boolean) }
-#    ^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
+#    ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #          ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #                  ^ reference [..] T#
 #                     ^^^^^^^ reference [..] T#Boolean.
@@ -249,10 +249,10 @@
  
  # Yet another global function
  sig { returns(T::Integer) }
-#^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
+#^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #      ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #              ^ reference [..] T#
-#                 ^^^^^^^ reference [..] T.untyped#
+#                 ^^^^^^^ reference [..] `T.untyped`#
 #                 ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
  def f2
 #^^^^^^ definition [..] Object#f2().
@@ -280,10 +280,10 @@
 #          ^^^ reference [..] T#Sig#
  
  sig { returns(T::Integer) }
-#^^^ reference [..] Sorbet#Private#<Class:Static>#sig().
+#^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #      ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #              ^ reference [..] T#
-#                 ^^^^^^^ reference [..] T.untyped#
+#                 ^^^^^^^ reference [..] `T.untyped`#
 #                 ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
  def f4 # another undocumented global function
 #^^^^^^ definition [..] Object#f4().
@@ -315,18 +315,18 @@
 #  documentation
 #  | sets @x and @@y
      @x = 10
-#    ^^ definition [..] K1#@x.
+#    ^^ definition [..] K1#`@x`.
 #    documentation
 #    | ```ruby
 #    | @x (T.untyped)
 #    | ```
      @@y = 10
-#    ^^^ definition [..] K1#@@y.
+#    ^^^ definition [..] K1#`@@y`.
 #    documentation
 #    | ```ruby
 #    | @@y (T.untyped)
 #    | ```
-#    ^^^^^^^^ reference [..] K1#@@y.
+#    ^^^^^^^^ reference [..] K1#`@@y`.
 #    override_documentation
 #    | ```ruby
 #    | @@y (Integer(10))
@@ -335,7 +335,7 @@
  
    # lorem ipsum, you get it
    def self.p2
-#  ^^^^^^^^^^^ definition [..] <Class:K1>#p2().
+#  ^^^^^^^^^^^ definition [..] `<Class:K1>`#p2().
 #  documentation
 #  | ```ruby
 #  | sig {returns(T.untyped)}
@@ -344,12 +344,12 @@
 #  documentation
 #  | lorem ipsum, you get it
      @z = 10
-#    ^^ definition [..] <Class:K1>#@z.
+#    ^^ definition [..] `<Class:K1>`#`@z`.
 #    documentation
 #    | ```ruby
 #    | @z (T.untyped)
 #    | ```
-#    ^^^^^^^ reference [..] <Class:K1>#@z.
+#    ^^^^^^^ reference [..] `<Class:K1>`#`@z`.
 #    override_documentation
 #    | ```ruby
 #    | @z (Integer(10))
@@ -375,7 +375,7 @@
 #           | Parent class
    # doc comment on class var ooh
    @z = 9
-#  ^^ definition [..] <Class:K2>#@z.
+#  ^^ definition [..] `<Class:K2>`#`@z`.
 #  documentation
 #  | ```ruby
 #  | @z (T.untyped)
@@ -394,22 +394,22 @@
 #  documentation
 #  | overrides K1's p1
      @x = 20
-#    ^^ definition [..] K2#@x.
+#    ^^ definition [..] K2#`@x`.
 #    documentation
 #    | ```ruby
 #    | @x (T.untyped)
 #    | ```
      @@y = 20
-#    ^^^ definition [..] K2#@@y.
+#    ^^^ definition [..] K2#`@@y`.
 #    documentation
 #    | ```ruby
 #    | @@y (T.untyped)
 #    | ```
      @z += @x
-#    ^^ reference [..] K2#@z.
-#    ^^ reference (write) [..] K2#@z.
-#    ^^^^^^^^ reference [..] K2#@z.
-#          ^^ reference [..] K2#@x.
+#    ^^ reference [..] K2#`@z`.
+#    ^^ reference (write) [..] K2#`@z`.
+#    ^^^^^^^^ reference [..] K2#`@z`.
+#          ^^ reference [..] K2#`@x`.
 #          override_documentation
 #          | ```ruby
 #          | @x (Integer(20))
