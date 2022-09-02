@@ -18,6 +18,7 @@ see the [Design Decisions doc][].
     - [Writing a new snapshot test](#writing-a-new-snapshot-test)
     - [Writing a new repo test](#writing-a-new-snapshot-test)
 - [Debugging](#debugging)
+  - [More readable stack traces](#more-readable-stack-traces)
   - [Debugging with print statements](#debugging-with-print-statements)
   - [Debugging with LLDB](#debugging-with-lldb)
   - [Debugging build issues](#debugging-build-issues)
@@ -204,6 +205,24 @@ modify the [scip_repos_test.bzl](test/scip/repos/scip_repos_test.bzl)
 file to include the relevant data.
 
 ## Debugging
+
+### More readable stack traces
+
+C++ stack traces can get pretty gnarly with text like:
+
+```c++
+std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char> >
+```
+
+instead of `std::string`.
+
+If you have a stack trace, run it through the simplification script.
+
+```
+./bazel-bin/main/scip-ruby <args> 2> >(./tools/scripts/simplify-cxx-fqns.py)
+```
+
+NOTE: The script requires [Comby](https://comby.dev/docs/get-started#install).
 
 ### Debugging with print statements
 

@@ -1,0 +1,28 @@
+[sorbet]
+match = 'sorbet:::[~(((core|realmain)::)?)]'
+rewrite = ''
+
+[std_string]
+match = 'std::__1::basic_string<char,...>'
+rewrite = 'string'
+
+[std_string_view]
+match = 'std::__1::basic_string_view<char,...>'
+rewrite = 'string_view'
+
+[std_utility]
+match = 'std::__1:::[name~(pair|tuple|optional)]<:[a]>'
+rewrite = 'name<:[a]>'
+
+[std_ptr]
+match = 'std::__1::shared_ptr'
+rewrite = 'shared_ptr'
+
+[std_vector]
+match = 'std::__1::vector<:[a],...>'
+rewrite = 'vector<:[a]>'
+
+# CAUTION: Patterns are run in alphabetical order, so use zzz to deprioritize this
+[std_zzz_1]
+match = 'std::__1::'
+rewrite = 'std::'
