@@ -880,7 +880,8 @@ private:
         auto ancestorType =
             core::make_type<core::UnresolvedClassType>(unresolvedPath->first, move(unresolvedPath->second));
 
-        auto uaSym = ctx.state.enterMethodSymbol(core::Loc::none(), item.klass, core::Names::unresolvedAncestors());
+        auto uaSym = ctx.state.enterMethodSymbol(core::Loc::none(), item.klass, core::Names::unresolvedAncestors(),
+                                                 core::LocOffsets::none());
 
         // Add a fake block argument so that this method symbol passes sanity checks
         auto &arg = ctx.state.enterMethodArgumentSymbol(core::Loc::none(), uaSym, core::Names::blkArg());
@@ -1073,7 +1074,7 @@ private:
                     // We never stored a mixin in this symbol
                     // Create a the fake property that will hold the mixed in modules
                     mixMethod = gs.enterMethodSymbol(core::Loc{todo.file, send->loc}, ownerKlass,
-                                                     core::Names::mixedInClassMethods());
+                                                     core::Names::mixedInClassMethods(), core::LocOffsets::none());
                     mixMethod.data(gs)->resultType = core::make_type<core::TupleType>(vector<core::TypePtr>{});
 
                     // Create a dummy block argument to satisfy sanitycheck during GlobalState::expandNames
@@ -2438,7 +2439,8 @@ class ResolveTypeMembersAndFieldsWalk {
             return;
         }
 
-        auto alias = ctx.state.enterMethodSymbol(ctx.locAt(job.loc), job.owner, job.fromName);
+        // TODO(varun): is toNameLoc the right field?
+        auto alias = ctx.state.enterMethodSymbol(ctx.locAt(job.loc), job.owner, job.fromName, job.toNameLoc);
         alias.data(ctx)->resultType = core::make_type<core::AliasType>(core::SymbolRef(toMethod));
 
         // Add a fake keyword argument to remember the toName (for fast path hashing).

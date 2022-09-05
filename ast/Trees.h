@@ -388,6 +388,9 @@ public:
     /// The range for the method declaration, including 'def' and ending
     /// after the closing ')' after the parameter list.
     core::LocOffsets declLoc;
+    /// The range for the name of the method itself in the method declaration,
+    /// excluding 'def' and the parameter list '(...)'.
+    core::LocOffsets nameLoc;
     /// Reference to the method data.
     core::MethodRef symbol;
 
@@ -401,8 +404,8 @@ public:
     using Flags = core::FoundMethod::Flags;
     Flags flags;
 
-    MethodDef(core::LocOffsets loc, core::LocOffsets declLoc, core::MethodRef symbol, core::NameRef name,
-              ARGS_store args, ExpressionPtr rhs, Flags flags);
+    MethodDef(core::LocOffsets loc, core::LocOffsets declLoc, core::LocOffsets nameLoc, core::MethodRef symbol,
+              core::NameRef name, ARGS_store args, ExpressionPtr rhs, Flags flags);
 
     ExpressionPtr deepCopy() const;
 
@@ -412,7 +415,7 @@ public:
 
     void _sanityCheck();
 };
-CheckSize(MethodDef, 64, 8);
+CheckSize(MethodDef, 72, 8);
 
 EXPRESSION(If) {
 public:

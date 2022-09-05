@@ -392,10 +392,23 @@ public:
         return absl::OkStatus();
     }
 
-    core::Loc symbolLoc(const core::GlobalState &gs) const {
-        // FIXME(varun): For methods, this returns the full line!
-        ENFORCE(this->name == core::NameRef::noName());
-        return this->selfOrOwner.loc(gs);
+    core::Loc symbolLoc(const core::GlobalState &gs, core::FileRef file) const {
+        switch (this->kind()) {
+            case Kind::Method: {
+                auto method = this->selfOrOwner.asMethodRef().data(gs);
+                auto offset = method->nameLoc;
+                if (!offset.exists() || offset.empty()) {
+                    fmt::print("Missing nameLoc for {}\n", this->showRaw(gs));
+                    return method->loc();
+                }
+                return core::Loc(file, offset);
+            }
+            case Kind::ClassOrModule:
+            case Kind::DeclaredField:
+                return this->selfOrOwner.loc(gs);
+            case Kind::UndeclaredField:
+                ENFORCE(false, "case UndeclaredField should not be triggered here");
+        }
     }
 };
 
@@ -628,7 +641,7 @@ public:
                                 std::optional<core::LocOffsets> loc = std::nullopt) {
         // TODO:(varun) Should we cache here too to avoid emitting duplicate definitions?
         scip::Symbol symbol;
-        auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs);
+        auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs, file);
         auto status = symRef.symbolForExpr(gs, this->gemMetadata, symbol, occLoc);
         if (!status.ok()) {
             return status;

@@ -18,12 +18,12 @@
 #                              ^^^^^^ reference [..] String#
 #                                              ^^^^^^ reference [..] String#
    def js_add(x, y)
-#  ^^^^^^^^^^^^^^^^ definition [..] M#js_add().
-#  documentation
-#  | ```ruby
-#  | sig {params(x: Integer, y: String).returns(String)}
-#  | def js_add(x, y)
-#  | ```
+#      ^^^^^^ definition [..] M#js_add().
+#      documentation
+#      | ```ruby
+#      | sig {params(x: Integer, y: String).returns(String)}
+#      | def js_add(x, y)
+#      | ```
 #             ^ definition local 1~#1239553962
 #             documentation
 #             | ```ruby

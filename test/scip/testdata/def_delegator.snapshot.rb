@@ -5,8 +5,8 @@
  class MyArray1
 #      ^^^^^^^^ definition [..] MyArray1#
    attr_accessor :inner_array
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyArray1#inner_array().
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyArray1#`inner_array=`().
+#                 ^^^^^^^^^^^ definition [..] MyArray1#inner_array().
+#                 ^^^^^^^^^^^ definition [..] MyArray1#`inner_array=`().
    extend Forwardable
 #         ^^^^^^^^^^^ reference [..] Forwardable#
    def_delegator :@inner_array, :[], :get_at_index
@@ -30,8 +30,8 @@
 #         ^ reference [..] T#
 #            ^^^ reference [..] T#Sig#
    attr_accessor :inner_array
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyArray2#inner_array().
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyArray2#`inner_array=`().
+#                 ^^^^^^^^^^^ definition [..] MyArray2#inner_array().
+#                 ^^^^^^^^^^^ definition [..] MyArray2#`inner_array=`().
    extend Forwardable
 #         ^^^^^^^^^^^ reference [..] Forwardable#
    def_delegator :@inner_array, :[], :get_at_index
@@ -52,8 +52,8 @@
  class MyArray3
 #      ^^^^^^^^ definition [..] MyArray3#
    attr_accessor :inner_array
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyArray3#inner_array().
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyArray3#`inner_array=`().
+#                 ^^^^^^^^^^^ definition [..] MyArray3#inner_array().
+#                 ^^^^^^^^^^^ definition [..] MyArray3#`inner_array=`().
    extend Forwardable
 #         ^^^^^^^^^^^ reference [..] Forwardable#
    def_delegators :@inner_array, :size, :<<, :map
@@ -99,8 +99,8 @@
 #         ^ reference [..] T#
 #            ^^^ reference [..] T#Sig#
    attr_accessor :inner_array
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyArray4#`inner_array=`().
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyArray4#inner_array().
+#                 ^^^^^^^^^^^ definition [..] MyArray4#`inner_array=`().
+#                 ^^^^^^^^^^^ definition [..] MyArray4#inner_array().
    extend Forwardable
 #         ^^^^^^^^^^^ reference [..] Forwardable#
    def_delegators :@inner_array, :size, :<<, :map

@@ -138,10 +138,10 @@ vector<ast::ExpressionPtr> Struct::run(core::MutableContext ctx, ast::Assign *as
             argName = ast::make_expression<ast::KeywordArg>(symLoc, move(argName));
         }
         newArgs.emplace_back(ast::MK::OptionalArg(symLoc, move(argName), ast::MK::Nil(symLoc)));
-
-        body.emplace_back(ast::MK::SyntheticMethod0(symLoc, symLoc, name, ast::MK::RaiseUnimplemented(loc)));
-        body.emplace_back(ast::MK::SyntheticMethod1(symLoc, symLoc, name.addEq(ctx), ast::MK::Local(symLoc, name),
-                                                    ast::MK::RaiseUnimplemented(loc)));
+        // TODO(varun): Is symLoc correct here?
+        body.emplace_back(ast::MK::SyntheticMethod0(symLoc, symLoc, symLoc, name, ast::MK::RaiseUnimplemented(loc)));
+        body.emplace_back(ast::MK::SyntheticMethod1(symLoc, symLoc, symLoc, name.addEq(ctx),
+                                                    ast::MK::Local(symLoc, name), ast::MK::RaiseUnimplemented(loc)));
     }
 
     // Elem = type_member {{fixed: T.untyped}}
@@ -157,7 +157,7 @@ vector<ast::ExpressionPtr> Struct::run(core::MutableContext ctx, ast::Assign *as
 
     if (isMissingInitialize(ctx, send)) {
         body.emplace_back(ast::MK::SigVoid(loc, std::move(sigArgs)));
-        body.emplace_back(ast::MK::SyntheticMethod(loc, loc, core::Names::initialize(), std::move(newArgs),
+        body.emplace_back(ast::MK::SyntheticMethod(loc, loc, loc, core::Names::initialize(), std::move(newArgs),
                                                    ast::MK::RaiseUnimplemented(loc)));
     }
 

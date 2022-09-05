@@ -1,7 +1,7 @@
  # typed: true
  
  def hashes(h, k)
-#^^^^^^^^^^^^^^^^ definition [..] Object#hashes().
+#    ^^^^^^ definition [..] Object#hashes().
 #           ^ definition local 1~#1685166589
 #              ^ definition local 2~#1685166589
    h["hello"] = "world"

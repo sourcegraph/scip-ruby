@@ -194,6 +194,7 @@ NodeDef nodes[] = {
         "DefMethod",
         "def",
         vector<FieldDef>({{"declLoc", FieldType::Loc},
+                          {"nameLoc", FieldType::Loc},
                           {"name", FieldType::Name},
                           {"args", FieldType::Node},
                           {"body", FieldType::Node}}),
@@ -205,13 +206,14 @@ NodeDef nodes[] = {
         vector<FieldDef>({{"value", FieldType::Node}}),
     },
     // def name, instance method def
-    {"DefnHead", "defnhead", vector<FieldDef>({{"name", FieldType::Name}})},
+    {"DefnHead", "defnhead", vector<FieldDef>({{"nameLoc", FieldType::Loc}, {"name", FieldType::Name}})},
     // def <expr>.name singleton-class method def
     {
         "DefS",
         "defs",
         vector<FieldDef>({{"declLoc", FieldType::Loc},
                           {"singleton", FieldType::Node},
+                          {"nameLoc", FieldType::Loc},
                           {"name", FieldType::Name},
                           {"args", FieldType::Node},
                           {"body", FieldType::Node}}),
@@ -222,6 +224,7 @@ NodeDef nodes[] = {
         "defshead",
         vector<FieldDef>({
             {"definee", FieldType::Node},
+            {"nameLoc", FieldType::Loc},
             {"name", FieldType::Name},
         }),
     },
@@ -1040,10 +1043,12 @@ void emitNodeClassfile(ostream &out, NodeDef &node) {
                     << maybeComma << "\\n\", " << arg.name << ");\n";
                 break;
             case FieldType::Loc:
+                out << "{\n";
                 out << "      bool showFull = true;";
                 out << R"(    fmt::format_to(std::back_inserter(buf),  "\")" << arg.name << R"(\" : \"{}\")"
                     << maybeComma << "\\n\", "
                     << "core::Loc(file, " << arg.name << ").filePosToString(gs, showFull));\n";
+                out << "}\n";
                 break;
             case FieldType::Bool:
                 out << R"(    fmt::format_to(std::back_inserter(buf),  "\")" << arg.name << R"(\" : \"{}\")"

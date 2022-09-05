@@ -1840,7 +1840,7 @@ void ClassOrModule::recordRequiredAncestorInternal(GlobalState &gs, ClassOrModul
     // We store the required ancestors into a fake property called `<required-ancestors>`
     auto ancestors = this->findMethod(gs, prop);
     if (!ancestors.exists()) {
-        ancestors = gs.enterMethodSymbol(ancestor.loc, this->ref(gs), prop);
+        ancestors = gs.enterMethodSymbol(ancestor.loc, this->ref(gs), prop, LocOffsets::none());
         ancestors.data(gs)->locs_.clear(); // Remove the original location
 
         // Create the return type tuple to store RequiredAncestor.symbol
@@ -2140,7 +2140,8 @@ void Method::sanityCheck(const GlobalState &gs) const {
         return;
     }
     MethodRef current = this->ref(gs);
-    MethodRef current2 = const_cast<GlobalState &>(gs).enterMethodSymbol(this->loc(), this->owner, this->name);
+    MethodRef current2 =
+        const_cast<GlobalState &>(gs).enterMethodSymbol(this->loc(), this->owner, this->name, this->nameLoc);
 
     ENFORCE_NO_TIMER(current == current2);
     for (auto &tp : typeArguments()) {

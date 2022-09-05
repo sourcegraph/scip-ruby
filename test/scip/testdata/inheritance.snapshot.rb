@@ -14,7 +14,7 @@
 #                     ^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#Static#
 #                              ^^^^ reference [..] T#Private#Methods#DeclBuilder#void().
    def write_f(a)
-#  ^^^^^^^^^^^^^^ definition [..] Z1#write_f().
+#      ^^^^^^^ definition [..] Z1#write_f().
 #              ^ definition local 1~#1000661517
      @f = a
 #    ^^ definition [..] Z1#`@f`.
@@ -29,7 +29,7 @@
 #                   ^^^^^^^ reference [..] T#Boolean.
 #                   ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
    def read_f?
-#  ^^^^^^^^^^^ definition [..] Z1#`read_f?`().
+#      ^^^^^^^ definition [..] Z1#`read_f?`().
      @f
 #    ^^ reference [..] Z1#`@f`.
    end
@@ -48,7 +48,7 @@
 #                   ^^^^^^^ reference [..] T#Boolean.
 #                   ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
    def read_f?
-#  ^^^^^^^^^^^ definition [..] Z2#`read_f?`().
+#      ^^^^^^^ definition [..] Z2#`read_f?`().
      @f
 #    ^^ reference [..] Z2#`@f`.
    end
@@ -61,7 +61,7 @@
 #                     ^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#Static#
 #                              ^^^^ reference [..] T#Private#Methods#DeclBuilder#void().
    def write_f(a)
-#  ^^^^^^^^^^^^^^ definition [..] Z2#write_f().
+#      ^^^^^^^ definition [..] Z2#write_f().
 #              ^ definition local 1~#1000661517
      @f = a
 #    ^^ definition [..] Z2#`@f`.
@@ -84,7 +84,7 @@
 #                   ^^^^^^^ reference [..] T#Boolean.
 #                   ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
    def read_f_plus_1?
-#  ^^^^^^^^^^^^^^^^^^ definition [..] Z3#`read_f_plus_1?`().
+#      ^^^^^^^^^^^^^^ definition [..] Z3#`read_f_plus_1?`().
      @f + 1
 #    ^^ reference [..] Z3#`@f`.
    end
@@ -105,7 +105,7 @@
 #                     ^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#Static#
 #                              ^^^^ reference [..] T#Private#Methods#DeclBuilder#void().
    def write_f_plus_1(a)
-#  ^^^^^^^^^^^^^^^^^^^^^ definition [..] Z4#write_f_plus_1().
+#      ^^^^^^^^^^^^^^ definition [..] Z4#write_f_plus_1().
 #                     ^ definition local 1~#3337417690
      write_f(a)
 #            ^ reference local 1~#3337417690

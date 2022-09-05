@@ -1,7 +1,7 @@
  # typed: true
  
  def f()
-#^^^^^^^ definition [..] Object#f().
+#    ^ definition [..] Object#f().
    T.let(true, T::Boolean)
 #              ^ reference [..] T#
 #                 ^^^^^^^ reference [..] T#Boolean.
@@ -19,8 +19,8 @@
 #                   ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
 #                   ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
    def b
-#  ^^^^^ definition [..] M#b().
-#  ^^^^^ definition [..] `<Class:M>`#b().
+#      ^ definition [..] M#b().
+#      ^ definition [..] `<Class:M>`#b().
      true
    end
  end

@@ -13,7 +13,7 @@
 #                   ^^^^^^^ reference [..] T#Boolean.
 #                   ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
    def m1
-#  ^^^^^^ definition [..] C1#m1().
+#      ^^ definition [..] C1#m1().
      true
    end
  end

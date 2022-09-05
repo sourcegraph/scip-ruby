@@ -18,8 +18,8 @@
 #  ^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #  ^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #  ^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#Static#
-#  ^^^^^^^^^^^^^^^^^^^^^ definition [..] S#`prop_i=`().
-#  ^^^^^^^^^^^^^^^^^^^^^ definition [..] S#prop_i().
+#        ^^^^^^ definition [..] S#`prop_i=`().
+#        ^^^^^^ definition [..] S#prop_i().
 #                ^^^^^^^ reference [..] Integer#
 #                ^^^^^^^ reference [..] Integer#
 #                ^^^^^^^ reference [..] Integer#
@@ -29,7 +29,7 @@
 #  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#Static#
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] S#const_s().
+#         ^^^^^^^ definition [..] S#const_s().
 #                  ^ reference [..] T#
 #                  ^ reference [..] T#
 #                  ^ reference [..] T#
@@ -41,16 +41,16 @@
 #                            ^^^^^^ reference [..] String#
    const :const_f, Float, default: 0.5
 #  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] S#const_f().
 #  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#Static#
+#         ^^^^^^^ definition [..] S#const_f().
 #                  ^^^^^ reference [..] Float#
 #                  ^^^^^ reference [..] Float#
 #                  ^^^^^ reference [..] Float#
  end
  
  def f
-#^^^^^ definition [..] Object#f().
+#    ^ definition [..] Object#f().
    s = S.new(prop_i: 3)
 #  ^ definition local 1~#3809224601
 #      ^ reference [..] S#
@@ -92,7 +92,7 @@
 #                        ^ definition [..] POINT#`y=`().
 #                        ^ reference [..] BasicObject#
    def array
-#  ^^^^^^^^^ definition [..] POINT#array().
+#      ^^^^^ definition [..] POINT#array().
      [x, y]
 #     ^ reference [..] POINT#x().
 #        ^ reference [..] POINT#y().
@@ -100,7 +100,7 @@
  end
  
  def g
-#^^^^^ definition [..] Object#g().
+#    ^ definition [..] Object#g().
    p = POINT.new(0, 1)
 #  ^ definition local 1~#3792446982
 #      ^^^^^ reference [..] POINT#

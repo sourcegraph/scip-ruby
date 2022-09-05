@@ -300,8 +300,9 @@ ExpressionPtr validateRBIBody(DesugarContext dctx, ExpressionPtr body) {
     return body;
 }
 
-ExpressionPtr buildMethod(DesugarContext dctx, core::LocOffsets loc, core::LocOffsets declLoc, core::NameRef name,
-                          unique_ptr<parser::Node> &argnode, unique_ptr<parser::Node> &body, bool isSelf) {
+ExpressionPtr buildMethod(DesugarContext dctx, core::LocOffsets loc, core::LocOffsets declLoc, core::LocOffsets nameLoc,
+                          core::NameRef name, unique_ptr<parser::Node> &argnode, unique_ptr<parser::Node> &body,
+                          bool isSelf) {
     // Reset uniqueCounter within this scope (to keep numbers small)
     uint32_t uniqueCounter = 1;
     DesugarContext dctx1(dctx.ctx, uniqueCounter, dctx.enclosingBlockArg, declLoc, name);
@@ -320,7 +321,7 @@ ExpressionPtr buildMethod(DesugarContext dctx, core::LocOffsets loc, core::LocOf
     ExpressionPtr desugaredBody = desugarBody(dctx2, loc, body, std::move(destructures));
     desugaredBody = validateRBIBody(dctx2, move(desugaredBody));
 
-    auto mdef = MK::Method(loc, declLoc, name, std::move(args), std::move(desugaredBody));
+    auto mdef = MK::Method(loc, declLoc, nameLoc, name, std::move(args), std::move(desugaredBody));
     cast_tree<MethodDef>(mdef)->flags.isSelfMethod = isSelf;
     return mdef;
 }
@@ -1515,8 +1516,8 @@ ExpressionPtr node2TreeImpl(DesugarContext dctx, unique_ptr<parser::Node> what) 
             },
             [&](parser::DefMethod *method) {
                 bool isSelf = false;
-                ExpressionPtr res =
-                    buildMethod(dctx, method->loc, method->declLoc, method->name, method->args, method->body, isSelf);
+                ExpressionPtr res = buildMethod(dctx, method->loc, method->declLoc, method->nameLoc, method->name,
+                                                method->args, method->body, isSelf);
                 result = std::move(res);
             },
             [&](parser::DefS *method) {
@@ -1528,8 +1529,8 @@ ExpressionPtr node2TreeImpl(DesugarContext dctx, unique_ptr<parser::Node> what) 
                     }
                 }
                 bool isSelf = true;
-                ExpressionPtr res =
-                    buildMethod(dctx, method->loc, method->declLoc, method->name, method->args, method->body, isSelf);
+                ExpressionPtr res = buildMethod(dctx, method->loc, method->declLoc, method->nameLoc, method->name,
+                                                method->args, method->body, isSelf);
                 result = std::move(res);
             },
             [&](parser::SClass *sclass) {

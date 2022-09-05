@@ -1241,6 +1241,7 @@ void SerializerImpl::pickle(Pickler &p, const ast::ExpressionPtr &what) {
             auto &c = ast::cast_tree_nonnull<ast::MethodDef>(what);
             pickle(p, c.loc);
             pickle(p, c.declLoc);
+            pickle(p, c.nameLoc);
             uint8_t flags;
             static_assert(sizeof(flags) == sizeof(c.flags));
             // Can replace this with std::bit_cast in C++20
@@ -1518,6 +1519,7 @@ ast::ExpressionPtr SerializerImpl::unpickleExpr(serialize::UnPickler &p, const G
         case ast::Tag::MethodDef: {
             auto loc = unpickleLocOffsets(p);
             auto declLoc = unpickleLocOffsets(p);
+            auto nameLoc = unpickleLocOffsets(p);
             auto flagsU1 = p.getU1();
             ast::MethodDef::Flags flags;
             static_assert(sizeof(flags) == sizeof(flagsU1));
@@ -1531,7 +1533,7 @@ ast::ExpressionPtr SerializerImpl::unpickleExpr(serialize::UnPickler &p, const G
             for (auto &arg : args) {
                 arg = unpickleExpr(p, gs);
             }
-            auto ret = ast::MK::SyntheticMethod(loc, declLoc, name, std::move(args), std::move(rhs));
+            auto ret = ast::MK::SyntheticMethod(loc, declLoc, nameLoc, name, std::move(args), std::move(rhs));
 
             {
                 auto &method = ast::cast_tree_nonnull<ast::MethodDef>(ret);

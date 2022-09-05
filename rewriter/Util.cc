@@ -249,15 +249,16 @@ ast::ExpressionPtr ASTUtil::mkKwArgsHash(const ast::Send *send) {
     }
 }
 
-ast::ExpressionPtr ASTUtil::mkGet(core::Context ctx, core::LocOffsets loc, core::NameRef name, ast::ExpressionPtr rhs,
-                                  ast::MethodDef::Flags flags) {
-    auto ret = ast::MK::SyntheticMethod0(loc, loc, name, move(rhs), flags);
+ast::ExpressionPtr ASTUtil::mkGet(core::Context ctx, core::LocOffsets loc, core::NameRef name, core::LocOffsets nameLoc,
+                                  ast::ExpressionPtr rhs, ast::MethodDef::Flags flags) {
+    auto ret = ast::MK::SyntheticMethod0(loc, loc, nameLoc, name, move(rhs), flags);
     return ret;
 }
 
-ast::ExpressionPtr ASTUtil::mkSet(core::Context ctx, core::LocOffsets loc, core::NameRef name, core::LocOffsets argLoc,
+ast::ExpressionPtr ASTUtil::mkSet(core::Context ctx, core::LocOffsets loc, core::NameRef name, core::LocOffsets nameLoc,
                                   ast::ExpressionPtr rhs, ast::MethodDef::Flags flags) {
-    return ast::MK::SyntheticMethod1(loc, loc, name, ast::MK::Local(argLoc, core::Names::arg0()), move(rhs), flags);
+    return ast::MK::SyntheticMethod1(loc, loc, nameLoc, name, ast::MK::Local(nameLoc, core::Names::arg0()), move(rhs),
+                                     flags);
 }
 
 ast::ExpressionPtr ASTUtil::mkNilable(core::LocOffsets loc, ast::ExpressionPtr type) {

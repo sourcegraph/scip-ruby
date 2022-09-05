@@ -301,7 +301,7 @@ vector<ast::ExpressionPtr> AttrReader::run(core::MutableContext ctx, ast::Send *
             if (sigIsUnchecked(ctx, sig)) {
                 flags.isAttrReader = true;
             }
-            auto reader = ast::MK::SyntheticMethod0(loc, loc, name, ast::MK::Instance(argLoc, varName), flags);
+            auto reader = ast::MK::SyntheticMethod0(loc, loc, argLoc, name, ast::MK::Instance(argLoc, varName), flags);
             stats.emplace_back(std::move(reader));
         }
     }
@@ -337,7 +337,8 @@ vector<ast::ExpressionPtr> AttrReader::run(core::MutableContext ctx, ast::Send *
             } else {
                 body = ast::MK::Assign(loc, ast::MK::Instance(argLoc, varName), ast::MK::Local(loc, name));
             }
-            stats.emplace_back(ast::MK::SyntheticMethod1(loc, loc, setName, ast::MK::Local(argLoc, name), move(body)));
+            stats.emplace_back(
+                ast::MK::SyntheticMethod1(loc, loc, argLoc, setName, ast::MK::Local(argLoc, name), move(body)));
         }
     }
 

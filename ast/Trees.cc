@@ -164,9 +164,10 @@ ClassDef::ClassDef(core::LocOffsets loc, core::LocOffsets declLoc, core::ClassOr
     _sanityCheck();
 }
 
-MethodDef::MethodDef(core::LocOffsets loc, core::LocOffsets declLoc, core::MethodRef symbol, core::NameRef name,
-                     ARGS_store args, ExpressionPtr rhs, Flags flags)
-    : loc(loc), declLoc(declLoc), symbol(symbol), rhs(std::move(rhs)), args(std::move(args)), name(name), flags(flags) {
+MethodDef::MethodDef(core::LocOffsets loc, core::LocOffsets declLoc, core::LocOffsets nameLoc, core::MethodRef symbol,
+                     core::NameRef name, ARGS_store args, ExpressionPtr rhs, Flags flags)
+    : loc(loc), declLoc(declLoc), nameLoc(nameLoc), symbol(symbol), rhs(std::move(rhs)), args(std::move(args)),
+      name(name), flags(flags) {
     categoryCounterInc("trees", "methoddef");
     histogramInc("trees.methodDef.args", this->args.size());
     _sanityCheck();

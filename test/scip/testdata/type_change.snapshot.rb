@@ -2,12 +2,12 @@
  # options: showDocs
  
  def assign_different_branches(b)
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] Object#assign_different_branches().
-#documentation
-#| ```ruby
-#| sig {params(b: T.untyped).returns(T.untyped)}
-#| def assign_different_branches(b)
-#| ```
+#    ^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] Object#assign_different_branches().
+#    documentation
+#    | ```ruby
+#    | sig {params(b: T.untyped).returns(T.untyped)}
+#    | def assign_different_branches(b)
+#    | ```
 #                              ^ definition local 1~#3317016627
 #                              documentation
 #                              | ```ruby
@@ -32,12 +32,12 @@
  end
  
  def change_different_branches(b)
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] Object#change_different_branches().
-#documentation
-#| ```ruby
-#| sig {params(b: T.untyped).returns(T.untyped)}
-#| def change_different_branches(b)
-#| ```
+#    ^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] Object#change_different_branches().
+#    documentation
+#    | ```ruby
+#    | sig {params(b: T.untyped).returns(T.untyped)}
+#    | def change_different_branches(b)
+#    | ```
 #                              ^ definition local 1~#2122680152
 #                              documentation
 #                              | ```ruby
@@ -68,12 +68,12 @@
  end
  
  def loop_type_change(bs)
-#^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] Object#loop_type_change().
-#documentation
-#| ```ruby
-#| sig {params(bs: T.untyped).returns(T.untyped)}
-#| def loop_type_change(bs)
-#| ```
+#    ^^^^^^^^^^^^^^^^ definition [..] Object#loop_type_change().
+#    documentation
+#    | ```ruby
+#    | sig {params(bs: T.untyped).returns(T.untyped)}
+#    | def loop_type_change(bs)
+#    | ```
 #                     ^^ definition local 1~#4057334513
 #                     documentation
 #                     | ```ruby
@@ -137,12 +137,12 @@
 #  | ```
  
    def change_type(b)
-#  ^^^^^^^^^^^^^^^^^^ definition [..] C#change_type().
-#  documentation
-#  | ```ruby
-#  | sig {params(b: T.untyped).returns(T.untyped)}
-#  | def change_type(b)
-#  | ```
+#      ^^^^^^^^^^^ definition [..] C#change_type().
+#      documentation
+#      | ```ruby
+#      | sig {params(b: T.untyped).returns(T.untyped)}
+#      | def change_type(b)
+#      | ```
 #                  ^ definition local 1~#2066187318
 #                  documentation
 #                  | ```ruby
@@ -230,12 +230,12 @@
 #          | class C
 #          | ```
    def change_type(b)
-#  ^^^^^^^^^^^^^^^^^^ definition [..] D#change_type().
-#  documentation
-#  | ```ruby
-#  | sig {params(b: T.untyped).returns(T.untyped)}
-#  | def change_type(b)
-#  | ```
+#      ^^^^^^^^^^^ definition [..] D#change_type().
+#      documentation
+#      | ```ruby
+#      | sig {params(b: T.untyped).returns(T.untyped)}
+#      | def change_type(b)
+#      | ```
 #                  ^ definition local 1~#2066187318
 #                  documentation
 #                  | ```ruby

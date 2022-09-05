@@ -21,7 +21,7 @@
  class C
 #      ^ definition [..] C#
    def f(a, b)
-#  ^^^^^^^^^^^ definition [..] C#f().
+#      ^ definition [..] C#f().
 #        ^ definition local 1~#3809224601
 #           ^ definition local 2~#3809224601
      super
