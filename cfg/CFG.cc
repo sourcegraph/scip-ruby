@@ -238,25 +238,16 @@ string CFG::toString(const core::GlobalState &gs) const {
     return to_string(buf);
 }
 
-string locToString(const core::GlobalState &gs, core::Loc loc) {
-    if (!loc.exists() || loc.empty()) {
-        return " @ <>";
-    }
-    auto [start, end] = loc.position(gs);
-    return start.line == end.line ? fmt::format(" @ {}:{}-{}", start.line, start.column, end.column)
-                                  : fmt::format(" @ {}:{}-{}:{}", start.line, start.column, end.line, end.column);
-}
-
 string CFG::toTextualString(const core::GlobalState &gs, optional<core::FileRef> file) const {
     fmt::memory_buffer buf;
     string symbolName = this->symbol.showFullName(gs);
     if (file) {
         auto method = this->symbol.data(gs);
         if (method->nameLoc.exists() && !method->nameLoc.empty()) {
-            fmt::format_to(std::back_inserter(buf), "method{} {} {{\n\n",
-                           locToString(gs, core::Loc(file.value(), method->nameLoc)), symbolName);
+            fmt::format_to(std::back_inserter(buf), "method @ {} {} {{\n\n",
+                           core::Loc(file.value(), method->nameLoc).showRawLineColumn(gs), symbolName);
         } else {
-            fmt::format_to(std::back_inserter(buf), "method{} (full) {} {{\n\n", locToString(gs, method->loc()),
+            fmt::format_to(std::back_inserter(buf), "method @ {} (full) {} {{\n\n", method->loc().showRawLineColumn(gs),
                            symbolName);
         }
     } else {
@@ -399,7 +390,7 @@ string BasicBlock::toTextualString(const core::GlobalState &gs, optional<core::F
     for (const Binding &exp : this->exprs) {
         string positionText = "";
         if (file) {
-            positionText = locToString(gs, core::Loc(file.value(), exp.loc));
+            positionText = fmt::format(" @ {}", core::Loc(file.value(), exp.loc).showRawLineColumn(gs));
         }
 
         fmt::format_to(std::back_inserter(buf), "    {}{} = {}\n", exp.bind.toString(gs, cfg), positionText,
