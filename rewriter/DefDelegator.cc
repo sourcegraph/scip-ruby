@@ -9,7 +9,7 @@ using namespace std;
 namespace sorbet::rewriter {
 
 /// Generate method stub and sig for the delegator method
-void generateStub(vector<ast::ExpressionPtr> &methodStubs, const core::LocOffsets &loc,
+void generateStub(vector<ast::ExpressionPtr> &methodStubs, const core::LocOffsets &loc, core::LocOffsets nameLoc,
                   const core::NameRef &methodName) {
     // sig {params(arg0: T.untyped, blk: Proc).returns(T.untyped)}
     auto sigArgs = ast::MK::SendArgs(ast::MK::Symbol(loc, core::Names::arg0()), ast::MK::Untyped(loc),
@@ -24,7 +24,7 @@ void generateStub(vector<ast::ExpressionPtr> &methodStubs, const core::LocOffset
     args.emplace_back(ast::make_expression<ast::BlockArg>(loc, ast::MK::Local(loc, core::Names::blkArg())));
 
     methodStubs.push_back(
-        ast::MK::SyntheticMethod(loc, loc, loc, methodName, std::move(args), ast::MK::RaiseUnimplemented(loc)));
+        ast::MK::SyntheticMethod(loc, loc, nameLoc, methodName, std::move(args), ast::MK::RaiseUnimplemented(loc)));
 }
 
 /// Handle #def_delegator for a single delegate method
@@ -53,6 +53,7 @@ vector<ast::ExpressionPtr> runDefDelegator(core::MutableContext ctx, const ast::
     }
 
     core::NameRef methodName = method->asSymbol();
+    auto nameLoc = method->loc;
 
     if (send->numPosArgs() == 3) {
         auto *alias = ast::cast_tree<ast::Literal>(send->getPosArg(2));
@@ -61,9 +62,10 @@ vector<ast::ExpressionPtr> runDefDelegator(core::MutableContext ctx, const ast::
         }
 
         methodName = alias->asSymbol();
+        nameLoc = alias->loc;
     }
 
-    generateStub(methodStubs, loc, methodName);
+    generateStub(methodStubs, loc, nameLoc, methodName);
 
     // Include the original call to def_delegator so sorbet will still type-check it
     // and throw errors if the class (or its parent) didn't `extend Forwardable`
@@ -100,7 +102,7 @@ vector<ast::ExpressionPtr> runDefDelegators(core::MutableContext ctx, const ast:
             continue;
         }
 
-        generateStub(methodStubs, loc, method->asSymbol());
+        generateStub(methodStubs, loc, method->loc, method->asSymbol());
     }
 
     // Include the original call to def_delegators so sorbet will still type-check it
