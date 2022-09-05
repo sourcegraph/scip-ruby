@@ -53,8 +53,6 @@ vector<ast::ExpressionPtr> DSLBuilder::run(core::MutableContext ctx, ast::Send *
     ENFORCE(!ctx.locAt(sym->loc).source(ctx).value().empty() && ctx.locAt(sym->loc).source(ctx).value()[0] == ':');
     auto nameLoc = core::LocOffsets{sym->loc.beginPos() + 1, sym->loc.endPos()};
 
-    fmt::print(stderr, "log: [DSLBuilder::run] name = {} @ {}\n", name.toString(ctx), ctx.locAt(nameLoc).showRaw(ctx));
-
     type = ASTUtil::dupType(send->getPosArg(1));
     if (!type) {
         return empty;
@@ -108,16 +106,15 @@ vector<ast::ExpressionPtr> DSLBuilder::run(core::MutableContext ctx, ast::Send *
         // def self.get_<prop>
         core::NameRef getName = ctx.state.enterNameUTF8("get_" + name.show(ctx));
         stats.emplace_back(ast::MK::Sig0(loc, ASTUtil::dupType(type)));
-        // TODO(varun): Get proper location here
         auto defSelfGetProp =
-            ast::MK::SyntheticMethod(loc, loc, loc, getName, {}, ast::MK::RaiseUnimplemented(loc), flags);
+            ast::MK::SyntheticMethod(loc, loc, nameLoc, getName, {}, ast::MK::RaiseUnimplemented(loc), flags);
         ast::cast_tree<ast::MethodDef>(defSelfGetProp)->flags.isSelfMethod = true;
         stats.emplace_back(move(defSelfGetProp));
 
-        // TODO(varun): Get proper location here
         // def <prop>()
         stats.emplace_back(ast::MK::Sig0(loc, ASTUtil::dupType(type)));
-        stats.emplace_back(ast::MK::SyntheticMethod(loc, loc, loc, name, {}, ast::MK::RaiseUnimplemented(loc), flags));
+        stats.emplace_back(
+            ast::MK::SyntheticMethod(loc, loc, nameLoc, name, {}, ast::MK::RaiseUnimplemented(loc), flags));
     }
 
     return stats;

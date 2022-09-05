@@ -353,8 +353,6 @@ vector<ast::ExpressionPtr> processProp(core::MutableContext ctx, PropInfo &ret, 
     const auto name = ret.name;
     const auto nameLoc = ret.nameLoc;
 
-    fmt::print(stderr, "log: [processProp] name = {} @ {}\n", name.toString(ctx), ctx.locAt(nameLoc).showRaw(ctx));
-
     const auto getType = ASTUtil::dupType(ret.type);
 
     const auto computedByMethodName = ret.computedByMethodName;
