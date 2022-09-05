@@ -1725,8 +1725,6 @@ void GlobalState::mangleRenameSymbolInternal(SymbolRef what, NameRef origName, U
         }
         case SymbolRef::Kind::Method:
             what.asMethodRef().data(*this)->name = name;
-            // TODO(varun): This code path seems to be triggered when processing the stdlib.
-            // Should we be setting nameLoc here?
             break;
         case SymbolRef::Kind::FieldOrStaticField:
             what.asFieldRef().data(*this)->name = name;
@@ -2347,7 +2345,7 @@ const vector<shared_ptr<File>> &GlobalState::getFiles() const {
 MethodRef GlobalState::staticInitForClass(ClassOrModuleRef klass, Loc loc) {
     auto prevCount = methodsUsed();
     auto sym = enterMethodSymbol(loc, klass.data(*this)->singletonClass(*this), core::Names::staticInit(),
-                                 klass.data(*this)->loc().offsets()); // TODO(varun): Check if this is OK
+                                 klass.data(*this)->loc().offsets());
     if (prevCount != methodsUsed()) {
         auto blkLoc = core::Loc::none(loc.file());
         auto &blkSym = enterMethodArgumentSymbol(blkLoc, sym, core::Names::blkArg());

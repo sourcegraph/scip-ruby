@@ -1874,6 +1874,7 @@ class ResolveTypeMembersAndFieldsWalk {
         core::ClassOrModuleRef owner;
         core::LocOffsets loc;
         core::LocOffsets toNameLoc;
+        // FIXME[alias-support]: Add a fromNameLoc field here
         core::NameRef toName;
         core::NameRef fromName;
     };
@@ -2439,8 +2440,8 @@ class ResolveTypeMembersAndFieldsWalk {
             return;
         }
 
-        // TODO(varun): is toNameLoc the right field?
-        auto alias = ctx.state.enterMethodSymbol(ctx.locAt(job.loc), job.owner, job.fromName, job.toNameLoc);
+        // FIXME[alias-support]: Use job.fromNameLoc here for the last argument.
+        auto alias = ctx.state.enterMethodSymbol(ctx.locAt(job.loc), job.owner, job.fromName, job.loc);
         alias.data(ctx)->resultType = core::make_type<core::AliasType>(core::SymbolRef(toMethod));
 
         // Add a fake keyword argument to remember the toName (for fast path hashing).
