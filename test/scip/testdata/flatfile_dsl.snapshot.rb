@@ -17,54 +17,15 @@
 #                 ^^^^^^ definition [..] Record#
    flatfile do
      from   1..2, :foo
-#    ^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
-#    ^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#Static#
-#    ^^^^^^^^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
-#    ^^^^^^^^^^^^^^^^^ reference [..] `<Class:T>`#untyped().
-#    ^^^^^^^^^^^^^^^^^ reference [..] T#
-#    ^^^^^^^^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#params().
-#    ^^^^^^^^^^^^^^^^^ reference [..] `<Class:T>`#untyped().
-#    ^^^^^^^^^^^^^^^^^ reference [..] T#
-#    ^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#Static#
-#    ^^^^^^^^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
-#    ^^^^^^^^^^^^^^^^^ reference [..] `<Class:T>`#untyped().
-#    ^^^^^^^^^^^^^^^^^ reference [..] T#
-#    ^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #                 ^^^^ definition [..] Flatfile#`foo=`().
 #                 ^^^^ definition [..] Flatfile#foo().
      pattern(/A-Za-z/, :bar)
-#    ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
-#    ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#Static#
-#    ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
-#    ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] `<Class:T>`#untyped().
-#    ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#
-#    ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#params().
-#    ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] `<Class:T>`#untyped().
-#    ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#
-#    ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
-#    ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#Static#
-#    ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] `<Class:T>`#untyped().
-#    ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#
-#    ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #            ^^^^^^^^ reference [..] Regexp#
-#                      ^^^^ definition [..] Flatfile#`bar=`().
 #                      ^^^^ definition [..] Flatfile#bar().
+#                      ^^^^ definition [..] Flatfile#`bar=`().
      field :baz
-#    ^^^^^^^^^^ reference [..] `<Class:T>`#untyped().
-#    ^^^^^^^^^^ reference [..] `<Class:T>`#untyped().
-#    ^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
-#    ^^^^^^^^^^ reference [..] `<Class:T>`#untyped().
-#    ^^^^^^^^^^ reference [..] T#
-#    ^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#params().
-#    ^^^^^^^^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
-#    ^^^^^^^^^^ reference [..] T#
-#    ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
-#    ^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
-#    ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
-#    ^^^^^^^^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
-#    ^^^^^^^^^^ reference [..] T#
-#          ^^^^ definition [..] Flatfile#`baz=`().
 #          ^^^^ definition [..] Flatfile#baz().
+#          ^^^^ definition [..] Flatfile#`baz=`().
    end
  end
  

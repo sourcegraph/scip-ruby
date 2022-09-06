@@ -11,8 +11,6 @@
 #      documentation
 #      | Class doc comment
    extend T::Sig
-#         ^ reference [..] T#
-#            ^^^ reference [..] T#Sig#
  
    def m1
 #      ^^ definition [..] C1#m1().
@@ -24,11 +22,7 @@
    end
  
    sig { returns(T::Boolean) }
-#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
-#        ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
-#                ^ reference [..] T#
 #                   ^^^^^^^ reference [..] T#Boolean.
-#                   ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
    def m2
 #      ^^ definition [..] C1#m2().
 #      documentation
@@ -40,15 +34,9 @@
    end
  
    sig { params(C, T::Boolean).returns(T::Boolean) }
-#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
-#        ^^^^^^ reference [..] T#Private#Methods#DeclBuilder#params().
 #               ^ reference [..] `T.untyped`#
-#                  ^ reference [..] T#
 #                     ^^^^^^^ reference [..] T#Boolean.
-#                              ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
-#                                      ^ reference [..] T#
 #                                         ^^^^^^^ reference [..] T#Boolean.
-#                                         ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
    def m3(c, b)
 #      ^^ definition [..] C1#m3().
 #      documentation
@@ -95,11 +83,7 @@
    # Yet another..
    # ...doc comment
    sig { returns(T::Boolean) }
-#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
-#        ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
-#                ^ reference [..] T#
 #                   ^^^^^^^ reference [..] T#Boolean.
-#                   ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
    def m5
 #      ^^ definition [..] C1#m5().
 #      documentation
@@ -116,15 +100,9 @@
    # And...
    # ...one more doc comment
    sig { params(C, T::Boolean).returns(T::Boolean) }
-#  ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
-#        ^^^^^^ reference [..] T#Private#Methods#DeclBuilder#params().
 #               ^ reference [..] `T.untyped`#
-#                  ^ reference [..] T#
 #                     ^^^^^^^ reference [..] T#Boolean.
-#                              ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
-#                                      ^ reference [..] T#
 #                                         ^^^^^^^ reference [..] T#Boolean.
-#                                         ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
    def m6(c, b)
 #      ^^ definition [..] C1#m6().
 #      documentation
@@ -193,16 +171,10 @@
 #         documentation
 #         | This module is nested inside M1
      extend T::Sig
-#           ^ reference [..] T#
-#              ^^^ reference [..] T#Sig#
  
      # This method is inside M1::M2
      sig { returns(T::Boolean) }
-#    ^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
-#          ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
-#                  ^ reference [..] T#
 #                     ^^^^^^^ reference [..] T#Boolean.
-#                     ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
      def n1
 #        ^^ definition [..] M1#M2#n1().
 #        documentation

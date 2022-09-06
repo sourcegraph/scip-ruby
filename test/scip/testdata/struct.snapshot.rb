@@ -4,20 +4,9 @@
  class S < T::Struct
 #      ^ definition [..] S#
 #          ^ reference [..] T#
-#             ^^^^^^ reference [..] T#Private#Methods#DeclBuilder#params().
-#             ^^^^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
-#             ^^^^^^ reference [..] Sorbet#Private#Static#
 #             ^^^^^^ definition [..] S#initialize().
 #             ^^^^^^ definition [..] T#Struct#
-#             ^^^^^^ reference [..] T#Private#Methods#DeclBuilder#void().
    prop :prop_i, Integer
-#  ^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#Static#
-#  ^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
-#  ^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#params().
-#  ^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
-#  ^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
-#  ^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
-#  ^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#Static#
 #        ^^^^^^ definition [..] S#`prop_i=`().
 #        ^^^^^^ definition [..] S#prop_i().
 #                ^^^^^^^ reference [..] Integer#
@@ -26,23 +15,11 @@
 #                ^^^^^^^ reference [..] Integer#
 #                ^^^^^^^ reference [..] Integer#
    const :const_s, T.nilable(String)
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#Static#
 #         ^^^^^^^ definition [..] S#const_s().
-#                  ^ reference [..] T#
-#                  ^ reference [..] T#
-#                  ^ reference [..] T#
-#                    ^^^^^^^ reference [..] `<Class:T>`#nilable().
-#                    ^^^^^^^ reference [..] `<Class:T>`#nilable().
-#                    ^^^^^^^ reference [..] `<Class:T>`#nilable().
 #                            ^^^^^^ reference [..] String#
 #                            ^^^^^^ reference [..] String#
 #                            ^^^^^^ reference [..] String#
    const :const_f, Float, default: 0.5
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#Static#
 #         ^^^^^^^ definition [..] S#const_f().
 #                  ^^^^^ reference [..] Float#
 #                  ^^^^^ reference [..] Float#
@@ -78,12 +55,6 @@
 #^^^^^ definition [..] POINT#
 #^^^^^^^^^^^^^^^^^^^^ definition [..] Struct#
 #^^^^^^^^^^^^^^^^^^^^ definition [..] POINT#initialize().
-#^^^^^^^^^^^^^^^^^^^^ reference [..] `<Class:T>`#untyped().
-#^^^^^^^^^^^^^^^^^^^^ reference [..] T#
-#^^^^^^^^^^^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#void().
-#^^^^^^^^^^^^^^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#params().
-#^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
-#^^^^^^^^^^^^^^^^^^^^ reference [..] Sorbet#Private#Static#
 #^^^^^^^^^^^^^^^^^^^^ definition local 5~#119448696
 #                    ^ definition [..] POINT#x().
 #                    ^ definition [..] POINT#`x=`().

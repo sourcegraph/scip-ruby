@@ -158,6 +158,21 @@ public:
     }
 };
 
+bool isDescendantOfSorbetPrivateOrT(const core::GlobalState &gs, core::SymbolRef sym) {
+    UnorderedSet<core::SymbolRef> visited;
+    while (sym.exists() && !visited.contains(sym)) {
+        if (sym.isClassOrModule()) {
+            auto klass = sym.asClassOrModuleRef();
+            if (klass == core::Symbols::Sorbet_Private() || klass == core::Symbols::T()) {
+                return true;
+            }
+        }
+        visited.insert(sym);
+        sym = sym.owner(gs);
+    }
+    return false;
+}
+
 // A wrapper type to handle both top-level symbols (like classes) as well as
 // "inner symbols" like fields (@x). In a statically typed language, field
 // symbols are like any other symbols, but in Ruby, they aren't declared
@@ -266,6 +281,18 @@ public:
     core::SymbolRef asSymbolRef() const {
         ENFORCE(this->kind() != Kind::UndeclaredField);
         return this->selfOrOwner;
+    }
+
+    bool isSorbetInternalClassOrMethod(const core::GlobalState &gs) const {
+        switch (this->kind()) {
+            case Kind::UndeclaredField:
+            case Kind::DeclaredField:
+                return false;
+            case Kind::ClassOrModule:
+            case Kind::Method:
+                return isDescendantOfSorbetPrivateOrT(gs, this->asSymbolRef());
+        }
+        ENFORCE(false, "impossible");
     }
 
     vector<string> docStrings(const core::GlobalState &gs, core::TypePtr fieldType, core::Loc loc) {
@@ -673,8 +700,24 @@ public:
         return absl::OkStatus();
     }
 
-    absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, NamedSymbolRef symRef,
-                               optional<core::TypePtr> overrideType, core::LocOffsets occLoc, int32_t symbol_roles) {
+    absl::Status saveReference(const core::Context &ctx, NamedSymbolRef symRef, optional<core::TypePtr> overrideType,
+                               core::LocOffsets occLoc, int32_t symbol_roles) {
+        // HACK: Reduce noise due to <static-init> in snapshots.
+        if (ctx.owner.name(ctx) == core::Names::staticInit()) {
+            if (symRef.kind() == NamedSymbolRef::Kind::Method) {
+                auto funName = symRef.asSymbolRef().name(ctx);
+                // NOTE: For the untyped and nilable cases, we would ideally check that
+                // the owner is ::<Class:T> as well, but this is good enough for now.
+                if (funName == core::Names::untyped() || funName == core::Names::nilable()) {
+                    return absl::OkStatus();
+                }
+            }
+            if (symRef.isSorbetInternalClassOrMethod(ctx)) {
+                return absl::OkStatus();
+            }
+        }
+        auto &gs = ctx.state;
+        auto file = ctx.file;
         // TODO:(varun) Should we cache here to to avoid emitting duplicate references?
         absl::StatusOr<string *> valueOrStatus(this->saveSymbolString(gs, symRef, nullptr));
         if (!valueOrStatus.ok()) {
@@ -973,7 +1016,7 @@ private:
                 status = this->scipState.saveDefinition(gs, file, namedSym, loc);
             } else {
                 auto overrideType = computeOverrideType(namedSym.definitionType, type);
-                status = this->scipState.saveReference(gs, file, namedSym, overrideType, loc, referenceRole);
+                status = this->scipState.saveReference(ctx, namedSym, overrideType, loc, referenceRole);
             }
         } else {
             uint32_t localId = this->functionLocals[localRef];
@@ -1046,7 +1089,7 @@ public:
                 status = this->scipState.saveDefinition(gs, file, namedSym, arg.loc);
                 kind = "definition";
             } else {
-                status = this->scipState.saveReference(gs, file, namedSym, nullopt, arg.loc, 0);
+                status = this->scipState.saveReference(ctx, namedSym, nullopt, arg.loc, 0);
                 kind = "reference";
             }
             ENFORCE(status.ok(), "failed to save {} for {}\ncontext:\ninstruction: {}\nlocation: {}\n", kind,
@@ -1115,11 +1158,11 @@ public:
                             if (recv.exists()) {
                                 auto funSym = gs.lookupMethodSymbol(recv, send->fun);
                                 if (funSym.exists()) {
-                                    // TODO:(varun) For arrays, hashes etc., try to identify if the function
-                                    // matches a known operator (e.g. []=), and emit an appropriate 'WriteAccess'
-                                    // symbol role for it.
-                                    auto status = this->scipState.saveReference(
-                                        gs, file, NamedSymbolRef::method(funSym), nullopt, send->funLoc, 0);
+                                    // TODO(varun): For arrays, hashes etc., try to identify if the function
+                                    // matches a known operator (e.g. []=), and emit an appropriate
+                                    // 'WriteAccess' symbol role for it.
+                                    auto status = this->scipState.saveReference(ctx, NamedSymbolRef::method(funSym),
+                                                                                nullopt, send->funLoc, 0);
                                     ENFORCE(status.ok());
                                 }
                             }
@@ -1226,7 +1269,7 @@ public:
         //   Specifically, Go to Definition for modules seems to go to 'module M' even
         //   when other forms like 'class M::C' are present.
         for (auto &[namedSym, loc] : todo) {
-            auto status = this->scipState.saveReference(gs, file, namedSym, nullopt, loc, 0);
+            auto status = this->scipState.saveReference(ctx, namedSym, nullopt, loc, 0);
             ENFORCE(status.ok(), "status: {}\n", status.message());
         }
     }
