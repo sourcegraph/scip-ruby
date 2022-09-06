@@ -846,11 +846,12 @@ public:
         core::LocOffsets declLoc = head->loc.join(maybe_loc(args));
         core::LocOffsets loc = head->loc.join(body->loc);
         std::string name = head->name.toString(gs_);
+        auto nameLoc = head->nameLoc;
 
         checkEndlessSetter(name, declLoc);
         checkReservedForNumberedParameters(name, declLoc);
 
-        return make_unique<DefMethod>(loc, declLoc, gs_.enterNameUTF8(name), std::move(args), std::move(body));
+        return make_unique<DefMethod>(loc, declLoc, nameLoc, gs_.enterNameUTF8(name), std::move(args), std::move(body));
     }
 
     unique_ptr<Node> defEndlessSingleton(unique_ptr<Node> defHead, unique_ptr<Node> args, const token *equal,
@@ -863,7 +864,8 @@ public:
         checkEndlessSetter(name, declLoc);
         checkReservedForNumberedParameters(name, declLoc);
 
-        return make_unique<DefS>(loc, declLoc, std::move(head->definee), head->name, std::move(args), std::move(body));
+        return make_unique<DefS>(loc, declLoc, std::move(head->definee), head->nameLoc, head->name, std::move(args),
+                                 std::move(body));
     }
 
     unique_ptr<Node> defMethod(unique_ptr<Node> defHead, unique_ptr<Node> args, unique_ptr<Node> body,
@@ -872,10 +874,11 @@ public:
         core::LocOffsets declLoc = head->loc.join(maybe_loc(args));
         core::LocOffsets loc = head->loc.join(tokLoc(end));
         std::string name = head->name.toString(gs_);
+        auto nameLoc = head->nameLoc;
 
         checkReservedForNumberedParameters(name, declLoc);
 
-        return make_unique<DefMethod>(loc, declLoc, gs_.enterNameUTF8(name), std::move(args), std::move(body));
+        return make_unique<DefMethod>(loc, declLoc, nameLoc, gs_.enterNameUTF8(name), std::move(args), std::move(body));
     }
 
     unique_ptr<Node> defModule(const token *module, unique_ptr<Node> name, unique_ptr<Node> body, const token *end_) {
@@ -886,8 +889,9 @@ public:
 
     unique_ptr<Node> defnHead(const token *def, const token *name) {
         core::LocOffsets declLoc = tokLoc(def, name);
+        auto nameLoc = tokLoc(name);
 
-        return make_unique<DefnHead>(declLoc, gs_.enterNameUTF8(name->view()));
+        return make_unique<DefnHead>(declLoc, nameLoc, gs_.enterNameUTF8(name->view()));
     }
 
     unique_ptr<Node> def_sclass(const token *class_, const token *lshft_, unique_ptr<Node> expr, unique_ptr<Node> body,
@@ -898,19 +902,20 @@ public:
     }
 
     unique_ptr<Node> defnHeadError(const token *def) {
-        return make_unique<DefnHead>(tokLoc(def), core::Names::methodDefNameMissing());
+        return make_unique<DefnHead>(tokLoc(def), core::LocOffsets::none(), core::Names::methodDefNameMissing());
     }
 
     unique_ptr<Node> defsHead(const token *def, unique_ptr<Node> definee, const token *dot, const token *name) {
         core::LocOffsets declLoc = tokLoc(def, name);
 
-        return make_unique<DefsHead>(declLoc, std::move(definee), gs_.enterNameUTF8(name->view()));
+        return make_unique<DefsHead>(declLoc, std::move(definee), tokLoc(name), gs_.enterNameUTF8(name->view()));
     }
 
     unique_ptr<Node> defsHeadError(const token *def, unique_ptr<Node> definee, const token *dot) {
         core::LocOffsets declLoc = tokLoc(def, dot);
 
-        return make_unique<DefsHead>(declLoc, std::move(definee), core::Names::methodDefNameMissing());
+        return make_unique<DefsHead>(declLoc, std::move(definee), core::LocOffsets::none(),
+                                     core::Names::methodDefNameMissing());
     }
 
     unique_ptr<Node> defSingleton(unique_ptr<Node> defHead, unique_ptr<Node> args, unique_ptr<Node> body,
@@ -924,7 +929,8 @@ public:
         }
         checkReservedForNumberedParameters(head->name.toString(gs_), declLoc);
 
-        return make_unique<DefS>(loc, declLoc, std::move(head->definee), head->name, std::move(args), std::move(body));
+        return make_unique<DefS>(loc, declLoc, std::move(head->definee), head->nameLoc, head->name, std::move(args),
+                                 std::move(body));
     }
 
     unique_ptr<Node> empty_else(const token *tok) {

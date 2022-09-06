@@ -84,8 +84,8 @@ void Command::run(core::MutableContext ctx, ast::ClassDef *klass) {
     ast::MethodDef::Flags flags;
     flags.isSelfMethod = true;
     flags.discardDef = true;
-    auto selfCall = ast::MK::SyntheticMethod(call->loc, call->loc, call->name, std::move(newArgs),
-                                             ast::MK::UntypedNil(call->loc), flags);
+    auto selfCall = ast::MK::SyntheticMethod(call->loc, call->loc, core::LocOffsets::none(), call->name,
+                                             std::move(newArgs), ast::MK::UntypedNil(call->loc), flags);
 
     klass->rhs.insert(klass->rhs.begin() + i + 1, sig->deepCopy());
     klass->rhs.insert(klass->rhs.begin() + i + 2, std::move(selfCall));

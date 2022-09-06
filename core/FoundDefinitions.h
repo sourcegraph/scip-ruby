@@ -142,6 +142,7 @@ struct FoundMethod final {
     core::NameRef name;
     core::LocOffsets loc;
     core::LocOffsets declLoc;
+    core::LocOffsets nameLoc;
     std::vector<core::ParsedArg> parsedArgs;
     core::ArityHash arityHash;
     struct Flags {
@@ -161,7 +162,7 @@ struct FoundMethod final {
 
     std::string toString(const core::GlobalState &gs, const FoundDefinitions &foundDefs, uint32_t id) const;
 };
-CheckSize(FoundMethod, 56, 8);
+CheckSize(FoundMethod, 64, 8);
 
 struct FoundModifier {
     enum class Kind : uint8_t {

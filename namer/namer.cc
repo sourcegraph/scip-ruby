@@ -200,6 +200,7 @@ public:
         foundMethod.name = method.name;
         foundMethod.loc = method.loc;
         foundMethod.declLoc = method.declLoc;
+        foundMethod.nameLoc = method.nameLoc;
         foundMethod.flags = method.flags;
         foundMethod.parsedArgs = ast::ArgParsing::parseArgs(method.args);
         foundMethod.arityHash = ast::ArgParsing::hashArgs(ctx, foundMethod.parsedArgs);
@@ -338,6 +339,7 @@ public:
         foundMethod.name = fromName;
         foundMethod.loc = send.loc;
         foundMethod.declLoc = send.loc;
+        foundMethod.nameLoc = send.loc;
         foundMethod.arityHash = core::ArityHash::aliasMethodHash();
         foundDefs->addMethod(move(foundMethod));
     }
@@ -816,7 +818,7 @@ class SymbolDefiner {
         auto &parsedArgs = method.parsedArgs;
         auto symTableSize = ctx.state.methodsUsed();
         auto declLoc = ctx.locAt(method.declLoc);
-        auto sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name);
+        auto sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name, method.nameLoc);
         const bool isNewSymbol = symTableSize != ctx.state.methodsUsed();
         if (!isNewSymbol) {
             // See if this is == to the method we're defining now, or if we have a redefinition error.
@@ -828,7 +830,7 @@ class SymbolDefiner {
                     paramMismatchErrors(ctx.withOwner(sym), declLoc, parsedArgs);
                     ctx.state.mangleRenameSymbol(sym, method.name);
                     // Re-enter a new symbol.
-                    sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name);
+                    sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name, method.nameLoc);
                 } else {
                     // ...unless it's an intrinsic, because we allow multiple incompatible definitions of those in code
                     // TODO(jvilk): Wouldn't this always fail since `!sym.exists()`?
@@ -1022,8 +1024,8 @@ class SymbolDefiner {
             symbolData->flags.isSealed = true;
 
             auto classOfKlass = symbolData->singletonClass(ctx);
-            auto sealedSubclasses =
-                ctx.state.enterMethodSymbol(ctx.locAt(mod.loc), classOfKlass, core::Names::sealedSubclasses());
+            auto sealedSubclasses = ctx.state.enterMethodSymbol(
+                ctx.locAt(mod.loc), classOfKlass, core::Names::sealedSubclasses(), core::LocOffsets::none());
             auto &blkArg =
                 ctx.state.enterMethodArgumentSymbol(core::Loc::none(), sealedSubclasses, core::Names::blkArg());
             blkArg.flags.isBlock = true;

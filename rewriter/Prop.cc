@@ -378,21 +378,22 @@ vector<ast::ExpressionPtr> processProp(core::MutableContext ctx, PropInfo &ret, 
         auto assertTypeMatches =
             ast::MK::AssertType(computedByMethodNameLoc, std::move(sendComputedMethod), ASTUtil::dupType(getType));
         auto insSeq = ast::MK::InsSeq1(loc, std::move(assertTypeMatches), ast::MK::RaiseUnimplemented(loc));
-        nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, std::move(insSeq)));
+        nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, nameLoc, std::move(insSeq)));
     } else if (propContext.needsRealPropBodies && propContext.classDefKind == ast::ClassDef::Kind::Module) {
         // Not all modules include Kernel, can't make an initialize, etc. so we're punting on props in modules rn.
-        nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, ast::MK::RaiseUnimplemented(loc)));
+        nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, nameLoc, ast::MK::RaiseUnimplemented(loc)));
     } else if (ret.ifunset == nullptr) {
         if (knownNonModel(propContext.syntacticSuperClass)) {
             ast::MethodDef::Flags flags;
             flags.isAttrReader = true;
             if (wantTypedInitialize(propContext.syntacticSuperClass)) {
-                nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, ast::MK::Instance(nameLoc, ivarName), flags));
+                nodes.emplace_back(
+                    ASTUtil::mkGet(ctx, loc, name, nameLoc, ast::MK::Instance(nameLoc, ivarName), flags));
             } else {
                 // Need to hide the instance variable access, because there wasn't a typed constructor to declare it
                 auto ivarGet = ast::MK::Send1(loc, ast::MK::Self(loc), core::Names::instanceVariableGet(), locZero,
                                               ast::MK::Symbol(nameLoc, ivarName));
-                nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, std::move(ivarGet), flags));
+                nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, nameLoc, std::move(ivarGet), flags));
             }
         } else if (propContext.needsRealPropBodies) {
             ast::MethodDef::Flags flags;
@@ -414,12 +415,12 @@ vector<ast::ExpressionPtr> processProp(core::MutableContext ctx, PropInfo &ret, 
                                                ast::MK::Self(loc), ast::MK::Symbol(nameLoc, name), std::move(arg2));
 
             auto insSeq = ast::MK::InsSeq1(loc, std::move(assign), std::move(propGetLogic));
-            nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, std::move(insSeq), flags));
+            nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, nameLoc, std::move(insSeq), flags));
         } else {
-            nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, ast::MK::RaiseUnimplemented(loc)));
+            nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, nameLoc, ast::MK::RaiseUnimplemented(loc)));
         }
     } else {
-        nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, ast::MK::RaiseUnimplemented(loc)));
+        nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, nameLoc, ast::MK::RaiseUnimplemented(loc)));
     }
 
     core::NameRef setName = name.addEq(ctx);
@@ -494,8 +495,8 @@ vector<ast::ExpressionPtr> processProp(core::MutableContext ctx, PropInfo &ret, 
         auto arg = ast::MK::KeywordArgWithDefault(nameLoc, core::Names::allowDirectMutation(), ast::MK::Nil(loc));
         ast::MethodDef::Flags fkFlags;
         fkFlags.discardDef = true;
-        auto fkMethodDef =
-            ast::MK::SyntheticMethod1(loc, loc, fkMethod, std::move(arg), ast::MK::RaiseUnimplemented(loc), fkFlags);
+        auto fkMethodDef = ast::MK::SyntheticMethod1(loc, loc, nameLoc, fkMethod, std::move(arg),
+                                                     ast::MK::RaiseUnimplemented(loc), fkFlags);
         nodes.emplace_back(std::move(fkMethodDef));
 
         // sig {params(opts: T.untyped).returns($foreign)}
@@ -510,7 +511,7 @@ vector<ast::ExpressionPtr> processProp(core::MutableContext ctx, PropInfo &ret, 
         auto arg2 = ast::MK::KeywordArgWithDefault(nameLoc, core::Names::allowDirectMutation(), ast::MK::Nil(loc));
         ast::MethodDef::Flags fkBangFlags;
         fkBangFlags.discardDef = true;
-        auto fkMethodDefBang = ast::MK::SyntheticMethod1(loc, loc, fkMethodBang, std::move(arg2),
+        auto fkMethodDefBang = ast::MK::SyntheticMethod1(loc, loc, nameLoc, fkMethodBang, std::move(arg2),
                                                          ast::MK::RaiseUnimplemented(loc), fkBangFlags);
         nodes.emplace_back(std::move(fkMethodDefBang));
     }
@@ -545,7 +546,8 @@ ast::ExpressionPtr ensureWithoutAccessors(const PropInfo &prop, const ast::Send 
 }
 
 vector<ast::ExpressionPtr> mkTypedInitialize(core::MutableContext ctx, core::LocOffsets klassLoc,
-                                             core::LocOffsets klassDeclLoc, const vector<PropInfo> &props) {
+                                             core::LocOffsets klassDeclLoc, core::LocOffsets klassNameLoc,
+                                             const vector<PropInfo> &props) {
     ast::MethodDef::ARGS_store args;
     ast::Send::ARGS_store sigArgs;
     args.reserve(props.size());
@@ -596,8 +598,8 @@ vector<ast::ExpressionPtr> mkTypedInitialize(core::MutableContext ctx, core::Loc
 
     vector<ast::ExpressionPtr> result;
     result.emplace_back(ast::MK::SigVoid(klassDeclLoc, std::move(sigArgs)));
-    result.emplace_back(
-        ast::MK::SyntheticMethod(klassLoc, klassDeclLoc, core::Names::initialize(), std::move(args), std::move(body)));
+    result.emplace_back(ast::MK::SyntheticMethod(klassLoc, klassDeclLoc, klassNameLoc, core::Names::initialize(),
+                                                 std::move(args), std::move(body)));
     return result;
 }
 
@@ -661,7 +663,7 @@ void Prop::run(core::MutableContext ctx, ast::ClassDef *klass) {
     // we define our synthesized initialize first so that if the user wrote one themselves, it overrides ours.
     if (wantTypedInitialize(syntacticSuperClass)) {
         // For direct T::Struct subclasses, we know that seeing no props means the constructor should be zero-arity.
-        for (auto &stat : mkTypedInitialize(ctx, klass->loc, klass->declLoc, props)) {
+        for (auto &stat : mkTypedInitialize(ctx, klass->loc, klass->declLoc, klass->name.loc(), props)) {
             klass->rhs.emplace_back(std::move(stat));
         }
     }

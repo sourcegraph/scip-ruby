@@ -241,7 +241,18 @@ string CFG::toString(const core::GlobalState &gs) const {
 string CFG::toTextualString(const core::GlobalState &gs, optional<core::FileRef> file) const {
     fmt::memory_buffer buf;
     string symbolName = this->symbol.showFullName(gs);
-    fmt::format_to(std::back_inserter(buf), "method {} {{\n\n", symbolName);
+    if (file) {
+        auto method = this->symbol.data(gs);
+        if (method->nameLoc.exists() && !method->nameLoc.empty()) {
+            fmt::format_to(std::back_inserter(buf), "method @ {} {} {{\n\n",
+                           core::Loc(file.value(), method->nameLoc).showRawLineColumn(gs), symbolName);
+        } else {
+            fmt::format_to(std::back_inserter(buf), "method @ {} (full) {} {{\n\n", method->loc().showRawLineColumn(gs),
+                           symbolName);
+        }
+    } else {
+        fmt::format_to(std::back_inserter(buf), "method {} {{\n\n", symbolName);
+    }
     for (auto &basicBlock : this->basicBlocks) {
         if (!basicBlock->backEdges.empty()) {
             fmt::format_to(std::back_inserter(buf), "# backedges\n");
@@ -379,16 +390,7 @@ string BasicBlock::toTextualString(const core::GlobalState &gs, optional<core::F
     for (const Binding &exp : this->exprs) {
         string positionText = "";
         if (file) {
-            if (exp.loc.exists() && !exp.loc.empty()) {
-                auto lineCol = core::Loc(file.value(), exp.loc).position(gs);
-                positionText =
-                    lineCol.first.line == lineCol.second.line
-                        ? fmt::format(" @ {}:{}-{}", lineCol.first.line, lineCol.first.column, lineCol.second.column)
-                        : fmt::format(" @ {}:{}-{}:{}", lineCol.first.line, lineCol.first.column, lineCol.second.line,
-                                      lineCol.second.column);
-            } else {
-                positionText = " @ <>";
-            }
+            positionText = fmt::format(" @ {}", core::Loc(file.value(), exp.loc).showRawLineColumn(gs));
         }
 
         fmt::format_to(std::back_inserter(buf), "    {}{} = {}\n", exp.bind.toString(gs, cfg), positionText,

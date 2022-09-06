@@ -44,7 +44,7 @@ ExpressionPtr deepCopy(const void *avoid, const Tag tag, const void *tree, bool 
 
         case Tag::MethodDef: {
             auto *exp = reinterpret_cast<const MethodDef *>(tree);
-            return make_expression<MethodDef>(exp->loc, exp->declLoc, exp->symbol, exp->name,
+            return make_expression<MethodDef>(exp->loc, exp->declLoc, exp->nameLoc, exp->symbol, exp->name,
                                               deepCopyVec(avoid, exp->args), deepCopy(avoid, exp->rhs), exp->flags);
         }
 

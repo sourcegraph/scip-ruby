@@ -152,6 +152,7 @@ public:
 
     ClassOrModuleRef owner;
     NameRef name;
+    core::LocOffsets nameLoc;
     ClassOrModuleRef rebind;
     Flags flags;
     // We store an offset into the intrinsic table used by calls.cc; the only
@@ -188,7 +189,7 @@ private:
     InlinedVector<Loc, 2> locs_;
     std::unique_ptr<InlinedVector<TypeArgumentRef, 4>> typeArgs;
 };
-CheckSize(Method, 136, 8);
+CheckSize(Method, 144, 8);
 
 // Contains a field or a static field
 class Field final {

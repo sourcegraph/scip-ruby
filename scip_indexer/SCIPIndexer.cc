@@ -158,6 +158,26 @@ public:
     }
 };
 
+bool isSorbetInternal(const core::GlobalState &gs, core::SymbolRef sym) {
+    UnorderedSet<core::SymbolRef> visited;
+    auto classT = core::Symbols::T().data(gs)->lookupSingletonClass(gs);
+    while (sym.exists() && !visited.contains(sym)) {
+        if (sym.isClassOrModule()) {
+            auto klass = sym.asClassOrModuleRef();
+            if (klass == core::Symbols::Sorbet_Private() || klass == core::Symbols::T() || klass == classT) {
+                return true;
+            }
+            auto name = klass.data(gs)->name;
+            if (name == core::Names::Constants::Opus()) {
+                return true;
+            }
+        }
+        visited.insert(sym);
+        sym = sym.owner(gs);
+    }
+    return false;
+}
+
 // A wrapper type to handle both top-level symbols (like classes) as well as
 // "inner symbols" like fields (@x). In a statically typed language, field
 // symbols are like any other symbols, but in Ruby, they aren't declared
@@ -215,6 +235,11 @@ public:
         return lhs.selfOrOwner == rhs.selfOrOwner && lhs.name == rhs.name;
     }
 
+    friend bool operator<(const NamedSymbolRef &lhs, const NamedSymbolRef &rhs) {
+        return lhs.selfOrOwner.rawId() < rhs.selfOrOwner.rawId() ||
+               (lhs.selfOrOwner == rhs.selfOrOwner && lhs.name.rawId() < rhs.name.rawId());
+    }
+
     template <typename H> friend H AbslHashValue(H h, const NamedSymbolRef &c) {
         return H::combine(std::move(h), c.selfOrOwner, c.name);
     }
@@ -266,6 +291,18 @@ public:
     core::SymbolRef asSymbolRef() const {
         ENFORCE(this->kind() != Kind::UndeclaredField);
         return this->selfOrOwner;
+    }
+
+    bool isSorbetInternalClassOrMethod(const core::GlobalState &gs) const {
+        switch (this->kind()) {
+            case Kind::UndeclaredField:
+            case Kind::DeclaredField:
+                return false;
+            case Kind::ClassOrModule:
+            case Kind::Method:
+                return isSorbetInternal(gs, this->asSymbolRef());
+        }
+        ENFORCE(false, "impossible");
     }
 
     vector<string> docStrings(const core::GlobalState &gs, core::TypePtr fieldType, core::Loc loc) {
@@ -392,10 +429,22 @@ public:
         return absl::OkStatus();
     }
 
-    core::Loc symbolLoc(const core::GlobalState &gs) const {
-        // FIXME(varun): For methods, this returns the full line!
-        ENFORCE(this->name == core::NameRef::noName());
-        return this->selfOrOwner.loc(gs);
+    core::Loc symbolLoc(const core::GlobalState &gs, core::FileRef file) const {
+        switch (this->kind()) {
+            case Kind::Method: {
+                auto method = this->selfOrOwner.asMethodRef().data(gs);
+                auto offset = method->nameLoc;
+                if (!offset.exists() || offset.empty()) {
+                    return method->loc();
+                }
+                return core::Loc(file, offset);
+            }
+            case Kind::ClassOrModule:
+            case Kind::DeclaredField:
+                return this->selfOrOwner.loc(gs);
+            case Kind::UndeclaredField:
+                ENFORCE(false, "case UndeclaredField should not be triggered here");
+        }
     }
 };
 
@@ -454,6 +503,8 @@ class SCIPState {
     // cumbersome to conditionalize the type to be a set in non-debug and
     // map in debug, so keeping it a map.
     UnorderedMap<std::pair<core::LocOffsets, /*SymbolRole*/ int32_t>, uint32_t> localOccurrenceCache;
+
+    UnorderedSet<std::tuple<NamedSymbolRef, core::Loc, /*SymbolRole*/ int32_t>> symbolOccurrenceCache;
 
     GemMetadata gemMetadata;
 
@@ -606,6 +657,17 @@ private:
         return true;
     }
 
+    bool cacheOccurrence(const core::GlobalState &gs, core::Loc loc, NamedSymbolRef sym, int32_t symbolRoles) {
+        // Optimization:
+        //   Avoid emitting duplicate def/refs for symbols.
+        // This can happen with constructs like:
+        //   prop :foo, String
+        // Without this optimization, there are 4 occurrences for String
+        // emitted for the same source range.
+        auto [_, inserted] = this->symbolOccurrenceCache.insert({sym, loc, symbolRoles});
+        return !inserted;
+    }
+
 public:
     absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ, core::TypePtr type) {
         if (this->cacheOccurrence(gs, file, occ, scip::SymbolRole::Definition)) {
@@ -626,9 +688,10 @@ public:
     // TODO(varun): Should we always pass in the location instead of sometimes only?
     absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, NamedSymbolRef symRef,
                                 std::optional<core::LocOffsets> loc = std::nullopt) {
-        // TODO:(varun) Should we cache here too to avoid emitting duplicate definitions?
+        // In practice, there doesn't seem to be any situation which triggers
+        // a duplicate definition being emitted, so skip calling cacheOccurrence here.
         scip::Symbol symbol;
-        auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs);
+        auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs, file);
         auto status = symRef.symbolForExpr(gs, this->gemMetadata, symbol, occLoc);
         if (!status.ok()) {
             return status;
@@ -660,8 +723,20 @@ public:
         return absl::OkStatus();
     }
 
-    absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, NamedSymbolRef symRef,
-                               optional<core::TypePtr> overrideType, core::LocOffsets occLoc, int32_t symbol_roles) {
+    absl::Status saveReference(const core::Context &ctx, NamedSymbolRef symRef, optional<core::TypePtr> overrideType,
+                               core::LocOffsets occLoc, int32_t symbol_roles) {
+        // HACK: Reduce noise due to <static-init> in snapshots.
+        if (ctx.owner.name(ctx) == core::Names::staticInit()) {
+            if (symRef.isSorbetInternalClassOrMethod(ctx)) {
+                return absl::OkStatus();
+            }
+        }
+        auto loc = core::Loc(ctx.file, occLoc);
+        if (this->cacheOccurrence(ctx, loc, symRef, symbol_roles)) {
+            return absl::OkStatus();
+        }
+        auto &gs = ctx.state;
+        auto file = ctx.file;
         // TODO:(varun) Should we cache here to to avoid emitting duplicate references?
         absl::StatusOr<string *> valueOrStatus(this->saveSymbolString(gs, symRef, nullptr));
         if (!valueOrStatus.ok()) {
@@ -678,7 +753,7 @@ public:
             case Kind::UndeclaredField:
             case Kind::DeclaredField:
                 if (overrideType.has_value()) {
-                    overrideDocs = symRef.docStrings(gs, overrideType.value(), core::Loc(file, occLoc));
+                    overrideDocs = symRef.docStrings(gs, overrideType.value(), loc);
                 }
         }
         this->saveReferenceImpl(gs, file, symbolString, overrideDocs, occLoc, symbol_roles);
@@ -960,7 +1035,7 @@ private:
                 status = this->scipState.saveDefinition(gs, file, namedSym, loc);
             } else {
                 auto overrideType = computeOverrideType(namedSym.definitionType, type);
-                status = this->scipState.saveReference(gs, file, namedSym, overrideType, loc, referenceRole);
+                status = this->scipState.saveReference(ctx, namedSym, overrideType, loc, referenceRole);
             }
         } else {
             uint32_t localId = this->functionLocals[localRef];
@@ -1033,7 +1108,7 @@ public:
                 status = this->scipState.saveDefinition(gs, file, namedSym, arg.loc);
                 kind = "definition";
             } else {
-                status = this->scipState.saveReference(gs, file, namedSym, nullopt, arg.loc, 0);
+                status = this->scipState.saveReference(ctx, namedSym, nullopt, arg.loc, 0);
                 kind = "reference";
             }
             ENFORCE(status.ok(), "failed to save {} for {}\ncontext:\ninstruction: {}\nlocation: {}\n", kind,
@@ -1102,11 +1177,11 @@ public:
                             if (recv.exists()) {
                                 auto funSym = gs.lookupMethodSymbol(recv, send->fun);
                                 if (funSym.exists()) {
-                                    // TODO:(varun) For arrays, hashes etc., try to identify if the function
-                                    // matches a known operator (e.g. []=), and emit an appropriate 'WriteAccess'
-                                    // symbol role for it.
-                                    auto status = this->scipState.saveReference(
-                                        gs, file, NamedSymbolRef::method(funSym), nullopt, send->funLoc, 0);
+                                    // TODO(varun): For arrays, hashes etc., try to identify if the function
+                                    // matches a known operator (e.g. []=), and emit an appropriate
+                                    // 'WriteAccess' symbol role for it.
+                                    auto status = this->scipState.saveReference(ctx, NamedSymbolRef::method(funSym),
+                                                                                nullopt, send->funLoc, 0);
                                     ENFORCE(status.ok());
                                 }
                             }
@@ -1187,14 +1262,18 @@ public:
         // Sort for determinism
         fast_sort(todo, [&](const SymbolWithLoc &p1, const SymbolWithLoc &p2) -> bool {
             if (p1.second.beginPos() == p2.second.beginPos()) {
-                // TODO: This code path is hit when there is a module_function on top of a sig.
-                // In that case, the 'T' and 'X' in 'T::X' in a sig end up with two occurrences each.
-                // We should check if this is a Sorbet bug or deliberate.
-                ENFORCE(p1.first == p2.first,
-                        "found different symbols at same location in {}, source:\n{}\nsym1 = {}\nsym2 = {}\n",
-                        file.data(gs).path(), core::Loc(file, p1.second).toString(gs), p1.first.showRaw(gs),
-                        p2.first.showRaw(gs));
-                foundDupes = true;
+                if (p1.first == p2.first) {
+                    foundDupes = true;
+                    return false;
+                } else {
+                    // This code path is hit when trying to use encrypted_prop -- that creates two
+                    // classes ::Opus and ::Opus::DB::Model with the same source locations as the declaration.
+                    //
+                    // It is also hit when a module_function is on top of sig, in which case,
+                    // the 'T' and the 'X' in 'T::X' end up with two occurrences each. This latter
+                    // example seems like a bug though.
+                    return p1.first < p2.first;
+                }
             }
             return p1.second.beginPos() < p2.second.beginPos();
         });
@@ -1213,7 +1292,7 @@ public:
         //   Specifically, Go to Definition for modules seems to go to 'module M' even
         //   when other forms like 'class M::C' are present.
         for (auto &[namedSym, loc] : todo) {
-            auto status = this->scipState.saveReference(gs, file, namedSym, nullopt, loc, 0);
+            auto status = this->scipState.saveReference(ctx, namedSym, nullopt, loc, 0);
             ENFORCE(status.ok(), "status: {}\n", status.message());
         }
     }

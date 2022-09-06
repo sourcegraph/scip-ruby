@@ -10,16 +10,16 @@
 using namespace std;
 
 namespace sorbet::rewriter {
-optional<core::NameRef> getFieldName(core::MutableContext ctx, ast::Send &send) {
+optional<pair<core::NameRef, core::LocOffsets>> getFieldName(core::MutableContext ctx, ast::Send &send) {
     if (auto propLit = ast::cast_tree<ast::Literal>(send.getPosArg(0))) {
         if (propLit->isSymbol()) {
-            return propLit->asSymbol();
+            return make_pair(propLit->asSymbol(), propLit->loc);
         }
     }
     if (send.numPosArgs() >= 2) {
         if (auto propLit = ast::cast_tree<ast::Literal>(send.getPosArg(1))) {
             if (propLit->isSymbol()) {
-                return propLit->asSymbol();
+                return make_pair(propLit->asSymbol(), propLit->loc);
             }
         }
     }
@@ -42,19 +42,21 @@ void handleFieldDefinition(core::MutableContext ctx, ast::ExpressionPtr &stat, v
             !send->recv.isSelfReference() || send->numPosArgs() < 1) {
             return;
         }
-        auto name = getFieldName(ctx, *send);
-        if (!name) {
+        auto nameAndLoc = getFieldName(ctx, *send);
+        if (!nameAndLoc) {
             return;
         }
+        auto [name, nameLoc] = nameAndLoc.value();
 
         methods.emplace_back(ast::MK::Sig0(send->loc, ast::MK::Untyped(send->loc)));
-        methods.emplace_back(ast::MK::SyntheticMethod0(send->loc, send->loc, *name, ast::MK::Nil(send->loc)));
+
+        methods.emplace_back(ast::MK::SyntheticMethod0(send->loc, send->loc, nameLoc, name, ast::MK::Nil(send->loc)));
         auto var = ast::MK::Local(send->loc, core::Names::arg0());
-        auto setName = name->addEq(ctx);
+        auto setName = name.addEq(ctx);
         methods.emplace_back(ast::MK::Sig1(send->loc, ast::MK::Symbol(send->loc, core::Names::arg0()),
                                            ast::MK::Untyped(send->loc), ast::MK::Untyped(send->loc)));
         methods.emplace_back(
-            ast::MK::SyntheticMethod1(send->loc, send->loc, setName, move(var), ast::MK::Nil(send->loc)));
+            ast::MK::SyntheticMethod1(send->loc, send->loc, nameLoc, setName, move(var), ast::MK::Nil(send->loc)));
     }
 }
 
