@@ -167,6 +167,10 @@ bool isSorbetInternal(const core::GlobalState &gs, core::SymbolRef sym) {
             if (klass == core::Symbols::Sorbet_Private() || klass == core::Symbols::T() || klass == classT) {
                 return true;
             }
+            auto name = klass.data(gs)->name;
+            if (name == core::Names::Constants::Opus()) {
+                return true;
+            }
         }
         visited.insert(sym);
         sym = sym.owner(gs);
@@ -229,6 +233,11 @@ public:
 
     friend bool operator==(const NamedSymbolRef &lhs, const NamedSymbolRef &rhs) {
         return lhs.selfOrOwner == rhs.selfOrOwner && lhs.name == rhs.name;
+    }
+
+    friend bool operator<(const NamedSymbolRef &lhs, const NamedSymbolRef &rhs) {
+        return lhs.selfOrOwner.rawId() < rhs.selfOrOwner.rawId() ||
+               (lhs.selfOrOwner == rhs.selfOrOwner && lhs.name.rawId() < rhs.name.rawId());
     }
 
     template <typename H> friend H AbslHashValue(H h, const NamedSymbolRef &c) {
@@ -1236,14 +1245,26 @@ public:
         // Sort for determinism
         fast_sort(todo, [&](const SymbolWithLoc &p1, const SymbolWithLoc &p2) -> bool {
             if (p1.second.beginPos() == p2.second.beginPos()) {
-                // TODO: This code path is hit when there is a module_function on top of a sig.
-                // In that case, the 'T' and 'X' in 'T::X' in a sig end up with two occurrences each.
-                // We should check if this is a Sorbet bug or deliberate.
-                ENFORCE(p1.first == p2.first,
-                        "found different symbols at same location in {}, source:\n{}\nsym1 = {}\nsym2 = {}\n",
-                        file.data(gs).path(), core::Loc(file, p1.second).toString(gs), p1.first.showRaw(gs),
-                        p2.first.showRaw(gs));
-                foundDupes = true;
+                if (p1.first == p2.first) {
+                    foundDupes = true;
+                } else {
+                    // This code path is hit when trying to use encrypted_prop -- that creates two
+                    // classes ::Opus and ::Opus::DB::Model with the same source locations as the declaration.
+                    //
+                    // It is also hit when a module_function is on top of sig, in which case,
+                    // the 'T' and the 'X' in 'T::X' end up with two occurrences each. This latter
+                    // example seems like a bug though.
+                    return p1.first < p2.first;
+                }
+                // return p1.first.showRaw(gs) < p2.first.showRaw(gs);
+                // // TODO: This code path is hit when there is a module_function on top of a sig.
+                // // In that case, the 'T' and 'X' in 'T::X' in a sig end up with two occurrences each.
+                // // We should check if this is a Sorbet bug or deliberate.
+                // ENFORCE(p1.first == p2.first,
+                //         "found different symbols at same location in {}, source:\n{}\nsym1 = {}\nsym2 = {}\n",
+                //         file.data(gs).path(), core::Loc(file, p1.second).toString(gs), p1.first.showRaw(gs),
+                //         p2.first.showRaw(gs));
+                // foundDupes = true;
             }
             return p1.second.beginPos() < p2.second.beginPos();
         });
