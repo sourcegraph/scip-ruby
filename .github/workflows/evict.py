@@ -82,7 +82,7 @@ def default_main():
 
     # Sort descending based on timestamps, and evict the oldest two.
     sorted(entries_and_times, key=operator.itemgetter(1))
-    earliest_entries = entries_and_times[0:2][0]
+    earliest_entries = [x[0] for x in entries_and_times[0:2]]
 
     for early_entry in earliest_entries:
        if os.getenv('DRY_RUN'):
