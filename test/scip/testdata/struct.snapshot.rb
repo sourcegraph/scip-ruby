@@ -2,9 +2,9 @@
  
  # From Sorbet docs https://sorbet.org/docs/tstruct
  class S < T::Struct
+#      ^ definition [..] S#initialize().
 #      ^ definition [..] S#
 #          ^ reference [..] T#
-#             ^^^^^^ definition [..] S#initialize().
 #             ^^^^^^ definition [..] T#Struct#
    prop :prop_i, Integer
 #        ^^^^^^ definition [..] S#prop_i().

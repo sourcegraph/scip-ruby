@@ -546,7 +546,8 @@ ast::ExpressionPtr ensureWithoutAccessors(const PropInfo &prop, const ast::Send 
 }
 
 vector<ast::ExpressionPtr> mkTypedInitialize(core::MutableContext ctx, core::LocOffsets klassLoc,
-                                             core::LocOffsets klassDeclLoc, const vector<PropInfo> &props) {
+                                             core::LocOffsets klassDeclLoc, core::LocOffsets klassNameLoc,
+                                             const vector<PropInfo> &props) {
     ast::MethodDef::ARGS_store args;
     ast::Send::ARGS_store sigArgs;
     args.reserve(props.size());
@@ -597,8 +598,7 @@ vector<ast::ExpressionPtr> mkTypedInitialize(core::MutableContext ctx, core::Loc
 
     vector<ast::ExpressionPtr> result;
     result.emplace_back(ast::MK::SigVoid(klassDeclLoc, std::move(sigArgs)));
-    // TODO(varun): What does klassDeclLoc correspond to?
-    result.emplace_back(ast::MK::SyntheticMethod(klassLoc, klassDeclLoc, klassDeclLoc, core::Names::initialize(),
+    result.emplace_back(ast::MK::SyntheticMethod(klassLoc, klassDeclLoc, klassNameLoc, core::Names::initialize(),
                                                  std::move(args), std::move(body)));
     return result;
 }
@@ -663,7 +663,7 @@ void Prop::run(core::MutableContext ctx, ast::ClassDef *klass) {
     // we define our synthesized initialize first so that if the user wrote one themselves, it overrides ours.
     if (wantTypedInitialize(syntacticSuperClass)) {
         // For direct T::Struct subclasses, we know that seeing no props means the constructor should be zero-arity.
-        for (auto &stat : mkTypedInitialize(ctx, klass->loc, klass->declLoc, props)) {
+        for (auto &stat : mkTypedInitialize(ctx, klass->loc, klass->declLoc, klass->name.loc(), props)) {
             klass->rhs.emplace_back(std::move(stat));
         }
     }
