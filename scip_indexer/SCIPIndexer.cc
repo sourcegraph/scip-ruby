@@ -435,7 +435,6 @@ public:
                 auto method = this->selfOrOwner.asMethodRef().data(gs);
                 auto offset = method->nameLoc;
                 if (!offset.exists() || offset.empty()) {
-                    fmt::print("Missing nameLoc for {}\n", this->showRaw(gs));
                     return method->loc();
                 }
                 return core::Loc(file, offset);
@@ -1265,6 +1264,7 @@ public:
             if (p1.second.beginPos() == p2.second.beginPos()) {
                 if (p1.first == p2.first) {
                     foundDupes = true;
+                    return false;
                 } else {
                     // This code path is hit when trying to use encrypted_prop -- that creates two
                     // classes ::Opus and ::Opus::DB::Model with the same source locations as the declaration.
@@ -1274,15 +1274,6 @@ public:
                     // example seems like a bug though.
                     return p1.first < p2.first;
                 }
-                // return p1.first.showRaw(gs) < p2.first.showRaw(gs);
-                // // TODO: This code path is hit when there is a module_function on top of a sig.
-                // // In that case, the 'T' and 'X' in 'T::X' in a sig end up with two occurrences each.
-                // // We should check if this is a Sorbet bug or deliberate.
-                // ENFORCE(p1.first == p2.first,
-                //         "found different symbols at same location in {}, source:\n{}\nsym1 = {}\nsym2 = {}\n",
-                //         file.data(gs).path(), core::Loc(file, p1.second).toString(gs), p1.first.showRaw(gs),
-                //         p2.first.showRaw(gs));
-                // foundDupes = true;
             }
             return p1.second.beginPos() < p2.second.beginPos();
         });
