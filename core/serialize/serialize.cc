@@ -1459,6 +1459,7 @@ void SerializerImpl::pickle(Pickler &p, const File &f, const ast::ExpressionPtr 
             auto &c = ast::cast_tree_nonnull<ast::MethodDef>(what);
             pickle(p, c.loc);
             pickle(p, c.declLoc);
+            pickle(p, c.nameLoc);
             p.putU1(std::bit_cast<uint8_t>(c.flags));
             p.putU4(c.name.rawId());
             p.putU4(c.symbol.id());
@@ -1757,6 +1758,7 @@ ast::ExpressionPtr SerializerImpl::unpickleExpr(serialize::UnPickler &p, const G
         case ast::Tag::MethodDef: {
             auto loc = unpickleLocOffsets(p);
             auto declLoc = unpickleLocOffsets(p);
+            auto nameLoc = unpickleLocOffsets(p);
             auto flagsU1 = p.getU1();
             auto flags = std::bit_cast<ast::MethodDef::Flags>(flagsU1);
             NameRef name = unpickleNameRef(p);
@@ -1767,7 +1769,7 @@ ast::ExpressionPtr SerializerImpl::unpickleExpr(serialize::UnPickler &p, const G
             for (auto &param : params) {
                 param = unpickleExpr(p, gs);
             }
-            auto ret = ast::MK::Method(loc, declLoc, name, std::move(params), std::move(rhs));
+            auto ret = ast::MK::Method(loc, declLoc, nameLoc, name, std::move(params), std::move(rhs));
 
             {
                 auto &method = ast::cast_tree_nonnull<ast::MethodDef>(ret);

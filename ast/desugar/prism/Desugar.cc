@@ -2362,7 +2362,7 @@ ast::ExpressionPtr Desugarer::desugar(pm_node_t *node) {
                     blkLoc, MK::Local(methodContext.enclosingBlockParamLoc, methodContext.enclosingBlockParamName)));
             }
 
-            auto methodExpr = MK::Method(location, declLoc, name, move(paramsStore), move(body));
+            auto methodExpr = MK::Method(location, declLoc, translateLoc(defNode->name_loc), name, move(paramsStore), move(body));
 
             if (isSingletonMethod) {
                 ast::cast_tree<ast::MethodDef>(methodExpr)->flags.isSelfMethod = true;

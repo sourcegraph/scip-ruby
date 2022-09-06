@@ -128,7 +128,7 @@ struct MethodBuilder {
 };
 
 MethodBuilder enterMethod(GlobalState &gs, ClassOrModuleRef klass, NameRef name) {
-    return MethodBuilder{gs, gs.enterMethodSymbol(Loc::none(), klass, name)};
+    return MethodBuilder{gs, gs.enterMethodSymbol(Loc::none(), klass, name, LocOffsets::none())};
 }
 
 struct ParentLinearizationInformation {
@@ -309,7 +309,8 @@ void GlobalState::initEmpty() {
     ClassOrModuleRef klass;
     klass = synthesizeClass(core::Names::Constants::NoSymbol(), 0);
     ENFORCE_NO_TIMER(klass == Symbols::noClassOrModule());
-    MethodRef method = enterMethodSymbol(Loc::none(), Symbols::noClassOrModule(), Names::noMethod());
+    MethodRef method =
+        enterMethodSymbol(Loc::none(), Symbols::noClassOrModule(), Names::noMethod(), LocOffsets::none());
     ENFORCE_NO_TIMER(method == Symbols::noMethod());
     FieldRef field = enterFieldSymbol(Loc::none(), Symbols::noClassOrModule(), Names::noFieldOrStaticField());
     ENFORCE_NO_TIMER(field == Symbols::noField());
@@ -603,7 +604,7 @@ void GlobalState::initEmpty() {
     method = enterMethod(*this, Symbols::Class(), Names::new_()).repeatedArg(Names::args()).build();
     ENFORCE_NO_TIMER(method == Symbols::Class_new());
 
-    method = enterMethodSymbol(Loc::none(), Symbols::noClassOrModule(), Names::TodoMethod());
+    method = enterMethodSymbol(Loc::none(), Symbols::noClassOrModule(), Names::TodoMethod(), LocOffsets::none());
     enterMethodParameter(Loc::none(), method, Names::args());
     ENFORCE_NO_TIMER(method == Symbols::todoMethod());
 
@@ -994,7 +995,7 @@ void GlobalState::installIntrinsics() {
                 break;
         }
         auto countBefore = methodsUsed();
-        auto method = enterMethodSymbol(Loc::none(), symbol, entry.method);
+        auto method = enterMethodSymbol(Loc::none(), symbol, entry.method, LocOffsets::none());
         method.data(*this)->intrinsicOffset = offset + Method::FIRST_VALID_INTRINSIC_OFFSET;
         if (countBefore != methodsUsed()) {
             auto &blkParam = enterMethodParameter(Loc::none(), method, Names::blkArg());
@@ -1353,7 +1354,7 @@ TypeParameterRef GlobalState::enterTypeParameter(Loc loc, MethodRef owner, NameR
     return result;
 }
 
-MethodRef GlobalState::enterMethodSymbol(Loc loc, ClassOrModuleRef owner, NameRef name) {
+MethodRef GlobalState::enterMethodSymbol(Loc loc, ClassOrModuleRef owner, NameRef name, LocOffsets nameLoc) {
     ClassOrModuleData ownerScope = owner.dataAllowingNone(*this);
 
     auto &store = ownerScope->members()[name];
@@ -1370,6 +1371,7 @@ MethodRef GlobalState::enterMethodSymbol(Loc loc, ClassOrModuleRef owner, NameRe
 
     MethodData data = result.dataAllowingNone(*this);
     data->name = name;
+    data->nameLoc = nameLoc;
     data->owner = owner;
     data->addLoc(*this, loc);
     DEBUG_ONLY(categoryCounterInc("symbols", "method"));
@@ -1381,7 +1383,7 @@ MethodRef GlobalState::enterNewMethodOverload(Loc sigLoc, MethodRef original, co
                                               const vector<bool> &paramsToKeep) {
     NameRef name = freshNameUnique(UniqueNameKind::Overload, originalName, num);
     auto owner = original.data(*this)->owner;
-    auto res = enterMethodSymbol(sigLoc, owner, name);
+    auto res = enterMethodSymbol(sigLoc, owner, name, original.data(*this)->nameLoc);
     bool newMethod = res != original;
     const auto &resParameters = res.data(*this)->parameters;
     ENFORCE_NO_TIMER(newMethod || !resParameters.empty(), "must be at least the block arg");
@@ -2611,7 +2613,8 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash(uint32_t foundClassesHash) 
 
 MethodRef GlobalState::staticInitForClass(ClassOrModuleRef klass, Loc loc) {
     auto prevCount = methodsUsed();
-    auto sym = enterMethodSymbol(loc, klass.data(*this)->singletonClass(*this), core::Names::staticInit());
+    auto sym = enterMethodSymbol(loc, klass.data(*this)->singletonClass(*this), core::Names::staticInit(),
+                                 klass.data(*this)->loc().offsets());
     if (prevCount != methodsUsed()) {
         auto blkLoc = core::Loc::none(loc.file());
         auto &blkSym = enterMethodParameter(blkLoc, sym, core::Names::blkArg());
@@ -2634,7 +2637,7 @@ MethodRef GlobalState::lookupStaticInitForClass(ClassOrModuleRef klass, bool all
 MethodRef GlobalState::staticInitForFile(Loc loc) {
     auto nm = freshNameUnique(core::UniqueNameKind::Namer, core::Names::staticInit(), loc.file().id());
     auto prevCount = this->methodsUsed();
-    auto sym = enterMethodSymbol(loc, core::Symbols::rootSingleton(), nm);
+    auto sym = enterMethodSymbol(loc, core::Symbols::rootSingleton(), nm, LocOffsets::none());
     if (prevCount != this->methodsUsed()) {
         auto blkLoc = core::Loc::none(loc.file());
         auto &blkSym = this->enterMethodParameter(blkLoc, sym, core::Names::blkArg());

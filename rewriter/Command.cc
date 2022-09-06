@@ -110,7 +110,7 @@ void Command::run(core::MutableContext ctx, ast::ClassDef *klass) {
         ast::MethodDef::Flags flags;
         flags.isSelfMethod = true;
         flags.discardDef = true;
-        auto selfCall = ast::MK::SyntheticMethod(call->loc, call->declLoc, call->name, std::move(newParams),
+        auto selfCall = ast::MK::SyntheticMethod(call->loc, call->declLoc, core::LocOffsets::none(), call->name, std::move(newParams),
                                                  ast::MK::RaiseTypedUnimplemented(call->declLoc), flags);
 
         // We are now in the weird situation where we have an actual method that

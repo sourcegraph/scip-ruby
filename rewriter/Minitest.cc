@@ -13,6 +13,14 @@ using namespace std;
 namespace sorbet::rewriter {
 
 namespace {
+
+core::LocOffsets testHelperNameLoc(const ast::Send &send) {
+    if (send.fun == core::Names::before() || send.fun == core::Names::after() || send.numPosArgs() == 0) {
+        return send.funLoc;
+    }
+    return send.getPosArg(0).loc();
+}
+
 class ConstantMover {
     uint32_t classDepth = 0;
     vector<ast::ExpressionPtr> movedConstants = {};
@@ -491,7 +499,7 @@ ast::ExpressionPtr runUnderParameterized(core::MutableContext ctx, core::NameRef
                                         send->loc.copyWithZeroLength(), move(blk));
         // put that into a method def named the appropriate thing
         auto declLoc = declLocForSendWithBlock(*send);
-        auto method = addSigVoid(ctx, ast::MK::SyntheticMethod0(send->loc, declLoc, move(name), move(each)));
+        auto method = addSigVoid(ctx, ast::MK::SyntheticMethod0(send->loc, declLoc, testHelperNameLoc(*send), move(name), move(each)));
         // add back any moved constants
         return constantMover.addConstantsToExpression(send->loc, move(method));
     }
@@ -530,7 +538,7 @@ ast::ExpressionPtr runUnderParameterized(core::MutableContext ctx, core::NameRef
             auto body = move(send->block()->body);
             ast::TreeWalk::apply(ctx, constantMover, body);
 
-            auto method = ast::MK::SyntheticMethod0(send->loc, declLoc, methodName, move(body));
+            auto method = ast::MK::SyntheticMethod0(send->loc, declLoc, testHelperNameLoc(*send), methodName, move(body));
             return constantMover.addConstantsToExpression(send->loc, move(method));
         }
 
@@ -833,7 +841,7 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::
             }
 
             auto classDef =
-                ast::MK::Class(send->loc, declLoc, std::move(name), std::move(ancestors), std::move(classBody));
+                ast::MK::Class(send->loc, declLoc, testHelperNameLoc(*send), std::move(name), std::move(ancestors), std::move(classBody));
 
             // Preserve the original constant reference in the tree so Sorbet can
             // resolve it for hover and go-to-definition.
@@ -870,7 +878,7 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::
             ast::TreeWalk::apply(ctx, constantMover, block->body);
             auto declLoc = declLocForSendWithBlock(*send);
             auto method = ast::MK::SyntheticMethod0(
-                send->loc, declLoc, std::move(name),
+                send->loc, declLoc, testHelperNameLoc(*send), std::move(name),
                 prepareBody(ctx, isClass, move(maybeSharedExamplesName), std::move(block->body), insideDescribe));
 
             // This prevents the `RuntimeMethodDefinition` from getting generated. For these `it`-block
@@ -921,7 +929,7 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::
             ConstantMover constantMover;
             ast::TreeWalk::apply(ctx, constantMover, itBody);
 
-            auto itMethod = ast::MK::SyntheticMethod0(send->loc, itDeclLoc, itName,
+            auto itMethod = ast::MK::SyntheticMethod0(send->loc, itDeclLoc, arg.loc(), itName,
                                                       prepareBody(ctx, /* isClass */ true, maybeSharedExamplesName,
                                                                   std::move(itBody), /* insideDescribe */ true));
             ast::cast_tree_nonnull<ast::MethodDef>(itMethod).flags.discardDef = true;
@@ -955,7 +963,7 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::
             }
 
             auto [methodName, declLoc] = maybeDecl.value();
-            auto method = ast::MK::SyntheticMethod0(send->loc, declLoc, methodName, std::move(block->body));
+            auto method = ast::MK::SyntheticMethod0(send->loc, declLoc, testHelperNameLoc(*send), methodName, std::move(block->body));
             return constantMover.addConstantsToExpression(send->loc, move(method));
         }
 

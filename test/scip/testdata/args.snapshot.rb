@@ -1,7 +1,7 @@
  # typed: true
  
  def args(x, y)
-#^^^^^^^^^^^^^^ definition [..] Object#args().
+#    ^^^^ definition [..] Object#args().
 #         ^ definition local 1~#2634721084
 #            ^ definition local 2~#2634721084
    z = x + y
@@ -25,7 +25,7 @@
  end
  
  def keyword_args(w:, x: 3, y: [], **kwargs)
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] Object#keyword_args().
+#    ^^^^^^^^^^^^ definition [..] Object#keyword_args().
 #                 ^^ definition local 1~#3526982640
 #                     ^^ definition local 2~#3526982640
 #                           ^^ definition local 3~#3526982640
@@ -39,7 +39,7 @@
  end
  
  def use_kwargs
-#^^^^^^^^^^^^^^ definition [..] Object#use_kwargs().
+#    ^^^^^^^^^^ definition [..] Object#use_kwargs().
    h = { a: 3 }
 #  ^ definition local 1~#571973038
    keyword_args(w: 0, **h)

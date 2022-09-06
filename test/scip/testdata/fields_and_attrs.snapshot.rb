@@ -6,7 +6,7 @@
  class K
 #      ^ definition [..] K#
    def m1
-#  ^^^^^^ definition [..] K#m1().
+#      ^^ definition [..] K#m1().
      @f = 0
 #    ^^ definition [..] K#`@f`.
      @g = @f
@@ -15,7 +15,7 @@
      return
    end
    def m2
-#  ^^^^^^ definition [..] K#m2().
+#      ^^ definition [..] K#m2().
      @f = @g
 #    ^^ definition [..] K#`@f`.
 #         ^^ reference [..] K#`@g`.
@@ -27,7 +27,7 @@
  class K
 #      ^ definition [..] K#
    def m3
-#  ^^^^^^ definition [..] K#m3().
+#      ^^ definition [..] K#m3().
      @g = @f
 #    ^^ definition [..] K#`@g`.
 #         ^^ reference [..] K#`@f`.
@@ -43,7 +43,7 @@
    @y = 9
 #  ^^ definition [..] `<Class:L>`#`@y`.
    def self.m1
-#  ^^^^^^^^^^^ definition [..] `<Class:L>`#m1().
+#           ^^ definition [..] `<Class:L>`#m1().
      @y = @x
 #    ^^ definition [..] `<Class:L>`#`@y`.
 #         ^^ reference [..] `<Class:L>`#`@x`.
@@ -51,7 +51,7 @@
    end
  
    def m2
-#  ^^^^^^ definition [..] L#m2().
+#      ^^ definition [..] L#m2().
      # FIXME: Missing references
      self.class.y = self.class.x
      return
@@ -66,7 +66,7 @@
    @@b = 1
 #  ^^^ definition [..] `<Class:N>`#`@@b`.
    def self.m1
-#  ^^^^^^^^^^^ definition [..] `<Class:N>`#m1().
+#           ^^ definition [..] `<Class:N>`#m1().
      @@b = @@a
 #    ^^^ definition [..] `<Class:N>`#`@@b`.
 #          ^^^ reference [..] `<Class:N>`#`@@a`.
@@ -74,7 +74,7 @@
    end
  
    def m2
-#  ^^^^^^ definition [..] N#m2().
+#      ^^ definition [..] N#m2().
      @@b = @@a
 #    ^^^ definition [..] N#`@@b`.
 #          ^^^ reference [..] N#`@@a`.
@@ -82,7 +82,7 @@
    end
  
    def m3
-#  ^^^^^^ definition [..] N#m3().
+#      ^^ definition [..] N#m3().
      # FIXME: Missing references
      self.class.b = self.class.a
    end
@@ -92,15 +92,15 @@
  class P
 #      ^ definition [..] P#
    attr_accessor :a
-#  ^^^^^^^^^^^^^^^^ definition [..] P#`a=`().
-#  ^^^^^^^^^^^^^^^^ definition [..] P#a().
+#                 ^ definition [..] P#`a=`().
+#                 ^ definition [..] P#a().
    attr_reader :r
-#  ^^^^^^^^^^^^^^ definition [..] P#r().
+#               ^ definition [..] P#r().
    attr_writer :w
-#  ^^^^^^^^^^^^^^ definition [..] P#`w=`().
+#               ^ definition [..] P#`w=`().
  
    def init
-#  ^^^^^^^^ definition [..] P#init().
+#      ^^^^ definition [..] P#init().
      self.a = self.r
 #         ^^^ reference [..] P#`a=`().
 #                  ^ reference [..] P#r().
@@ -110,7 +110,7 @@
    end
  
    def wrong_init
-#  ^^^^^^^^^^^^^^ definition [..] P#wrong_init().
+#      ^^^^^^^^^^ definition [..] P#wrong_init().
      # Check that 'r' is a method access but 'a' and 'w' are locals
      a = r
 #    ^ definition local 1~#1021288725
@@ -123,7 +123,7 @@
  end
  
  def useP
-#^^^^^^^^ definition [..] Object#useP().
+#    ^^^^ definition [..] Object#useP().
    p = P.new
 #  ^ definition local 1~#2121829932
 #      ^ reference [..] P#

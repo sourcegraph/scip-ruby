@@ -1357,6 +1357,9 @@ public:
         if (print.CFGText.enabled) {
             print.CFGText.fmt("{}\n\n", cfg->toTextualString(ctx));
         }
+        if (print.CFGTextLoc.enabled) {
+            print.CFGTextLoc.fmt("{}\n\n", cfg->toTextualString(ctx, ctx.file));
+        }
         if (print.CFGRaw.enabled) {
             print.CFGRaw.fmt("{}\n\n", cfg->showRaw(ctx));
         }
@@ -1385,6 +1388,9 @@ public:
         }
         if (print.CFGText.enabled) {
             print.CFGText.fmt("{}\n\n", cfg->toTextualString(ctx));
+        }
+        if (print.CFGTextLoc.enabled) {
+            print.CFGTextLoc.fmt("{}\n\n", cfg->toTextualString(ctx, ctx.file));
         }
         if (print.CFGRaw.enabled) {
             print.CFGRaw.fmt("{}\n\n", cfg->showRaw(ctx));

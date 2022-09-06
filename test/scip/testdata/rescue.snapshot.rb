@@ -6,14 +6,14 @@
  end
  
  def handle(e)
-#^^^^^^^^^^^^^ definition [..] Object#handle().
+#    ^^^^^^ definition [..] Object#handle().
 #           ^ definition local 1~#780127187
    puts e.inspect.to_s 
 #       ^ reference local 1~#780127187
  end
  
  def f
-#^^^^^ definition [..] Object#f().
+#    ^ definition [..] Object#f().
    begin
      raise 'This exception will be rescued!'
    rescue MyError => e1

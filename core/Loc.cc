@@ -307,6 +307,18 @@ string Loc::fileShortPosToString(const GlobalState &gs) const {
     return buf.str();
 }
 
+string Loc::showRawLineColumn(const core::GlobalState &gs) const {
+    if (!this->exists()) {
+        return "<>";
+    }
+    if (this->empty()) {
+        return "<_>";
+    }
+    auto [start, end] = this->position(gs);
+    return start.line == end.line ? fmt::format("{}:{}-{}", start.line, start.column, end.column)
+                                  : fmt::format("{}:{}-{}:{}", start.line, start.column, end.line, end.column);
+}
+
 string Loc::filePosToString(const GlobalState &gs, bool showFull) const {
     stringstream buf;
     if (!file().exists()) {

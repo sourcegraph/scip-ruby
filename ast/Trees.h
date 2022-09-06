@@ -437,6 +437,9 @@ public:
     /// The range for the method declaration, including 'def' and ending
     /// after the closing ')' after the parameter list.
     core::LocOffsets declLoc;
+    /// The range for the name of the method itself in the method declaration,
+    /// excluding 'def' and the parameter list '(...)'.
+    core::LocOffsets nameLoc;
     /// Reference to the method data.
     core::MethodRef symbol;
 
@@ -450,8 +453,11 @@ public:
     using Flags = core::FoundMethod::Flags;
     Flags flags;
 
+    MethodDef(core::LocOffsets loc, core::LocOffsets declLoc, core::LocOffsets nameLoc, core::MethodRef symbol,
+              core::NameRef name, PARAMS_store params, ExpressionPtr rhs, Flags flags);
     MethodDef(core::LocOffsets loc, core::LocOffsets declLoc, core::MethodRef symbol, core::NameRef name,
-              PARAMS_store params, ExpressionPtr rhs, Flags flags);
+              PARAMS_store params, ExpressionPtr rhs, Flags flags)
+        : MethodDef(loc, declLoc, core::LocOffsets::none(), symbol, name, std::move(params), std::move(rhs), flags) {}
 
     ExpressionPtr deepCopy() const;
     bool structurallyEqual(const core::GlobalState &gs, const ExpressionPtr &other, const core::FileRef file) const;
@@ -464,7 +470,7 @@ public:
 
     void _sanityCheck();
 };
-CheckSize(MethodDef, 64, 8);
+CheckSize(MethodDef, 72, 8);
 
 EXPRESSION(If) {
 public:

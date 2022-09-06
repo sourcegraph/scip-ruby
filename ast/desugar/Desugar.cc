@@ -381,7 +381,7 @@ ExpressionPtr validateRBIBody(DesugarContext dctx, ExpressionPtr body) {
     return body;
 }
 
-ExpressionPtr buildMethod(DesugarContext dctx, core::LocOffsets loc, core::LocOffsets declLoc, core::NameRef name,
+ExpressionPtr buildMethod(DesugarContext dctx, core::LocOffsets loc, core::LocOffsets declLoc, core::LocOffsets nameLoc, core::NameRef name,
                           parser::Node *argnode, unique_ptr<parser::Node> &body, bool isSelf) {
     // Reset uniqueCounter within this scope (to keep numbers small)
     uint32_t uniqueCounter = 1;
@@ -412,7 +412,7 @@ ExpressionPtr buildMethod(DesugarContext dctx, core::LocOffsets loc, core::LocOf
         blockParam->expr = MK::Local(enclosingBlockParamLoc, enclosingBlockParamName);
     }
 
-    auto mdef = MK::Method(loc, declLoc, name, move(params), move(desugaredBody));
+    auto mdef = MK::Method(loc, declLoc, nameLoc, name, move(params), move(desugaredBody));
     cast_tree<MethodDef>(mdef)->flags.isSelfMethod = isSelf;
     return mdef;
 }
@@ -1654,7 +1654,7 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
             },
             [&](parser::DefMethod *method) {
                 bool isSelf = false;
-                ExpressionPtr res = buildMethod(dctx, method->loc, method->declLoc, method->name, method->params.get(),
+                ExpressionPtr res = buildMethod(dctx, method->loc, method->declLoc, method->nameLoc, method->name, method->params.get(),
                                                 method->body, isSelf);
                 result = move(res);
             },
@@ -1671,7 +1671,7 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
                     }
                 }
                 bool isSelf = true;
-                ExpressionPtr res = buildMethod(dctx, method->loc, method->declLoc, method->name, method->params.get(),
+                ExpressionPtr res = buildMethod(dctx, method->loc, method->declLoc, method->nameLoc, method->name, method->params.get(),
                                                 method->body, isSelf);
                 result = move(res);
             },

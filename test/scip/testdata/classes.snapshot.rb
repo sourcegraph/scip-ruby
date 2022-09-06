@@ -6,7 +6,7 @@
  class C1
 #      ^^ definition [..] C1#
    def f()
-#  ^^^^^^^ definition [..] C1#f().
+#      ^ definition [..] C1#f().
      _a = C1.new
 #    ^^ definition local 1~#3809224601
 #         ^^ reference [..] C1#
@@ -31,14 +31,14 @@
  end
  
  def local_class()
-#^^^^^^^^^^^^^^^^^ definition [..] Object#local_class().
+#    ^^^^^^^^^^^ definition [..] Object#local_class().
    localClass = Class.new
 #  ^^^^^^^^^^ definition local 1~#552113551
 #               ^^^^^ reference [..] Class#
    # Technically, this is not supported by Sorbet (https://srb.help/3001),
    # but make sure we don't crash or do something weird.
    def localClass.myMethod()
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] Object#myMethod().
+#                 ^^^^^^^^ definition [..] Object#myMethod().
      ":)"
    end
    _c = localClass.new
@@ -60,7 +60,7 @@
  end
  
  def module_access()
-#^^^^^^^^^^^^^^^^^^^ definition [..] Object#module_access().
+#    ^^^^^^^^^^^^^ definition [..] Object#module_access().
    _ = M4::K
 #  ^ definition local 1~#3353511840
 #      ^^ reference [..] M4#
@@ -73,12 +73,12 @@
    module M6
 #         ^^ definition [..] M5#M6#
      def self.g()
-#    ^^^^^^^^^^^^ definition [..] M5#`<Class:M6>`#g().
+#             ^ definition [..] M5#`<Class:M6>`#g().
      end
    end
  
    def self.h()
-#  ^^^^^^^^^^^^ definition [..] `<Class:M5>`#h().
+#           ^ definition [..] `<Class:M5>`#h().
      M6.g()
 #    ^^ reference [..] M5#M6#
 #       ^ reference [..] M5#`<Class:M6>`#g().
@@ -91,12 +91,12 @@
    module M8
 #         ^^ definition [..] C7#M8#
      def self.i()
-#    ^^^^^^^^^^^^ definition [..] C7#`<Class:M8>`#i().
+#             ^ definition [..] C7#`<Class:M8>`#i().
      end
    end
  
    def j()
-#  ^^^^^^^ definition [..] C7#j().
+#      ^ definition [..] C7#j().
      M8.i()
 #    ^^ reference [..] C7#M8#
 #       ^ reference [..] C7#`<Class:M8>`#i().

@@ -973,7 +973,8 @@ private:
         auto ancestorType =
             core::make_type<core::UnresolvedClassType>(unresolvedPath->first, move(unresolvedPath->second));
 
-        auto uaSym = ctx.state.enterMethodSymbol(core::Loc::none(), item.klass, core::Names::unresolvedAncestors());
+        auto uaSym = ctx.state.enterMethodSymbol(core::Loc::none(), item.klass, core::Names::unresolvedAncestors(),
+                                                 core::LocOffsets::none());
 
         // Add a fake block argument so that this method symbol passes sanity checks
         auto &arg = ctx.state.enterMethodParameter(core::Loc::none(), uaSym, core::Names::blkArg());
@@ -3038,7 +3039,7 @@ class ResolveTypeMembersAndFieldsWalk {
         }
 
         auto loc = ctx.locAt(job.fromNameLoc);
-        auto alias = ctx.state.enterMethodSymbol(loc, job.owner, job.fromName);
+        auto alias = ctx.state.enterMethodSymbol(loc, job.owner, job.fromName, job.fromNameLoc);
         alias.data(ctx)->addLoc(ctx, loc);
         alias.data(ctx)->resultType = core::make_type<core::AliasType>(core::SymbolRef(toMethod));
 

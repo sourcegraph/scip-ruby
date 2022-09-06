@@ -90,6 +90,7 @@ vector<ast::ExpressionPtr> Delegate::run(core::MutableContext ctx, const ast::Se
             return empty;
         }
         core::NameRef methodName;
+        core::LocOffsets nameLoc = lit->loc;
         if (prefixNode) {
             if (useToAsPrefix && (beforeUnderscore.empty() || beforeUnderscore[0] == '@')) {
                 // Active Support raises at runtime for these cases
@@ -112,7 +113,7 @@ vector<ast::ExpressionPtr> Delegate::run(core::MutableContext ctx, const ast::Se
         params.emplace_back(ast::MK::RestParam(loc, ast::MK::Local(loc, core::Names::arg0())));
         params.emplace_back(ast::make_expression<ast::BlockParam>(loc, ast::MK::Local(loc, core::Names::blkArg())));
 
-        methodStubs.push_back(ast::MK::SyntheticMethod(loc, loc, methodName, std::move(params), ast::MK::EmptyTree()));
+        methodStubs.push_back(ast::MK::SyntheticMethod(loc, loc, nameLoc, methodName, std::move(params), ast::MK::EmptyTree()));
     }
 
     return methodStubs;
