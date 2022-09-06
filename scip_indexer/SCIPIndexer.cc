@@ -158,12 +158,13 @@ public:
     }
 };
 
-bool isDescendantOfSorbetPrivateOrT(const core::GlobalState &gs, core::SymbolRef sym) {
+bool isSorbetInternal(const core::GlobalState &gs, core::SymbolRef sym) {
     UnorderedSet<core::SymbolRef> visited;
+    auto classT = core::Symbols::T().data(gs)->lookupSingletonClass(gs);
     while (sym.exists() && !visited.contains(sym)) {
         if (sym.isClassOrModule()) {
             auto klass = sym.asClassOrModuleRef();
-            if (klass == core::Symbols::Sorbet_Private() || klass == core::Symbols::T()) {
+            if (klass == core::Symbols::Sorbet_Private() || klass == core::Symbols::T() || klass == classT) {
                 return true;
             }
         }
@@ -290,7 +291,7 @@ public:
                 return false;
             case Kind::ClassOrModule:
             case Kind::Method:
-                return isDescendantOfSorbetPrivateOrT(gs, this->asSymbolRef());
+                return isSorbetInternal(gs, this->asSymbolRef());
         }
         ENFORCE(false, "impossible");
     }
@@ -704,14 +705,6 @@ public:
                                core::LocOffsets occLoc, int32_t symbol_roles) {
         // HACK: Reduce noise due to <static-init> in snapshots.
         if (ctx.owner.name(ctx) == core::Names::staticInit()) {
-            if (symRef.kind() == NamedSymbolRef::Kind::Method) {
-                auto funName = symRef.asSymbolRef().name(ctx);
-                // NOTE: For the untyped and nilable cases, we would ideally check that
-                // the owner is ::<Class:T> as well, but this is good enough for now.
-                if (funName == core::Names::untyped() || funName == core::Names::nilable()) {
-                    return absl::OkStatus();
-                }
-            }
             if (symRef.isSorbetInternalClassOrMethod(ctx)) {
                 return absl::OkStatus();
             }
