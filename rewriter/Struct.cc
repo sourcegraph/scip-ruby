@@ -138,7 +138,6 @@ vector<ast::ExpressionPtr> Struct::run(core::MutableContext ctx, ast::Assign *as
             argName = ast::make_expression<ast::KeywordArg>(symLoc, move(argName));
         }
         newArgs.emplace_back(ast::MK::OptionalArg(symLoc, move(argName), ast::MK::Nil(symLoc)));
-        // TODO(varun): Is symLoc correct here?
         body.emplace_back(ast::MK::SyntheticMethod0(symLoc, symLoc, symLoc, name, ast::MK::RaiseUnimplemented(loc)));
         body.emplace_back(ast::MK::SyntheticMethod1(symLoc, symLoc, symLoc, name.addEq(ctx),
                                                     ast::MK::Local(symLoc, name), ast::MK::RaiseUnimplemented(loc)));

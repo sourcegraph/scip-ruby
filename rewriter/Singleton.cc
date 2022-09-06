@@ -84,7 +84,6 @@ void Singleton::run(core::MutableContext ctx, ast::ClassDef *cdef) {
     }
 
     {
-        // TODO(varun): Not sure if 'loc' is the right 'nameLoc' here.
         auto method =
             ast::MK::SyntheticMethod0(loc, loc, loc, core::Names::instance(), ast::MK::RaiseUnimplemented(loc));
         ast::cast_tree_nonnull<ast::MethodDef>(method).flags.isSelfMethod = true;
