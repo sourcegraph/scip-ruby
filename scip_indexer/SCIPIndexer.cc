@@ -505,6 +505,8 @@ class SCIPState {
     // map in debug, so keeping it a map.
     UnorderedMap<std::pair<core::LocOffsets, /*SymbolRole*/ int32_t>, uint32_t> localOccurrenceCache;
 
+    UnorderedSet<std::tuple<NamedSymbolRef, core::Loc, /*SymbolRole*/ int32_t>> symbolOccurrenceCache;
+
     GemMetadata gemMetadata;
 
 public:
@@ -656,6 +658,17 @@ private:
         return true;
     }
 
+    bool cacheOccurrence(const core::GlobalState &gs, core::Loc loc, NamedSymbolRef sym, int32_t symbolRoles) {
+        // Optimization:
+        //   Avoid emitting duplicate def/refs for symbols.
+        // This can happen with constructs like:
+        //   prop :foo, String
+        // Without this optimization, there are 4 occurrences for String
+        // emitted for the same source range.
+        auto [_, inserted] = this->symbolOccurrenceCache.insert({sym, loc, symbolRoles});
+        return !inserted;
+    }
+
 public:
     absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ, core::TypePtr type) {
         if (this->cacheOccurrence(gs, file, occ, scip::SymbolRole::Definition)) {
@@ -676,7 +689,8 @@ public:
     // TODO(varun): Should we always pass in the location instead of sometimes only?
     absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, NamedSymbolRef symRef,
                                 std::optional<core::LocOffsets> loc = std::nullopt) {
-        // TODO:(varun) Should we cache here too to avoid emitting duplicate definitions?
+        // In practice, there doesn't seem to be any situation which triggers
+        // a duplicate definition being emitted, so skip calling cacheOccurrence here.
         scip::Symbol symbol;
         auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs, file);
         auto status = symRef.symbolForExpr(gs, this->gemMetadata, symbol, occLoc);
@@ -718,6 +732,10 @@ public:
                 return absl::OkStatus();
             }
         }
+        auto loc = core::Loc(ctx.file, occLoc);
+        if (this->cacheOccurrence(ctx, loc, symRef, symbol_roles)) {
+            return absl::OkStatus();
+        }
         auto &gs = ctx.state;
         auto file = ctx.file;
         // TODO:(varun) Should we cache here to to avoid emitting duplicate references?
@@ -736,7 +754,7 @@ public:
             case Kind::UndeclaredField:
             case Kind::DeclaredField:
                 if (overrideType.has_value()) {
-                    overrideDocs = symRef.docStrings(gs, overrideType.value(), core::Loc(file, occLoc));
+                    overrideDocs = symRef.docStrings(gs, overrideType.value(), loc);
                 }
         }
         this->saveReferenceImpl(gs, file, symbolString, overrideDocs, occLoc, symbol_roles);

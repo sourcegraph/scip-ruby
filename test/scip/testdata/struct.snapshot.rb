@@ -7,22 +7,14 @@
 #             ^^^^^^ definition [..] S#initialize().
 #             ^^^^^^ definition [..] T#Struct#
    prop :prop_i, Integer
-#        ^^^^^^ definition [..] S#`prop_i=`().
 #        ^^^^^^ definition [..] S#prop_i().
-#                ^^^^^^^ reference [..] Integer#
-#                ^^^^^^^ reference [..] Integer#
-#                ^^^^^^^ reference [..] Integer#
-#                ^^^^^^^ reference [..] Integer#
+#        ^^^^^^ definition [..] S#`prop_i=`().
 #                ^^^^^^^ reference [..] Integer#
    const :const_s, T.nilable(String)
 #         ^^^^^^^ definition [..] S#const_s().
 #                            ^^^^^^ reference [..] String#
-#                            ^^^^^^ reference [..] String#
-#                            ^^^^^^ reference [..] String#
    const :const_f, Float, default: 0.5
 #         ^^^^^^^ definition [..] S#const_f().
-#                  ^^^^^ reference [..] Float#
-#                  ^^^^^ reference [..] Float#
 #                  ^^^^^ reference [..] Float#
  end
  
@@ -53,9 +45,9 @@
  
  POINT = Struct.new(:x, :y) do
 #^^^^^ definition [..] POINT#
+#^^^^^^^^^^^^^^^^^^^^ definition local 5~#119448696
 #^^^^^^^^^^^^^^^^^^^^ definition [..] Struct#
 #^^^^^^^^^^^^^^^^^^^^ definition [..] POINT#initialize().
-#^^^^^^^^^^^^^^^^^^^^ definition local 5~#119448696
 #                    ^ definition [..] POINT#x().
 #                    ^ definition [..] POINT#`x=`().
 #                    ^ reference [..] BasicObject#
