@@ -193,7 +193,8 @@ ast::ExpressionPtr runUnderEach(core::MutableContext ctx, core::NameRef eachName
         if (send->fun == core::Names::it() && send->numPosArgs() == 1 && send->hasBlock() &&
             send->block()->args.size() == 0) {
             // we use this for the name of our test
-            auto argString = to_s(ctx, send->getPosArg(0));
+            auto &arg0 = send->getPosArg(0);
+            auto argString = to_s(ctx, arg0);
             auto name = ctx.state.enterNameUTF8("<it '" + argString + "'>");
 
             // pull constants out of the block
@@ -221,7 +222,7 @@ ast::ExpressionPtr runUnderEach(core::MutableContext ctx, core::NameRef eachName
                                             send->loc.copyWithZeroLength(), move(blk));
             // put that into a method def named the appropriate thing
             auto method =
-                addSigVoid(ast::MK::SyntheticMethod0(send->loc, send->loc, send->loc, move(name), move(each)));
+                addSigVoid(ast::MK::SyntheticMethod0(send->loc, send->loc, arg0.loc(), move(name), move(each)));
             // add back any moved constants
             return constantMover.addConstantsToExpression(send->loc, move(method));
         }
@@ -357,7 +358,7 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, ast::Send *
         auto name = send->fun == core::Names::after() ? core::Names::afterAngles() : core::Names::initialize();
         ConstantMover constantMover;
         ast::TreeWalk::apply(ctx, constantMover, block->body);
-        auto method = addSigVoid(ast::MK::SyntheticMethod0(send->loc, send->loc, send->loc, name,
+        auto method = addSigVoid(ast::MK::SyntheticMethod0(send->loc, send->loc, send->funLoc, name,
                                                            prepareBody(ctx, isClass, std::move(block->body))));
         return constantMover.addConstantsToExpression(send->loc, move(method));
     }
@@ -388,7 +389,7 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, ast::Send *
         ast::TreeWalk::apply(ctx, constantMover, block->body);
         auto name = ctx.state.enterNameUTF8("<it '" + argString + "'>");
         const bool bodyIsClass = false;
-        auto method = addSigVoid(ast::MK::SyntheticMethod0(send->loc, send->loc, send->loc, std::move(name),
+        auto method = addSigVoid(ast::MK::SyntheticMethod0(send->loc, send->loc, arg.loc(), std::move(name),
                                                            prepareBody(ctx, bodyIsClass, std::move(block->body))));
         method = ast::MK::InsSeq1(send->loc, send->getPosArg(0).deepCopy(), move(method));
         return constantMover.addConstantsToExpression(send->loc, move(method));

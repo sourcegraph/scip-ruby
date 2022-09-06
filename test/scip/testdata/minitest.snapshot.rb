@@ -6,19 +6,19 @@
      end
  
      it "works outside" do
-#    ^^^ definition [..] MyTest#`<it 'works outside'>`().
+#       ^^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'works outside'>`().
          outside_method
      end
  
      it "allows constants inside of IT" do
-#    ^^^^^^^ definition [..] MyTest#`<it 'allows constants inside of IT'>`().
+#       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'allows constants inside of IT'>`().
        CONST = 10
 #      ^^^^^ definition [..] MyTest#CONST.
 #      ^^^^^^^^^^ reference [..] Kernel#
      end
  
      it "allows let-ed constants inside of IT" do
-#    ^^^^^^^^^^^ definition [..] MyTest#`<it 'allows let-ed constants inside of IT'>`().
+#       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'allows let-ed constants inside of IT'>`().
        C2 = T.let(10, Integer)
 #      ^^ definition [..] MyTest#C2.
 #      ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Kernel#
@@ -26,11 +26,11 @@
      end
  
      it "allows path constants inside of IT" do
+#       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'allows path constants inside of IT'>`().
        C3 = Mod::C
 #      ^^ definition [..] MyTest#C3.
 #           ^^^ reference [..] Mod#
 #                ^ reference [..] Mod#C#
-#                ^^^^ definition [..] MyTest#`<it 'allows path constants inside of IT'>`().
        C3.new
      end
  
@@ -41,7 +41,7 @@
          end
  
          it "works inside" do
-#        ^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'some inner tests'>`#`<it 'works inside'>`().
+#           ^^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'some inner tests'>`#`<it 'works inside'>`().
              outside_method
              inside_method
          end
@@ -51,13 +51,13 @@
 #        ^^^^^^^^^^^^^^^ definition [..] MyTest#instance_helper().
  
      before do
-#    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#initialize().
+#    ^^^^^^ definition [..] MyTest#initialize().
          @foo = T.let(3, Integer)
          instance_helper
      end
  
      it 'can read foo' do
-#    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'can read foo'>`().
+#       ^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'can read foo'>`().
          T.assert_type!(@foo, Integer)
          instance_helper
      end
@@ -69,8 +69,8 @@
      describe Object do
 #             ^^^^^^ definition [..] MyTest#`<describe 'Object'>`#
          it Object do
-#        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
-#        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
+#           ^^^^^^ definition [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
+#           ^^^^^^ definition [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
 #           ^^^^^^ reference [..] Object#
          end
          it Object do
@@ -91,7 +91,7 @@
      describe "a non-ideal situation" do
 #             ^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'a non-ideal situation'>`#
        it "contains nested describes" do
-#      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'a non-ideal situation'>`#`<it 'contains nested describes'>`().
+#         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'a non-ideal situation'>`#`<it 'contains nested describes'>`().
          describe "nobody should write this but we should still parse it" do
 #                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'a non-ideal situation'>`#`<describe 'nobody should write this but we should still parse it'>`#
          end
