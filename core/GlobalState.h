@@ -102,7 +102,7 @@ public:
     ClassOrModuleRef enterClassSymbol(Loc loc, ClassOrModuleRef owner, NameRef name);
     TypeMemberRef enterTypeMember(Loc loc, ClassOrModuleRef owner, NameRef name, Variance variance);
     TypeArgumentRef enterTypeArgument(Loc loc, MethodRef owner, NameRef name, Variance variance);
-    MethodRef enterMethodSymbol(Loc loc, ClassOrModuleRef owner, NameRef name, LocOffsets nameLoc);
+    MethodRef enterMethodSymbol(Loc loc, ClassOrModuleRef owner, NameRef name, Loc nameLoc);
     MethodRef enterNewMethodOverload(Loc loc, MethodRef original, core::NameRef originalName, uint32_t num,
                                      const std::vector<bool> &argsToKeep);
     FieldRef enterFieldSymbol(Loc loc, ClassOrModuleRef owner, NameRef name);

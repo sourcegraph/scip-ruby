@@ -244,8 +244,8 @@ string CFG::toTextualString(const core::GlobalState &gs, optional<core::FileRef>
     if (file) {
         auto method = this->symbol.data(gs);
         if (method->nameLoc.exists() && !method->nameLoc.empty()) {
-            fmt::format_to(std::back_inserter(buf), "method @ {} {} {{\n\n",
-                           core::Loc(file.value(), method->nameLoc).showRawLineColumn(gs), symbolName);
+            fmt::format_to(std::back_inserter(buf), "method @ {} {} {{\n\n", method->nameLoc.showRawLineColumn(gs),
+                           symbolName);
         } else {
             fmt::format_to(std::back_inserter(buf), "method @ {} (full) {} {{\n\n", method->loc().showRawLineColumn(gs),
                            symbolName);

@@ -818,7 +818,7 @@ class SymbolDefiner {
         auto &parsedArgs = method.parsedArgs;
         auto symTableSize = ctx.state.methodsUsed();
         auto declLoc = ctx.locAt(method.declLoc);
-        auto sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name, method.nameLoc);
+        auto sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name, ctx.locAt(method.nameLoc));
         const bool isNewSymbol = symTableSize != ctx.state.methodsUsed();
         if (!isNewSymbol) {
             // See if this is == to the method we're defining now, or if we have a redefinition error.
@@ -830,7 +830,7 @@ class SymbolDefiner {
                     paramMismatchErrors(ctx.withOwner(sym), declLoc, parsedArgs);
                     ctx.state.mangleRenameSymbol(sym, method.name);
                     // Re-enter a new symbol.
-                    sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name, method.nameLoc);
+                    sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name, ctx.locAt(method.nameLoc));
                 } else {
                     // ...unless it's an intrinsic, because we allow multiple incompatible definitions of those in code
                     // TODO(jvilk): Wouldn't this always fail since `!sym.exists()`?
@@ -1024,8 +1024,8 @@ class SymbolDefiner {
             symbolData->flags.isSealed = true;
 
             auto classOfKlass = symbolData->singletonClass(ctx);
-            auto sealedSubclasses = ctx.state.enterMethodSymbol(
-                ctx.locAt(mod.loc), classOfKlass, core::Names::sealedSubclasses(), core::LocOffsets::none());
+            auto sealedSubclasses = ctx.state.enterMethodSymbol(ctx.locAt(mod.loc), classOfKlass,
+                                                                core::Names::sealedSubclasses(), core::Loc::none());
             auto &blkArg =
                 ctx.state.enterMethodArgumentSymbol(core::Loc::none(), sealedSubclasses, core::Names::blkArg());
             blkArg.flags.isBlock = true;

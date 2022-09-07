@@ -429,15 +429,14 @@ public:
         return absl::OkStatus();
     }
 
-    core::Loc symbolLoc(const core::GlobalState &gs, core::FileRef file) const {
+    core::Loc symbolLoc(const core::GlobalState &gs) const {
         switch (this->kind()) {
             case Kind::Method: {
                 auto method = this->selfOrOwner.asMethodRef().data(gs);
-                auto offset = method->nameLoc;
-                if (!offset.exists() || offset.empty()) {
+                if (!method->nameLoc.exists() || method->nameLoc.empty()) {
                     return method->loc();
                 }
-                return core::Loc(file, offset);
+                return method->nameLoc;
             }
             case Kind::ClassOrModule:
             case Kind::DeclaredField:
@@ -690,8 +689,9 @@ public:
                                 std::optional<core::LocOffsets> loc = std::nullopt) {
         // In practice, there doesn't seem to be any situation which triggers
         // a duplicate definition being emitted, so skip calling cacheOccurrence here.
+
+        auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs);
         scip::Symbol symbol;
-        auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs, file);
         auto status = symRef.symbolForExpr(gs, this->gemMetadata, symbol, occLoc);
         if (!status.ok()) {
             return status;
