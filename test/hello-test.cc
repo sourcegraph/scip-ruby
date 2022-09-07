@@ -123,7 +123,7 @@ TEST_CASE("CountTrees") {
 
     // see if it crashes via failed ENFORCE
     cb.enterTypeMember(loc, classSym, cb.enterNameConstant(name), sorbet::core::Variance::CoVariant);
-    auto methodSym = cb.enterMethodSymbol(loc, classSym, name, core::LocOffsets::none());
+    auto methodSym = cb.enterMethodSymbol(loc, classSym, name, core::Loc::none());
 
     // see if it crashes via failed ENFORCE
     cb.enterTypeArgument(loc, methodSym, cb.enterNameConstant(name), sorbet::core::Variance::CoVariant);

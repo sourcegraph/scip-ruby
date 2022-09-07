@@ -1840,7 +1840,7 @@ void ClassOrModule::recordRequiredAncestorInternal(GlobalState &gs, ClassOrModul
     // We store the required ancestors into a fake property called `<required-ancestors>`
     auto ancestors = this->findMethod(gs, prop);
     if (!ancestors.exists()) {
-        ancestors = gs.enterMethodSymbol(ancestor.loc, this->ref(gs), prop, LocOffsets::none());
+        ancestors = gs.enterMethodSymbol(ancestor.loc, this->ref(gs), prop, Loc::none());
         ancestors.data(gs)->locs_.clear(); // Remove the original location
 
         // Create the return type tuple to store RequiredAncestor.symbol
