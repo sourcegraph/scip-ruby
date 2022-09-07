@@ -1086,7 +1086,7 @@ private:
         auto &parsedParams = method.parsedParams;
         auto symTableSize = ctx.state.methodsUsed();
         auto declLoc = ctx.locAt(method.declLoc);
-        auto sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name, method.nameLoc);
+        auto sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name, ctx.locAt(method.nameLoc));
         const bool isNewSymbol = symTableSize != ctx.state.methodsUsed();
         if (!isNewSymbol) {
             // See if this is == to the method we're defining now, or if we have a redefinition error.
@@ -1098,7 +1098,7 @@ private:
                     paramMismatchErrors(ctx.withOwner(sym), declLoc, parsedParams);
                     ctx.state.mangleRenameMethod(sym, method.name);
                     // Re-enter a new symbol.
-                    sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name, method.nameLoc);
+                    sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name, ctx.locAt(method.nameLoc));
                 } else {
                     // ...unless it's an intrinsic, because we allow multiple incompatible definitions of those in code
                     // TODO(jvilk): Wouldn't this always fail since `!sym.exists()`?
