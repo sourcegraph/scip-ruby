@@ -443,6 +443,7 @@ public:
                 return this->selfOrOwner.loc(gs);
             case Kind::UndeclaredField:
                 ENFORCE(false, "case UndeclaredField should not be triggered here");
+                return core::Loc();
         }
     }
 };
