@@ -209,7 +209,7 @@ private:
     SymbolRef::LOC_store locs_;
     std::unique_ptr<InlinedVector<TypeParameterRef, 4>> typeParams;
 };
-static_assert(sizeof(Method) == 168);
+CheckSize(Method, 152, 8);
 
 // Contains a field or a static field
 class Field final {
