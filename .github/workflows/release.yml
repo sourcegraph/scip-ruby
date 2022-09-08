@@ -111,6 +111,6 @@ jobs:
       # There is also publish-manual.yml in case that is needed for some reason.
       - name: 'Publish gems'
         run: |
-          for g in *.gem; do
+          for g in ./*-release-artifacts/**.gem; do
             GEM_HOST_API_KEY=${{ secrets.RUBYGEMS_API_KEY }} gem push "$g"
           done
