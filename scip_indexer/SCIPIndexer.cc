@@ -128,7 +128,7 @@ struct OwnedLocal {
     string toString(const core::GlobalState &gs, core::FileRef file) {
         // 32-bits => if there are 10k methods in a single file, the chance of at least one
         // colliding pair is about 1.1%, assuming even distribution. That seems OK.
-        return fmt::format("local {:x}~#{}", counter, ::fnv1a_32(owner.name(gs).show(gs)));
+        return fmt::format("local {}~#{}", counter, ::fnv1a_32(owner.name(gs).show(gs)));
     }
 };
 
