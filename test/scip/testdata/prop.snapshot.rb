@@ -6,8 +6,8 @@
      include T::Props
  
      prop :foo, String
-#          ^^^ definition [..] SomeODM#foo().
 #          ^^^ definition [..] SomeODM#`foo=`().
+#          ^^^ definition [..] SomeODM#foo().
 #               ^^^^^^ reference [..] String#
  
      sig {returns(T.nilable(String))}
@@ -17,6 +17,7 @@
 #                     ^ reference [..] T#
 #                       ^^^^^^ reference [..] `<Class:T>`#unsafe().
 #                                    ^ reference [..] T#
+#                                    ^^^^^^^^^^^^^^^^^ definition local 1~#1867563647
 #                                      ^^^^^^^ reference [..] `<Class:T>`#nilable().
 #                                              ^^^^^^ reference [..] String#
      sig {params(arg0: String).returns(String)}
@@ -24,6 +25,7 @@
 #                                      ^^^^^^ reference [..] String#
      def foo2=(arg0); T.cast(nil, String); end
 #        ^^^^^ definition [..] SomeODM#`foo2=`().
+#                                 ^^^^^^ definition local 1~#2116144614
 #                                 ^^^^^^ reference [..] String#
  end
  
@@ -44,8 +46,8 @@
 #                               ^^^^^^ reference [..] String#
  
      prop :array, Array
-#          ^^^^^ definition [..] AdvancedODM#`array=`().
 #          ^^^^^ definition [..] AdvancedODM#array().
+#          ^^^^^ definition [..] AdvancedODM#`array=`().
 #                 ^^^^^ reference [..] Array#
      prop :t_array, T::Array[String]
 #          ^^^^^^^ definition [..] AdvancedODM#t_array().
@@ -71,36 +73,36 @@
  
      prop :foreign_lazy, String, foreign: -> {ForeignClass}
 #    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Boolean.
-#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_lazy_!`().
-#          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_lazy_().
-#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_lazy=`().
 #          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_lazy().
+#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_lazy=`().
+#          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_lazy_().
+#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_lazy_!`().
 #                        ^^^^^^ reference [..] String#
 #                                         ^^ reference [..] Kernel#
 #                                             ^^^^^^^^^^^^ reference [..] ForeignClass#
      prop :foreign_proc, String, foreign: proc {ForeignClass}
 #    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Boolean.
+#          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_proc().
 #          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_proc_!`().
 #          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_proc_().
 #          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_proc=`().
-#          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_proc().
 #                        ^^^^^^ reference [..] String#
 #                                               ^^^^^^^^^^^^ reference [..] ForeignClass#
      prop :foreign_invalid, String, foreign: proc { :not_a_type }
 #    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Boolean.
+#          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_invalid().
+#          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_invalid=`().
 #          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_invalid_!`().
 #          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_invalid_().
-#          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_invalid=`().
-#          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_invalid().
 #                           ^^^^^^ reference [..] String#
  
      prop :ifunset, String, ifunset: ''
-#          ^^^^^^^ definition [..] AdvancedODM#ifunset().
 #          ^^^^^^^ definition [..] AdvancedODM#`ifunset=`().
+#          ^^^^^^^ definition [..] AdvancedODM#ifunset().
 #                   ^^^^^^ reference [..] String#
      prop :ifunset_nilable, T.nilable(String), ifunset: ''
-#          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#ifunset_nilable().
 #          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#`ifunset_nilable=`().
+#          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#ifunset_nilable().
 #                                     ^^^^^^ reference [..] String#
  
      prop :empty_hash_rules, String, {}
@@ -121,13 +123,13 @@
    def self.created_prop(opts={}); end
 #           ^^^^^^^^^^^^ definition [..] `<Class:PropHelpers>`#created_prop().
    token_prop
-#  ^^^^^ definition [..] PropHelpers#`token=`().
 #  ^^^^^ definition [..] PropHelpers#token().
+#  ^^^^^ definition [..] PropHelpers#`token=`().
 #  ^^^^^^^^^^ reference [..] `<Class:PropHelpers>`#token_prop().
 #  ^^^^^^^^^^ reference [..] String#
    created_prop
-#  ^^^^^^^ definition [..] PropHelpers#`created=`().
 #  ^^^^^^^ definition [..] PropHelpers#created().
+#  ^^^^^^^ definition [..] PropHelpers#`created=`().
 #  ^^^^^^^^^^^^ reference [..] `<Class:PropHelpers>`#created_prop().
 #  ^^^^^^^^^^^^ reference [..] Float#
  end

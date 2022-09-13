@@ -1078,9 +1078,9 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, const ast::ExpressionPtr &what, Ba
                     // This is kind of gross, but it is the only way to ensure that the bits in the
                     // type expression make it into the CFG for LSP to hit on their locations.
                     LocalRef deadSym = cctx.newTemporary(core::Names::keepForIde());
-                    current = walk(cctx.withTarget(deadSym), c.typeExpr, current);
+                    current = walk(cctx.withTarget(LocalOccurrence::synthetic(deadSym)), c.typeExpr, current);
                     // Ensure later passes don't delete the results of the typeExpr.
-                    current->exprs.emplace_back(deadSym, core::LocOffsets::none(), make_insn<KeepAlive>(deadSym));
+                    current->exprs.emplace_back(LocalOccurrence::synthetic(deadSym), core::LocOffsets::none(), make_insn<KeepAlive>(deadSym));
                 } else {
                     // c.typeExpr will be empty in the lambdaTLet case (i.e., T.let(->(){}, ...)).
                     // It's moved into the `Kernel#<lambda T.let>`
