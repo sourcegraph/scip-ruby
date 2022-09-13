@@ -240,6 +240,13 @@ void SerializerImpl::pickle(Pickler &p, shared_ptr<const FileHash> fh) {
     }
     p.putU1(1);
     p.putU4(fh->localSymbolTableHashes.hierarchyHash);
+    p.putU4(fh->localSymbolTableHashes.classModuleHash);
+    p.putU4(fh->localSymbolTableHashes.typeArgumentHash);
+    p.putU4(fh->localSymbolTableHashes.typeMemberHash);
+    p.putU4(fh->localSymbolTableHashes.fieldHash);
+    p.putU4(fh->localSymbolTableHashes.staticFieldHash);
+    p.putU4(fh->localSymbolTableHashes.classAliasHash);
+    p.putU4(fh->localSymbolTableHashes.methodHash);
     p.putU4(fh->localSymbolTableHashes.methodHashes.size());
     for (const auto &[key, value] : fh->localSymbolTableHashes.methodHashes) {
         p.putU4(key._hashValue);
@@ -250,16 +257,28 @@ void SerializerImpl::pickle(Pickler &p, shared_ptr<const FileHash> fh) {
         p.putU4(key._hashValue);
         p.putU4(value);
     }
+    p.putU4(fh->localSymbolTableHashes.fieldHashes.size());
+    for (const auto &[key, value] : fh->localSymbolTableHashes.fieldHashes) {
+        p.putU4(key._hashValue);
+        p.putU4(value);
+    }
     p.putU4(fh->usages.nameHashes.size());
     for (const auto &e : fh->usages.nameHashes) {
         p.putU4(e._hashValue);
     }
-    p.putU4(fh->foundMethodHashes.size());
-    for (const auto &fdh : fh->foundMethodHashes) {
+    p.putU4(fh->foundHashes.methodHashes.size());
+    for (const auto &fdh : fh->foundHashes.methodHashes) {
         p.putU4(fdh.owner.idx);
         p.putU1(fdh.owner.useSingletonClass);
         p.putU4(fdh.nameHash._hashValue);
         p.putU4(fdh.arityHash._hashValue);
+    }
+    p.putU4(fh->foundHashes.fieldHashes.size());
+    for (const auto &ffh : fh->foundHashes.fieldHashes) {
+        p.putU4(ffh.owner.idx);
+        p.putU1(ffh.owner.onSingletonClass);
+        p.putU1(ffh.owner.isInstanceVariable);
+        p.putU4(ffh.nameHash._hashValue);
     }
 }
 
@@ -271,29 +290,43 @@ unique_ptr<const FileHash> SerializerImpl::unpickleFileHash(UnPickler &p) {
     FileHash ret;
 
     ret.localSymbolTableHashes.hierarchyHash = p.getU4();
+    ret.localSymbolTableHashes.classModuleHash = p.getU4();
+    ret.localSymbolTableHashes.typeArgumentHash = p.getU4();
+    ret.localSymbolTableHashes.typeMemberHash = p.getU4();
+    ret.localSymbolTableHashes.fieldHash = p.getU4();
+    ret.localSymbolTableHashes.staticFieldHash = p.getU4();
+    ret.localSymbolTableHashes.classAliasHash = p.getU4();
+    ret.localSymbolTableHashes.methodHash = p.getU4();
     auto methodHashSize = p.getU4();
     ret.localSymbolTableHashes.methodHashes.reserve(methodHashSize);
     for (int it = 0; it < methodHashSize; it++) {
-        ShortNameHash key;
+        WithoutUniqueNameHash key;
         key._hashValue = p.getU4();
         ret.localSymbolTableHashes.methodHashes.emplace_back(key, p.getU4());
     }
     auto staticFieldHashSize = p.getU4();
     ret.localSymbolTableHashes.staticFieldHashes.reserve(staticFieldHashSize);
     for (int it = 0; it < staticFieldHashSize; it++) {
-        ShortNameHash key;
+        WithoutUniqueNameHash key;
         key._hashValue = p.getU4();
         ret.localSymbolTableHashes.staticFieldHashes.emplace_back(key, p.getU4());
+    }
+    auto fieldHashSize = p.getU4();
+    ret.localSymbolTableHashes.fieldHashes.reserve(fieldHashSize);
+    for (int it = 0; it < fieldHashSize; it++) {
+        WithoutUniqueNameHash key;
+        key._hashValue = p.getU4();
+        ret.localSymbolTableHashes.fieldHashes.emplace_back(key, p.getU4());
     }
     auto constantsSize = p.getU4();
     ret.usages.nameHashes.reserve(constantsSize);
     for (int it = 0; it < constantsSize; it++) {
-        ShortNameHash key;
+        WithoutUniqueNameHash key;
         key._hashValue = p.getU4();
         ret.usages.nameHashes.emplace_back(key);
     }
     auto foundMethodHashesSize = p.getU4();
-    ret.foundMethodHashes.reserve(foundMethodHashesSize);
+    ret.foundHashes.methodHashes.reserve(foundMethodHashesSize);
     for (int it = 0; it < foundMethodHashesSize; it++) {
         auto ownerIdx = p.getU4();
         auto useSingletonClass = p.getU1();
@@ -301,7 +334,17 @@ unique_ptr<const FileHash> SerializerImpl::unpickleFileHash(UnPickler &p) {
         fullNameHash._hashValue = p.getU4();
         ArityHash arityHash;
         arityHash._hashValue = p.getU4();
-        ret.foundMethodHashes.emplace_back(ownerIdx, useSingletonClass, fullNameHash, arityHash);
+        ret.foundHashes.methodHashes.emplace_back(ownerIdx, useSingletonClass, fullNameHash, arityHash);
+    }
+    auto foundFieldHashesSize = p.getU4();
+    ret.foundHashes.fieldHashes.reserve(foundFieldHashesSize);
+    for (int it = 0; it < foundFieldHashesSize; it++) {
+        auto ownerIdx = p.getU4();
+        auto onSingletonClass = p.getU1();
+        auto isInstanceVariable = p.getU1();
+        FullNameHash fullNameHash;
+        fullNameHash._hashValue = p.getU4();
+        ret.foundHashes.fieldHashes.emplace_back(ownerIdx, onSingletonClass, isInstanceVariable, fullNameHash);
     }
     return make_unique<const FileHash>(move(ret));
 }
@@ -1208,6 +1251,7 @@ void SerializerImpl::pickle(Pickler &p, const ast::ExpressionPtr &what) {
             p.putU4(c.cast.rawId());
             pickle(p, c.type);
             pickle(p, c.arg);
+            pickle(p, c.typeExpr);
             break;
         }
 
@@ -1481,7 +1525,8 @@ ast::ExpressionPtr SerializerImpl::unpickleExpr(serialize::UnPickler &p, const G
             NameRef kind = NameRef::fromRaw(gs, p.getU4());
             auto type = unpickleType(p, &gs);
             auto arg = unpickleExpr(p, gs);
-            return ast::make_expression<ast::Cast>(loc, std::move(type), std::move(arg), kind);
+            auto typeExpr = unpickleExpr(p, gs);
+            return ast::make_expression<ast::Cast>(loc, std::move(type), std::move(arg), kind, std::move(typeExpr));
         }
         case ast::Tag::EmptyTree:
             return ast::MK::EmptyTree();

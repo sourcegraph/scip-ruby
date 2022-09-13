@@ -34,12 +34,11 @@ bool isEmptyParseResult(const core::GlobalState &gs, const ast::ExpressionPtr &t
     }
 
     auto *classDef = ast::cast_tree<ast::ClassDef>(tree);
-    if (classDef == nullptr || classDef->symbol != core::Symbols::root() || classDef->rhs.empty()) {
+    if (classDef == nullptr || classDef->symbol != core::Symbols::root()) {
         return false;
     }
 
-    auto *rhsLiteral = ast::cast_tree<ast::Literal>(classDef->rhs[0]);
-    return rhsLiteral != nullptr && rhsLiteral->isNil(gs);
+    return classDef->rhs.empty();
 }
 
 unique_ptr<core::FileHash> computeFileHashForAST(spdlog::logger &logger, unique_ptr<core::GlobalState> &lgs,
@@ -70,7 +69,7 @@ unique_ptr<core::FileHash> computeFileHashForAST(spdlog::logger &logger, unique_
             logger.debug(view);
 
             return make_unique<core::FileHash>(core::LocalSymbolTableHashes::invalidParse(), move(usageHash),
-                                               core::FoundMethodHashes{});
+                                               core::FoundDefHashes{});
         }
     }
 
@@ -78,10 +77,10 @@ unique_ptr<core::FileHash> computeFileHashForAST(spdlog::logger &logger, unique_
     single.emplace_back(move(file));
 
     auto workers = WorkerPool::create(0, lgs->tracer());
-    core::FoundMethodHashes foundMethodHashes; // out parameter
-    realmain::pipeline::resolve(lgs, move(single), opts(), *workers, &foundMethodHashes);
+    core::FoundDefHashes foundHashes; // out parameter
+    realmain::pipeline::resolve(lgs, move(single), opts(), *workers, &foundHashes);
 
-    return make_unique<core::FileHash>(move(*lgs->hash()), move(usageHash), move(foundMethodHashes));
+    return make_unique<core::FileHash>(move(*lgs->hash()), move(usageHash), move(foundHashes));
 }
 
 // Note: lgs is an outparameter.

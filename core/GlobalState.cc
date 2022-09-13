@@ -698,11 +698,11 @@ void GlobalState::initEmpty() {
     method = enterMethod(*this, Symbols::MagicSingleton(), Names::attachedClass())
                  .repeatedUntypedArg(Names::arg0())
                  .buildWithResultUntyped();
-    // Synthesize <Magic>.<check-and-and>(arg0: T.untyped, arg1: T.untyped, arg2: Symbol, arg: *T.untyped) => T.untyped
+    // Synthesize <Magic>.<check-and-and>(arg0: T.untyped, arg1: Symbol, arg2: T.untyped, arg: *T.untyped) => T.untyped
     method = enterMethod(*this, Symbols::MagicSingleton(), Names::checkAndAnd())
                  .untypedArg(Names::arg0())
-                 .untypedArg(Names::arg1())
-                 .typedArg(Names::arg2(), core::Types::Symbol())
+                 .typedArg(Names::arg1(), core::Types::Symbol())
+                 .untypedArg(Names::arg2())
                  .repeatedUntypedArg(Names::arg())
                  .buildWithResultUntyped();
     // Synthesize <Magic>.<nil-for-safe-navigation>(recv: T.untyped) => NilClass
@@ -1772,6 +1772,19 @@ void GlobalState::deleteMethodSymbol(MethodRef what) {
     this->methods[what.id()] = this->methods[0].deepCopy(*this);
 }
 
+// Before using this method, double check the disclaimer on GlobalState::deleteMethodSymbol above.
+void GlobalState::deleteFieldSymbol(FieldRef what) {
+    ENFORCE(what.data(*this)->flags.isField);
+    const auto &whatData = what.data(*this);
+    auto owner = whatData->owner;
+    auto &ownerMembers = owner.data(*this)->members();
+    auto fnd = ownerMembers.find(whatData->name);
+    ENFORCE(fnd != ownerMembers.end());
+    ENFORCE(fnd->second == what);
+    ownerMembers.erase(fnd);
+    this->fields[what.id()] = this->fields[0].deepCopy(*this);
+}
+
 unsigned int GlobalState::classAndModulesUsed() const {
     return classAndModules.size();
 }
@@ -2188,7 +2201,7 @@ void GlobalState::replaceFile(FileRef whatFile, const shared_ptr<File> &withWhat
 }
 
 FileRef GlobalState::findFileByPath(string_view path) const {
-    auto fnd = fileRefByPath.find(string(path));
+    auto fnd = fileRefByPath.find(path);
     if (fnd != fileRefByPath.end()) {
         return fnd->second;
     }
@@ -2234,9 +2247,12 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash() const {
     uint32_t typeArgumentHash = 0;
     uint32_t typeMemberHash = 0;
     uint32_t fieldHash = 0;
+    uint32_t staticFieldHash = 0;
+    uint32_t classAliasHash = 0;
     uint32_t methodHash = 0;
-    UnorderedMap<ShortNameHash, uint32_t> methodHashesMap;
-    UnorderedMap<ShortNameHash, uint32_t> staticFieldHashesMap;
+    UnorderedMap<WithoutUniqueNameHash, uint32_t> methodHashesMap;
+    UnorderedMap<WithoutUniqueNameHash, uint32_t> staticFieldHashesMap;
+    UnorderedMap<WithoutUniqueNameHash, uint32_t> fieldHashesMap;
     int counter = 0;
 
     for (const auto &sym : this->classAndModules) {
@@ -2280,12 +2296,24 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash() const {
         counter++;
         // No fields are ignored in hashing.
         uint32_t symhash = field.hash(*this);
-        if (field.flags.isStaticField) {
-            auto &target = staticFieldHashesMap[ShortNameHash(*this, field.name)];
+        if (field.flags.isStaticField && !field.isClassAlias()) {
+            auto &target = staticFieldHashesMap[WithoutUniqueNameHash(*this, field.name)];
             target = mix(target, symhash);
+            uint32_t staticFieldShapeHash = field.fieldShapeHash(*this);
+            hierarchyHash = mix(hierarchyHash, staticFieldShapeHash);
+            staticFieldHash = mix(fieldHash, staticFieldShapeHash);
+        } else if (field.flags.isStaticField) {
+            hierarchyHash = mix(hierarchyHash, symhash);
+            classAliasHash = mix(classAliasHash, symhash);
+        } else {
+            auto &target = fieldHashesMap[WithoutUniqueNameHash(*this, field.name)];
+            target = mix(target, symhash);
+            uint32_t fieldShapeHash = field.fieldShapeHash(*this);
+            if (!this->lspExperimentalFastPathEnabled) {
+                hierarchyHash = mix(hierarchyHash, fieldShapeHash);
+                fieldHash = mix(fieldHash, fieldShapeHash);
+            }
         }
-        hierarchyHash = mix(hierarchyHash, field.fieldShapeHash(*this));
-        fieldHash = mix(fieldHash, symhash);
 
         if (DEBUG_HASHING_TAIL && counter > this->fields.size() - 15) {
             errorQueue->logger.info("Hashing symbols: {}, {}", hierarchyHash, field.name.show(*this));
@@ -2295,7 +2323,7 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash() const {
     counter = 0;
     for (const auto &sym : this->methods) {
         if (!sym.ignoreInHashing(*this)) {
-            auto &target = methodHashesMap[ShortNameHash(*this, sym.name)];
+            auto &target = methodHashesMap[WithoutUniqueNameHash(*this, sym.name)];
             target = mix(target, sym.hash(*this));
             auto needMethodShapeHash =
                 this->lspExperimentalFastPathEnabled
@@ -2303,9 +2331,16 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash() const {
                        sym.name == Names::requiredAncestorsLin())
                     : true;
             if (needMethodShapeHash) {
-                uint32_t symhash = sym.methodShapeHash(*this);
-                hierarchyHash = mix(hierarchyHash, symhash);
-                methodHash = mix(methodHash, symhash);
+                uint32_t methodShapeHash = sym.methodShapeHash(*this);
+                hierarchyHash = mix(hierarchyHash, methodShapeHash);
+                if (this->lspExperimentalFastPathEnabled) {
+                    // With this feature enabled, the only three methods that trigger a method
+                    // change anymore all relate to inheritance. Let's blame this to a change to
+                    // class symbols, not to methods
+                    classModuleHash = mix(classModuleHash, methodShapeHash);
+                } else {
+                    methodHash = mix(methodHash, methodShapeHash);
+                }
             }
 
             counter++;
@@ -2318,21 +2353,28 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash() const {
     unique_ptr<LocalSymbolTableHashes> result = make_unique<LocalSymbolTableHashes>();
     result->methodHashes.reserve(methodHashesMap.size());
     result->staticFieldHashes.reserve(staticFieldHashesMap.size());
+    result->fieldHashes.reserve(fieldHashesMap.size());
     for (const auto &[nameHash, symbolHash] : methodHashesMap) {
         result->methodHashes.emplace_back(nameHash, LocalSymbolTableHashes::patchHash(symbolHash));
     }
     for (const auto &[nameHash, symbolHash] : staticFieldHashesMap) {
         result->staticFieldHashes.emplace_back(nameHash, LocalSymbolTableHashes::patchHash(symbolHash));
     }
+    for (const auto &[nameHash, symbolHash] : fieldHashesMap) {
+        result->fieldHashes.emplace_back(nameHash, LocalSymbolTableHashes::patchHash(symbolHash));
+    }
     // Sort the hashes. Semantically important for quickly diffing hashes.
     fast_sort(result->methodHashes);
     fast_sort(result->staticFieldHashes);
+    fast_sort(result->fieldHashes);
 
     result->hierarchyHash = LocalSymbolTableHashes::patchHash(hierarchyHash);
     result->classModuleHash = LocalSymbolTableHashes::patchHash(classModuleHash);
     result->typeArgumentHash = LocalSymbolTableHashes::patchHash(typeArgumentHash);
     result->typeMemberHash = LocalSymbolTableHashes::patchHash(typeMemberHash);
     result->fieldHash = LocalSymbolTableHashes::patchHash(fieldHash);
+    result->staticFieldHash = LocalSymbolTableHashes::patchHash(staticFieldHash);
+    result->classAliasHash = LocalSymbolTableHashes::patchHash(classAliasHash);
     result->methodHash = LocalSymbolTableHashes::patchHash(methodHash);
     return result;
 }

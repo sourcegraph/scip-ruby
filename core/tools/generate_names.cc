@@ -380,7 +380,6 @@ NameDef names[] = {
     {"args"},
     {"Elem", "Elem", true},
     {"keepForIde", "keep_for_ide"},
-    {"keepForTypechecking", "keep_for_typechecking"},
     {"keepDef", "keep_def"},
     {"keepSelfDef", "keep_self_def"},
     {"keepForCfg", "<keep-for-cfg>"},
@@ -543,7 +542,8 @@ NameDef names[] = {
     {"Test", "Test", true},
     {"Autogen", "Autogen", true},
     {"Tokens", "Tokens", true},
-    {"AccountModelMerchantToken", "AccountModelMerchantToken", true},
+    {"AccountModelMerchant", "AccountModelMerchant", true},
+    {"Token", "Token", true},
 
     // used by the compiler
     {"returnValue", "<returnValue>"},

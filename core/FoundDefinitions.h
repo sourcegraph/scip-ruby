@@ -18,6 +18,7 @@ struct FoundClass;
 struct FoundStaticField;
 struct FoundTypeMember;
 struct FoundMethod;
+struct FoundField;
 
 class FoundDefinitionRef final {
 public:
@@ -29,6 +30,7 @@ public:
         StaticField = 4,
         TypeMember = 5,
         Symbol = 6,
+        Field = 7,
     };
     CheckSize(Kind, 1, 1);
 
@@ -76,6 +78,9 @@ public:
 
     FoundTypeMember &typeMember(FoundDefinitions &foundDefs);
     const FoundTypeMember &typeMember(const FoundDefinitions &foundDefs) const;
+
+    FoundField &field(FoundDefinitions &foundDefs);
+    const FoundField &field(const FoundDefinitions &foundDefs) const;
 
     core::SymbolRef symbol() const;
 
@@ -185,11 +190,26 @@ struct FoundModifier {
 };
 CheckSize(FoundModifier, 24, 4);
 
+struct FoundField {
+    enum class Kind : uint8_t {
+        ClassVariable,
+        InstanceVariable,
+    };
+    Kind kind;
+    bool onSingletonClass;
+    FoundDefinitionRef owner;
+    core::LocOffsets loc;
+    core::NameRef name;
+
+    std::string toString(const core::GlobalState &gs, const FoundDefinitions &foundDefs, uint32_t id) const;
+};
+CheckSize(FoundField, 20, 4);
+
 class FoundDefinitions final {
     // Contains references to items in _klasses, _staticFields, and _typeMembers.
     // Used to determine the order in which symbols are defined in SymbolDefiner.
-    // (All non-method definitions are defined before all method definitions)
-    std::vector<FoundDefinitionRef> _nonMethodDefinitions;
+    // (All non-deletable definitions are defined before all deletable definitions)
+    std::vector<FoundDefinitionRef> _nonDeletableDefinitions;
     // Contains references to classes in general. Separate from `FoundClass` because we sometimes need to define class
     // Symbols for classes that are referenced from but not present in the given file.
     std::vector<FoundClassRef> _klassRefs;
@@ -203,12 +223,15 @@ class FoundDefinitions final {
     std::vector<FoundTypeMember> _typeMembers;
     // Contains all method and class modifiers (e.g. private/public/protected).
     std::vector<FoundModifier> _modifiers;
+    // Contains all class and instance variables defined in the file.
+    std::vector<FoundField> _fields;
 
     FoundDefinitionRef addDefinition(FoundDefinitionRef ref) {
         DEBUG_ONLY(switch (ref.kind()) {
             case FoundDefinitionRef::Kind::Class:
             case FoundDefinitionRef::Kind::StaticField:
             case FoundDefinitionRef::Kind::TypeMember:
+            case FoundDefinitionRef::Kind::Field:
                 break;
             case FoundDefinitionRef::Kind::Method:
             case FoundDefinitionRef::Kind::ClassRef:
@@ -216,7 +239,7 @@ class FoundDefinitions final {
             case FoundDefinitionRef::Kind::Symbol:
                 ENFORCE(false, "Attempted to give unexpected FoundDefinitionRef kind to addDefinition");
         });
-        _nonMethodDefinitions.emplace_back(ref);
+        _nonDeletableDefinitions.emplace_back(ref);
         return ref;
     }
 
@@ -238,8 +261,10 @@ public:
         return FoundDefinitionRef(FoundDefinitionRef::Kind::ClassRef, idx);
     }
 
-    void addMethod(FoundMethod &&method) {
+    FoundDefinitionRef addMethod(FoundMethod &&method) {
+        const uint32_t idx = _methods.size();
         _methods.emplace_back(std::move(method));
+        return FoundDefinitionRef(FoundDefinitionRef::Kind::Method, idx);
     }
 
     FoundDefinitionRef addStaticField(FoundStaticField &&staticField) {
@@ -254,6 +279,12 @@ public:
         return addDefinition(FoundDefinitionRef(FoundDefinitionRef::Kind::TypeMember, idx));
     }
 
+    FoundDefinitionRef addField(FoundField &&field) {
+        const uint32_t idx = _fields.size();
+        _fields.emplace_back(std::move(field));
+        return FoundDefinitionRef(FoundDefinitionRef::Kind::Field, idx);
+    }
+
     FoundDefinitionRef addSymbol(core::SymbolRef symbol) {
         return FoundDefinitionRef(FoundDefinitionRef::Kind::Symbol, symbol.rawId());
     }
@@ -262,9 +293,9 @@ public:
         _modifiers.emplace_back(std::move(mod));
     }
 
-    // See documentation on _definitions
-    const std::vector<FoundDefinitionRef> &nonMethodDefinitions() const {
-        return _nonMethodDefinitions;
+    // See documentation on _nonDeletableDefinitions
+    const std::vector<FoundDefinitionRef> &nonDeletableDefinitions() const {
+        return _nonDeletableDefinitions;
     }
 
     // See documentation on _klasses
@@ -280,6 +311,11 @@ public:
     // See documentation on _modifiers
     const std::vector<FoundModifier> &modifiers() const {
         return _modifiers;
+    }
+
+    // See documentation on _fields
+    const std::vector<FoundField> &fields() const {
+        return _fields;
     }
 
     friend FoundDefinitionRef;

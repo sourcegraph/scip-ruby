@@ -2,6 +2,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
+#include "absl/synchronization/blocking_counter.h"
 #include "ast/Helpers.h"
 #include "ast/treemap/treemap.h"
 #include "common/FileOps.h"
@@ -13,6 +14,7 @@
 #include "core/Unfreeze.h"
 #include "core/errors/packager.h"
 #include "core/packages/PackageInfo.h"
+#include <algorithm>
 #include <cctype>
 #include <sstream>
 #include <sys/stat.h>
@@ -23,7 +25,6 @@ namespace sorbet::packager {
 namespace {
 
 constexpr string_view PACKAGE_FILE_NAME = "__package.rb"sv;
-constexpr core::NameRef TEST_NAME = core::Names::Constants::Test();
 
 bool isPrimaryTestNamespace(const core::NameRef ns) {
     return ns == TEST_NAME;
@@ -835,13 +836,19 @@ public:
             return;
         }
         auto &pkgName = requiredNamespace(ctx);
-        if (namespaces.packageForNamespace() != pkg.mangledName()) {
+        auto packageForNamespace = namespaces.packageForNamespace();
+        if (packageForNamespace != pkg.mangledName()) {
             ENFORCE(errorDepth == 0);
             errorDepth++;
             if (auto e = ctx.beginError(loc, core::errors::Packager::DefinitionPackageMismatch)) {
                 e.setHeader(
                     "Class or method behavior may not be defined outside of the enclosing package namespace `{}`",
                     fmt::map_join(pkgName, "::", [&](const auto &nr) { return nr.show(ctx); }));
+                if (packageForNamespace.exists()) {
+                    auto &namespaceParts = ctx.state.packageDB().getPackageInfo(packageForNamespace).fullName();
+                    e.addErrorNote("Attempting to define class or method behavior in package namespace `{}`",
+                                   fmt::map_join(namespaceParts, "::", [&](const auto &nr) { return nr.show(ctx); }));
+                }
             }
         }
     }
@@ -930,6 +937,15 @@ struct PackageInfoFinder {
 
     unique_ptr<PackageInfoImpl> info = nullptr;
     vector<Export> exported;
+
+    void postTransformCast(ContextType ctx, ast::ExpressionPtr &tree) {
+        auto &cast = ast::cast_tree_nonnull<ast::Cast>(tree);
+        if (!ast::isa_tree<ast::Literal>(cast.typeExpr)) {
+            if (auto e = ctx.beginError(cast.typeExpr.loc(), core::errors::Packager::InvalidPackageExpression)) {
+                e.setHeader("Invalid expression in package: Arguments to functions must be literals");
+            }
+        }
+    }
 
     void postTransformSend(ContextType ctx, ast::ExpressionPtr &tree) {
         auto &send = ast::cast_tree_nonnull<ast::Send>(tree);
@@ -1474,10 +1490,11 @@ void Packager::setPackageNameOnFiles(core::GlobalState &gs, const vector<core::F
 vector<ast::ParsedFile> Packager::run(core::GlobalState &gs, WorkerPool &workers, vector<ast::ParsedFile> files) {
     Timer timeit(gs.tracer(), "packager");
 
-    files = findPackages(gs, workers, std::move(files));
-    setPackageNameOnFiles(gs, files);
-    if (gs.runningUnderAutogen) {
-        // Autogen only requires package metadata. Remove the package files.
+    if (!gs.runningUnderAutogen) {
+        files = findPackages(gs, workers, std::move(files));
+        setPackageNameOnFiles(gs, files);
+    } else {
+        // Autogen needs to know nothing about packages. Remove the package files and quit.
         auto it = std::remove_if(files.begin(), files.end(),
                                  [&gs](auto &file) -> bool { return file.file.data(gs).isPackage(); });
         files.erase(it, files.end());
@@ -1490,20 +1507,19 @@ vector<ast::ParsedFile> Packager::run(core::GlobalState &gs, WorkerPool &workers
     {
         Timer timeit(gs.tracer(), "packager.rewritePackagesAndFiles");
 
-        auto resultq = make_shared<BlockingBoundedQueue<vector<ast::ParsedFile>>>(files.size());
-        auto fileq = make_shared<ConcurrentBoundedQueue<ast::ParsedFile>>(files.size());
-        for (auto &file : files) {
-            fileq->push(move(file), 1);
+        auto taskq = std::make_shared<ConcurrentBoundedQueue<size_t>>(files.size());
+        absl::BlockingCounter barrier(max(workers.size(), 1));
+
+        for (size_t i = 0; i < files.size(); ++i) {
+            taskq->push(i, 1);
         }
 
-        workers.multiplexJob("rewritePackagesAndFiles", [&gs, fileq, resultq]() {
+        workers.multiplexJob("rewritePackagesAndFiles", [&gs, &files, &barrier, taskq]() {
             Timer timeit(gs.tracer(), "packager.rewritePackagesAndFilesWorker");
-            vector<ast::ParsedFile> results;
-            uint32_t filesProcessed = 0;
-            ast::ParsedFile job;
-            for (auto result = fileq->try_pop(job); !result.done(); result = fileq->try_pop(job)) {
+            size_t idx;
+            for (auto result = taskq->try_pop(idx); !result.done(); result = taskq->try_pop(idx)) {
+                ast::ParsedFile &job = files[idx];
                 if (result.gotItem()) {
-                    filesProcessed++;
                     auto &file = job.file.data(gs);
                     core::Context ctx(gs, core::Symbols::root(), job.file);
 
@@ -1512,30 +1528,14 @@ vector<ast::ParsedFile> Packager::run(core::GlobalState &gs, WorkerPool &workers
                     } else {
                         job = rewritePackagedFile(ctx, move(job));
                     }
-
-                    results.emplace_back(move(job));
                 }
             }
-            if (filesProcessed > 0) {
-                resultq->push(move(results), filesProcessed);
-            }
+
+            barrier.DecrementCount();
         });
-        files.clear();
 
-        {
-            vector<ast::ParsedFile> threadResult;
-            for (auto result = resultq->wait_pop_timed(threadResult, WorkerPool::BLOCK_INTERVAL(), gs.tracer());
-                 !result.done();
-                 result = resultq->wait_pop_timed(threadResult, WorkerPool::BLOCK_INTERVAL(), gs.tracer())) {
-                if (result.gotItem()) {
-                    files.insert(files.end(), make_move_iterator(threadResult.begin()),
-                                 make_move_iterator(threadResult.end()));
-                }
-            }
-        }
+        barrier.Wait();
     }
-
-    fast_sort(files, [](const auto &a, const auto &b) -> bool { return a.file < b.file; });
 
     return files;
 }

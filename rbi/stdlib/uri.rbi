@@ -1,27 +1,5 @@
 # typed: __STDLIB_INTERNAL
 
-# RubyGems adds the
-# [`gem`](https://docs.ruby-lang.org/en/2.7.0/Kernel.html#method-i-gem) method
-# to allow activation of specific gem versions and overrides the
-# [`require`](https://docs.ruby-lang.org/en/2.7.0/Kernel.html#method-i-require)
-# method on [`Kernel`](https://docs.ruby-lang.org/en/2.7.0/Kernel.html) to make
-# gems appear as if they live on the `$LOAD_PATH`. See the documentation of
-# these methods for further detail.
-# The [`Kernel`](https://docs.ruby-lang.org/en/2.7.0/Kernel.html) module is
-# included by class [`Object`](https://docs.ruby-lang.org/en/2.7.0/Object.html),
-# so its methods are available in every Ruby object.
-#
-# The [`Kernel`](https://docs.ruby-lang.org/en/2.7.0/Kernel.html) instance
-# methods are documented in class
-# [`Object`](https://docs.ruby-lang.org/en/2.7.0/Object.html) while the module
-# methods are documented here. These methods are called without a receiver and
-# thus can be called in functional form:
-#
-# ```ruby
-# sprintf "%.1f", 1.234 #=> "1.2"
-# ```
-#
-# fronzen-string-literal: true
 module Kernel
   # Returns `uri` converted to an
   # [`URI`](https://docs.ruby-lang.org/en/2.7.0/URI.html) object.
@@ -159,8 +137,10 @@ module URI
   HOST = T.let(T.unsafe(nil), Regexp)
   HTML5ASCIIINCOMPAT = T.let(T.unsafe(nil), String)
   OPAQUE = T.let(T.unsafe(nil), Regexp)
+  Parser = URI::RFC2396_Parser
   PORT = T.let(T.unsafe(nil), Regexp)
   QUERY = T.let(T.unsafe(nil), Regexp)
+  REGEXP = URI::RFC2396_REGEXP
   REGISTRY = T.let(T.unsafe(nil), Regexp)
   REL_PATH = T.let(T.unsafe(nil), Regexp)
   REL_URI = T.let(T.unsafe(nil), Regexp)
@@ -2370,4 +2350,9 @@ class URI::RFC3986_Parser < Object
 end
 
 module URI::Util
+end
+
+# The "file" [`URI`](https://docs.ruby-lang.org/en/2.7.0/URI.html) is defined by
+# RFC8089.
+class URI::File
 end

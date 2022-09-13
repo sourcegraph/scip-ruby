@@ -758,7 +758,7 @@ void validateUnsatisfiableRequiredAncestors(core::Context ctx, const core::Class
             requiredClasses.emplace_back(ancst);
         }
 
-        if (ancst.symbol.data(ctx)->typeArity(ctx) > 0) {
+        if (ancst.symbol.data(ctx)->typeArity(ctx) > 0 && !ancst.symbol.data(ctx)->isSingletonClass(ctx)) {
             if (auto e = ctx.state.beginError(data->loc(), core::errors::Resolver::UnsatisfiableRequiredAncestor)) {
                 e.setHeader("`{}` can't require generic ancestor `{}` (unsupported)", sym.show(ctx),
                             ancst.symbol.show(ctx));
@@ -839,7 +839,15 @@ private:
         auto isAbstract = klass.data(gs)->flags.isAbstract;
         if (isAbstract) {
             for (auto [name, sym] : klass.data(gs)->members()) {
-                if (sym.exists() && sym.isMethod() && sym.asMethodRef().data(gs)->flags.isAbstract) {
+                if (!sym.exists() || !sym.isMethod()) {
+                    continue;
+                }
+                const auto &method = sym.asMethodRef().data(gs);
+                if (method->flags.isAbstract &&
+                    // Ignore mangle renames, because users shouldn't have to create *another*
+                    // mangle rename error in order to implement such an abstract method.
+                    !(method->name.kind() == core::NameKind::UNIQUE &&
+                      method->name.dataUnique(gs)->uniqueNameKind == core::UniqueNameKind::MangleRename)) {
                     abstract.emplace_back(sym.asMethodRef());
                 }
             }

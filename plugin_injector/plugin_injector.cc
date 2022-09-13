@@ -149,7 +149,6 @@ class LLVMSemanticExtension : public SemanticExtension {
                 if (auto *send = cfg::cast_instruction<cfg::Send>(binding.value)) {
                     switch (send->fun.rawId()) {
                         case core::Names::keepForIde().rawId():
-                        case core::Names::keepForTypechecking().rawId():
                             // TODO: figure out why we can't delete this.
                             // case core::Names::keepForCfg().rawId():
                             refsToDelete.emplace(binding.bind.variable);
@@ -167,6 +166,8 @@ class LLVMSemanticExtension : public SemanticExtension {
                         refsToDelete.emplace(arg.variable);
                     }
                     refsToDelete.emplace(send->recv.variable);
+                } else if (auto *read = cfg::cast_instruction<cfg::KeepAlive>(binding.value)) {
+                    refsToDelete.emplace(read->what);
                 }
             }
 

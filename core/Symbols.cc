@@ -2267,6 +2267,11 @@ uint32_t ClassOrModule::hash(const GlobalState &gs) const {
                 continue;
             }
 
+            if (e.second.isFieldOrStaticField() && e.second.asFieldRef().data(gs)->flags.isField &&
+                gs.lspExperimentalFastPathEnabled) {
+                continue;
+            }
+
             if (e.second.isClassOrModule() && e.second.asClassOrModuleRef().data(gs)->ignoreInHashing(gs)) {
                 continue;
             }
@@ -2321,6 +2326,11 @@ uint32_t Method::hash(const GlobalState &gs) const {
     return result;
 }
 
+bool Field::isClassAlias() const {
+    ENFORCE(this->flags.isStaticField, "should never ask whether instance variable is a class alias");
+    return isa_type<AliasType>(resultType);
+}
+
 uint32_t Field::hash(const GlobalState &gs) const {
     uint32_t result = _hash(name.shortName(gs));
     result = mix(result, !this->resultType ? 0 : this->resultType.hash(gs));
@@ -2357,19 +2367,14 @@ uint32_t Method::methodShapeHash(const GlobalState &gs) const {
 }
 
 uint32_t Field::fieldShapeHash(const GlobalState &gs) const {
+    // Only consider static fields for the fast path at the moment.  It is probably
+    // straightforward to take the fast path for changes to regular fields by changing
+    // this and the corresponding code in GlobalState, but one step at a time.
+    // Only normal static fields are ok (no type aliases, no class aliases).
+    ENFORCE(!this->flags.isStaticField || (this->flags.isStaticField && !this->isClassAlias()));
     uint32_t result = _hash(name.shortName(gs));
 
-    auto canSkipType =
-        // Only consider static fields for the fast path at the moment.  It is probably
-        // straightforward to take the fast path for changes to regular fields by changing
-        // this and the corresponding code in GlobalState, but one step at a time.
-        !this->flags.isField &&
-        // Only normal static fields are ok (no type aliases, no class aliases/type templates).
-        (!this->flags.isStaticFieldTypeAlias && !isa_type<AliasType>(this->resultType));
-
-    if (!canSkipType) {
-        result = mix(result, !this->resultType ? 0 : this->resultType.hash(gs));
-    }
+    result = mix(result, 1 + (this->resultType != nullptr));
     result = mix(result, this->flags.serialize());
     result = mix(result, this->owner.id());
     return result;
@@ -2487,6 +2492,11 @@ void Field::addLoc(const core::GlobalState &gs, core::Loc loc) {
     }
 
     addLocInternal(gs, loc, this->loc(), locs_);
+}
+
+void Field::removeLocsForFile(core::FileRef file) {
+    auto it = remove_if(locs_.begin(), locs_.end(), [&](const auto loc) { return loc.file() == file; });
+    locs_.erase(it, locs_.end());
 }
 
 void TypeParameter::addLoc(const core::GlobalState &gs, core::Loc loc) {
@@ -2640,6 +2650,10 @@ const TypeParameter *ConstTypeParameterData::operator->() const {
 
 bool Method::hasIntrinsic() const {
     return this->intrinsicOffset != INVALID_INTRINSIC_OFFSET;
+}
+
+vector<NameRef> IntrinsicMethod::dispatchesTo() const {
+    return {};
 }
 
 const IntrinsicMethod *Method::getIntrinsic() const {

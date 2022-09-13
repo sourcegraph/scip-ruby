@@ -212,17 +212,17 @@ vector<core::FileRef> LSPTypechecker::runFastPath(LSPFileUpdates &updates, Worke
     gs->errorQueue = make_shared<core::ErrorQueue>(gs->errorQueue->logger, gs->errorQueue->tracer, errorFlusher);
     auto result = updates.fastPathFilesToTypecheck(*gs, *config);
     config->logger->debug("Added {} files that were not part of the edit to the update set", result.extraFiles.size());
-    UnorderedMap<core::FileRef, core::FoundMethodHashes> oldFoundMethodHashesForFiles;
+    UnorderedMap<core::FileRef, core::FoundDefHashes> oldFoundHashesForFiles;
     auto toTypecheck = move(result.extraFiles);
     for (auto [fref, idx] : result.changedFiles) {
         if (config->opts.lspExperimentalFastPathEnabled && !result.changedSymbolNameHashes.empty()) {
-            // Only set oldFoundMethodHashesForFiles if symbols actually changed
+            // Only set oldFoundHashesForFiles if symbols actually changed
             // Means that no-op edits (and thus calls to LSPTypechecker::retypecheck) don't blow away
             // methods only to redefine them with different IDs.
 
             // Okay to `move` here (steals component of getFileHash) because we're about to use
             // replaceFile to clobber fref.data(gs) anyways.
-            oldFoundMethodHashesForFiles.emplace(fref, move(fref.data(*gs).getFileHash()->foundMethodHashes));
+            oldFoundHashesForFiles.emplace(fref, move(fref.data(*gs).getFileHash()->foundHashes));
         }
 
         gs->replaceFile(fref, updates.updatedFiles[idx]);
@@ -235,7 +235,7 @@ vector<core::FileRef> LSPTypechecker::runFastPath(LSPFileUpdates &updates, Worke
 
     config->logger->debug("Running fast path over num_files={}", toTypecheck.size());
     unique_ptr<ShowOperation> op;
-    if (toTypecheck.size() > 100) {
+    if (toTypecheck.size() > config->opts.lspMaxFilesOnFastPath / 2) {
         op = make_unique<ShowOperation>(*config, ShowOperation::Kind::FastPath);
     }
     ENFORCE(gs->errorQueue->isEmpty());
@@ -251,20 +251,20 @@ vector<core::FileRef> LSPTypechecker::runFastPath(LSPFileUpdates &updates, Worke
 
         // See earlier in the method for an explanation of the .empty() check here.
         if (config->opts.lspExperimentalFastPathEnabled && !result.changedSymbolNameHashes.empty() &&
-            oldFoundMethodHashesForFiles.find(f) == oldFoundMethodHashesForFiles.end()) {
+            oldFoundHashesForFiles.find(f) == oldFoundHashesForFiles.end()) {
             // This is an extra file that we need to typecheck which was not part of the original
             // edited files, so whatever it happens to have in foundMethodHashes is still "old"
             // (but we can't use `move` to steal it like before, because we're not replacing the
             // whole file).
-            oldFoundMethodHashesForFiles.emplace(f, f.data(*gs).getFileHash()->foundMethodHashes);
+            oldFoundHashesForFiles.emplace(f, f.data(*gs).getFileHash()->foundHashes);
         }
     }
 
     ENFORCE(gs->lspQuery.isEmpty());
-    auto resolved = config->opts.lspExperimentalFastPathEnabled
-                        ? pipeline::incrementalResolve(*gs, move(updatedIndexed),
-                                                       std::move(oldFoundMethodHashesForFiles), config->opts)
-                        : pipeline::incrementalResolve(*gs, move(updatedIndexed), nullopt, config->opts);
+    auto resolved =
+        config->opts.lspExperimentalFastPathEnabled
+            ? pipeline::incrementalResolve(*gs, move(updatedIndexed), std::move(oldFoundHashesForFiles), config->opts)
+            : pipeline::incrementalResolve(*gs, move(updatedIndexed), nullopt, config->opts);
     auto sorted = sortParsedFiles(*gs, *errorReporter, move(resolved));
     const auto presorted = true;
     const auto cancelable = false;
@@ -409,9 +409,9 @@ bool LSPTypechecker::runSlowPath(LSPFileUpdates updates, WorkerPool &workers, bo
                 }
             }
         }
-        // Only need to compute FoundMethodHashes when running to compute a FileHash
-        auto foundMethodHashes = nullptr;
-        auto maybeResolved = pipeline::resolve(gs, move(indexedCopies), config->opts, workers, foundMethodHashes);
+        // Only need to compute FoundDefHashes when running to compute a FileHash
+        auto foundHashes = nullptr;
+        auto maybeResolved = pipeline::resolve(gs, move(indexedCopies), config->opts, workers, foundHashes);
         if (!maybeResolved.hasResult()) {
             return;
         }
@@ -444,16 +444,28 @@ bool LSPTypechecker::runSlowPath(LSPFileUpdates updates, WorkerPool &workers, bo
 
         // [Test only] Wait for a preemption if one is expected.
         while (updates.preemptionsExpected > 0) {
+            auto loopStartTime = Timer::clock_gettime_coarse();
+            auto coarseThreshold = Timer::get_clock_threshold_coarse();
             while (!preemptManager->tryRunScheduledPreemptionTask(*gs)) {
-                Timer::timedSleep(1ms, *logger, "slow_path.expected_preemption.sleep");
+                auto curTime = Timer::clock_gettime_coarse();
+                if (curTime.usec - loopStartTime.usec > 20'000'000) {
+                    Exception::raise("Slow path timed out waiting for preemption edit");
+                }
+                Timer::timedSleep(coarseThreshold, *logger, "slow_path.expected_preemption.sleep");
             }
             updates.preemptionsExpected--;
         }
 
         // [Test only] Wait for a cancellation if one is expected.
         if (updates.cancellationExpected) {
+            auto loopStartTime = Timer::clock_gettime_coarse();
+            auto coarseThreshold = Timer::get_clock_threshold_coarse();
             while (!epochManager.wasTypecheckingCanceled()) {
-                Timer::timedSleep(1ms, *logger, "slow_path.expected_cancellation.sleep");
+                auto curTime = Timer::clock_gettime_coarse();
+                if (curTime.usec - loopStartTime.usec > 20'000'000) {
+                    Exception::raise("Slow path timed out waiting for cancellation edit");
+                }
+                Timer::timedSleep(coarseThreshold, *logger, "slow_path.expected_cancellation.sleep");
             }
             return;
         }
@@ -633,9 +645,9 @@ vector<ast::ParsedFile> LSPTypechecker::getResolved(const vector<core::FileRef> 
     // There are two incrementalResolve modes: one when running for the purpose of processing a file update,
     // and one for running an LSP query on an already-resolved file.
     // In getResolved, we want the LSP query behavior, not the file update behavior, which we get by passing nullopt.
-    auto foundMethodHashesForFiles = nullopt;
+    auto foundHashesForFiles = nullopt;
 
-    return pipeline::incrementalResolve(*gs, move(updatedIndexed), move(foundMethodHashesForFiles), config->opts);
+    return pipeline::incrementalResolve(*gs, move(updatedIndexed), move(foundHashesForFiles), config->opts);
 }
 
 const core::GlobalState &LSPTypechecker::state() const {

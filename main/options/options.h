@@ -158,7 +158,7 @@ struct Options {
     bool silenceErrors = false;
     bool silenceDevMessage = false;
     bool suggestSig = false;
-    bool supressNonCriticalErrors = false;
+    bool suppressNonCriticalErrors = false;
     bool runLSP = false;
     bool disableWatchman = false;
     std::string watchmanPath = "watchman";
@@ -169,7 +169,6 @@ struct Options {
     bool noErrorCount = false;
     bool autocorrect = false;
     bool waitForDebugger = false;
-    bool skipRewriterPasses = false;
     bool censorForSnapshotTests = false;
     bool forceHashing = false;
     int threads = 0;
@@ -248,6 +247,8 @@ struct Options {
     std::vector<std::string> autogenSubclassesAbsoluteIgnorePatterns;
     // Ignore patterns that can occur anywhere in a file's path from an input folder.
     std::vector<std::string> autogenSubclassesRelativeIgnorePatterns;
+    // Allow RBI files to define behavior if they are in one of these paths.
+    std::vector<std::string> autogenBehaviorAllowedInRBIFilesPaths;
     AutogenConstCacheConfig autogenConstantCacheConfig;
 
     // List of directories not available editor-side. References to files in these directories should be sent via
