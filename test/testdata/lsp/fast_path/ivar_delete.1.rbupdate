@@ -1,0 +1,18 @@
+# typed: strict
+# assert-fast-path: ivar_delete.rb
+
+class A
+  extend T::Sig
+
+  sig {void}
+  def initialize
+    @x = T.let(0, Integer)
+  end
+
+  sig {returns(String)}
+  def y
+    T.reveal_type(@y) # error: Revealed type: `T.untyped`
+                # ^^ error: Use of undeclared variable `@y`
+    @y
+  end
+end

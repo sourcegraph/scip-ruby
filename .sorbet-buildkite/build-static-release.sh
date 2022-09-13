@@ -71,7 +71,8 @@ rbenv exec gem uninstall --all --executables --ignore-dependencies sorbet sorbet
 trap 'rbenv exec gem uninstall --all --executables --ignore-dependencies sorbet sorbet-static' EXIT
 
 if [[ "mac" == "$platform" ]]; then
-  rbenv exec gem install ../../gems/sorbet-static/sorbet-static-*-universal-darwin-18.gem
+  gem_platform="$(ruby -e "(platform = Gem::Platform.local).cpu = 'universal'; puts(platform.to_s)")"
+  rbenv exec gem install ../../gems/sorbet-static/sorbet-static-*-"$gem_platform".gem
 else
   rbenv exec gem install ../../gems/sorbet-static/sorbet-static-*-x86_64-linux.gem
 fi
@@ -103,7 +104,7 @@ rm -rf _out_
 mkdir -p _out_/gems
 
 mv gems/sorbet-static/sorbet-static-*.gem _out_/gems/
-if [[ "mac" == "$platform" ]]; then
+if [[ "linux" == "$platform" ]]; then
   mv gems/sorbet/sorbet*.gem _out_/gems/
 fi
 

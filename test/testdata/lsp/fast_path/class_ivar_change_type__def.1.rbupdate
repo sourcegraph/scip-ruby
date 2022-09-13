@@ -1,0 +1,6 @@
+# typed: true
+# assert-fast-path: class_ivar_change_type__def.rb,class_ivar_change_type__use.rb
+
+class Parent
+  @x = T.let("", String)
+end

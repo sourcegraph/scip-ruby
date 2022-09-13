@@ -104,12 +104,12 @@ LSPQueryResult LSPQuery::LSPQuery::bySymbolInFiles(const LSPConfiguration &confi
 }
 
 LSPQueryResult LSPQuery::bySymbol(const LSPConfiguration &config, LSPTypecheckerInterface &typechecker,
-                                  core::SymbolRef symbol) {
+                                  core::SymbolRef symbol, core::NameRef pkgName) {
     Timer timeit(config.logger, "setupLSPQueryBySymbol");
     ENFORCE(symbol.exists());
     vector<core::FileRef> frefs;
     const core::GlobalState &gs = typechecker.state();
-    const core::ShortNameHash symShortNameHash(gs, symbol.name(gs));
+    const core::WithoutUniqueNameHash symShortNameHash(gs, symbol.name(gs));
     // Locate files that contain the same Name as the symbol. Is an overapproximation, but a good first filter.
     int i = -1;
     for (auto &file : typechecker.state().getFiles()) {
@@ -118,10 +118,14 @@ LSPQueryResult LSPQuery::bySymbol(const LSPConfiguration &config, LSPTypechecker
             continue;
         }
 
+        auto ref = core::FileRef(i);
+        if (pkgName.exists() && gs.packageDB().getPackageNameForFile(ref) != pkgName) {
+            continue;
+        }
+
         ENFORCE(file->getFileHash() != nullptr);
         const auto &hash = *file->getFileHash();
         const auto &usedSymbolNameHashes = hash.usages.nameHashes;
-        auto ref = core::FileRef(i);
 
         const bool fileIsValid = ref.exists() && ref.data(gs).sourceType == core::File::Type::Normal;
         if (fileIsValid && (absl::c_find(usedSymbolNameHashes, symShortNameHash) != usedSymbolNameHashes.end())) {

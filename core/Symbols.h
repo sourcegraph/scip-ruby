@@ -29,6 +29,16 @@ class SerializerImpl;
 }
 class IntrinsicMethod {
 public:
+    // A list of method names that this intrinsic dispatches to.
+    // Used to ensure that calls involving intrinsics are correctly typechecked on the fast path.
+    //
+    // If your intrinsic does not dispatch to another method, the default implementation returns an
+    // empty vector, so you can elide an implementation.
+    //
+    // If your intrinsic cannot declare the list of methods it might dispatch to (like
+    // `<call-with-splat>`, etc.), you will have to edit Substitute.cc.
+    virtual std::vector<NameRef> dispatchesTo() const;
+
     virtual void apply(const GlobalState &gs, const DispatchArgs &args, DispatchResult &res) const = 0;
 };
 
@@ -193,10 +203,15 @@ CheckSize(Method, 152, 8);
 
 // Contains a field or a static field
 class Field final {
+    friend class GlobalState;
     friend class serialize::SerializerImpl;
+
+    // This is to allow updating `GlobalState::fields` in place with a new field, over top of an existing field
+    Field &operator=(Field &&) = default;
 
 public:
     Field(const Field &) = delete;
+    Field &operator=(const Field &) = delete;
     Field() = default;
     Field(Field &&) noexcept = default;
 
@@ -231,6 +246,9 @@ public:
     Loc loc() const;
     const InlinedVector<Loc, 2> &locs() const;
     void addLoc(const core::GlobalState &gs, core::Loc loc);
+    void removeLocsForFile(core::FileRef file);
+
+    bool isClassAlias() const;
 
     uint32_t hash(const GlobalState &gs) const;
     uint32_t fieldShapeHash(const GlobalState &gs) const;
@@ -470,7 +488,7 @@ public:
     }
 
     inline bool isUndeclared() const {
-        if (!flags.isModule && !flags.isClass) {
+        if (!isClassModuleSet()) {
             return true;
         }
         return flags.isUndeclared;

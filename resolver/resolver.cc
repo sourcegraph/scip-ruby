@@ -93,6 +93,25 @@ namespace {
  * the fixed point loop at a high level.
  */
 
+bool isT(ast::ExpressionPtr &expr) {
+    auto *tMod = ast::cast_tree<ast::ConstantLit>(expr);
+    return tMod && tMod->symbol == core::Symbols::T();
+}
+
+bool isTClassOf(ast::ExpressionPtr &expr) {
+    auto *send = ast::cast_tree<ast::Send>(expr);
+
+    if (send == nullptr) {
+        return false;
+    }
+
+    if (!isT(send->recv)) {
+        return false;
+    }
+
+    return send->fun == core::Names::classOf();
+}
+
 class ResolveConstantsWalk {
     friend class ResolveSanityCheckWalk;
 
@@ -218,8 +237,7 @@ private:
                 // static fields to find the field on the singleton class.
                 auto lookup = scope->scope.asClassOrModuleRef().data(ctx)->findMemberNoDealias(ctx, name);
                 if (lookup.isStaticField(ctx)) {
-                    const auto &resultType = lookup.asFieldRef().data(ctx)->resultType;
-                    if (core::isa_type<core::AliasType>(resultType)) {
+                    if (lookup.asFieldRef().data(ctx)->isClassAlias()) {
                         auto dealiased = lookup.dealias(ctx);
                         if (dealiased.isTypeMember() &&
                             dealiased.asTypeMemberRef().data(ctx)->owner ==
@@ -1145,9 +1163,37 @@ private:
         ENFORCE(block->body);
 
         auto blockLoc = core::Loc(todo.file, block->body.loc());
-        auto *id = ast::cast_tree<ast::ConstantLit>(block->body);
+        core::ClassOrModuleRef symbol = core::Symbols::StubModule();
 
-        if (id == nullptr || !id->symbol.exists() || !id->symbol.isClassOrModule()) {
+        if (auto *constant = ast::cast_tree<ast::ConstantLit>(block->body)) {
+            if (constant->symbol.exists() && constant->symbol.isClassOrModule()) {
+                symbol = constant->symbol.asClassOrModuleRef();
+            }
+        } else if (isTClassOf(block->body)) {
+            send = ast::cast_tree<ast::Send>(block->body);
+
+            ENFORCE(send);
+
+            if (send->numPosArgs() == 1) {
+                if (auto *argClass = ast::cast_tree<ast::ConstantLit>(send->getPosArg(0))) {
+                    if (argClass->symbol.exists() && argClass->symbol.isClassOrModule()) {
+                        if (argClass->symbol == owner) {
+                            if (auto e = gs.beginError(blockLoc, core::errors::Resolver::InvalidRequiredAncestor)) {
+                                e.setHeader("Must not pass yourself to `{}` inside of `requires_ancestor`",
+                                            send->fun.show(gs));
+                            }
+                            return;
+                        }
+
+                        if constexpr (isMutableStateType) {
+                            symbol = argClass->symbol.asClassOrModuleRef().data(gs)->singletonClass(gs);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (symbol == core::Symbols::StubModule()) {
             if (auto e = gs.beginError(blockLoc, core::errors::Resolver::InvalidRequiredAncestor)) {
                 e.setHeader("Argument to `{}` must be statically resolvable to a class or a module",
                             send->fun.show(gs));
@@ -1155,7 +1201,7 @@ private:
             return;
         }
 
-        if (id->symbol == owner) {
+        if (symbol == owner) {
             if (auto e = gs.beginError(blockLoc, core::errors::Resolver::InvalidRequiredAncestor)) {
                 e.setHeader("Must not pass yourself to `{}`", send->fun.show(gs));
             }
@@ -1163,7 +1209,7 @@ private:
         }
 
         if constexpr (isMutableStateType) {
-            owner.data(gs)->recordRequiredAncestor(gs, id->symbol.asClassOrModuleRef(), blockLoc);
+            owner.data(gs)->recordRequiredAncestor(gs, symbol, blockLoc);
         }
     }
 
@@ -1845,7 +1891,6 @@ class ResolveTypeMembersAndFieldsWalk {
     struct ResolveCastItem {
         core::FileRef file;
         core::SymbolRef owner;
-        ast::ExpressionPtr *typeArg;
         ast::Cast *cast;
         bool inFieldAssign;
     };
@@ -1919,11 +1964,6 @@ class ResolveTypeMembersAndFieldsWalk {
         }
     }
 
-    static bool isT(const ast::ExpressionPtr &expr) {
-        auto *tMod = ast::cast_tree<ast::ConstantLit>(expr);
-        return tMod && tMod->symbol == core::Symbols::T();
-    }
-
     static bool isTodo(const core::TypePtr &type) {
         return core::isa_type<core::ClassType>(type) &&
                core::cast_type_nonnull<core::ClassType>(type).symbol == core::Symbols::todo();
@@ -1954,11 +1994,11 @@ class ResolveTypeMembersAndFieldsWalk {
     // Resolve a cast to a simple, non-generic class type (e.g., T.let(x, ClassOrModule)). Returns `false` if
     // `ResolveCastItem` is not simple.
     [[nodiscard]] static bool tryResolveSimpleClassCastItem(const core::GlobalState &gs, ResolveCastItem &job) {
-        if (!ast::isa_tree<ast::ConstantLit>(*job.typeArg)) {
+        if (!ast::isa_tree<ast::ConstantLit>(job.cast->typeExpr)) {
             return false;
         }
 
-        auto &lit = ast::cast_tree_nonnull<ast::ConstantLit>(*job.typeArg);
+        auto &lit = ast::cast_tree_nonnull<ast::ConstantLit>(job.cast->typeExpr);
         if (!lit.symbol.isClassOrModule()) {
             return false;
         }
@@ -1992,7 +2032,7 @@ class ResolveTypeMembersAndFieldsWalk {
         auto allowTypeMember = true;
         auto allowUnspecifiedTypeParameter = !lastTry;
         auto ctx = core::Context(gs, job.owner.enclosingClass(gs), job.file);
-        auto type = TypeSyntax::getResultType(ctx, *job.typeArg, emptySig,
+        auto type = TypeSyntax::getResultType(ctx, job.cast->typeExpr, emptySig,
                                               TypeSyntaxArgs{allowSelfType, allowRebind, allowTypeMember,
                                                              allowUnspecifiedTypeParameter, core::Symbols::noSymbol()});
         if (type == core::Types::todo()) {
@@ -2019,7 +2059,6 @@ class ResolveTypeMembersAndFieldsWalk {
         return castType;
     }
 
-    // Attempts to resolve the type of the given field. Returns `false` if the cast is not yet resolved.
     static void resolveField(core::MutableContext ctx, ResolveFieldItem &job) {
         auto cast = job.cast;
 
@@ -2063,44 +2102,38 @@ class ResolveTypeMembersAndFieldsWalk {
         }
 
         auto prior = scope.data(ctx)->findMember(ctx, uid->name);
-        if (prior.exists() && prior.isFieldOrStaticField()) {
-            auto priorField = prior.asFieldRef();
-            if (core::Types::equiv(ctx, priorField.data(ctx)->resultType, castType)) {
-                // We already have a symbol for this field, and it matches what we already saw, so we can short
-                // circuit.
-                return;
-            } else {
-                // We do some normalization here to ensure that the file / line we report the error on doesn't
-                // depend on the order that we traverse files nor the order we traverse within a file.
-                auto priorLoc = priorField.data(ctx)->loc();
-                core::Loc reportOn;
-                core::Loc errorLine;
-                core::Loc thisLoc = core::Loc(job.file, uid->loc);
-                if (thisLoc.file() == priorLoc.file()) {
-                    reportOn = thisLoc.beginPos() < priorLoc.beginPos() ? thisLoc : priorLoc;
-                    errorLine = thisLoc.beginPos() < priorLoc.beginPos() ? priorLoc : thisLoc;
-                } else {
-                    reportOn = thisLoc.file() < priorLoc.file() ? thisLoc : priorLoc;
-                    errorLine = thisLoc.file() < priorLoc.file() ? priorLoc : thisLoc;
-                }
-
-                if (auto e = ctx.state.beginError(reportOn, core::errors::Resolver::DuplicateVariableDeclaration)) {
-                    e.setHeader("Redeclaring variable `{}` with mismatching type", uid->name.show(ctx));
-                    e.addErrorLine(errorLine, "Previous declaration is here:");
-                }
-                return;
-            }
-        }
-        core::FieldRef var;
-
-        if (uid->kind == ast::UnresolvedIdent::Kind::Class) {
-            var = ctx.state.enterStaticFieldSymbol(core::Loc(job.file, uid->loc), scope, uid->name);
+        ENFORCE(prior.exists());
+        ENFORCE(prior.isFieldOrStaticField());
+        auto priorField = prior.asFieldRef();
+        if (priorField.data(ctx)->resultType == core::Types::todo()) {
+            // This was previously entered by namer and we are now resolving the type.
+            priorField.data(ctx)->resultType = castType;
+            return;
+        } else if (core::Types::equiv(ctx, priorField.data(ctx)->resultType, castType)) {
+            // We already have a symbol for this field, and it matches what we already saw, so we can short
+            // circuit.
+            return;
         } else {
-            var = ctx.state.enterFieldSymbol(core::Loc(job.file, uid->loc), scope, uid->name);
-        }
+            // We do some normalization here to ensure that the file / line we report the error on doesn't
+            // depend on the order that we traverse files nor the order we traverse within a file.
+            auto priorLoc = priorField.data(ctx)->loc();
+            core::Loc reportOn;
+            core::Loc errorLine;
+            core::Loc thisLoc = core::Loc(job.file, uid->loc);
+            if (thisLoc.file() == priorLoc.file()) {
+                reportOn = thisLoc.beginPos() < priorLoc.beginPos() ? thisLoc : priorLoc;
+                errorLine = thisLoc.beginPos() < priorLoc.beginPos() ? priorLoc : thisLoc;
+            } else {
+                reportOn = thisLoc.file() < priorLoc.file() ? thisLoc : priorLoc;
+                errorLine = thisLoc.file() < priorLoc.file() ? priorLoc : thisLoc;
+            }
 
-        var.data(ctx)->resultType = castType;
-        return;
+            if (auto e = ctx.state.beginError(reportOn, core::errors::Resolver::DuplicateVariableDeclaration)) {
+                e.setHeader("Redeclaring variable `{}` with mismatching type", uid->name.show(ctx));
+                e.addErrorLine(errorLine, "Previous declaration is here:");
+            }
+            return;
+        }
     }
 
     // Resolve the type of the rhs of a constant declaration. This logic is
@@ -2802,6 +2835,17 @@ public:
         }
     }
 
+    void postTransformCast(core::Context ctx, ast::ExpressionPtr &tree) {
+        ResolveCastItem item;
+        item.file = ctx.file;
+        item.owner = ctx.owner;
+        item.cast = ast::cast_tree<ast::Cast>(tree);
+        item.inFieldAssign = this->inFieldAssign.back();
+        if (!tryResolveSimpleClassCastItem(ctx.state, item)) {
+            todoResolveCastItems_.emplace_back(move(item));
+        }
+    }
+
     void postTransformSend(core::Context ctx, ast::ExpressionPtr &tree) {
         auto &send = ast::cast_tree_nonnull<ast::Send>(tree);
 
@@ -2834,29 +2878,7 @@ public:
                         return;
                     }
 
-                    ResolveCastItem item;
-                    item.file = ctx.file;
-                    item.owner = ctx.owner;
-                    item.inFieldAssign = this->inFieldAssign.back();
-
-                    auto typeExpr = ast::MK::KeepForTypechecking(std::move(send.getPosArg(1)));
-                    auto expr = std::move(send.getPosArg(0));
-                    // We only do this for `bind` because `bind` doesn't participate in the same
-                    // sort of pinning decisions that the other casts do. Hiding pinning errors from
-                    // arbitrary synthetic lets and casts would push confusing behavior downstream.
-                    auto fun = (send.fun == core::Names::bind() && send.flags.isRewriterSynthesized)
-                                   ? core::Names::syntheticBind()
-                                   : send.fun;
-                    auto cast = ast::make_expression<ast::Cast>(send.loc, core::Types::todo(), std::move(expr), fun);
-                    item.cast = ast::cast_tree<ast::Cast>(cast);
-                    item.typeArg = &ast::cast_tree_nonnull<ast::Send>(typeExpr).getPosArg(0);
-
-                    // We should be able to resolve simple casts immediately.
-                    if (!tryResolveSimpleClassCastItem(ctx.state, item)) {
-                        todoResolveCastItems_.emplace_back(move(item));
-                    }
-
-                    tree = ast::MK::InsSeq1(send.loc, move(typeExpr), move(cast));
+                    ENFORCE(false, "should have converted these to cast nodes");
                     return;
                 }
                 case core::Names::revealType().rawId():
@@ -3715,11 +3737,6 @@ private:
                     handleAbstractMethod(ctx, mdef);
                 }
             },
-            [&](const ast::ClassDef &cdef) {
-                // Leave in place
-            },
-
-            [&](const ast::EmptyTree &e) { stat.reset(nullptr); },
 
             [&](const ast::ExpressionPtr &e) {});
     }
@@ -3829,14 +3846,12 @@ public:
                 }
             }
         }
-        // handleAbstractMethod called elsewhere
     }
     static void resolveSignatureJob(core::MutableContext ctx, ResolveSignatureJob &job) {
         prodCounterInc("types.sig.count");
         auto &mdef = *job.mdef;
         bool isOverloaded = false;
         fillInInfoFromSig(ctx, mdef.symbol, job.loc, job.sig, isOverloaded, mdef);
-        // handleAbstractMethod called elsewhere
     }
 
     static void handleAbstractMethod(core::Context ctx, ast::MethodDef &mdef) {

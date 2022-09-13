@@ -77,6 +77,11 @@ const users = [
     infoLink: 'https://www.taskrabbit.com/',
   },
   {
+    caption: 'TriumphPay',
+    image: 'img/triumphpay-logo.svg',
+    infoLink: 'https://triumphpay.com',
+  },
+  {
     caption: 'Vonage',
     image: 'img/vonage-logo.png',
     infoLink: 'https://www.vonage.com/',
@@ -165,8 +170,8 @@ const siteConfig = {
 
   // Open Graph and Twitter card images.
   // (these images can't be SVGs)
-  ogImage: 'img/sorbet-logo-card@2x.png',
-  twitterImage: 'img/sorbet-logo-card@2x.png',
+  // ogImage: 'img/sorbet-logo-card@2x.png',
+  // twitterImage: 'img/sorbet-logo-card@2x.png',
 
   // Show documentation's last contributor's name.
   // enableUpdateBy: true,

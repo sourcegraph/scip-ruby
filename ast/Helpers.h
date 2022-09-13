@@ -370,8 +370,9 @@ public:
         return Constant(loc, core::Symbols::T());
     }
 
-    static ExpressionPtr Bind(core::LocOffsets loc, ExpressionPtr value, ExpressionPtr type) {
-        return Send2(loc, T(loc), core::Names::bind(), loc, std::move(value), std::move(type));
+    static ExpressionPtr SyntheticBind(core::LocOffsets loc, ExpressionPtr value, ExpressionPtr type) {
+        return ast::make_expression<ast::Cast>(loc, core::Types::todo(), std::move(value), core::Names::syntheticBind(),
+                                               std::move(type));
     }
 
     static ExpressionPtr ClassOf(core::LocOffsets loc, ExpressionPtr value) {
@@ -379,11 +380,13 @@ public:
     }
 
     static ExpressionPtr Let(core::LocOffsets loc, ExpressionPtr value, ExpressionPtr type) {
-        return Send2(loc, T(loc), core::Names::let(), loc, std::move(value), std::move(type));
+        return ast::make_expression<ast::Cast>(loc, core::Types::todo(), std::move(value), core::Names::let(),
+                                               std::move(type));
     }
 
     static ExpressionPtr AssertType(core::LocOffsets loc, ExpressionPtr value, ExpressionPtr type) {
-        return Send2(loc, T(loc), core::Names::assertType(), loc, std::move(value), std::move(type));
+        return ast::make_expression<ast::Cast>(loc, core::Types::todo(), std::move(value), core::Names::assertType(),
+                                               std::move(type));
     }
 
     static ExpressionPtr Unsafe(core::LocOffsets loc, ExpressionPtr inner) {
@@ -410,12 +413,6 @@ public:
     static ExpressionPtr KeepForIDE(core::LocOffsets loc, ExpressionPtr arg) {
         return Send1(loc, Constant(loc, core::Symbols::Sorbet_Private_Static()), core::Names::keepForIde(), loc,
                      std::move(arg));
-    }
-
-    static ExpressionPtr KeepForTypechecking(ExpressionPtr arg) {
-        auto loc = core::LocOffsets::none();
-        return Send1(loc, Constant(loc, core::Symbols::Sorbet_Private_Static()), core::Names::keepForTypechecking(),
-                     loc, std::move(arg));
     }
 
     static ExpressionPtr ZSuper(core::LocOffsets loc) {

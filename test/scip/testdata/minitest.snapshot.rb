@@ -22,6 +22,7 @@
        C2 = T.let(10, Integer)
 #      ^^ definition [..] MyTest#C2.
 #      ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Kernel#
+#                     ^^^^^^^ definition local 9~#119448696
 #                     ^^^^^^^ reference [..] Integer#
      end
  

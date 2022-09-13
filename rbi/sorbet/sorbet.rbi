@@ -21,15 +21,6 @@ module Sorbet::Private::Static
   end
 
   sig do
-    params(
-        expr: T.untyped,
-    )
-    .void
-  end
-  def self.keep_for_typechecking(expr)
-  end
-
-  sig do
     type_parameters(:U)
       .params(this: T.untyped, fun: T.all(T.type_parameter(:U), Symbol), kind: Symbol)
       .returns(T.type_parameter(:U))
@@ -116,7 +107,7 @@ end
 class Sorbet::Private::Static::ENVClass
   extend T::Generic
   include Enumerable
-  Elem = type_member(:out) {{fixed: [String, T.nilable(String)]}}
+  Elem = type_member(:out) {{fixed: [String, String]}}
 
   sig do
     params(
