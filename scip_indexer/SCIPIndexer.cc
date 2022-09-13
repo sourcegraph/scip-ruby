@@ -1141,10 +1141,6 @@ public:
                                                     ValueCategory::RValue, binding.bind.type);
                 };
                 switch (binding.value.tag()) {
-                    case cfg::Tag::Literal: {
-                        // RHS is a literal, not occurrence information needed.
-                        break;
-                    }
                     case cfg::Tag::Ident: {
                         auto ident = cfg::cast_instruction<cfg::Ident>(binding.value);
                         emitLocal(ident->what);
@@ -1232,6 +1228,8 @@ public:
                         // 2. For nested classes, sometimes, there is no usage at all in the method body
                         //    (in some cases, there is a keep_for_ide send instruction, which we special-case).
                         //    In such a situation, we emit unused aliases after processing the CFG.
+                    case cfg::Tag::Literal:
+                    case cfg::Tag::KeepAlive:
                     case cfg::Tag::SolveConstraint:
                     case cfg::Tag::TAbsurd:
                     case cfg::Tag::LoadSelf:
