@@ -1,6 +1,7 @@
  # typed: true
  
  require 'def_untyped'
+#^^^^^^^ reference [..] Kernel#require().
  
  module N
 #       ^ definition [..] N#

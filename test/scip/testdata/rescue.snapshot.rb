@@ -9,13 +9,17 @@
 #    ^^^^^^ definition [..] Object#handle().
 #           ^ definition local 1~#780127187
    puts e.inspect.to_s 
+#  ^^^^ reference [..] Kernel#puts().
 #       ^ reference local 1~#780127187
+#         ^^^^^^^ reference [..] Kernel#inspect().
+#                 ^^^^ reference [..] Kernel#to_s().
  end
  
  def f
 #    ^ definition [..] Object#f().
    begin
      raise 'This exception will be rescued!'
+#    ^^^^^ reference [..] Kernel#raise().
    rescue MyError => e1
 #         ^^^^^^^ reference local 1~#3809224601
 #         ^^^^^^^ reference [..] MyError#

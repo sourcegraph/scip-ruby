@@ -3,6 +3,7 @@
  class MethodNameManipulation
 #      ^^^^^^^^^^^^^^^^^^^^^^ definition [..] MethodNameManipulation#
    extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
    delegate :ball, to: :thing, private: true, allow_nil: true
 #  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Proc#
 #           ^^^^^ definition [..] MethodNameManipulation#ball().

@@ -16,14 +16,18 @@
 #      ^^^^^^^^ definition [..] Flatfile#
 #                 ^^^^^^ definition [..] Record#
    flatfile do
+#  ^^^^^^^^ reference [..] `<Class:Record>`#flatfile().
      from   1..2, :foo
+#    ^^^^ reference [..] `<Class:Record>`#from().
 #                 ^^^^ definition [..] Flatfile#`foo=`().
 #                 ^^^^ definition [..] Flatfile#foo().
      pattern(/A-Za-z/, :bar)
+#    ^^^^^^^ reference [..] `<Class:Record>`#pattern().
 #            ^^^^^^^^ reference [..] Regexp#
-#                      ^^^^ definition [..] Flatfile#bar().
 #                      ^^^^ definition [..] Flatfile#`bar=`().
+#                      ^^^^ definition [..] Flatfile#bar().
      field :baz
+#    ^^^^^ reference [..] `<Class:Record>`#field().
 #          ^^^^ definition [..] Flatfile#baz().
 #          ^^^^ definition [..] Flatfile#`baz=`().
    end
@@ -32,6 +36,7 @@
  t = Flatfile.new
 #^ definition local 1~#119448696
 #    ^^^^^^^^ reference [..] Flatfile#
+#             ^^^ reference [..] Class#new().
  t.foo = t.foo + 1
 #^ reference local 1~#119448696
 #  ^^^^^ reference [..] Flatfile#`foo=`().

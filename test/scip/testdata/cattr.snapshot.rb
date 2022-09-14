@@ -3,6 +3,7 @@
  class CR
 #      ^^ definition [..] CR#
    extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
    cattr_reader :both, :foo
 #               ^^^^^ definition [..] CR#both().
 #               ^^^^^ definition [..] `<Class:CR>`#both().
@@ -32,6 +33,7 @@
  class CW
 #      ^^ definition [..] CW#
    extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
    cattr_writer :both, :foo
 #               ^^^^^ definition [..] CW#`both=`().
 #               ^^^^^ definition [..] `<Class:CW>`#`both=`().
@@ -61,11 +63,12 @@
  class CA
 #      ^^ definition [..] CA#
    extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
    cattr_accessor :both, :foo
 #                 ^^^^^ definition [..] CA#`both=`().
 #                 ^^^^^ definition [..] `<Class:CA>`#both().
-#                 ^^^^^ definition [..] CA#both().
 #                 ^^^^^ definition [..] `<Class:CA>`#`both=`().
+#                 ^^^^^ definition [..] CA#both().
 #                        ^^^^ definition [..] CA#foo().
 #                        ^^^^ definition [..] `<Class:CA>`#foo().
 #                        ^^^^ definition [..] CA#`foo=`().
@@ -81,9 +84,9 @@
 #                 ^^^^ definition [..] CA#bar().
 #                 ^^^^ definition [..] `<Class:CA>`#bar().
 #                 ^^^^ definition [..] `<Class:CA>`#`bar=`().
-#                       ^^^^^^^^^^^^^^^^^^^ definition [..] CA#no_instance_writer().
 #                       ^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:CA>`#no_instance_writer().
 #                       ^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:CA>`#`no_instance_writer=`().
+#                       ^^^^^^^^^^^^^^^^^^^ definition [..] CA#no_instance_writer().
  
    sig {void}
    def usages

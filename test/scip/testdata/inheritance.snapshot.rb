@@ -3,6 +3,7 @@
  class Z1
 #      ^^ definition [..] Z1#
    extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
  
    sig { params(a: T::Boolean).void }
 #                     ^^^^^^^ reference [..] T#Boolean.
@@ -27,6 +28,7 @@
  class Z2
 #      ^^ definition [..] Z2#
    extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
  
    sig { returns(T::Boolean) }
 #                   ^^^^^^^ reference [..] T#Boolean.
@@ -52,6 +54,7 @@
 #      ^^ definition [..] Z3#
 #           ^^ definition [..] Z1#
    extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
  
    sig { returns(T::Boolean) }
 #                   ^^^^^^^ reference [..] T#Boolean.
@@ -66,6 +69,7 @@
 #      ^^ definition [..] Z4#
 #           ^^ definition [..] Z3#
    extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
  
    sig { params(a: T::Boolean).void }
 #                     ^^^^^^^ reference [..] T#Boolean.
@@ -73,10 +77,12 @@
 #      ^^^^^^^^^^^^^^ definition [..] Z4#write_f_plus_1().
 #                     ^ definition local 1~#3337417690
      write_f(a)
+#    ^^^^^^^ reference [..] Z1#write_f().
 #            ^ reference local 1~#3337417690
      @f = read_f_plus_1?
 #    ^^ definition [..] Z4#`@f`.
 #    ^^^^^^^^^^^^^^^^^^^ reference [..] Z4#`@f`.
+#         ^^^^^^^^^^^^^^ reference [..] Z3#`read_f_plus_1?`().
    end
  end
  
