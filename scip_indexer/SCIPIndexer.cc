@@ -32,54 +32,10 @@
 #include "main/pipeline/semantic_extension/SemanticExtension.h"
 #include "sorbet_version/sorbet_version.h"
 
+#include "scip_indexer/Debug.h"
 #include "scip_indexer/SCIPUtils.h"
 
 using namespace std;
-
-// Wrapper for quickly commenting out print lines.
-template <typename... T> FMT_INLINE static void print_dbg(fmt::format_string<T...> fmt, T &&...args) {
-    return;
-}
-
-template <typename... T> FMT_INLINE static void print_err(fmt::format_string<T...> fmt, T &&...args) {
-    return fmt::print(fmt, args...);
-}
-
-template <typename K, typename V, typename Fn> static string map_to_string(const sorbet::UnorderedMap<K, V> m, Fn f) {
-    ostringstream out;
-    out << "{";
-    auto i = -1;
-    for (auto &[k, v] : m) {
-        i++;
-        out << f(k, v);
-        if (i != m.size() - 1) {
-            out << ", ";
-        }
-    }
-    out << "}";
-    return out.str();
-}
-
-template <typename T, typename Fn> static string vec_to_string(const vector<T> v, Fn f) {
-    ostringstream out;
-    out << "[";
-    for (auto i = 0; i < v.size(); ++i) {
-        out << f(v[i]);
-        if (i != v.size() - 1) {
-            out << ", ";
-        }
-    }
-    out << "]";
-    return out.str();
-}
-
-template <typename T> static void drain(vector<T> &input, vector<T> &output) {
-    output.reserve(output.size() + input.size());
-    for (auto &v : input) {
-        output.push_back(move(v));
-    }
-    input.clear();
-}
 
 /** 32-bit FNV-1a hash function.
 
@@ -117,6 +73,7 @@ static bool isTemporary(const core::GlobalState &gs, const core::LocalVariable &
            n == Names::unconditional();
 }
 
+/// Utility type for carrying a local variable along with its owner.
 struct OwnedLocal {
     /// Parent method.
     const core::SymbolRef owner;
@@ -125,7 +82,8 @@ struct OwnedLocal {
     /// Location for the occurrence.
     core::LocOffsets offsets;
 
-    string toString(const core::GlobalState &gs, core::FileRef file) {
+    /// Display the OwnedLocal, suitable for use inside a SCIP index.
+    string toSCIPString(const core::GlobalState &gs, core::FileRef file) {
         // 32-bits => if there are 10k methods in a single file, the chance of at least one
         // colliding pair is about 1.1%, assuming even distribution. That seems OK.
         return fmt::format("local {}~#{}", counter, ::fnv1a_32(owner.name(gs).show(gs)));
@@ -149,11 +107,11 @@ public:
         return GemMetadata{v[0], v[1]};
     }
 
-    const std::string &name() const {
+    const string &name() const {
         return this->_name;
     }
 
-    const std::string &version() const {
+    const string &version() const {
         return this->_version;
     }
 };
@@ -180,23 +138,26 @@ bool isSorbetInternal(const core::GlobalState &gs, core::SymbolRef sym) {
 
 // A wrapper type to handle both top-level symbols (like classes) as well as
 // "inner symbols" like fields (@x). In a statically typed language, field
-// symbols are like any other symbols, but in Ruby, they aren't declared
-// ahead-of-time. So Sorbet represents them with a separate name on the side.
+// symbols are like any other symbols, but in Ruby, they aren't (necessarily)
+// declared ahead-of-time (you can declare them with @x = T.let(…, …) though).
+// So Sorbet represents them with a separate name on the side.
 //
 // Structurally, this is similar to the Alias instruction. One key difference
 // is that the SymbolRef may refer to the owner in some situations.
 class NamedSymbolRef final {
     core::SymbolRef selfOrOwner;
+
+    /// Name of the symbol, which may or may not exist.
     core::NameRef name;
 
-public:
-    // The type of the original definition, if applicable.
-    //
-    // Note that references to this symbol may have a different type,
-    // because you can change the type of a field, including within
-    // the same basic block.
-    core::TypePtr definitionType;
+    /// The type of the symbol at its definition, if applicable.
+    ///
+    /// References to this symbol may have a different type,
+    /// because you can change the type of a field, including within
+    /// the same basic block.
+    core::TypePtr _definitionType;
 
+public:
     enum class Kind {
         ClassOrModule,
         UndeclaredField,
@@ -206,7 +167,7 @@ public:
 
 private:
     NamedSymbolRef(core::SymbolRef s, core::NameRef n, core::TypePtr t, Kind k)
-        : selfOrOwner(s), name(n), definitionType(t) {
+        : selfOrOwner(s), name(n), _definitionType(t) {
         switch (k) {
             case Kind::ClassOrModule:
                 ENFORCE(s.isClassOrModule());
@@ -260,6 +221,10 @@ public:
         return NamedSymbolRef(self, {}, {}, Kind::Method);
     }
 
+    core::TypePtr definitionType() const {
+        return this->_definitionType;
+    }
+
     Kind kind() const {
         if (this->name.exists()) {
             return Kind::UndeclaredField;
@@ -273,6 +238,7 @@ public:
         return Kind::ClassOrModule;
     }
 
+    /// Display a NamedSymbolRef for debugging.
     string showRaw(const core::GlobalState &gs) const {
         switch (this->kind()) {
             case Kind::UndeclaredField:
@@ -365,11 +331,11 @@ public:
 #undef CHECK_TYPE
     }
 
-    // Returns OK if we were able to compute a symbol for the expression.
-    absl::Status symbolForExpr(const core::GlobalState &gs, const GemMetadata &metadata, scip::Symbol &symbol,
-                               optional<core::Loc> loc) const {
-        // Don't set symbol.scheme and package.manager here because those are hard-coded to 'scip-ruby' and 'gem'
-        // anyways.
+    // Try to compute a scip::Symbol for this NamedSymbolRef.
+    absl::Status symbolForExpr(const core::GlobalState &gs, const GemMetadata &metadata, optional<core::Loc> loc,
+                               scip::Symbol &symbol) const {
+        // Don't set symbol.scheme and package.manager here because
+        // those are hard-coded to 'scip-ruby' and 'gem' anyways.
         scip::Package package;
         package.set_name(metadata.name());
         package.set_version(metadata.version());
@@ -378,7 +344,7 @@ public:
         InlinedVector<scip::Descriptor, 4> descriptors;
         auto cur = this->selfOrOwner;
         while (cur != core::Symbols::root()) {
-            // NOTE:(varun) The current scheme will cause multiple 'definitions' for the same
+            // NOTE(varun): The current scheme will cause multiple 'definitions' for the same
             // entity if it is present in different files, because the path is not encoded
             // in the descriptor whose parent is the root. This matches the semantics of
             // RubyMine, but we may want to revisit this if it is problematic for classes
@@ -386,10 +352,10 @@ public:
             scip::Descriptor descriptor;
             *descriptor.mutable_name() = cur.name(gs).show(gs);
             ENFORCE(!descriptor.name().empty());
-            // TODO: Are the scip descriptor kinds correct?
+            // TODO(varun): Are the scip descriptor kinds correct?
             switch (cur.kind()) {
                 case core::SymbolRef::Kind::Method:
-                    // NOTE: There is a separate isOverloaded field in the flags field,
+                    // NOTE(varun): There is a separate isOverloaded field in the flags field,
                     // despite SO/docs saying that Ruby doesn't support method overloading,
                     // Technically, we should better understand how this works and set the
                     // disambiguator based on that. However, right now, an extension's
@@ -449,9 +415,9 @@ public:
 };
 
 InlinedVector<int32_t, 4> fromSorbetLoc(const core::GlobalState &gs, core::Loc loc) {
-    ENFORCE_NO_TIMER(!loc.empty());
+    ENFORCE(!loc.empty());
     auto [start, end] = loc.position(gs);
-    ENFORCE_NO_TIMER(start.line <= INT32_MAX && start.column <= INT32_MAX);
+    ENFORCE(start.line <= INT32_MAX && start.column <= INT32_MAX);
     ENFORCE(end.line <= INT32_MAX && end.column <= INT32_MAX);
     InlinedVector<int32_t, 4> r;
     r.push_back(start.line - 1);
@@ -472,7 +438,7 @@ core::Loc trimColonColonPrefix(const core::GlobalState &gs, core::Loc baseLoc) {
         return baseLoc;
     }
     auto colonColonOffsetFromRangeStart = source.value().rfind("::"sv);
-    if (colonColonOffsetFromRangeStart == std::string::npos) {
+    if (colonColonOffsetFromRangeStart == string::npos) {
         return baseLoc;
     }
     auto occLen = source.value().length() - (colonColonOffsetFromRangeStart + 2);
@@ -487,36 +453,49 @@ enum class Emitted {
     Earlier,
 };
 
-using OccurrenceCache = UnorderedMap<std::pair<core::LocOffsets, /*SymbolRole*/ int32_t>, uint32_t>;
+using OccurrenceCache = UnorderedMap<pair<core::LocOffsets, /*SymbolRole*/ int32_t>, uint32_t>;
 
+/// Per-thread state storing information to be emitting in a SCIP index.
+///
+/// The states are implicitly merged at the time of emitting the index.
 class SCIPState {
     string symbolScratchBuffer;
     UnorderedMap<NamedSymbolRef, string> symbolStringCache;
 
-    // Cache of occurrences for locals that have been emitted in this function.
-    //
-    // Note that the SymbolRole is a part of the key too, because we can
-    // have a read-reference and write-reference at the same location
-    // (we don't merge those for now).
-    //
-    // The 'value' in the map is purely for sanity-checking. It's a bit
+    /// Cache of occurrences for locals that have been emitted in this function.
+    ///
+    /// Note that the SymbolRole is a part of the key too, because we can
+    /// have a read-reference and write-reference at the same location
+    /// (we don't merge those for now).
+    UnorderedMap<pair<core::LocOffsets, /*SymbolRole*/ int32_t>, uint32_t> localOccurrenceCache;
+    // ^ The 'value' in the map is purely for sanity-checking. It's a bit
     // cumbersome to conditionalize the type to be a set in non-debug and
     // map in debug, so keeping it a map.
-    UnorderedMap<std::pair<core::LocOffsets, /*SymbolRole*/ int32_t>, uint32_t> localOccurrenceCache;
 
-    UnorderedSet<std::tuple<NamedSymbolRef, core::Loc, /*SymbolRole*/ int32_t>> symbolOccurrenceCache;
+    /// Analogous to localOccurrenceCache but for symbols.
+    ///
+    /// This is mainly present to avoid emitting duplicate occurrences
+    /// for DSL-like constructs like prop/def_delegator.
+    UnorderedSet<tuple<NamedSymbolRef, core::Loc, /*SymbolRole*/ int32_t>> symbolOccurrenceCache;
+    // ^ Naively, I would think that that shouldn't happen because we don't traverse
+    // rewriter-synthesized method bodies, but it does seem to happen.
+    //
+    // Also, you would think that emittedSymbols below would handle this.
+    // But it doesn't, for some reason... 🤔
+    //
+    // FIXME(varun): This seems redundant, get rid of it.
 
     GemMetadata gemMetadata;
 
 public:
     UnorderedMap<core::FileRef, vector<scip::Occurrence>> occurrenceMap;
 
-    // Set containing symbols that have been emitted.
-    //
-    // For every (f, s) in emittedSymbols, symbolMap[f] = SymbolInfo{s, ... other stuff}
-    // and vice-versa. This is present to avoid emitting multiple SymbolInfos
-    // for the same local variable if there are multiple definitions.
-    UnorderedSet<std::pair<core::FileRef, std::string>> emittedSymbols;
+    /// Set containing symbols that have been emitted.
+    ///
+    /// For every (f, s) in emittedSymbols, symbolMap[f] = SymbolInfo{s, ... other stuff}
+    /// and vice-versa. This is present to avoid emitting multiple SymbolInfos
+    /// for the same local variable if there are multiple definitions.
+    UnorderedSet<pair<core::FileRef, string>> emittedSymbols;
     UnorderedMap<core::FileRef, vector<scip::SymbolInformation>> symbolMap;
 
     vector<scip::Document> documents;
@@ -535,11 +514,11 @@ public:
         this->localOccurrenceCache.clear();
     }
 
-    // If the returned value is as success, the pointer is non-null.
-    //
-    // The argument symbol is used instead of recomputing from scratch if it is non-null.
-    absl::StatusOr<string *> saveSymbolString(const core::GlobalState &gs, NamedSymbolRef symRef,
-                                              const scip::Symbol *symbol) {
+    /// If the returned value is as success, the pointer is non-null.
+    ///
+    /// The argument symbol is used instead of recomputing from scratch if it is non-null.
+    absl::StatusOr<const string *> saveSymbolString(const core::GlobalState &gs, NamedSymbolRef symRef,
+                                                    const scip::Symbol *symbol) {
         auto pair = this->symbolStringCache.find(symRef);
         if (pair != this->symbolStringCache.end()) {
             return &pair->second;
@@ -552,7 +531,7 @@ public:
             status = scip::utils::emitSymbolString(*symbol, this->symbolScratchBuffer);
         } else {
             scip::Symbol symbol;
-            status = symRef.symbolForExpr(gs, this->gemMetadata, symbol, nullopt);
+            status = symRef.symbolForExpr(gs, this->gemMetadata, {}, symbol);
             if (!status.ok()) {
                 return status;
             }
@@ -680,30 +659,30 @@ public:
             ENFORCE(var.has_value(), "Failed to find source text for definition of local variable");
             docStrings.push_back(fmt::format("```ruby\n{} ({})\n```", var.value(), type.show(gs)));
         }
-        return this->saveDefinitionImpl(gs, file, occ.toString(gs, file), loc, docStrings);
+        return this->saveDefinitionImpl(gs, file, occ.toSCIPString(gs, file), loc, docStrings);
     }
 
     // Save definition when you have a sorbet Symbol.
     // Meant for methods, fields etc., but not local variables.
     // TODO(varun): Should we always pass in the location instead of sometimes only?
     absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, NamedSymbolRef symRef,
-                                std::optional<core::LocOffsets> loc = std::nullopt) {
+                                optional<core::LocOffsets> loc = nullopt) {
         // In practice, there doesn't seem to be any situation which triggers
         // a duplicate definition being emitted, so skip calling cacheOccurrence here.
 
         auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs);
         scip::Symbol symbol;
-        auto status = symRef.symbolForExpr(gs, this->gemMetadata, symbol, occLoc);
+        auto status = symRef.symbolForExpr(gs, this->gemMetadata, occLoc, symbol);
         if (!status.ok()) {
             return status;
         }
-        absl::StatusOr<string *> valueOrStatus(this->saveSymbolString(gs, symRef, &symbol));
+        absl::StatusOr<const string *> valueOrStatus(this->saveSymbolString(gs, symRef, &symbol));
         if (!valueOrStatus.ok()) {
             return valueOrStatus.status();
         }
-        string &symbolString = *valueOrStatus.value();
+        const string &symbolString = *valueOrStatus.value();
         return this->saveDefinitionImpl(gs, file, symbolString, occLoc,
-                                        symRef.docStrings(gs, symRef.definitionType, occLoc));
+                                        symRef.docStrings(gs, symRef.definitionType(), occLoc));
     }
 
     absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ,
@@ -720,7 +699,7 @@ public:
             ENFORCE(var.has_value(), "Failed to find source text for definition of local variable");
             overrideDocs.push_back(fmt::format("```ruby\n{} ({})\n```", var.value(), overrideType->show(gs)));
         }
-        this->saveReferenceImpl(gs, file, occ.toString(gs, file), overrideDocs, occ.offsets, symbol_roles);
+        this->saveReferenceImpl(gs, file, occ.toSCIPString(gs, file), overrideDocs, occ.offsets, symbol_roles);
         return absl::OkStatus();
     }
 
@@ -738,12 +717,11 @@ public:
         }
         auto &gs = ctx.state;
         auto file = ctx.file;
-        // TODO:(varun) Should we cache here to to avoid emitting duplicate references?
-        absl::StatusOr<string *> valueOrStatus(this->saveSymbolString(gs, symRef, nullptr));
+        absl::StatusOr<const string *> valueOrStatus(this->saveSymbolString(gs, symRef, nullptr));
         if (!valueOrStatus.ok()) {
             return valueOrStatus.status();
         }
-        string &symbolString = *valueOrStatus.value();
+        const string &symbolString = *valueOrStatus.value();
 
         vector<string> overrideDocs{};
         using Kind = NamedSymbolRef::Kind;
@@ -787,12 +765,12 @@ public:
     }
 };
 
-std::string format_ancestry(const core::GlobalState &gs, core::SymbolRef sym) {
+string format_ancestry(const core::GlobalState &gs, core::SymbolRef sym) {
     UnorderedSet<core::SymbolRef> visited;
     auto i = 0;
     std::ostringstream out;
     while (sym.exists() && !visited.contains(sym)) {
-        out << fmt::format("#{}{}{}\n", std::string(i * 2, ' '), i == 0 ? "" : "<- ", sym.name(gs).toString(gs));
+        out << fmt::format("#{}{}{}\n", string(i * 2, ' '), i == 0 ? "" : "<- ", sym.name(gs).toString(gs));
         visited.insert(sym);
         sym = sym.owner(gs);
         i++;
@@ -803,7 +781,7 @@ std::string format_ancestry(const core::GlobalState &gs, core::SymbolRef sym) {
 // Loosely inspired by AliasesAndKeywords in IREmitterContext.cc
 class AliasMap final {
 public:
-    using Impl = UnorderedMap<cfg::LocalRef, std::tuple<NamedSymbolRef, core::LocOffsets, /*emitted*/ bool>>;
+    using Impl = UnorderedMap<cfg::LocalRef, tuple<NamedSymbolRef, core::LocOffsets, /*emitted*/ bool>>;
 
 private:
     Impl map;
@@ -873,7 +851,7 @@ public:
         }
     }
 
-    optional<std::pair<NamedSymbolRef, core::LocOffsets>> try_consume(cfg::LocalRef localRef) {
+    optional<pair<NamedSymbolRef, core::LocOffsets>> try_consume(cfg::LocalRef localRef) {
         auto it = this->map.find(localRef);
         if (it == this->map.end()) {
             return nullopt;
@@ -913,6 +891,7 @@ optional<core::TypePtr> computeOverrideType(core::TypePtr definitionType, core::
     return {newType};
 }
 
+/// Convenience type to handle CFG traversal and recording info in SCIPState.
 class CFGTraversal final {
     // A map from each basic block to the locals in it.
     //
@@ -940,6 +919,8 @@ class CFGTraversal final {
     UnorderedMap<cfg::LocalRef, uint32_t> functionLocals;
 
     // Map for storing the type at the original site of definition for a local variable.
+    //
+    // Performs the role of definitionType on NamedSymbolRef but for locals.
     //
     // NOTE: Subsequent references may have different types.
     UnorderedMap<uint32_t, core::TypePtr> localDefinitionType;
@@ -1018,7 +999,7 @@ private:
                 // here even though it's not available in this block. In such
                 // a case, perhaps we should emit a diagnostic instead of a reference?
                 if (!this->blockLocals[bb].contains(localRef)) {
-                    print_dbg("# ill-formed code where variable is accessed before use");
+                    fmt::print(stderr, "# ill-formed code where variable is accessed before use");
                 }
                 break;
             }
@@ -1035,7 +1016,7 @@ private:
             if (isDefinition) {
                 status = this->scipState.saveDefinition(gs, file, namedSym, loc);
             } else {
-                auto overrideType = computeOverrideType(namedSym.definitionType, type);
+                auto overrideType = computeOverrideType(namedSym.definitionType(), type);
                 status = this->scipState.saveReference(ctx, namedSym, overrideType, loc, referenceRole);
             }
         } else {
@@ -1052,7 +1033,7 @@ private:
             }
         }
 
-        ENFORCE_NO_TIMER(status.ok());
+        ENFORCE(status.ok());
         return true;
     }
 
@@ -1162,9 +1143,9 @@ public:
                         if (recvType && send->fun.exists() && send->funLoc.exists() && !send->funLoc.empty() &&
                             !isTemporary(gs, core::LocalVariable(send->fun, 1))) {
                             core::ClassOrModuleRef recv{};
-                            // NOTE(varun): Based on core::Types::getRepresentedClass. Trying to use it directly didn't
-                            // quite work properly, but we might want to consolidate the implementation. I didn't quite
-                            // understand the bit about attachedClass.
+                            // NOTE(varun): Based on core::Types::getRepresentedClass. Trying to use it directly
+                            // didn't quite work properly, but we might want to consolidate the implementation. I
+                            // didn't quite understand the bit about attachedClass.
                             if (core::isa_type<core::ClassType>(recvType)) {
                                 recv = core::cast_type_nonnull<core::ClassType>(recvType).symbol;
                             } else if (core::isa_type<core::AppliedType>(send->recv.type)) {
@@ -1249,8 +1230,8 @@ public:
         // See NOTE[alias-handling].
         AliasMap::Impl map;
         this->aliasMap.extract(map);
-        using SymbolWithLoc = std::pair<NamedSymbolRef, core::LocOffsets>;
-        std::vector<SymbolWithLoc> todo;
+        using SymbolWithLoc = pair<NamedSymbolRef, core::LocOffsets>;
+        vector<SymbolWithLoc> todo;
         for (auto &[_, value] : map) {
             auto &[namedSym, loc, emitted] = value;
             if (!emitted) {
@@ -1280,8 +1261,9 @@ public:
             auto last = unique(todo.begin(), todo.end());
             todo.erase(last, todo.end());
         }
-        // NOTE:(varun) Not 100% sure if emitting a reference here. Here's why it's written this
-        // way right now. This code path is hit in two different kinds of situations:
+        // NOTE(varun): Not 100% sure if emitting a reference here is always correct.
+        // Here's why it's written this way right now. This code path is hit in two
+        // different kinds of situations:
         // - You have a reference to a nested class etc. inside a method body.
         // - You have a 'direct' definition of a nested class
         //     class M::C
@@ -1327,28 +1309,19 @@ public:
         }
         {
             absl::WriterMutexLock lock(&mutableState.mtx);
-            //
+
             // We will move the state out later, so use a no-op deleter.
             return mutableState.states[this_thread::get_id()] =
                        shared_ptr<SCIPState>(new SCIPState(gemMetadata), [](SCIPState *) {});
         }
     }
 
-    void emitSymbol(const core::GlobalState &gs, core::FileRef file, ast::ClassDef *cd) const {
-        auto classLoc = core::Loc(file, cd->name.loc());
-    }
-
     bool doNothing() const {
         return this->indexFilePath.empty();
     }
 
-    void run(core::MutableContext &ctx, ast::ClassDef *cd) const override {
-        if (this->doNothing()) {
-            return;
-        }
-        // FIXME:(varun) This is a no-op???
-        emitSymbol(ctx.state, ctx.file, cd);
-    };
+    void run(core::MutableContext &ctx, ast::ClassDef *cd) const override {}
+
     virtual void finishTypecheckFile(const core::GlobalState &gs, const core::FileRef &file) const override {
         if (this->doNothing()) {
             return;
@@ -1368,7 +1341,8 @@ public:
         metadata.set_version(scip::UnspecifiedProtocolVersion);
         *metadata.mutable_tool_info() = toolInfo;
         // NOTE: We are not respecting the path prefix option here. Should we do that?
-        // FIXME: filesystem::current_path() returns the path in 'native' format, so this won't work on Windows.
+        // FIXME(varun): filesystem::current_path() returns the path in 'native' format,
+        // so this won't work on Windows.
         metadata.set_project_root("file:/" + filesystem::current_path().string());
         metadata.set_text_document_encoding(scip::TextEncoding::UTF8);
 
@@ -1384,6 +1358,14 @@ public:
 
         vector<scip::Document> allDocuments;
         vector<scip::SymbolInformation> allExternalSymbols;
+        auto drain = [](auto &input, auto &output) {
+            output.reserve(output.size() + input.size());
+            for (auto &v : input) {
+                output.push_back(move(v));
+            }
+            input.clear();
+        };
+
         for (auto &state : allStates) {
             drain(state.documents, allDocuments);
             drain(state.externalSymbols, allExternalSymbols);
