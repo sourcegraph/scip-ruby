@@ -974,32 +974,29 @@ private:
             case ValueCategory::LValue: {
                 referenceRole = scip::SymbolRole::WriteAccess;
                 if (!this->functionLocals.contains(localRef)) {
-                    isDefinition = true; // If we're seeing this for the first time in topological order,
-                                         // The current block must have a definition for the variable.
+                    // If we're seeing this for the first time in topological order,
+                    // The current block must have a definition for the variable.
+                    isDefinition = true;
                     auto id = this->addLocal(bb, localRef);
                     this->localDefinitionType[id] = type;
+                } else if (!this->blockLocals[bb].contains(localRef)) {
+                    // The variable wasn't passed in as an argument, and hasn't already been recorded
+                    // as a local in the block. So this must be a definition line.
+                    isDefinition = true;
+                    this->blockLocals[bb].insert(localRef);
                 }
-                // The variable wasn't passed in as an argument, and hasn't already been recorded
-                // as a local in the block. So this must be a definition line.
-                isDefinition = isDefinition || !this->blockLocals[bb].contains(localRef);
                 break;
             }
             case ValueCategory::RValue: {
                 referenceRole = scip::SymbolRole::ReadAccess;
 
-                if (!this->functionLocals.contains(localRef)) {
-                    // Ill-formed code where we're trying to access a variable
-                    // without setting it first. Emit a local as a best-effort.
-                    // TODO(varun): Will Sorbet error out before we get here?
-                    this->addLocal(bb, localRef);
-                }
+                // Ill-formed code where we're trying to access a variable
+                // without setting it first. Emit a local as a best-effort.
                 // TODO(varun): Will Sorbet error out before we get here?
-                // It's possible that we have ill-formed code where the variable
-                // is defined in some other basic block, and tried to access it
-                // here even though it's not available in this block. In such
-                // a case, perhaps we should emit a diagnostic instead of a reference?
-                if (!this->blockLocals[bb].contains(localRef)) {
-                    fmt::print(stderr, "# ill-formed code where variable is accessed before use");
+                if (!this->functionLocals.contains(localRef)) {
+                    this->addLocal(bb, localRef);
+                } else if (!this->blockLocals[bb].contains(localRef)) {
+                    this->blockLocals[bb].insert(localRef);
                 }
                 break;
             }
