@@ -1150,7 +1150,7 @@ public:
                                 recv = core::cast_type_nonnull<core::AppliedType>(send->recv.type).klass;
                             }
                             if (recv.exists()) {
-                                auto funSym = gs.lookupMethodSymbol(recv, send->fun);
+                                auto funSym = recv.data(gs)->findMethodTransitive(gs, send->fun);
                                 if (funSym.exists()) {
                                     // TODO(varun): For arrays, hashes etc., try to identify if the function
                                     // matches a known operator (e.g. []=), and emit an appropriate

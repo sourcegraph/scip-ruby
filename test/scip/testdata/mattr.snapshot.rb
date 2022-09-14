@@ -3,6 +3,7 @@
  class MR
 #      ^^ definition [..] MR#
    extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
    mattr_reader :both, :foo
 #               ^^^^^ definition [..] MR#both().
 #               ^^^^^ definition [..] `<Class:MR>`#both().
@@ -32,6 +33,7 @@
  class MW
 #      ^^ definition [..] MW#
    extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
    mattr_writer :both, :foo
 #               ^^^^^ definition [..] MW#`both=`().
 #               ^^^^^ definition [..] `<Class:MW>`#`both=`().
@@ -61,11 +63,12 @@
  class MA
 #      ^^ definition [..] MA#
    extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
    mattr_accessor :both, :foo
 #                 ^^^^^ definition [..] MA#`both=`().
 #                 ^^^^^ definition [..] `<Class:MA>`#both().
-#                 ^^^^^ definition [..] MA#both().
 #                 ^^^^^ definition [..] `<Class:MA>`#`both=`().
+#                 ^^^^^ definition [..] MA#both().
 #                        ^^^^ definition [..] MA#foo().
 #                        ^^^^ definition [..] `<Class:MA>`#foo().
 #                        ^^^^ definition [..] MA#`foo=`().
@@ -81,9 +84,9 @@
 #                 ^^^^ definition [..] MA#bar().
 #                 ^^^^ definition [..] `<Class:MA>`#bar().
 #                 ^^^^ definition [..] `<Class:MA>`#`bar=`().
-#                       ^^^^^^^^^^^^^^^^^^^ definition [..] MA#no_instance_writer().
 #                       ^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:MA>`#no_instance_writer().
 #                       ^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:MA>`#`no_instance_writer=`().
+#                       ^^^^^^^^^^^^^^^^^^^ definition [..] MA#no_instance_writer().
  
    sig {void}
    def usages

@@ -29,6 +29,7 @@
    l1 = ->(x) {
 #  ^^ definition local 4~#1499497673
 #       ^^ reference [..] Kernel#
+#       ^^ reference [..] Kernel#lambda().
 #          ^ definition local 3~#1499497673
      y += x
 #    ^ reference local 1~#1499497673
@@ -38,6 +39,7 @@
    }
    l2 = lambda { |x|
 #  ^^ definition local 6~#1499497673
+#       ^^^^^^ reference [..] Kernel#lambda().
 #                 ^ definition local 5~#1499497673
      y += x
 #    ^ reference (write) local 1~#1499497673
@@ -48,6 +50,7 @@
    l3 = ->(x:) {
 #  ^^ definition local 9~#1499497673
 #       ^^ reference [..] Kernel#
+#       ^^ reference [..] Kernel#lambda().
 #          ^^ definition local 8~#1499497673
      y += x
 #    ^ reference local 1~#1499497673
@@ -57,6 +60,7 @@
    }
    l4 = lambda { |x:|
 #  ^^ definition local 11~#1499497673
+#       ^^^^^^ reference [..] Kernel#lambda().
 #                 ^^ definition local 10~#1499497673
      y += x
 #    ^ reference local 1~#1499497673
@@ -95,6 +99,7 @@
    }
    p2 = proc { |x|
 #  ^^ definition local 6~#1283111692
+#       ^^^^ reference [..] Kernel#proc().
 #               ^ definition local 5~#1283111692
      y += x
 #    ^ reference local 1~#1283111692
@@ -115,6 +120,7 @@
    }
    p4 = proc { |x:|
 #  ^^ definition local 11~#1283111692
+#       ^^^^ reference [..] Kernel#proc().
 #               ^^ definition local 10~#1283111692
      y += x
 #    ^ reference local 1~#1283111692

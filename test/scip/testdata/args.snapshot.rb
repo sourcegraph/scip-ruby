@@ -10,6 +10,7 @@
 #          ^ reference local 2~#2634721084
    if x == 2
 #     ^ reference local 1~#2634721084
+#       ^^ reference [..] BasicObject#`==`().
      z += y
 #    ^ reference local 3~#2634721084
 #    ^ reference (write) local 3~#2634721084

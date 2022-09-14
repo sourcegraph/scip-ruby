@@ -21,6 +21,7 @@
  class EncryptedProp
 #      ^^^^^^^^^^^^^ definition [..] EncryptedProp#
    include T::Props
+#  ^^^^^^^ reference [..] Module#include().
    def self.encrypted_prop(opts={}); end
 #           ^^^^^^^^^^^^^^ definition [..] `<Class:EncryptedProp>`#encrypted_prop().
    encrypted_prop :foo
@@ -40,11 +41,14 @@
 #    ^ definition [..] Object#f().
    EncryptedProp.new.foo = "hello"
 #  ^^^^^^^^^^^^^ reference [..] EncryptedProp#
+#                ^^^ reference [..] Class#new().
 #                    ^^^^^ reference [..] EncryptedProp#`foo=`().
    EncryptedProp.new.foo = nil
 #  ^^^^^^^^^^^^^ reference [..] EncryptedProp#
+#                ^^^ reference [..] Class#new().
 #                    ^^^^^ reference [..] EncryptedProp#`foo=`().
    return EncryptedProp.new.encrypted_foo
 #         ^^^^^^^^^^^^^ reference [..] EncryptedProp#
+#                       ^^^ reference [..] Class#new().
 #                           ^^^^^^^^^^^^^ reference [..] EncryptedProp#encrypted_foo().
  end

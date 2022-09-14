@@ -54,6 +54,8 @@
 #      ^^ definition [..] L#m2().
      # FIXME: Missing references
      self.class.y = self.class.x
+#         ^^^^^ reference [..] Object#class().
+#                        ^^^^^ reference [..] Object#class().
      return
    end
  end
@@ -85,6 +87,8 @@
 #      ^^ definition [..] N#m3().
      # FIXME: Missing references
      self.class.b = self.class.a
+#         ^^^^^ reference [..] Object#class().
+#                        ^^^^^ reference [..] Object#class().
    end
  end
  
@@ -127,6 +131,7 @@
    p = P.new
 #  ^ definition local 1~#2121829932
 #      ^ reference [..] P#
+#        ^^^ reference [..] Class#new().
    p.a = p.r
 #  ^ reference local 1~#2121829932
 #    ^^^ reference [..] P#`a=`().

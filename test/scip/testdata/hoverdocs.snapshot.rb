@@ -11,6 +11,7 @@
 #      documentation
 #      | Class doc comment
    extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
  
    def m1
 #      ^^ definition [..] C1#m1().
@@ -171,6 +172,7 @@
 #         documentation
 #         | This module is nested inside M1
      extend T::Sig
+#    ^^^^^^ reference [..] Kernel#extend().
  
      # This method is inside M1::M2
      sig { returns(T::Boolean) }
@@ -248,6 +250,7 @@
  end
  
  extend T::Sig
+#^^^^^^ reference [..] Kernel#extend().
 #       ^ reference [..] T#
 #          ^^^ reference [..] T#Sig#
  

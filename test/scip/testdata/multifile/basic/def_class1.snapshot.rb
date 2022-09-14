@@ -3,6 +3,7 @@
  class C1
 #      ^^ definition [..] C1#
    extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
  
    sig { returns(T::Boolean) }
 #                   ^^^^^^^ reference [..] T#Boolean.

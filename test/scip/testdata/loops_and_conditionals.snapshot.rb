@@ -39,6 +39,7 @@
 #  ^ reference (write) local 3~#2393773952
 #      ^ reference local 3~#2393773952
 #           ^ reference local 3~#2393773952
+#             ^^ reference [..] BasicObject#`!=`().
  
    return
  end
@@ -98,6 +99,7 @@
 #      ^ definition local 2~#2901640080
 #           ^^ reference local 1~#2901640080
      puts e
+#    ^^^^ reference [..] Kernel#puts().
 #         ^ reference local 2~#2901640080
    end
  
@@ -109,18 +111,23 @@
 #        ^ reference local 3~#2901640080
      next if g == 0
 #            ^ reference local 4~#2901640080
+#              ^^ reference [..] BasicObject#`==`().
      next g+1 if g == 1
 #         ^ reference local 4~#2901640080
 #                ^ reference local 4~#2901640080
+#                  ^^ reference [..] BasicObject#`==`().
      break if g == 2
 #             ^ reference local 4~#2901640080
+#               ^^ reference [..] BasicObject#`==`().
      break g+1 if g == 3
 #          ^ reference local 4~#2901640080
 #                 ^ reference local 4~#2901640080
+#                   ^^ reference [..] BasicObject#`==`().
      # NOTE: redo is unsupported (https://srb.help/3003)
      # but emitting a reference here does work
      redo if g == 4
 #            ^ reference local 4~#2901640080
+#              ^^ reference [..] BasicObject#`==`().
    end
  end
  
@@ -132,6 +139,7 @@
    while i < 10
 #        ^ reference local 2~#231090382
      puts xs[i]
+#    ^^^^ reference [..] Kernel#puts().
 #         ^^ reference local 1~#231090382
 #            ^ reference local 2~#231090382
    end
@@ -146,18 +154,23 @@
 #           ^ reference local 3~#231090382
      next if g == 0
 #            ^ reference local 4~#231090382
+#              ^^ reference [..] BasicObject#`==`().
      next g+1 if g == 1
 #         ^ reference local 4~#231090382
 #                ^ reference local 4~#231090382
+#                  ^^ reference [..] BasicObject#`==`().
      break if g == 2
 #             ^ reference local 4~#231090382
+#               ^^ reference [..] BasicObject#`==`().
      break g+1 if g == 3
 #          ^ reference local 4~#231090382
 #                 ^ reference local 4~#231090382
+#                   ^^ reference [..] BasicObject#`==`().
      # NOTE: redo is unsupported (https://srb.help/3003)
      # but emitting a reference here does work
      redo if g == 4
 #            ^ reference local 4~#231090382
+#              ^^ reference [..] BasicObject#`==`().
    end
  end
  
@@ -169,6 +182,7 @@
    until i > 10
 #        ^ reference local 2~#3132432719
      puts xs[i]
+#    ^^^^ reference [..] Kernel#puts().
 #         ^^ reference local 1~#3132432719
 #            ^ reference local 2~#3132432719
    end
@@ -183,18 +197,23 @@
 #           ^ reference local 3~#3132432719
      next if g == 0
 #            ^ reference local 4~#3132432719
+#              ^^ reference [..] BasicObject#`==`().
      next g+1 if g == 1
 #         ^ reference local 4~#3132432719
 #                ^ reference local 4~#3132432719
+#                  ^^ reference [..] BasicObject#`==`().
      break if g == 2
 #             ^ reference local 4~#3132432719
+#               ^^ reference [..] BasicObject#`==`().
      break g+1 if g == 3
 #          ^ reference local 4~#3132432719
 #                 ^ reference local 4~#3132432719
+#                   ^^ reference [..] BasicObject#`==`().
      # NOTE: redo is unsupported (https://srb.help/3003)
      # but emitting a reference here does work
      redo if g == 4
 #            ^ reference local 4~#3132432719
+#              ^^ reference [..] BasicObject#`==`().
    end
  end
  

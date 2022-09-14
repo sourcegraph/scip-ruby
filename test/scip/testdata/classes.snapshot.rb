@@ -10,10 +10,12 @@
      _a = C1.new
 #    ^^ definition local 1~#3809224601
 #         ^^ reference [..] C1#
+#            ^^^ reference [..] Class#new().
      _b = M2::C2.new
 #    ^^ definition local 3~#3809224601
 #         ^^ reference [..] M2#
 #             ^^ reference [..] M2#C2#
+#                ^^^ reference [..] Class#new().
      return
    end
  end
@@ -35,6 +37,7 @@
    localClass = Class.new
 #  ^^^^^^^^^^ definition local 1~#552113551
 #               ^^^^^ reference [..] Class#
+#                     ^^^ reference [..] Class#new().
    # Technically, this is not supported by Sorbet (https://srb.help/3001),
    # but make sure we don't crash or do something weird.
    def localClass.myMethod()
@@ -49,6 +52,7 @@
    _m = localClass.myMethod
 #  ^^ definition local 4~#552113551
 #       ^^^^^^^^^^ reference local 1~#552113551
+#                  ^^^^^^^^ reference [..] Object#myMethod().
    return
  end
  
