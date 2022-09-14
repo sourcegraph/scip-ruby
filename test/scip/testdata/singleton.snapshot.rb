@@ -3,6 +3,7 @@
  class A
 #      ^ definition [..] A#
    include Singleton
+#  ^^^^^^^ reference [..] Module#include().
 #  ^^^^^^^^^^^^^^^^^ definition [..] `<Class:A>`#instance().
 #          ^^^^^^^^^ reference [..] Singleton#
  end
@@ -15,9 +16,11 @@
  class C
 #      ^ definition [..] C#
    include Singleton
+#  ^^^^^^^ reference [..] Module#include().
 #  ^^^^^^^^^^^^^^^^^ definition [..] `<Class:C>`#instance().
 #          ^^^^^^^^^ reference [..] Singleton#
    extend T::Helpers
+#  ^^^^^^ reference [..] Kernel#extend().
    final!
  end
  
@@ -27,6 +30,7 @@
 #          ^ reference [..] A#
 #            ^^^^^^^^ reference [..] `<Class:A>`#instance().
 #                      ^ reference [..] B#
+#                        ^^^^^^^^ reference [..] `<Class:A>`#instance().
 #                                  ^ reference [..] C#
 #                                    ^^^^^^^^ reference [..] `<Class:C>`#instance().
  end

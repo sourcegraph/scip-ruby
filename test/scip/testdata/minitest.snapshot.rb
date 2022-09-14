@@ -14,6 +14,7 @@
 #       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'allows constants inside of IT'>`().
        CONST = 10
 #      ^^^^^ definition [..] MyTest#CONST.
+#      ^^^^^^^^^^ reference [..] Kernel#raise().
 #      ^^^^^^^^^^ reference [..] Kernel#
      end
  
@@ -22,6 +23,7 @@
        C2 = T.let(10, Integer)
 #      ^^ definition [..] MyTest#C2.
 #      ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Kernel#
+#      ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Kernel#raise().
 #                     ^^^^^^^ definition local 9~#119448696
 #                     ^^^^^^^ reference [..] Integer#
      end
@@ -86,7 +88,9 @@
 #    ^^ reference [..] `<Class:MyTest>`#it().
  
      junk.it "ignores non-self calls" do
+#    ^^^^ reference [..] Object#junk().
          junk
+#        ^^^^ reference [..] Object#junk().
      end
  
      describe "a non-ideal situation" do

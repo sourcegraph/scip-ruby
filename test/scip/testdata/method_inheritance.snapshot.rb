@@ -20,6 +20,7 @@
    def m3
 #      ^^ definition [..] C2#m3().
      m1
+#    ^^ reference [..] C1#m1().
      m2
 #    ^^ reference [..] C2#m2().
    end

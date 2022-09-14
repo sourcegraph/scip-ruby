@@ -93,6 +93,7 @@
 #      | ```
 #           ^^ reference local 1~#4057334513
      puts x
+#    ^^^^ reference [..] Kernel#puts().
 #         ^ reference local 2~#4057334513
      if b
        x = 1
@@ -242,6 +243,7 @@
 #                  | b (T.untyped)
 #                  | ```
      if !b
+#       ^ reference [..] BasicObject#`!`().
 #        ^ reference local 1~#2066187318
        @f = 1
 #      ^^ definition [..] D#`@f`.

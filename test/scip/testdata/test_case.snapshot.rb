@@ -10,6 +10,7 @@
 #               ^^^^^^^^^^^^^ reference [..] ActiveSupport#
 #                              ^^^^^^^^ definition [..] ActiveSupport#TestCase#
    extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
    # Helper instance method
    sig { params(test: T.untyped).returns(T::Boolean) }
 #                                           ^^^^^^^ reference [..] T#Boolean.
@@ -46,6 +47,7 @@
 #                    ^^^^^^^^^^^^^ reference [..] ActiveSupport#
 #                                   ^^^^^^^^ definition [..] ActiveSupport#TestCase#
    extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
  
    sig { params(block: T.proc.void).void }
 #                             ^^^^ reference [..] `<Class:<DeclBuilderForProcs>>`#void().
@@ -61,6 +63,7 @@
  class NoParentClass
 #      ^^^^^^^^^^^^^ definition [..] NoParentClass#
    extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
  
    sig { params(block: T.proc.void).void }
 #                             ^^^^ reference [..] `<Class:<DeclBuilderForProcs>>`#void().
