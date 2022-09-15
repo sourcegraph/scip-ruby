@@ -359,6 +359,20 @@ See the [release workflow](/.github/workflows/release.yml) for details.
       #define RTREE_NSB (LG_VADDR - RTREE_NLIB)
                 ^~~~~~~~~~~~~~~~~~~~~~~
    ```
+3. Using Xcode 14 can trigger a build error inside the C++ toolchain config.
+   ```text
+   File "/private/var/tmp/_bazel_xyz/0eec049f96822615c65f9acc22fdf113/external/local_config_cc/cc_toolchain_config.bzl", line 45, column 25, in _can_use_deterministic_libtool
+           if _compare_versions(xcode_version, _SUPPORTS_DETERMINISTIC_MODE) >= 0:
+   File "/private/var/tmp/_bazel_xyz/0eec049f96822615c65f9acc22fdf113/external/local_config_cc/cc_toolchain_config.bzl", line 38, column 15, in _compare_versions
+           return dv1.compare_to(apple_common.dotted_version(v2))
+   Error: 'NoneType' value has no field or method 'compare_to'
+   ```
+   Downgrading to Xcode 13.4 fixes the issue.
+   Older Xcode versions can be downloaded from developer.apple.com
+   (requires logging in; a free account is fine).
+   It is a bit difficult to find in the UI,
+   so you may want to click on one of the 'Download' links on
+   the [xcodereleases.com](https://xcodereleases.com/) page.
 
 ### Known RubyGems related issues
 
