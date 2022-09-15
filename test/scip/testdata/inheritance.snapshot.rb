@@ -61,7 +61,7 @@
    def read_f_plus_1?
 #      ^^^^^^^^^^^^^^ definition [..] Z3#`read_f_plus_1?`().
      @f + 1
-#    ^^ reference [..] Z3#`@f`.
+#    ^^ reference [..] Z1#`@f`.
    end
  end
  
@@ -80,8 +80,8 @@
 #    ^^^^^^^ reference [..] Z1#write_f().
 #            ^ reference local 1~#3337417690
      @f = read_f_plus_1?
-#    ^^ definition [..] Z4#`@f`.
-#    ^^^^^^^^^^^^^^^^^^^ reference [..] Z4#`@f`.
+#    ^^ definition [..] Z1#`@f`.
+#    ^^^^^^^^^^^^^^^^^^^ reference [..] Z1#`@f`.
 #         ^^^^^^^^^^^^^^ reference [..] Z3#`read_f_plus_1?`().
    end
  end

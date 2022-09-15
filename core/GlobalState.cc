@@ -1962,6 +1962,7 @@ unique_ptr<GlobalState> GlobalState::deepCopy(bool keepId) const {
     result->sleepInSlowPathSeconds = this->sleepInSlowPathSeconds;
     result->requiresAncestorEnabled = this->requiresAncestorEnabled;
     result->lspExperimentalFastPathEnabled = this->lspExperimentalFastPathEnabled;
+    result->isSCIPRuby = this->isSCIPRuby;
 
     if (keepId) {
         result->globalStateId = this->globalStateId;
@@ -2055,6 +2056,7 @@ unique_ptr<GlobalState> GlobalState::copyForIndex() const {
     result->runningUnderAutogen = this->runningUnderAutogen;
     result->censorForSnapshotTests = this->censorForSnapshotTests;
     result->lspExperimentalFastPathEnabled = this->lspExperimentalFastPathEnabled;
+    result->isSCIPRuby = this->isSCIPRuby;
     result->sleepInSlowPathSeconds = this->sleepInSlowPathSeconds;
     result->requiresAncestorEnabled = this->requiresAncestorEnabled;
     result->kvstoreUuid = this->kvstoreUuid;
