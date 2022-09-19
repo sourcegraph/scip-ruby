@@ -24,6 +24,7 @@
 #include "cfg/CFG.h"
 #include "common/common.h"
 #include "common/sort.h"
+#include "core/Error.h"
 #include "core/ErrorQueue.h"
 #include "core/Loc.h"
 #include "core/SymbolRef.h"
@@ -56,6 +57,29 @@ static uint32_t fnv1a_32(const string &s) {
 }
 
 namespace sorbet::scip_indexer {
+
+constexpr sorbet::core::ErrorClass SCIPRubyDebug{400, sorbet::core::StrictLevel::False};
+
+void _log_debug(const sorbet::core::GlobalState &gs, sorbet::core::Loc loc, std::string s) {
+    if (auto e = gs.beginError(loc, SCIPRubyDebug)) {
+        auto lines = absl::StrSplit(s, '\n');
+        for (auto line = lines.begin(); line != lines.end(); line++) {
+            auto text = string(line->begin(), line->length());
+            if (line == lines.begin()) {
+                e.setHeader("[scip-ruby] {}", text);
+            } else {
+                e.addErrorNote("{}", text);
+            }
+        }
+    }
+}
+
+#ifndef NDEBUG
+#define LOG_DEBUG(__gs, __loc, __s) _log_debug(__gs, __loc, __s)
+#else
+#define LOG_DEBUG(__gs, __s) \
+    {}
+#endif
 
 // TODO(varun): This is an inline workaround for https://github.com/sorbet/sorbet/issues/5925
 // I've not changed the main definition because I didn't bother to rerun the tests with the change.
@@ -778,6 +802,63 @@ string format_ancestry(const core::GlobalState &gs, core::SymbolRef sym) {
     return out.str();
 }
 
+static absl::variant</*owner*/ core::ClassOrModuleRef, core::SymbolRef>
+findUnresolvedFieldTransitive(const core::GlobalState &gs, core::Loc loc, core::ClassOrModuleRef start,
+                              core::NameRef field) {
+    auto fieldText = field.shortName(gs);
+    auto isInstanceVar = fieldText.size() >= 2 && fieldText[0] == '@' && fieldText[1] != '@';
+    auto isClassInstanceVar = isInstanceVar && start.data(gs)->isSingletonClass(gs);
+    // Class instance variables are not inherited, unlike ordinary instance
+    // variables or class variables.
+    if (isClassInstanceVar) {
+        return start;
+    }
+    auto isClassVar = fieldText.size() >= 2 && fieldText[0] == '@' && fieldText[1] == '@';
+    if (isClassVar && !start.data(gs)->isSingletonClass(gs)) {
+        // Triggered when undeclared class variables are accessed from instance methods.
+        start = start.data(gs)->lookupSingletonClass(gs);
+    }
+
+    // TODO(varun): Should we add a cache here? It seems wasteful to redo
+    // work for every occurrence.
+    if (gs.unresolvedFields.find(start) == gs.unresolvedFields.end() ||
+        !gs.unresolvedFields.find(start)->second.contains(field)) {
+        // Triggered by code patterns like:
+        //   # top-level
+        //   def MyClass.method
+        //     # blah
+        //   end
+        // which is not supported by Sorbet.
+        LOG_DEBUG(gs, loc,
+                  fmt::format("couldn't find field {} in class {};\n"
+                              "are you using a code pattern like def MyClass.method which is unsupported by Sorbet?",
+                              field.exists() ? field.toString(gs) : "<non-existent>",
+                              start.exists() ? start.showFullName(gs) : "<non-existent>"));
+        // As a best-effort guess, assume that the definition is
+        // in this class but we somehow missed it.
+        return start;
+    }
+
+    auto best = start;
+    auto cur = start;
+    while (cur.exists()) {
+        auto klass = cur.data(gs);
+        auto sym = klass->findMember(gs, field);
+        if (sym.exists()) {
+            return sym;
+        }
+        auto it = gs.unresolvedFields.find(cur);
+        if (it != gs.unresolvedFields.end() && it->second.contains(field)) {
+            best = cur;
+        }
+        if (cur == klass->superClass()) { // FIXME(varun): Handle mix-ins
+            break;
+        }
+        cur = klass->superClass();
+    }
+    return best;
+}
+
 // Loosely inspired by AliasesAndKeywords in IREmitterContext.cc
 class AliasMap final {
 public:
@@ -816,9 +897,27 @@ public:
                 }
                 if (sym == core::Symbols::Magic_undeclaredFieldStub()) {
                     ENFORCE(!bind.loc.empty());
-                    this->map.insert( // no trim(...) because undeclared fields shouldn't have ::
-                        {bind.bind.variable,
-                         {NamedSymbolRef::undeclaredField(klass, instr->name, bind.bind.type), bind.loc, false}});
+                    ENFORCE(klass.isClassOrModule());
+                    auto result = findUnresolvedFieldTransitive(ctx, ctx.locAt(bind.loc), klass.asClassOrModuleRef(),
+                                                                instr->name);
+                    if (absl::holds_alternative<core::ClassOrModuleRef>(result)) {
+                        auto klass = absl::get<core::ClassOrModuleRef>(result);
+                        if (klass.exists()) {
+                            this->map.insert( // no trim(...) because undeclared fields shouldn't have ::
+                                {bind.bind.variable,
+                                 {NamedSymbolRef::undeclaredField(klass, instr->name, bind.bind.type), bind.loc,
+                                  false}});
+                        }
+                    } else if (absl::holds_alternative<core::SymbolRef>(result)) {
+                        auto fieldSym = absl::get<core::SymbolRef>(result);
+                        if (fieldSym.exists()) {
+                            this->map.insert(
+                                {bind.bind.variable,
+                                 {NamedSymbolRef::declaredField(fieldSym, bind.bind.type), trim(bind.loc), false}});
+                        }
+                    } else {
+                        ENFORCE(false, "Should've handled all cases of variant earlier");
+                    }
                     continue;
                 }
                 if (sym.isFieldOrStaticField()) {
@@ -1019,9 +1118,18 @@ private:
         } else {
             uint32_t localId = this->functionLocals[localRef];
             auto it = this->localDefinitionType.find(localId);
-            ENFORCE(it != this->localDefinitionType.end(), "file:{}, code:\n{}\naliasMap: {}\n", file.data(gs).path(),
-                    core::Loc(file, loc).toString(gs), this->aliasMap.showRaw(gs, file, cfg));
-            auto overrideType = computeOverrideType(it->second, type);
+            optional<core::TypePtr> overrideType;
+            if (it != this->localDefinitionType.end()) {
+                overrideType = computeOverrideType(it->second, type);
+            } else {
+                LOG_DEBUG(
+                    gs, core::Loc(file, loc),
+                    fmt::format(
+                        "failed to find type info; are you using a code pattern unsupported by Sorbet?\ndebugging "
+                        "information: aliasMap: {}",
+                        this->aliasMap.showRaw(gs, file, cfg)));
+                overrideType = type;
+            }
             if (isDefinition) {
                 status = this->scipState.saveDefinition(gs, file, OwnedLocal{this->ctx.owner, localId, loc}, type);
             } else {

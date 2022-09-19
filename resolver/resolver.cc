@@ -3924,6 +3924,93 @@ public:
     }
 };
 
+/// Helper type to traverse ASTs and aggregate information about unresolved fields.
+///
+/// For perf, it would make sense to fuse this along with some other map-reduce
+/// operation over files, but I've kept it separate for now for ease of maintenance.
+class CollectUnresolvedFieldsWalk final {
+    UnorderedMap<core::ClassOrModuleRef, UnorderedSet<core::NameRef>> unresolvedFields;
+
+public:
+    void postTransformUnresolvedIdent(core::Context ctx, ast::ExpressionPtr &tree) {
+        auto &unresolvedIdent = ast::cast_tree_nonnull<ast::UnresolvedIdent>(tree);
+        using Kind = ast::UnresolvedIdent::Kind;
+        core::ClassOrModuleRef klass;
+        switch (unresolvedIdent.kind) {
+            case Kind::Global:
+            case Kind::Local:
+                return;
+            case Kind::Class: {
+                auto enclosingClass = ctx.owner.enclosingClass(ctx);
+                klass = enclosingClass.data(ctx)->isSingletonClass(ctx)
+                            ? enclosingClass                                       // in <static-init>
+                            : enclosingClass.data(ctx)->lookupSingletonClass(ctx); // in static methods
+                break;
+            }
+            case Kind::Instance: {
+                klass = ctx.owner.enclosingClass(ctx);
+            }
+        }
+        this->unresolvedFields[klass].insert(unresolvedIdent.name);
+    }
+
+    struct CollectWalkResult {
+        UnorderedMap<core::ClassOrModuleRef, UnorderedSet<core::NameRef>> unresolvedFields;
+        vector<ast::ParsedFile> trees;
+    };
+
+    static vector<ast::ParsedFile> collect(core::GlobalState &gs, vector<ast::ParsedFile> trees, WorkerPool &workers) {
+        Timer timeit(gs.tracer(), "resolver.collect_unresolved_fields");
+        const core::GlobalState &igs = gs;
+        auto resultq = make_shared<BlockingBoundedQueue<CollectWalkResult>>(trees.size());
+        auto fileq = make_shared<ConcurrentBoundedQueue<ast::ParsedFile>>(trees.size());
+        for (auto &tree : trees) {
+            fileq->push(move(tree), 1);
+        }
+        trees.clear();
+
+        workers.multiplexJob("collectUnresolvedFieldsWalk", [&igs, fileq, resultq]() {
+            Timer timeit(igs.tracer(), "CollectUnresolvedFieldsWorker");
+            CollectUnresolvedFieldsWalk collect;
+            CollectWalkResult walkResult;
+            vector<ast::ParsedFile> collectedTrees;
+            ast::ParsedFile job;
+            for (auto result = fileq->try_pop(job); !result.done(); result = fileq->try_pop(job)) {
+                if (!result.gotItem()) {
+                    continue;
+                }
+                core::Context ictx(igs, core::Symbols::root(), job.file);
+                ast::TreeWalk::apply(ictx, collect, job.tree);
+                collectedTrees.emplace_back(move(job));
+            }
+            if (!collectedTrees.empty()) {
+                walkResult.trees = move(collectedTrees);
+                walkResult.unresolvedFields = std::move(collect.unresolvedFields);
+                resultq->push(move(walkResult), walkResult.trees.size());
+            }
+        });
+
+        {
+            CollectWalkResult threadResult;
+            for (auto result = resultq->wait_pop_timed(threadResult, WorkerPool::BLOCK_INTERVAL(), gs.tracer());
+                 !result.done();
+                 result = resultq->wait_pop_timed(threadResult, WorkerPool::BLOCK_INTERVAL(), gs.tracer())) {
+                if (!result.gotItem()) {
+                    continue;
+                }
+                trees.insert(trees.end(), make_move_iterator(threadResult.trees.begin()),
+                             make_move_iterator(threadResult.trees.end()));
+                gs.unresolvedFields.reserve(gs.unresolvedFields.size() + threadResult.unresolvedFields.size());
+                gs.unresolvedFields.insert(make_move_iterator(threadResult.unresolvedFields.begin()),
+                                           make_move_iterator(threadResult.unresolvedFields.end()));
+            }
+        }
+
+        fast_sort(trees, [](const auto &lhs, const auto &rhs) -> bool { return lhs.file < rhs.file; });
+        return trees;
+    }
+};
+
 class ResolveSanityCheckWalk {
 public:
     void postTransformClassDef(core::Context ctx, ast::ExpressionPtr &tree) {
@@ -4102,6 +4189,9 @@ ast::ParsedFilesOrCancelled Resolver::run(core::GlobalState &gs, vector<ast::Par
 
     auto result = resolveSigs(gs, std::move(rtmafResult.trees), workers);
     ResolveTypeMembersAndFieldsWalk::resolvePendingCastItems(gs, rtmafResult.todoResolveCastItems);
+    if (gs.isSCIPRuby) {
+        result = CollectUnresolvedFieldsWalk::collect(gs, std::move(result), workers);
+    }
     sanityCheck(gs, result);
 
     return result;

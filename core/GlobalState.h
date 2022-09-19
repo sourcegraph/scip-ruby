@@ -291,6 +291,13 @@ public:
     // If 'true', enable the experimental, symbol-deletion-based fast path mode
     bool lspExperimentalFastPathEnabled = false;
 
+    // If 'true', we're running in scip-ruby mode.
+    bool isSCIPRuby = true;
+
+    // --- begin scip-ruby specific state
+    UnorderedMap<core::ClassOrModuleRef, UnorderedSet<core::NameRef>> unresolvedFields;
+    // --- end scip-ruby specific state
+
     // When present, this indicates that single-package rbi generation is being performed, and contains metadata about
     // the packages that are imported by the one whose interface is being generated.
     std::optional<packages::ImportInfo> singlePackageImports;

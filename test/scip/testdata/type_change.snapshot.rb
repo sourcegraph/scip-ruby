@@ -156,7 +156,7 @@
 #    | @f (T.untyped)
 #    | ```
      @@g = nil
-#    ^^^ definition [..] C#`@@g`.
+#    ^^^ definition [..] `<Class:C>`#`@@g`.
 #    documentation
 #    | ```ruby
 #    | @@g (T.untyped)
@@ -175,7 +175,7 @@
 #      | @f (Integer(1))
 #      | ```
        @@g = 1
-#      ^^^ reference (write) [..] C#`@@g`.
+#      ^^^ reference (write) [..] `<Class:C>`#`@@g`.
 #      override_documentation
 #      | ```ruby
 #      | @@g (Integer(1))
@@ -199,7 +199,7 @@
 #      | @f (String("f"))
 #      | ```
        @@g = 'g'
-#      ^^^ reference (write) [..] C#`@@g`.
+#      ^^^ reference (write) [..] `<Class:C>`#`@@g`.
 #      override_documentation
 #      | ```ruby
 #      | @@g (String("g"))
@@ -246,48 +246,48 @@
 #       ^ reference [..] BasicObject#`!`().
 #        ^ reference local 1~#2066187318
        @f = 1
-#      ^^ definition [..] D#`@f`.
+#      ^^ definition [..] C#`@f`.
 #      documentation
 #      | ```ruby
 #      | @f (T.untyped)
 #      | ```
        @@g = 1
-#      ^^^ definition [..] D#`@@g`.
+#      ^^^ definition [..] `<Class:C>`#`@@g`.
 #      documentation
 #      | ```ruby
 #      | @@g (T.untyped)
 #      | ```
        @k = 1
-#      ^^ definition [..] D#`@k`.
+#      ^^ definition [..] C#`@k`.
 #      documentation
 #      | ```ruby
 #      | @k (T.untyped)
 #      | ```
-#      ^^^^^^ reference [..] D#`@k`.
+#      ^^^^^^ reference [..] C#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (Integer(1))
 #      | ```
      else
        @f = 'f'
-#      ^^ definition [..] D#`@f`.
+#      ^^ definition [..] C#`@f`.
 #      documentation
 #      | ```ruby
 #      | @f (T.untyped)
 #      | ```
        @@g = 'g'
-#      ^^^ definition [..] D#`@@g`.
+#      ^^^ definition [..] `<Class:C>`#`@@g`.
 #      documentation
 #      | ```ruby
 #      | @@g (T.untyped)
 #      | ```
        @k = 'k'
-#      ^^ definition [..] D#`@k`.
+#      ^^ definition [..] C#`@k`.
 #      documentation
 #      | ```ruby
 #      | @k (T.untyped)
 #      | ```
-#      ^^^^^^^^ reference [..] D#`@k`.
+#      ^^^^^^^^ reference [..] C#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (String("k"))
