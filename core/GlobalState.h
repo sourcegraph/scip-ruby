@@ -523,6 +523,10 @@ public:
     void incrementNameTableDiffCount();
 
     int globalStateId;
+    // SCIP records unresolved fields for navigation through untyped code.
+    bool isSCIPRuby = true;
+    UnorderedMap<core::ClassOrModuleRef, UnorderedSet<core::NameRef>> unresolvedFields;
+
     bool silenceErrors = false;
     bool autocorrect = false;
     bool didYouMean = true;

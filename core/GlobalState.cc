@@ -2036,6 +2036,7 @@ unique_ptr<GlobalState> GlobalState::deepCopyGlobalState(bool keepId) const {
     auto result = make_unique<GlobalState>(this->errorQueue, this->epochManager);
 
     result->copyOptions(*this);
+    result->isSCIPRuby = this->isSCIPRuby;
 
     if (keepId) {
         result->globalStateId = this->globalStateId;

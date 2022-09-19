@@ -296,12 +296,12 @@
 #    | @x (T.untyped)
 #    | ```
      @@y = 10
-#    ^^^ definition [..] K1#`@@y`.
+#    ^^^ definition [..] `<Class:K1>`#`@@y`.
 #    documentation
 #    | ```ruby
 #    | @@y (T.untyped)
 #    | ```
-#    ^^^^^^^^ reference [..] K1#`@@y`.
+#    ^^^^^^^^ reference [..] `<Class:K1>`#`@@y`.
 #    override_documentation
 #    | ```ruby
 #    | @@y (Integer(10))
@@ -369,13 +369,13 @@
 #      documentation
 #      | overrides K1's p1
      @x = 20
-#    ^^ definition [..] K2#`@x`.
+#    ^^ definition [..] K1#`@x`.
 #    documentation
 #    | ```ruby
 #    | @x (T.untyped)
 #    | ```
      @@y = 20
-#    ^^^ definition [..] K2#`@@y`.
+#    ^^^ definition [..] `<Class:K1>`#`@@y`.
 #    documentation
 #    | ```ruby
 #    | @@y (T.untyped)
@@ -384,7 +384,7 @@
 #    ^^ reference [..] K2#`@z`.
 #    ^^ reference (write) [..] K2#`@z`.
 #    ^^^^^^^^ reference [..] K2#`@z`.
-#          ^^ reference [..] K2#`@x`.
+#          ^^ reference [..] K1#`@x`.
 #          override_documentation
 #          | ```ruby
 #          | @x (Integer(20))
