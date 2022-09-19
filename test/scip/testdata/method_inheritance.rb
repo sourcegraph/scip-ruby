@@ -16,3 +16,9 @@ class C2 < C1
     m2
   end
 end
+
+class C3 < C2
+  def m4
+    m1
+  end
+end
