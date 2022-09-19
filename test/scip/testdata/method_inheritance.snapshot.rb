@@ -25,3 +25,13 @@
 #    ^^ reference [..] C2#m2().
    end
  end
+ 
+ class C3 < C2
+#      ^^ definition [..] C3#
+#           ^^ definition [..] C2#
+   def m4
+#      ^^ definition [..] C3#m4().
+     m1
+#    ^^ reference [..] C1#m1().
+   end
+ end
