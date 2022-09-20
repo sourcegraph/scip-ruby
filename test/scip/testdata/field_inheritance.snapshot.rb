@@ -26,14 +26,17 @@
    def get_inherited_ivar
 #      ^^^^^^^^^^^^^^^^^^ definition [..] C2#get_inherited_ivar().
      return @f + @h
-#           ^^ reference [..] C1#`@f`.
-#                ^^ reference [..] C1#`@h`.
+#           ^^ reference [..] C2#`@f`.
+#           relation definition=[..] C1#`@f`.
+#                ^^ reference [..] C2#`@h`.
+#                relation definition=[..] C1#`@h`.
    end
  
    def set_inherited_ivar
 #      ^^^^^^^^^^^^^^^^^^ definition [..] C2#set_inherited_ivar().
      @f = 10
-#    ^^ definition [..] C1#`@f`.
+#    ^^ definition [..] C2#`@f`.
+#    relation definition=[..] C1#`@f`.
      return
    end
  
@@ -57,9 +60,11 @@
    def refs
 #      ^^^^ definition [..] C3#refs().
      @f = @g + @i
-#    ^^ definition [..] C1#`@f`.
-#         ^^ reference [..] C2#`@g`.
-#              ^^ reference [..] C1#`@i`.
+#    ^^ definition [..] C3#`@f`.
+#    relation definition=[..] C1#`@f`.
+#         ^^ reference [..] C3#`@g`.
+#         relation definition=[..] C2#`@g`.
+#              ^^ reference [..] C3#`@i`.
      return
    end
  end
@@ -148,10 +153,13 @@
 #           ^^^ definition [..] `<Class:D2>`#get().
      @@d2_x = @@d1_v + @@d1_x
 #    ^^^^^^ definition [..] `<Class:D2>`#`@@d2_x`.
-#             ^^^^^^ reference [..] `<Class:D1>`#`@@d1_v`.
-#                      ^^^^^^ reference [..] `<Class:D1>`#`@@d1_x`.
+#             ^^^^^^ reference [..] `<Class:D2>`#`@@d1_v`.
+#             relation definition=[..] `<Class:D1>`#`@@d1_v`.
+#                      ^^^^^^ reference [..] `<Class:D2>`#`@@d1_x`.
+#                      relation definition=[..] `<Class:D1>`#`@@d1_x`.
      @@d1_y + @@d1_z
-#    ^^^^^^ reference [..] `<Class:D1>`#`@@d1_y`.
+#    ^^^^^^ reference [..] `<Class:D2>`#`@@d1_y`.
+#    relation definition=[..] `<Class:D1>`#`@@d1_y`.
 #             ^^^^^^ reference [..] `<Class:D2>`#`@@d1_z`.
      return
    end
@@ -163,13 +171,18 @@
    def self.get_2
 #           ^^^^^ definition [..] `<Class:D3>`#get_2().
      @@d1_v + @@d1_x
-#    ^^^^^^ reference [..] `<Class:D1>`#`@@d1_v`.
-#             ^^^^^^ reference [..] `<Class:D1>`#`@@d1_x`.
+#    ^^^^^^ reference [..] `<Class:D3>`#`@@d1_v`.
+#    relation definition=[..] `<Class:D1>`#`@@d1_v`.
+#             ^^^^^^ reference [..] `<Class:D3>`#`@@d1_x`.
+#             relation definition=[..] `<Class:D1>`#`@@d1_x`.
      @@d1_y + @@d1_z
-#    ^^^^^^ reference [..] `<Class:D1>`#`@@d1_y`.
-#             ^^^^^^ reference [..] `<Class:D2>`#`@@d1_z`.
+#    ^^^^^^ reference [..] `<Class:D3>`#`@@d1_y`.
+#    relation definition=[..] `<Class:D1>`#`@@d1_y`.
+#             ^^^^^^ reference [..] `<Class:D3>`#`@@d1_z`.
+#             relation definition=[..] `<Class:D2>`#`@@d1_z`.
      @@d2_x
-#    ^^^^^^ reference [..] `<Class:D2>`#`@@d2_x`.
+#    ^^^^^^ reference [..] `<Class:D3>`#`@@d2_x`.
+#    relation definition=[..] `<Class:D2>`#`@@d2_x`.
      return
    end
  end

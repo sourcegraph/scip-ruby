@@ -219,10 +219,21 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
                 }
             };
             printDocs(occ.override_documentation(), "override_documentation");
-            if (!(isDefinition && symbolTable.contains(occ.symbol()))) {
+            if (!symbolTable.contains(occ.symbol())) {
                 continue;
             }
             auto &symbolInfo = symbolTable[occ.symbol()];
+            bool isDefinedByAnother = ([&]() -> bool {
+                for (auto &rel : symbolInfo.relationships()) {
+                    if (rel.is_definition()) {
+                        return true;
+                    }
+                }
+                return false;
+            })();
+            if (!isDefinition && !isDefinedByAnother) {
+                continue;
+            }
             printDocs(symbolInfo.documentation(), "documentation");
 
             relationships.clear();
@@ -233,16 +244,26 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
             fast_sort(relationships, [](const scip::Relationship &r1, const scip::Relationship &r2) -> bool {
                 return r1.symbol() < r2.symbol();
             });
-            for (auto &rel : relationships) {
-                out << lineStart << "relation " << formatSymbol(rel.symbol());
-                if (rel.is_implementation()) {
-                    out << " implementation";
-                }
-                if (rel.is_reference()) {
-                    out << " reference";
-                }
-                if (rel.is_type_definition()) {
-                    out << " type_definition";
+            if (!relationships.empty()) {
+                out << lineStart << "relation ";
+                for (auto i = 0; i < relationships.size(); ++i) {
+                    auto &rel = relationships[i];
+                    if (rel.is_implementation()) {
+                        out << "implementation=";
+                    }
+                    if (rel.is_reference()) {
+                        out << "reference=";
+                    }
+                    if (rel.is_type_definition()) {
+                        out << "type_definition=";
+                    }
+                    if (rel.is_definition()) {
+                        out << "definition=";
+                    }
+                    out << formatSymbol(rel.symbol());
+                    if (i != relationships.size() - 1) {
+                        out << ' ';
+                    }
                 }
                 out << '\n';
             }

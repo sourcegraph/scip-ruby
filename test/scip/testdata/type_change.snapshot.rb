@@ -156,11 +156,12 @@
 #    | @f (T.untyped)
 #    | ```
      @@g = nil
-#    ^^^ definition [..] `<Class:C>`#`@@g`.
+#    ^^^ definition [..] C#`@@g`.
 #    documentation
 #    | ```ruby
 #    | @@g (T.untyped)
 #    | ```
+#    relation definition=[..] `<Class:C>`#`@@g`.
      @k = nil
 #    ^^ definition [..] C#`@k`.
 #    documentation
@@ -175,11 +176,16 @@
 #      | @f (Integer(1))
 #      | ```
        @@g = 1
-#      ^^^ reference (write) [..] `<Class:C>`#`@@g`.
+#      ^^^ reference (write) [..] C#`@@g`.
 #      override_documentation
 #      | ```ruby
 #      | @@g (Integer(1))
 #      | ```
+#      documentation
+#      | ```ruby
+#      | @@g (T.untyped)
+#      | ```
+#      relation definition=[..] `<Class:C>`#`@@g`.
        @k = 1
 #      ^^ reference (write) [..] C#`@k`.
 #      override_documentation
@@ -199,11 +205,16 @@
 #      | @f (String("f"))
 #      | ```
        @@g = 'g'
-#      ^^^ reference (write) [..] `<Class:C>`#`@@g`.
+#      ^^^ reference (write) [..] C#`@@g`.
 #      override_documentation
 #      | ```ruby
 #      | @@g (String("g"))
 #      | ```
+#      documentation
+#      | ```ruby
+#      | @@g (T.untyped)
+#      | ```
+#      relation definition=[..] `<Class:C>`#`@@g`.
        @k = 'k'
 #      ^^ reference (write) [..] C#`@k`.
 #      override_documentation
@@ -246,52 +257,68 @@
 #       ^ reference [..] BasicObject#`!`().
 #        ^ reference local 1~#2066187318
        @f = 1
-#      ^^ definition [..] C#`@f`.
+#      ^^ definition [..] D#`@f`.
 #      documentation
 #      | ```ruby
 #      | @f (T.untyped)
 #      | ```
+#      relation definition=[..] C#`@f`.
        @@g = 1
-#      ^^^ definition [..] `<Class:C>`#`@@g`.
+#      ^^^ definition [..] D#`@@g`.
 #      documentation
 #      | ```ruby
 #      | @@g (T.untyped)
 #      | ```
+#      relation definition=[..] `<Class:C>`#`@@g`.
        @k = 1
-#      ^^ definition [..] C#`@k`.
+#      ^^ definition [..] D#`@k`.
 #      documentation
 #      | ```ruby
 #      | @k (T.untyped)
 #      | ```
-#      ^^^^^^ reference [..] C#`@k`.
+#      relation definition=[..] C#`@k`.
+#      ^^^^^^ reference [..] D#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (Integer(1))
 #      | ```
-     else
-       @f = 'f'
-#      ^^ definition [..] C#`@f`.
-#      documentation
-#      | ```ruby
-#      | @f (T.untyped)
-#      | ```
-       @@g = 'g'
-#      ^^^ definition [..] `<Class:C>`#`@@g`.
-#      documentation
-#      | ```ruby
-#      | @@g (T.untyped)
-#      | ```
-       @k = 'k'
-#      ^^ definition [..] C#`@k`.
 #      documentation
 #      | ```ruby
 #      | @k (T.untyped)
 #      | ```
-#      ^^^^^^^^ reference [..] C#`@k`.
+#      relation definition=[..] C#`@k`.
+     else
+       @f = 'f'
+#      ^^ definition [..] D#`@f`.
+#      documentation
+#      | ```ruby
+#      | @f (T.untyped)
+#      | ```
+#      relation definition=[..] C#`@f`.
+       @@g = 'g'
+#      ^^^ definition [..] D#`@@g`.
+#      documentation
+#      | ```ruby
+#      | @@g (T.untyped)
+#      | ```
+#      relation definition=[..] `<Class:C>`#`@@g`.
+       @k = 'k'
+#      ^^ definition [..] D#`@k`.
+#      documentation
+#      | ```ruby
+#      | @k (T.untyped)
+#      | ```
+#      relation definition=[..] C#`@k`.
+#      ^^^^^^^^ reference [..] D#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (String("k"))
 #      | ```
+#      documentation
+#      | ```ruby
+#      | @k (T.untyped)
+#      | ```
+#      relation definition=[..] C#`@k`.
      end
    end
  end

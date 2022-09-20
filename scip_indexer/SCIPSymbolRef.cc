@@ -6,16 +6,26 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/str_replace.h"
+#include "spdlog/fmt/fmt.h"
 
 #include "core/Loc.h"
 #include "main/lsp/lsp.h"
 
+#include "scip_indexer/Debug.h"
 #include "scip_indexer/SCIPSymbolRef.h"
 
 using namespace std;
 
 namespace sorbet::scip_indexer {
+
+string showRawRelationshipsMap(const core::GlobalState &gs, const RelationshipsMap &relMap) {
+    return showMap(relMap, [&gs](const UntypedGenericSymbolRef &ugsr, const auto &result) -> string {
+        return fmt::format("{}: (inherited={}, mixins={})", ugsr.showRaw(gs), result.inherited.showRaw(gs),
+                           showVec(*result.mixedIn, [&gs](const auto &mixin) -> string { return mixin.showRaw(gs); }));
+    });
+}
 
 // Try to compute a scip::Symbol for this value.
 absl::Status UntypedGenericSymbolRef::symbolForExpr(const core::GlobalState &gs, const GemMetadata &metadata,
@@ -83,9 +93,56 @@ absl::Status UntypedGenericSymbolRef::symbolForExpr(const core::GlobalState &gs,
 
 string UntypedGenericSymbolRef::showRaw(const core::GlobalState &gs) const {
     if (this->name.exists()) {
-        return fmt::format("UGSR(owner: {}, name: {})", this->selfOrOwner.showFullName(gs), this->name.toString(gs));
+        return fmt::format("UGSR({}.{})", absl::StripAsciiWhitespace(this->selfOrOwner.showFullName(gs)),
+                           this->name.toString(gs));
     }
-    return fmt::format("UGSR(symbol: {})", this->selfOrOwner.showFullName(gs));
+    return fmt::format("UGSR({})", absl::StripAsciiWhitespace(this->selfOrOwner.showFullName(gs)));
+}
+
+void UntypedGenericSymbolRef::saveRelationships(
+    const core::GlobalState &gs, const RelationshipsMap &relationshipMap, SmallVec<scip::Relationship> &rels,
+    const absl::FunctionRef<void(UntypedGenericSymbolRef, std::string &)> &saveSymbolString) const {
+    auto it = relationshipMap.find(*this);
+    if (it == relationshipMap.end()) {
+        return;
+    }
+    using Kind = FieldQueryResult::Kind;
+    auto saveSymbol = [&](FieldQueryResult::Data data, scip::Relationship &rel) {
+        switch (data.kind()) {
+            case Kind::FromUndeclared:
+                saveSymbolString(UntypedGenericSymbolRef::undeclared(data.originalClass(), this->name),
+                                 *rel.mutable_symbol());
+                break;
+            case Kind::FromDeclared:
+                saveSymbolString(UntypedGenericSymbolRef::declared(data.originalSymbol()), *rel.mutable_symbol());
+                break;
+        }
+        ENFORCE(!rel.symbol().empty());
+        rels.push_back(move(rel));
+    };
+
+    auto result = it->second;
+
+    bool saveInherited = false;
+    switch (result.inherited.kind()) {
+        case Kind::FromUndeclared:
+            saveInherited = core::SymbolRef(result.inherited.originalClass()) != this->selfOrOwner;
+            break;
+        case Kind::FromDeclared:
+            saveInherited = result.inherited.originalSymbol().owner(gs) != this->selfOrOwner;
+    }
+
+    if (saveInherited) {
+        scip::Relationship rel;
+        rel.set_is_definition(true);
+        saveSymbol(result.inherited, rel);
+    }
+
+    for (auto mixin : *result.mixedIn) {
+        scip::Relationship rel;
+        rel.set_is_reference(true);
+        saveSymbol(mixin, rel);
+    }
 }
 
 string GenericSymbolRef::showRaw(const core::GlobalState &gs) const {

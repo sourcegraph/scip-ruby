@@ -33,6 +33,7 @@
 #include "sorbet_version/sorbet_version.h"
 
 #include "scip_indexer/Debug.h"
+#include "scip_indexer/SCIPFieldResolve.h"
 #include "scip_indexer/SCIPProtoExt.h"
 #include "scip_indexer/SCIPSymbolRef.h"
 #include "scip_indexer/SCIPUtils.h"
@@ -134,6 +135,10 @@ enum class Emitted {
 /// Per-thread state storing information to be emitting in a SCIP index.
 ///
 /// The states are implicitly merged at the time of emitting the index.
+///
+/// WARNING: A SCIPState value will in general be reused across files,
+/// so caches should generally directly or indirectly include a FileRef
+/// as part of key (e.g. via core::Loc).
 class SCIPState {
     string symbolScratchBuffer;
     UnorderedMap<UntypedGenericSymbolRef, string> symbolStringCache;
@@ -153,6 +158,15 @@ class SCIPState {
     /// This is mainly present to avoid emitting duplicate occurrences
     /// for DSL-like constructs like prop/def_delegator.
     UnorderedSet<tuple<GenericSymbolRef, core::Loc, /*SymbolRole*/ int32_t>> symbolOccurrenceCache;
+
+    /// Map to keep track of symbols which lack a direct definition,
+    /// and are indirectly defined by another symbol through a Relationship.
+    ///
+    /// Ideally, 'UntypedGenericSymbolRef' would not be duplicated across files
+    /// but we keep these separate per file to avoid weirdness where logically
+    /// different but identically named classes exist in different files.
+    UnorderedMap<core::FileRef, UnorderedSet<UntypedGenericSymbolRef>> potentialRefOnlySymbols;
+
     // ^ Naively, I would think that that shouldn't happen because we don't traverse
     // rewriter-synthesized method bodies, but it does seem to happen.
     //
@@ -173,6 +187,15 @@ public:
     /// for the same local variable if there are multiple definitions.
     UnorderedSet<pair<core::FileRef, string>> emittedSymbols;
     UnorderedMap<core::FileRef, vector<scip::SymbolInformation>> symbolMap;
+
+    /// Stores the relationships that apply to a field or a method.
+    ///
+    /// Ideally, 'UntypedGenericSymbolRef' would not be duplicated across files
+    /// but we keep these separate per file to avoid weirdness where logically
+    /// different but identically named classes exist in different files.
+    UnorderedMap<core::FileRef, RelationshipsMap> relationshipsMap;
+
+    FieldResolver fieldResolver;
 
     vector<scip::Document> documents;
     vector<scip::SymbolInformation> externalSymbols;
@@ -223,8 +246,13 @@ public:
     }
 
 private:
-    Emitted saveSymbolInfo(core::FileRef file, const string &symbolString, const SmallVec<string> &docs) {
-        if (this->emittedSymbols.contains({file, symbolString})) {
+    bool alreadyEmittedSymbolInfo(core::FileRef file, const string &symbolString) {
+        return this->emittedSymbols.contains({file, symbolString});
+    }
+
+    Emitted saveSymbolInfo(core::FileRef file, const string &symbolString, const SmallVec<string> &docs,
+                           const SmallVec<scip::Relationship> &rels) {
+        if (this->alreadyEmittedSymbolInfo(file, symbolString)) {
             return Emitted::Earlier;
         }
         scip::SymbolInformation symbolInfo;
@@ -232,15 +260,19 @@ private:
         for (auto &doc : docs) {
             symbolInfo.add_documentation(doc);
         }
+        for (auto &rel : rels) {
+            *symbolInfo.add_relationships() = rel;
+        }
         this->symbolMap[file].push_back(symbolInfo);
         return Emitted::Now;
     }
 
     absl::Status saveDefinitionImpl(const core::GlobalState &gs, core::FileRef file, const string &symbolString,
-                                    core::Loc occLoc, const SmallVec<string> &docs) {
+                                    core::Loc occLoc, const SmallVec<string> &docs,
+                                    const SmallVec<scip::Relationship> &rels) {
         ENFORCE(!symbolString.empty());
 
-        auto emitted = this->saveSymbolInfo(file, symbolString, docs);
+        auto emitted = this->saveSymbolInfo(file, symbolString, docs, rels);
 
         occLoc = trimColonColonPrefix(gs, occLoc);
         scip::Occurrence occurrence;
@@ -325,6 +357,16 @@ private:
         return !inserted;
     }
 
+    void saveRelationships(const core::GlobalState &gs, core::FileRef file, UntypedGenericSymbolRef untypedSymRef,
+                           SmallVec<scip::Relationship> &rels) {
+        untypedSymRef.saveRelationships(gs, this->relationshipsMap[file], rels,
+                                        [this, &gs](UntypedGenericSymbolRef sym, std::string &out) {
+                                            auto status = this->saveSymbolString(gs, sym, nullptr);
+                                            ENFORCE(status.ok());
+                                            out = *status.value();
+                                        });
+    }
+
 public:
     absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ, core::TypePtr type) {
         if (this->cacheOccurrence(gs, file, occ, scip::SymbolRole::Definition)) {
@@ -337,7 +379,7 @@ public:
             ENFORCE(var.has_value(), "Failed to find source text for definition of local variable");
             docStrings.push_back(fmt::format("```ruby\n{} ({})\n```", var.value(), type.show(gs)));
         }
-        return this->saveDefinitionImpl(gs, file, occ.toSCIPString(gs, file), loc, docStrings);
+        return this->saveDefinitionImpl(gs, file, occ.toSCIPString(gs, file), loc, docStrings, {});
     }
 
     // Save definition when you have a sorbet Symbol.
@@ -350,11 +392,12 @@ public:
 
         auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs);
         scip::Symbol symbol;
-        auto status = symRef.withoutType().symbolForExpr(gs, this->gemMetadata, occLoc, symbol);
+        auto untypedSymRef = symRef.withoutType();
+        auto status = untypedSymRef.symbolForExpr(gs, this->gemMetadata, occLoc, symbol);
         if (!status.ok()) {
             return status;
         }
-        absl::StatusOr<const string *> valueOrStatus(this->saveSymbolString(gs, symRef.withoutType(), &symbol));
+        absl::StatusOr<const string *> valueOrStatus(this->saveSymbolString(gs, untypedSymRef, &symbol));
         if (!valueOrStatus.ok()) {
             return valueOrStatus.status();
         }
@@ -362,7 +405,11 @@ public:
 
         SmallVec<string> docs;
         symRef.saveDocStrings(gs, symRef.definitionType(), occLoc, docs);
-        return this->saveDefinitionImpl(gs, file, symbolString, occLoc, docs);
+
+        SmallVec<scip::Relationship> rels;
+        this->saveRelationships(gs, file, symRef.withoutType(), rels);
+
+        return this->saveDefinitionImpl(gs, file, symbolString, occLoc, docs, rels);
     }
 
     absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ,
@@ -415,8 +462,41 @@ public:
                     symRef.saveDocStrings(gs, overrideType.value(), loc, overrideDocs);
                 }
         }
+
+        // If we haven't emitted a SymbolInfo yet, record that we may want to emit
+        // a SymbolInfo in the future, if it isn't emitted later in this file.
+        if (!this->emittedSymbols.contains({file, symbolString})) {
+            auto &rels = this->relationshipsMap[file];
+            if (rels.contains(symRef.withoutType())) {
+                this->potentialRefOnlySymbols[file].insert(symRef.withoutType());
+            }
+        }
+
         this->saveReferenceImpl(gs, file, symbolString, overrideDocs, occLoc, symbol_roles);
         return absl::OkStatus();
+    }
+
+    void finalizeRefOnlySymbolInfos(const core::GlobalState &gs, core::FileRef file) {
+        auto &potentialSyms = this->potentialRefOnlySymbols[file];
+        fmt::print(stderr, "potentialSyms = {}\n",
+                   showSet(potentialSyms, [&](UntypedGenericSymbolRef sym) -> string { return sym.showRaw(gs); }));
+        fmt::print(stderr, "relMap = {}\n", showRawRelationshipsMap(gs, this->relationshipsMap[file]));
+
+        for (auto symRef : potentialSyms) {
+            auto valueOrError = this->saveSymbolString(gs, symRef, nullptr);
+            if (!valueOrError.ok()) {
+                continue;
+            }
+            auto &symbolString = *valueOrError.value();
+            // Avoid calling saveRelationships if we already emitted this.
+            // saveSymbolInfo does this check too, so it isn't strictly needed.
+            if (this->alreadyEmittedSymbolInfo(file, symbolString)) {
+                continue;
+            }
+            SmallVec<scip::Relationship> rels;
+            this->saveRelationships(gs, file, symRef, rels);
+            this->saveSymbolInfo(file, symbolString, {}, rels);
+        }
     }
 
     void saveDocument(const core::GlobalState &gs, const core::FileRef file) {
@@ -463,63 +543,6 @@ string format_ancestry(const core::GlobalState &gs, core::SymbolRef sym) {
     return out.str();
 }
 
-static absl::variant</*owner*/ core::ClassOrModuleRef, core::SymbolRef>
-findUnresolvedFieldTransitive(const core::GlobalState &gs, core::Loc loc, core::ClassOrModuleRef start,
-                              core::NameRef field) {
-    auto fieldText = field.shortName(gs);
-    auto isInstanceVar = fieldText.size() >= 2 && fieldText[0] == '@' && fieldText[1] != '@';
-    auto isClassInstanceVar = isInstanceVar && start.data(gs)->isSingletonClass(gs);
-    // Class instance variables are not inherited, unlike ordinary instance
-    // variables or class variables.
-    if (isClassInstanceVar) {
-        return start;
-    }
-    auto isClassVar = fieldText.size() >= 2 && fieldText[0] == '@' && fieldText[1] == '@';
-    if (isClassVar && !start.data(gs)->isSingletonClass(gs)) {
-        // Triggered when undeclared class variables are accessed from instance methods.
-        start = start.data(gs)->lookupSingletonClass(gs);
-    }
-
-    // TODO(varun): Should we add a cache here? It seems wasteful to redo
-    // work for every occurrence.
-    if (gs.unresolvedFields.find(start) == gs.unresolvedFields.end() ||
-        !gs.unresolvedFields.find(start)->second.contains(field)) {
-        // Triggered by code patterns like:
-        //   # top-level
-        //   def MyClass.method
-        //     # blah
-        //   end
-        // which is not supported by Sorbet.
-        LOG_DEBUG(gs, loc,
-                  fmt::format("couldn't find field {} in class {};\n"
-                              "are you using a code pattern like def MyClass.method which is unsupported by Sorbet?",
-                              field.exists() ? field.toString(gs) : "<non-existent>",
-                              start.exists() ? start.showFullName(gs) : "<non-existent>"));
-        // As a best-effort guess, assume that the definition is
-        // in this class but we somehow missed it.
-        return start;
-    }
-
-    auto best = start;
-    auto cur = start;
-    while (cur.exists()) {
-        auto klass = cur.data(gs);
-        auto sym = klass->findMember(gs, field);
-        if (sym.exists()) {
-            return sym;
-        }
-        auto it = gs.unresolvedFields.find(cur);
-        if (it != gs.unresolvedFields.end() && it->second.contains(field)) {
-            best = cur;
-        }
-        if (cur == klass->superClass()) { // FIXME(varun): Handle mix-ins
-            break;
-        }
-        cur = klass->superClass();
-    }
-    return best;
-}
-
 // Loosely inspired by AliasesAndKeywords in IREmitterContext.cc
 class AliasMap final {
 public:
@@ -534,7 +557,8 @@ private:
 public:
     AliasMap() = default;
 
-    void populate(const core::Context &ctx, const cfg::CFG &cfg) {
+    void populate(const core::Context &ctx, const cfg::CFG &cfg, FieldResolver &fieldResolver,
+                  RelationshipsMap &relMap) {
         this->map = {};
         auto &gs = ctx.state;
         auto method = ctx.owner;
@@ -567,25 +591,42 @@ public:
                              {GenericSymbolRef::undeclaredField(klass, instr->name, bind.bind.type), bind.loc, false}});
                         continue;
                     }
-                    auto result = findUnresolvedFieldTransitive(ctx, ctx.locAt(bind.loc), klass.asClassOrModuleRef(),
-                                                                instr->name);
-                    if (absl::holds_alternative<core::ClassOrModuleRef>(result)) {
-                        auto klass = absl::get<core::ClassOrModuleRef>(result);
-                        if (klass.exists()) {
-                            this->map.insert( // no trim(...) because undeclared fields shouldn't have ::
-                                {bind.bind.variable,
-                                 {GenericSymbolRef::undeclaredField(klass, instr->name, bind.bind.type), bind.loc,
-                                  false}});
+                    auto [result, cacheHit] = fieldResolver.findUnresolvedFieldTransitive(
+                        ctx, ctx.locAt(bind.loc), {klass.asClassOrModuleRef(), instr->name});
+                    auto checkExists = [&](bool exists, const std::string &text) {
+                        ENFORCE(exists,
+                                "Returned non-existent {} from findUnresolvedFieldTransitive with start={}, "
+                                "field={}, file={}, loc={}",
+                                text, klass.exists() ? klass.toStringFullName(gs) : "<non-existent>",
+                                instr->name.exists() ? instr->name.toString(gs) : "<non-existent>",
+                                ctx.file.data(gs).path(), ctx.locAt(bind.loc).showRawLineColumn(gs));
+                    };
+                    switch (result.inherited.kind()) {
+                        case FieldQueryResult::Kind::FromUndeclared: {
+                            checkExists(result.inherited.originalClass().exists(), "class");
+                            auto namedSymRef = GenericSymbolRef::undeclaredField(klass, instr->name, bind.bind.type);
+                            if (!cacheHit) {
+                                // It may be the case that the mixin values are already stored because of the
+                                // traversal in some other function. In that case, don't bother overriding.
+                                relMap.insert({namedSymRef.withoutType(), result});
+                            }
+                            // no trim(...) because undeclared fields shouldn't have ::
+                            this->map.insert({bind.bind.variable, {namedSymRef, bind.loc, false}});
+                            break;
                         }
-                    } else if (absl::holds_alternative<core::SymbolRef>(result)) {
-                        auto fieldSym = absl::get<core::SymbolRef>(result);
-                        if (fieldSym.exists()) {
-                            this->map.insert(
-                                {bind.bind.variable,
-                                 {GenericSymbolRef::declaredField(fieldSym, bind.bind.type), trim(bind.loc), false}});
+                        case FieldQueryResult::Kind::FromDeclared: {
+                            auto fieldSym = result.inherited.originalSymbol();
+                            checkExists(fieldSym.exists(), "field");
+                            auto namedSymRef =
+                                fieldSym.owner(gs) == klass
+                                    ? GenericSymbolRef::declaredField(fieldSym, bind.bind.type)
+                                    : GenericSymbolRef::undeclaredField(klass, instr->name, bind.bind.type);
+                            if (!cacheHit) {
+                                relMap.insert({namedSymRef.withoutType(), result});
+                            }
+                            this->map.insert({bind.bind.variable, {namedSymRef, trim(bind.loc), false}});
+                            break;
                         }
-                    } else {
-                        ENFORCE(false, "Should've handled all cases of variant earlier");
                     }
                     continue;
                 }
@@ -831,7 +872,10 @@ private:
 
 public:
     void traverse(const cfg::CFG &cfg) {
-        this->aliasMap.populate(this->ctx, cfg);
+        this->aliasMap.populate(this->ctx, cfg, this->scipState.fieldResolver,
+                                this->scipState.relationshipsMap[ctx.file]);
+        fmt::print(stderr, "log: [traverse] relationshipsMap = {}\n",
+                   showRawRelationshipsMap(this->ctx.state, this->scipState.relationshipsMap[ctx.file]));
         auto &gs = this->ctx.state;
         auto file = this->ctx.file;
         auto method = this->ctx.owner;
@@ -1100,7 +1144,9 @@ public:
         if (this->doNothing()) {
             return;
         }
-        getSCIPState()->saveDocument(gs, file);
+        auto scipState = this->getSCIPState();
+        scipState->finalizeRefOnlySymbolInfos(gs, file);
+        scipState->saveDocument(gs, file);
     };
     virtual void finishTypecheck(const core::GlobalState &gs) const override {
         if (this->doNothing()) {

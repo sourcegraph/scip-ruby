@@ -296,16 +296,22 @@
 #    | @x (T.untyped)
 #    | ```
      @@y = 10
-#    ^^^ definition [..] `<Class:K1>`#`@@y`.
+#    ^^^ definition [..] K1#`@@y`.
 #    documentation
 #    | ```ruby
 #    | @@y (T.untyped)
 #    | ```
-#    ^^^^^^^^ reference [..] `<Class:K1>`#`@@y`.
+#    relation definition=[..] `<Class:K1>`#`@@y`.
+#    ^^^^^^^^ reference [..] K1#`@@y`.
 #    override_documentation
 #    | ```ruby
 #    | @@y (Integer(10))
 #    | ```
+#    documentation
+#    | ```ruby
+#    | @@y (T.untyped)
+#    | ```
+#    relation definition=[..] `<Class:K1>`#`@@y`.
    end
  
    # lorem ipsum, you get it
@@ -369,25 +375,32 @@
 #      documentation
 #      | overrides K1's p1
      @x = 20
-#    ^^ definition [..] K1#`@x`.
+#    ^^ definition [..] K2#`@x`.
 #    documentation
 #    | ```ruby
 #    | @x (T.untyped)
 #    | ```
+#    relation definition=[..] K1#`@x`.
      @@y = 20
-#    ^^^ definition [..] `<Class:K1>`#`@@y`.
+#    ^^^ definition [..] K2#`@@y`.
 #    documentation
 #    | ```ruby
 #    | @@y (T.untyped)
 #    | ```
+#    relation definition=[..] `<Class:K1>`#`@@y`.
      @z += @x
 #    ^^ reference (write) [..] K2#`@z`.
 #    ^^ reference [..] K2#`@z`.
 #    ^^^^^^^^ reference [..] K2#`@z`.
-#          ^^ reference [..] K1#`@x`.
+#          ^^ reference [..] K2#`@x`.
 #          override_documentation
 #          | ```ruby
 #          | @x (Integer(20))
 #          | ```
+#          documentation
+#          | ```ruby
+#          | @x (T.untyped)
+#          | ```
+#          relation definition=[..] K1#`@x`.
    end
  end

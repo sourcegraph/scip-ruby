@@ -78,8 +78,10 @@
    def m2
 #      ^^ definition [..] N#m2().
      @@b = @@a
-#    ^^^ definition [..] `<Class:N>`#`@@b`.
-#          ^^^ reference [..] `<Class:N>`#`@@a`.
+#    ^^^ definition [..] N#`@@b`.
+#    relation definition=[..] `<Class:N>`#`@@b`.
+#          ^^^ reference [..] N#`@@a`.
+#          relation definition=[..] `<Class:N>`#`@@a`.
      return
    end
  

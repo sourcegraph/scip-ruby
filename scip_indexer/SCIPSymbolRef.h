@@ -15,9 +15,12 @@
 #include "core/Symbols.h"
 #include "core/TypePtr.h"
 
+#include "scip_indexer/SCIPFieldResolve.h"
+
 namespace scip { // Avoid needlessly including protobuf header here.
 class Symbol;
-}
+class Relationship;
+} // namespace scip
 
 namespace sorbet::scip_indexer {
 
@@ -48,6 +51,12 @@ public:
         return this->_version;
     }
 };
+
+class UntypedGenericSymbolRef;
+
+using RelationshipsMap = UnorderedMap<UntypedGenericSymbolRef, FieldQueryResult>;
+
+std::string showRawRelationshipsMap(const core::GlobalState &gs, const RelationshipsMap &relMap);
 
 // Simplified version of GenericSymbolRef that doesn't care about types.
 //
@@ -83,6 +92,11 @@ public:
     // Try to compute a scip::Symbol for this value.
     absl::Status symbolForExpr(const core::GlobalState &gs, const GemMetadata &metadata, std::optional<core::Loc> loc,
                                scip::Symbol &symbol) const;
+
+    void
+    saveRelationships(const core::GlobalState &gs, const RelationshipsMap &relationshipMap,
+                      SmallVec<scip::Relationship> &rels,
+                      const absl::FunctionRef<void(UntypedGenericSymbolRef, std::string &)> &saveSymbolString) const;
 
     std::string showRaw(const core::GlobalState &gs) const;
 };
@@ -210,8 +224,10 @@ public:
         return this->selfOrOwner;
     }
 
+private:
     static bool isSorbetInternal(const core::GlobalState &gs, core::SymbolRef sym);
 
+public:
     bool isSorbetInternalClassOrMethod(const core::GlobalState &gs) const {
         switch (this->kind()) {
             case Kind::UndeclaredField:
