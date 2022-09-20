@@ -28,8 +28,11 @@ cc_library(
 cc_library(
     name = "scip_indexer",
     srcs = [
+        "Debug.cc",
         "Debug.h",
         "SCIPIndexer.cc",
+        "SCIPSymbolRef.cc",
+        "SCIPSymbolRef.h",
     ],
     linkstatic = select({
         "@com_stripe_ruby_typer//tools/config:linkshared": 0,
