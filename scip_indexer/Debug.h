@@ -1,8 +1,14 @@
-#include <ostream>
+#ifndef SORBET_SCIP_DEBUG
+#define SORBET_SCIP_DEBUG
+
+#include <sstream>
 #include <string>
 #include <vector>
 
+#include "absl/strings/str_split.h"
+
 #include "common/common.h"
+#include "core/Error.h"
 
 template <typename K, typename V, typename Fn> std::string map_to_string(const sorbet::UnorderedMap<K, V> m, Fn f) {
     std::ostringstream out;
@@ -46,3 +52,18 @@ template <typename T, typename Fn> std::string vec_to_string(const std::vector<T
     out << "]";
     return out.str();
 }
+
+namespace sorbet::scip_indexer {
+
+constexpr sorbet::core::ErrorClass SCIPRubyDebug{400, sorbet::core::StrictLevel::False};
+
+void _log_debug(const sorbet::core::GlobalState &gs, sorbet::core::Loc loc, std::string s);
+} // namespace sorbet::scip_indexer
+
+#ifndef NDEBUG
+#define LOG_DEBUG(__gs, __loc, __s) sorbet::scip_indexer::_log_debug(__gs, __loc, __s)
+#else
+#define LOG_DEBUG(__gs, __s)
+#endif
+
+#endif // SORBET_SCIP_DEBUG
