@@ -58,29 +58,6 @@ static uint32_t fnv1a_32(const string &s) {
 
 namespace sorbet::scip_indexer {
 
-constexpr sorbet::core::ErrorClass SCIPRubyDebug{400, sorbet::core::StrictLevel::False};
-
-void _log_debug(const sorbet::core::GlobalState &gs, sorbet::core::Loc loc, std::string s) {
-    if (auto e = gs.beginError(loc, SCIPRubyDebug)) {
-        auto lines = absl::StrSplit(s, '\n');
-        for (auto line = lines.begin(); line != lines.end(); line++) {
-            auto text = string(line->begin(), line->length());
-            if (line == lines.begin()) {
-                e.setHeader("[scip-ruby] {}", text);
-            } else {
-                e.addErrorNote("{}", text);
-            }
-        }
-    }
-}
-
-#ifndef NDEBUG
-#define LOG_DEBUG(__gs, __loc, __s) _log_debug(__gs, __loc, __s)
-#else
-#define LOG_DEBUG(__gs, __s) \
-    {}
-#endif
-
 // TODO(varun): This is an inline workaround for https://github.com/sorbet/sorbet/issues/5925
 // I've not changed the main definition because I didn't bother to rerun the tests with the change.
 static bool isTemporary(const core::GlobalState &gs, const core::LocalVariable &var) {

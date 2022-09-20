@@ -28,6 +28,7 @@ cc_library(
 cc_library(
     name = "scip_indexer",
     srcs = [
+        "Debug.cc",
         "Debug.h",
         "SCIPIndexer.cc",
     ],
