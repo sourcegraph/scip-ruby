@@ -259,22 +259,23 @@ public:
     }
 
     vector<string> docStrings(const core::GlobalState &gs, core::TypePtr fieldType, core::Loc loc) {
-#define CHECK_TYPE(type, name) \
-    ENFORCE(type, "missing type for {} in file {}\n{}\n", name, loc.file().data(gs).path(), loc.toString(gs))
+        auto checkType = [&gs, &loc](core::TypePtr ty, const std::string &name) {
+            ENFORCE(ty, "missing type for {} in file {}\n{}\n", name, loc.file().data(gs).path(), loc.toString(gs));
+        };
 
         vector<string> docs;
         string markdown = "";
         switch (this->kind()) {
             case Kind::UndeclaredField: {
                 auto name = this->name.show(gs);
-                CHECK_TYPE(fieldType, name);
+                checkType(fieldType, name);
                 markdown = fmt::format("{} ({})", name, fieldType.show(gs));
                 break;
             }
             case Kind::DeclaredField: {
                 auto fieldRef = this->selfOrOwner.asFieldRef();
                 auto name = fieldRef.showFullName(gs);
-                CHECK_TYPE(fieldType, name);
+                checkType(fieldType, name);
                 markdown = fmt::format("{} ({})", name, fieldType.show(gs));
                 break;
             }
@@ -296,7 +297,7 @@ public:
             case Kind::Method: {
                 auto ref = this->selfOrOwner.asMethodRef();
                 auto resultType = ref.data(gs)->owner.data(gs)->resultType;
-                CHECK_TYPE(resultType, fmt::format("result type for {}", ref.showFullName(gs)));
+                checkType(resultType, fmt::format("result type for {}", ref.showFullName(gs)));
                 markdown = realmain::lsp::prettyTypeForMethod(gs, ref, resultType, nullptr, nullptr);
                 // FIXME(varun): For some reason, it looks like a bunch of public methods
                 // get marked as private here. Avoid printing misleading info until we fix that.
@@ -315,7 +316,6 @@ public:
             }
         }
         return docs;
-#undef CHECK_TYPE
     }
 
     core::Loc symbolLoc(const core::GlobalState &gs) const {
