@@ -52,6 +52,7 @@ cc_library(
         "//sorbet_version",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
         "@cxxopts",
         "@spdlog",
