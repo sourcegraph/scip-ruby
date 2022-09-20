@@ -112,6 +112,8 @@ bool isSorbetInternal(const core::GlobalState &gs, core::SymbolRef sym) {
     return false;
 }
 
+template <typename T> using SmallVec = InlinedVector<T, 2>;
+
 // A wrapper type to handle both top-level symbols (like classes) as well as
 // "inner symbols" like fields (@x). In a statically typed language, field
 // symbols are like any other symbols, but in Ruby, they aren't (necessarily)
@@ -258,12 +260,11 @@ public:
         }
     }
 
-    vector<string> docStrings(const core::GlobalState &gs, core::TypePtr fieldType, core::Loc loc) {
+    void saveDocStrings(const core::GlobalState &gs, core::TypePtr fieldType, core::Loc loc, SmallVec<string> &docs) {
         auto checkType = [&gs, &loc](core::TypePtr ty, const std::string &name) {
             ENFORCE(ty, "missing type for {} in file {}\n{}\n", name, loc.file().data(gs).path(), loc.toString(gs));
         };
 
-        vector<string> docs;
         string markdown = "";
         switch (this->kind()) {
             case Kind::UndeclaredField: {
@@ -315,7 +316,6 @@ public:
                 docs.push_back(doc.value());
             }
         }
-        return docs;
     }
 
     core::Loc symbolLoc(const core::GlobalState &gs) const {
@@ -466,7 +466,7 @@ public:
     }
 
 private:
-    Emitted saveSymbolInfo(core::FileRef file, const string &symbolString, const vector<string> &docs) {
+    Emitted saveSymbolInfo(core::FileRef file, const string &symbolString, const SmallVec<string> &docs) {
         if (this->emittedSymbols.contains({file, symbolString})) {
             return Emitted::Earlier;
         }
@@ -480,7 +480,7 @@ private:
     }
 
     absl::Status saveDefinitionImpl(const core::GlobalState &gs, core::FileRef file, const string &symbolString,
-                                    core::Loc occLoc, const vector<string> &docs) {
+                                    core::Loc occLoc, const SmallVec<string> &docs) {
         ENFORCE(!symbolString.empty());
 
         auto emitted = this->saveSymbolInfo(file, symbolString, docs);
@@ -506,7 +506,7 @@ private:
     }
 
     void saveReferenceImpl(const core::GlobalState &gs, core::FileRef file, const string &symbolString,
-                           const vector<string> &overrideDocs, core::LocOffsets occLocOffsets, int32_t symbol_roles) {
+                           const SmallVec<string> &overrideDocs, core::LocOffsets occLocOffsets, int32_t symbol_roles) {
         ENFORCE(!symbolString.empty());
         auto occLoc = trimColonColonPrefix(gs, core::Loc(file, occLocOffsets));
         scip::Occurrence occurrence;
@@ -573,7 +573,7 @@ public:
         if (this->cacheOccurrence(gs, file, occ, scip::SymbolRole::Definition)) {
             return absl::OkStatus();
         }
-        vector<string> docStrings;
+        SmallVec<string> docStrings;
         auto loc = core::Loc(file, occ.offsets);
         if (type) {
             auto var = loc.source(gs);
@@ -602,8 +602,10 @@ public:
             return valueOrStatus.status();
         }
         const string &symbolString = *valueOrStatus.value();
-        return this->saveDefinitionImpl(gs, file, symbolString, occLoc,
-                                        symRef.docStrings(gs, symRef.definitionType(), occLoc));
+
+        SmallVec<string> docs;
+        symRef.saveDocStrings(gs, symRef.definitionType(), occLoc, docs);
+        return this->saveDefinitionImpl(gs, file, symbolString, occLoc, docs);
     }
 
     absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ,
@@ -611,7 +613,7 @@ public:
         if (this->cacheOccurrence(gs, file, occ, symbol_roles)) {
             return absl::OkStatus();
         }
-        vector<string> overrideDocs;
+        SmallVec<string> overrideDocs;
         auto loc = core::Loc(file, occ.offsets);
         if (overrideType.has_value()) {
             ENFORCE(overrideType.value(), "forgot to fold type to nullopt earlier: {}\n{}\n", file.data(gs).path(),
@@ -644,7 +646,7 @@ public:
         }
         const string &symbolString = *valueOrStatus.value();
 
-        vector<string> overrideDocs{};
+        SmallVec<string> overrideDocs{};
         using Kind = NamedSymbolRef::Kind;
         switch (symRef.kind()) {
             case Kind::ClassOrModule:
@@ -653,7 +655,7 @@ public:
             case Kind::UndeclaredField:
             case Kind::DeclaredField:
                 if (overrideType.has_value()) {
-                    overrideDocs = symRef.docStrings(gs, overrideType.value(), loc);
+                    symRef.saveDocStrings(gs, overrideType.value(), loc, overrideDocs);
                 }
         }
         this->saveReferenceImpl(gs, file, symbolString, overrideDocs, occLoc, symbol_roles);
