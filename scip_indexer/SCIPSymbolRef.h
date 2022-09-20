@@ -45,7 +45,7 @@ public:
     }
 };
 
-// Simplified version of NamedSymbolRef that doesn't care about types.
+// Simplified version of GenericSymbolRef that doesn't care about types.
 //
 // Primarily for use in storing/looking up information in maps/sets,
 // as type information for fields can be refined based on control flow.

@@ -121,8 +121,8 @@ template <typename T> using SmallVec = InlinedVector<T, 2>;
 // So Sorbet represents them with a separate name on the side.
 //
 // Structurally, this is similar to the Alias instruction. One key difference
-// is that the SymbolRef may refer to the owner in some situations.
-class NamedSymbolRef final {
+// is that a GenericSymbolRef may refer to the owner in some situations.
+class GenericSymbolRef final {
     core::SymbolRef selfOrOwner;
 
     /// Name of the symbol, which may or may not exist.
@@ -144,7 +144,7 @@ public:
     };
 
 private:
-    NamedSymbolRef(core::SymbolRef s, core::NameRef n, core::TypePtr t, Kind k)
+    GenericSymbolRef(core::SymbolRef s, core::NameRef n, core::TypePtr t, Kind k)
         : selfOrOwner(s), name(n), _definitionType(t) {
         switch (k) {
             case Kind::ClassOrModule:
@@ -166,38 +166,38 @@ private:
     }
 
 public:
-    NamedSymbolRef(const NamedSymbolRef &) = default;
-    NamedSymbolRef(NamedSymbolRef &&) = default;
-    NamedSymbolRef &operator=(const NamedSymbolRef &) = default;
-    NamedSymbolRef &operator=(NamedSymbolRef &&) = default;
+    GenericSymbolRef(const GenericSymbolRef &) = default;
+    GenericSymbolRef(GenericSymbolRef &&) = default;
+    GenericSymbolRef &operator=(const GenericSymbolRef &) = default;
+    GenericSymbolRef &operator=(GenericSymbolRef &&) = default;
 
-    friend bool operator==(const NamedSymbolRef &lhs, const NamedSymbolRef &rhs) {
+    friend bool operator==(const GenericSymbolRef &lhs, const GenericSymbolRef &rhs) {
         return lhs.selfOrOwner == rhs.selfOrOwner && lhs.name == rhs.name;
     }
 
-    friend bool operator<(const NamedSymbolRef &lhs, const NamedSymbolRef &rhs) {
+    friend bool operator<(const GenericSymbolRef &lhs, const GenericSymbolRef &rhs) {
         return lhs.selfOrOwner.rawId() < rhs.selfOrOwner.rawId() ||
                (lhs.selfOrOwner == rhs.selfOrOwner && lhs.name.rawId() < rhs.name.rawId());
     }
 
-    template <typename H> friend H AbslHashValue(H h, const NamedSymbolRef &c) {
+    template <typename H> friend H AbslHashValue(H h, const GenericSymbolRef &c) {
         return H::combine(std::move(h), c.selfOrOwner, c.name);
     }
 
-    static NamedSymbolRef classOrModule(core::SymbolRef self) {
-        return NamedSymbolRef(self, {}, {}, Kind::ClassOrModule);
+    static GenericSymbolRef classOrModule(core::SymbolRef self) {
+        return GenericSymbolRef(self, {}, {}, Kind::ClassOrModule);
     }
 
-    static NamedSymbolRef undeclaredField(core::SymbolRef owner, core::NameRef name, core::TypePtr type) {
-        return NamedSymbolRef(owner, name, type, Kind::UndeclaredField);
+    static GenericSymbolRef undeclaredField(core::SymbolRef owner, core::NameRef name, core::TypePtr type) {
+        return GenericSymbolRef(owner, name, type, Kind::UndeclaredField);
     }
 
-    static NamedSymbolRef declaredField(core::SymbolRef self, core::TypePtr type) {
-        return NamedSymbolRef(self, {}, type, Kind::DeclaredField);
+    static GenericSymbolRef declaredField(core::SymbolRef self, core::TypePtr type) {
+        return GenericSymbolRef(self, {}, type, Kind::DeclaredField);
     }
 
-    static NamedSymbolRef method(core::SymbolRef self) {
-        return NamedSymbolRef(self, {}, {}, Kind::Method);
+    static GenericSymbolRef method(core::SymbolRef self) {
+        return GenericSymbolRef(self, {}, {}, Kind::Method);
     }
 
     core::TypePtr definitionType() const {
@@ -229,7 +229,7 @@ public:
         }
     }
 
-    /// Display a NamedSymbolRef for debugging.
+    /// Display a GenericSymbolRef for debugging.
     string showRaw(const core::GlobalState &gs) const {
         switch (this->kind()) {
             case Kind::UndeclaredField:
@@ -397,7 +397,7 @@ class SCIPState {
     ///
     /// This is mainly present to avoid emitting duplicate occurrences
     /// for DSL-like constructs like prop/def_delegator.
-    UnorderedSet<tuple<NamedSymbolRef, core::Loc, /*SymbolRole*/ int32_t>> symbolOccurrenceCache;
+    UnorderedSet<tuple<GenericSymbolRef, core::Loc, /*SymbolRole*/ int32_t>> symbolOccurrenceCache;
     // ^ Naively, I would think that that shouldn't happen because we don't traverse
     // rewriter-synthesized method bodies, but it does seem to happen.
     //
@@ -559,7 +559,7 @@ private:
         return true;
     }
 
-    bool cacheOccurrence(const core::GlobalState &gs, core::Loc loc, NamedSymbolRef sym, int32_t symbolRoles) {
+    bool cacheOccurrence(const core::GlobalState &gs, core::Loc loc, GenericSymbolRef sym, int32_t symbolRoles) {
         // Optimization:
         //   Avoid emitting duplicate def/refs for symbols.
         // This can happen with constructs like:
@@ -588,7 +588,7 @@ public:
     // Save definition when you have a sorbet Symbol.
     // Meant for methods, fields etc., but not local variables.
     // TODO(varun): Should we always pass in the location instead of sometimes only?
-    absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, NamedSymbolRef symRef,
+    absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, GenericSymbolRef symRef,
                                 optional<core::LocOffsets> loc = nullopt) {
         // In practice, there doesn't seem to be any situation which triggers
         // a duplicate definition being emitted, so skip calling cacheOccurrence here.
@@ -628,7 +628,7 @@ public:
         return absl::OkStatus();
     }
 
-    absl::Status saveReference(const core::Context &ctx, NamedSymbolRef symRef, optional<core::TypePtr> overrideType,
+    absl::Status saveReference(const core::Context &ctx, GenericSymbolRef symRef, optional<core::TypePtr> overrideType,
                                core::LocOffsets occLoc, int32_t symbol_roles) {
         // HACK: Reduce noise due to <static-init> in snapshots.
         if (ctx.owner.name(ctx) == core::Names::staticInit()) {
@@ -649,7 +649,7 @@ public:
         const string &symbolString = *valueOrStatus.value();
 
         SmallVec<string> overrideDocs{};
-        using Kind = NamedSymbolRef::Kind;
+        using Kind = GenericSymbolRef::Kind;
         switch (symRef.kind()) {
             case Kind::ClassOrModule:
             case Kind::Method:
@@ -763,7 +763,7 @@ findUnresolvedFieldTransitive(const core::GlobalState &gs, core::Loc loc, core::
 // Loosely inspired by AliasesAndKeywords in IREmitterContext.cc
 class AliasMap final {
 public:
-    using Impl = UnorderedMap<cfg::LocalRef, tuple<NamedSymbolRef, core::LocOffsets, /*emitted*/ bool>>;
+    using Impl = UnorderedMap<cfg::LocalRef, tuple<GenericSymbolRef, core::LocOffsets, /*emitted*/ bool>>;
 
 private:
     Impl map;
@@ -806,7 +806,7 @@ public:
                         if (klass.exists()) {
                             this->map.insert( // no trim(...) because undeclared fields shouldn't have ::
                                 {bind.bind.variable,
-                                 {NamedSymbolRef::undeclaredField(klass, instr->name, bind.bind.type), bind.loc,
+                                 {GenericSymbolRef::undeclaredField(klass, instr->name, bind.bind.type), bind.loc,
                                   false}});
                         }
                     } else if (absl::holds_alternative<core::SymbolRef>(result)) {
@@ -814,7 +814,7 @@ public:
                         if (fieldSym.exists()) {
                             this->map.insert(
                                 {bind.bind.variable,
-                                 {NamedSymbolRef::declaredField(fieldSym, bind.bind.type), trim(bind.loc), false}});
+                                 {GenericSymbolRef::declaredField(fieldSym, bind.bind.type), trim(bind.loc), false}});
                         }
                     } else {
                         ENFORCE(false, "Should've handled all cases of variant earlier");
@@ -825,7 +825,7 @@ public:
                     ENFORCE(!bind.loc.empty());
                     this->map.insert(
                         {bind.bind.variable,
-                         {NamedSymbolRef::declaredField(instr->what, bind.bind.type), trim(bind.loc), false}});
+                         {GenericSymbolRef::declaredField(instr->what, bind.bind.type), trim(bind.loc), false}});
                     continue;
                 }
                 // Outside of definition contexts for classes & modules,
@@ -845,13 +845,13 @@ public:
                         // all the 'internal' stuff here?
                         continue;
                     }
-                    this->map.insert({bind.bind.variable, {NamedSymbolRef::classOrModule(sym), trim(loc), false}});
+                    this->map.insert({bind.bind.variable, {GenericSymbolRef::classOrModule(sym), trim(loc), false}});
                 }
             }
         }
     }
 
-    optional<pair<NamedSymbolRef, core::LocOffsets>> try_consume(cfg::LocalRef localRef) {
+    optional<pair<GenericSymbolRef, core::LocOffsets>> try_consume(cfg::LocalRef localRef) {
         auto it = this->map.find(localRef);
         if (it == this->map.end()) {
             return nullopt;
@@ -922,7 +922,7 @@ class CFGTraversal final {
 
     // Map for storing the type at the original site of definition for a local variable.
     //
-    // Performs the role of definitionType on NamedSymbolRef but for locals.
+    // Performs the role of definitionType on GenericSymbolRef but for locals.
     //
     // NOTE: Subsequent references may have different types.
     UnorderedMap<uint32_t, core::TypePtr> localDefinitionType;
@@ -1164,7 +1164,7 @@ public:
                                     // TODO(varun): For arrays, hashes etc., try to identify if the function
                                     // matches a known operator (e.g. []=), and emit an appropriate
                                     // 'WriteAccess' symbol role for it.
-                                    auto status = this->scipState.saveReference(ctx, NamedSymbolRef::method(funSym),
+                                    auto status = this->scipState.saveReference(ctx, GenericSymbolRef::method(funSym),
                                                                                 nullopt, send->funLoc, 0);
                                     ENFORCE(status.ok());
                                 }
@@ -1236,7 +1236,7 @@ public:
         // See NOTE[alias-handling].
         AliasMap::Impl map;
         this->aliasMap.extract(map);
-        using SymbolWithLoc = pair<NamedSymbolRef, core::LocOffsets>;
+        using SymbolWithLoc = pair<GenericSymbolRef, core::LocOffsets>;
         vector<SymbolWithLoc> todo;
         for (auto &[_, value] : map) {
             auto &[namedSym, loc, emitted] = value;
@@ -1406,7 +1406,7 @@ public:
         }
         auto scipState = this->getSCIPState();
         if (methodDef.name != core::Names::staticInit()) {
-            auto status = scipState->saveDefinition(gs, file, scip_indexer::NamedSymbolRef::method(methodDef.symbol));
+            auto status = scipState->saveDefinition(gs, file, scip_indexer::GenericSymbolRef::method(methodDef.symbol));
             ENFORCE(status.ok());
         }
 
