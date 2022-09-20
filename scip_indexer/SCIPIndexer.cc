@@ -240,7 +240,6 @@ public:
             case Kind::Method:
                 return fmt::format("Method {}", this->selfOrOwner.showFullName(gs));
         }
-        ENFORCE(false, "impossible");
     }
 
     core::SymbolRef asSymbolRef() const {
@@ -257,7 +256,6 @@ public:
             case Kind::Method:
                 return isSorbetInternal(gs, this->asSymbolRef());
         }
-        ENFORCE(false, "impossible");
     }
 
     vector<string> docStrings(const core::GlobalState &gs, core::TypePtr fieldType, core::Loc loc) {
@@ -1000,8 +998,6 @@ private:
                 }
                 break;
             }
-            default:
-                ENFORCE(false, "unhandled case of ValueCategory")
         }
         ENFORCE(this->functionLocals.contains(localRef), "should've added local earlier if it was missing");
         absl::Status status;
