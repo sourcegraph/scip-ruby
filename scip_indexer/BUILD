@@ -31,6 +31,8 @@ cc_library(
         "Debug.cc",
         "Debug.h",
         "SCIPIndexer.cc",
+        "SCIPSymbolRef.cc",
+        "SCIPSymbolRef.h",
     ],
     linkstatic = select({
         "@com_stripe_ruby_typer//tools/config:linkshared": 0,

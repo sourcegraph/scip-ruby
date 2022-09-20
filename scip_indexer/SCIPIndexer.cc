@@ -34,6 +34,7 @@
 #include "sorbet_version/sorbet_version.h"
 
 #include "scip_indexer/Debug.h"
+#include "scip_indexer/SCIPSymbolRef.h"
 #include "scip_indexer/SCIPUtils.h"
 
 using namespace std;
@@ -88,32 +89,6 @@ struct OwnedLocal {
         // 32-bits => if there are 10k methods in a single file, the chance of at least one
         // colliding pair is about 1.1%, assuming even distribution. That seems OK.
         return fmt::format("local {}~#{}", counter, ::fnv1a_32(owner.name(gs).show(gs)));
-    }
-};
-
-class GemMetadata final {
-    string _name;
-    string _version;
-
-    GemMetadata(string name, string version) : _name(name), _version(version) {}
-
-public:
-    GemMetadata &operator=(const GemMetadata &) = default;
-
-    static GemMetadata tryParseOrDefault(string metadata) {
-        vector<string> v = absl::StrSplit(metadata, '@');
-        if (v.size() != 2 || v[0].empty() || v[1].empty()) {
-            return GemMetadata{"TODO", "TODO"};
-        }
-        return GemMetadata{v[0], v[1]};
-    }
-
-    const string &name() const {
-        return this->_name;
-    }
-
-    const string &version() const {
-        return this->_version;
     }
 };
 
@@ -179,6 +154,7 @@ private:
                 ENFORCE(!n.exists());
                 return;
             case Kind::UndeclaredField:
+                ENFORCE(s.isClassOrModule());
                 ENFORCE(n.exists());
                 return;
             case Kind::Method:
@@ -237,6 +213,18 @@ public:
             return Kind::Method;
         }
         return Kind::ClassOrModule;
+    }
+
+    UntypedGenericSymbolRef withoutType() const {
+        switch (this->kind()) {
+            case Kind::UndeclaredField:
+                ENFORCE(this->selfOrOwner.isClassOrModule());
+                return UntypedGenericSymbolRef::undeclared(this->selfOrOwner.asClassOrModuleRef(), this->name);
+            case Kind::Method:
+            case Kind::ClassOrModule:
+            case Kind::DeclaredField:
+                return UntypedGenericSymbolRef::declared(this->selfOrOwner);
+        }
     }
 
     /// Display a NamedSymbolRef for debugging.
@@ -332,70 +320,6 @@ public:
 #undef CHECK_TYPE
     }
 
-    // Try to compute a scip::Symbol for this NamedSymbolRef.
-    absl::Status symbolForExpr(const core::GlobalState &gs, const GemMetadata &metadata, optional<core::Loc> loc,
-                               scip::Symbol &symbol) const {
-        // Don't set symbol.scheme and package.manager here because
-        // those are hard-coded to 'scip-ruby' and 'gem' anyways.
-        scip::Package package;
-        package.set_name(metadata.name());
-        package.set_version(metadata.version());
-        *symbol.mutable_package() = move(package);
-
-        InlinedVector<scip::Descriptor, 4> descriptors;
-        auto cur = this->selfOrOwner;
-        while (cur != core::Symbols::root()) {
-            // NOTE(varun): The current scheme will cause multiple 'definitions' for the same
-            // entity if it is present in different files, because the path is not encoded
-            // in the descriptor whose parent is the root. This matches the semantics of
-            // RubyMine, but we may want to revisit this if it is problematic for classes
-            // that are extended in lots of places.
-            scip::Descriptor descriptor;
-            *descriptor.mutable_name() = cur.name(gs).show(gs);
-            ENFORCE(!descriptor.name().empty());
-            // TODO(varun): Are the scip descriptor kinds correct?
-            switch (cur.kind()) {
-                case core::SymbolRef::Kind::Method:
-                    // NOTE(varun): There is a separate isOverloaded field in the flags field,
-                    // despite SO/docs saying that Ruby doesn't support method overloading,
-                    // Technically, we should better understand how this works and set the
-                    // disambiguator based on that. However, right now, an extension's
-                    // type-checking function is not run if a method is overloaded,
-                    // (see pipeline.cc), so it's unclear if we need to care about that.
-                    descriptor.set_suffix(scip::Descriptor::Method);
-                    break;
-                case core::SymbolRef::Kind::ClassOrModule:
-                    descriptor.set_suffix(scip::Descriptor::Type);
-                    break;
-                case core::SymbolRef::Kind::TypeArgument:
-                    descriptor.set_suffix(scip::Descriptor::TypeParameter);
-                    break;
-                case core::SymbolRef::Kind::FieldOrStaticField:
-                    descriptor.set_suffix(scip::Descriptor::Term);
-                    break;
-                case core::SymbolRef::Kind::TypeMember: // TODO: What does TypeMember mean?
-                    descriptor.set_suffix(scip::Descriptor::Type);
-                    break;
-                default:
-                    return absl::InvalidArgumentError("unexpected expr type for symbol computation");
-            }
-            descriptors.push_back(move(descriptor));
-            cur = cur.owner(gs);
-        }
-        while (!descriptors.empty()) {
-            *symbol.add_descriptors() = move(descriptors.back());
-            descriptors.pop_back();
-        }
-        if (this->name != core::NameRef::noName()) {
-            scip::Descriptor descriptor;
-            descriptor.set_suffix(scip::Descriptor::Term);
-            *descriptor.mutable_name() = this->name.shortName(gs);
-            ENFORCE(!descriptor.name().empty());
-            *symbol.add_descriptors() = move(descriptor);
-        }
-        return absl::OkStatus();
-    }
-
     core::Loc symbolLoc(const core::GlobalState &gs) const {
         switch (this->kind()) {
             case Kind::Method: {
@@ -461,7 +385,7 @@ using OccurrenceCache = UnorderedMap<pair<core::LocOffsets, /*SymbolRole*/ int32
 /// The states are implicitly merged at the time of emitting the index.
 class SCIPState {
     string symbolScratchBuffer;
-    UnorderedMap<NamedSymbolRef, string> symbolStringCache;
+    UnorderedMap<UntypedGenericSymbolRef, string> symbolStringCache;
 
     /// Cache of occurrences for locals that have been emitted in this function.
     ///
@@ -518,7 +442,7 @@ public:
     /// If the returned value is as success, the pointer is non-null.
     ///
     /// The argument symbol is used instead of recomputing from scratch if it is non-null.
-    absl::StatusOr<const string *> saveSymbolString(const core::GlobalState &gs, NamedSymbolRef symRef,
+    absl::StatusOr<const string *> saveSymbolString(const core::GlobalState &gs, UntypedGenericSymbolRef symRef,
                                                     const scip::Symbol *symbol) {
         auto pair = this->symbolStringCache.find(symRef);
         if (pair != this->symbolStringCache.end()) {
@@ -673,11 +597,11 @@ public:
 
         auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs);
         scip::Symbol symbol;
-        auto status = symRef.symbolForExpr(gs, this->gemMetadata, occLoc, symbol);
+        auto status = symRef.withoutType().symbolForExpr(gs, this->gemMetadata, occLoc, symbol);
         if (!status.ok()) {
             return status;
         }
-        absl::StatusOr<const string *> valueOrStatus(this->saveSymbolString(gs, symRef, &symbol));
+        absl::StatusOr<const string *> valueOrStatus(this->saveSymbolString(gs, symRef.withoutType(), &symbol));
         if (!valueOrStatus.ok()) {
             return valueOrStatus.status();
         }
@@ -718,7 +642,7 @@ public:
         }
         auto &gs = ctx.state;
         auto file = ctx.file;
-        absl::StatusOr<const string *> valueOrStatus(this->saveSymbolString(gs, symRef, nullptr));
+        absl::StatusOr<const string *> valueOrStatus(this->saveSymbolString(gs, symRef.withoutType(), nullptr));
         if (!valueOrStatus.ok()) {
             return valueOrStatus.status();
         }
