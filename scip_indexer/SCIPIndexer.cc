@@ -423,7 +423,9 @@ public:
     vector<scip::SymbolInformation> externalSymbols;
 
 public:
-    SCIPState(GemMetadata metadata) : symbolScratchBuffer(), symbolStringCache(), gemMetadata(metadata) {}
+    SCIPState(GemMetadata metadata)
+        : symbolScratchBuffer(), symbolStringCache(), localOccurrenceCache(), symbolOccurrenceCache(),
+          gemMetadata(metadata), occurrenceMap(), emittedSymbols(), symbolMap(), documents(), externalSymbols() {}
     ~SCIPState() = default;
     SCIPState(SCIPState &&) = default;
     SCIPState &operator=(SCIPState &&other) = default;
@@ -890,6 +892,8 @@ optional<core::TypePtr> computeOverrideType(core::TypePtr definitionType, core::
 }
 
 /// Convenience type to handle CFG traversal and recording info in SCIPState.
+///
+/// Any caches that are not specific to a traversal should be added to SCIPState.
 class CFGTraversal final {
     // A map from each basic block to the locals in it.
     //
