@@ -376,8 +376,6 @@ enum class Emitted {
     Earlier,
 };
 
-using OccurrenceCache = UnorderedMap<pair<core::LocOffsets, /*SymbolRole*/ int32_t>, uint32_t>;
-
 /// Per-thread state storing information to be emitting in a SCIP index.
 ///
 /// The states are implicitly merged at the time of emitting the index.
