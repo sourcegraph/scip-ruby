@@ -10,7 +10,9 @@
 #include "common/common.h"
 #include "core/Error.h"
 
-template <typename K, typename V, typename Fn> std::string map_to_string(const sorbet::UnorderedMap<K, V> m, Fn f) {
+namespace sorbet::scip_indexer {
+
+template <typename K, typename V, typename Fn> std::string showMap(const sorbet::UnorderedMap<K, V> &m, Fn f) {
     std::ostringstream out;
     out << "{";
     auto i = -1;
@@ -25,7 +27,7 @@ template <typename K, typename V, typename Fn> std::string map_to_string(const s
     return out.str();
 }
 
-template <typename T, typename Fn> std::string set_to_string(const sorbet::UnorderedSet<T> s, Fn f) {
+template <typename T, typename Fn> std::string showSet(const sorbet::UnorderedSet<T> &s, Fn f) {
     std::ostringstream out;
     out << "{";
     auto i = -1;
@@ -40,7 +42,7 @@ template <typename T, typename Fn> std::string set_to_string(const sorbet::Unord
     return out.str();
 }
 
-template <typename T, typename Fn> std::string vec_to_string(const std::vector<T> v, Fn f) {
+template <typename T, typename Fn> std::string showVec(const std::vector<T> &v, Fn f) {
     std::ostringstream out;
     out << "[";
     for (auto i = 0; i < v.size(); ++i) {
@@ -52,10 +54,6 @@ template <typename T, typename Fn> std::string vec_to_string(const std::vector<T
     out << "]";
     return out.str();
 }
-
-namespace sorbet::scip_indexer {
-
-constexpr sorbet::core::ErrorClass SCIPRubyDebug{400, sorbet::core::StrictLevel::False};
 
 void _log_debug(const sorbet::core::GlobalState &gs, sorbet::core::Loc loc, std::string s);
 } // namespace sorbet::scip_indexer

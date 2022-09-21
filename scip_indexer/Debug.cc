@@ -8,6 +8,8 @@
 
 namespace sorbet::scip_indexer {
 
+constexpr sorbet::core::ErrorClass SCIPRubyDebug{400, sorbet::core::StrictLevel::False};
+
 void _log_debug(const sorbet::core::GlobalState &gs, sorbet::core::Loc loc, std::string s) {
     if (auto e = gs.beginError(loc, SCIPRubyDebug)) {
         auto lines = absl::StrSplit(s, '\n');
