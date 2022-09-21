@@ -83,6 +83,8 @@ public:
     // Try to compute a scip::Symbol for this value.
     absl::Status symbolForExpr(const core::GlobalState &gs, const GemMetadata &metadata, std::optional<core::Loc> loc,
                                scip::Symbol &symbol) const;
+
+    std::string showRaw(const core::GlobalState &gs) const;
 };
 
 // A wrapper type to handle both top-level symbols (like classes) as well as

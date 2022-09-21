@@ -81,6 +81,13 @@ absl::Status UntypedGenericSymbolRef::symbolForExpr(const core::GlobalState &gs,
     return absl::OkStatus();
 }
 
+string UntypedGenericSymbolRef::showRaw(const core::GlobalState &gs) const {
+    if (this->name.exists()) {
+        return fmt::format("UGSR(owner: {}, name: {})", this->selfOrOwner.showFullName(gs), this->name.toString(gs));
+    }
+    return fmt::format("UGSR(symbol: {})", this->selfOrOwner.showFullName(gs));
+}
+
 string GenericSymbolRef::showRaw(const core::GlobalState &gs) const {
     switch (this->kind()) {
         case Kind::UndeclaredField:

@@ -616,7 +616,7 @@ public:
     }
 
     string showRaw(const core::GlobalState &gs, core::FileRef file, const cfg::CFG &cfg) const {
-        return map_to_string(this->map, [&](const cfg::LocalRef &local, auto &data) -> string {
+        return showMap(this->map, [&](const cfg::LocalRef &local, const auto &data) -> string {
             auto symRef = get<0>(data);
             auto offsets = get<1>(data);
             auto emitted = get<2>(data);
