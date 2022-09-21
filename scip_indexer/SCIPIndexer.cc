@@ -553,6 +553,14 @@ public:
                 if (sym == core::Symbols::Magic_undeclaredFieldStub()) {
                     ENFORCE(!bind.loc.empty());
                     ENFORCE(klass.isClassOrModule());
+                    auto fieldName = instr->name.shortName(gs);
+                    if (!fieldName.empty() && fieldName[0] == '$') {
+                        auto klass = core::Symbols::rootSingleton();
+                        this->map.insert( // no trim(...) because globals can't have a :: prefix
+                            {bind.bind.variable,
+                             {GenericSymbolRef::undeclaredField(klass, instr->name, bind.bind.type), bind.loc, false}});
+                        continue;
+                    }
                     auto result = findUnresolvedFieldTransitive(ctx, ctx.locAt(bind.loc), klass.asClassOrModuleRef(),
                                                                 instr->name);
                     if (absl::holds_alternative<core::ClassOrModuleRef>(result)) {
