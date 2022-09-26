@@ -61,7 +61,7 @@ void _log_debug(const sorbet::core::GlobalState &gs, sorbet::core::Loc loc, std:
 #ifndef NDEBUG
 #define LOG_DEBUG(__gs, __loc, __s) sorbet::scip_indexer::_log_debug(__gs, __loc, __s)
 #else
-#define LOG_DEBUG(__gs, __s)
+#define LOG_DEBUG(__gs, __loc, __s)
 #endif
 
 #endif // SORBET_SCIP_DEBUG
