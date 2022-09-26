@@ -85,7 +85,11 @@ message Document {
   string relative_path = 1;
   // Occurrences that appear in this file.
   repeated Occurrence occurrences = 2;
-  // Symbols that are defined within this document.
+  // Symbols that are "defined" within this document.
+  //
+  // This should include symbols which technically do not have any definition,
+  // but have a reference and are defined by some other symbol (see
+  // Relationship.is_definition).
   repeated SymbolInformation symbols = 3;
 }
 
@@ -97,7 +101,8 @@ message Document {
 // Symbol has a standardized string representation, which can be used
 // interchangeably with `Symbol`. The syntax for Symbol is the following:
 // ```
-//   <symbol>               ::= <scheme> ' ' <package> ' ' { <descriptor> } | 'local ' <local-id>
+//   # (<x>)+ stands for one or more repetitions of <x>
+//   <symbol>               ::= <scheme> ' ' <package> ' ' (<descriptor>)+ | 'local ' <local-id>
 //   <package>              ::= <manager> ' ' <package-name> ' ' <version>
 //   <scheme>               ::= any UTF-8, escape spaces with double space.
 //   <manager>              ::= same as above, use the placeholder '.' to indicate an empty value
@@ -114,11 +119,17 @@ message Document {
 //   <name>                 ::= <identifier>
 //   <method-disambiguator> ::= <simple-identifier>
 //   <identifier>           ::= <simple-identifier> | <escaped-identifier>
-//   <simple-identifier>    ::= { <identifier-character> }
+//   <simple-identifier>    ::= (<identifier-character>)+
 //   <identifier-character> ::= '_' | '+' | '-' | '$' | ASCII letter or digit
-//   <escaped-identifier>   ::= '`' { <escaped-character> } '`'
+//   <escaped-identifier>   ::= '`' (<escaped-character>)+ '`'
 //   <escaped-characters>   ::= any UTF-8 character, escape backticks with double backtick.
 // ```
+//
+// The list of descriptors for a symbol should together form a fully
+// qualified name for the symbol. That is, it should serve as a unique
+// identifier across the package. Typically, it will include one descriptor
+// for every node in the AST (along the ancestry path) between the root of
+// the file and the node corresponding to the symbol.
 message Symbol {
   string scheme = 1;
   Package package = 2;
@@ -149,6 +160,7 @@ message Descriptor {
     Method = 4;
     TypeParameter = 5;
     Parameter = 6;
+    Macro = 9;
     // Can be used for any purpose.
     Meta = 7;
     Local = 8;
@@ -211,6 +223,19 @@ message Relationship {
   bool is_implementation = 3;
   // Similar to `references_symbols` but for "Go to type definition".
   bool is_type_definition = 4;
+  // Allows overriding the behavior of "Go to definition" and "Find references"
+  // for symbols which do not have a definition of their own or could
+  // potentially have multiple definitions.
+  //
+  // For example, in a language with single inheritance and no field overriding,
+  // inherited fields can reuse the same symbol as the ancestor which declares
+  // the field. In such a situation, is_definition is not needed.
+  //
+  // On the other hand, in languages with single inheritance and some form
+  // of mixins, you can use is_definition to relate the symbol to the
+  // matching symbol in ancestor classes, and is_reference to relate the
+  // symbol to the matching symbol in mixins.
+  bool is_definition = 5;
 }
 
 // SymbolRole declares what "role" a symbol has in an occurrence.  A role is
@@ -250,7 +275,8 @@ enum SyntaxKind {
   PunctuationBracket = 3;
 
   // `if`, `else`, `return`, `class`, etc.
-  IdentifierKeyword = 4;
+  Keyword = 4;
+  IdentifierKeyword = 4 [deprecated=true];
 
   // `+`, `*`, etc.
   IdentifierOperator = 5;
@@ -366,6 +392,9 @@ message Occurrence {
   // where this field might be useful is when the symbol represents a generic
   // function (with abstract type parameters such as `List<T>`) and at this
   // occurrence we know the exact values (such as `List<String>`).
+  //
+  // This field can also be used for dynamically or gradually typed languages,
+  // which commonly allow for type-changing assignment.
   repeated string override_documentation = 4;
   // (optional) What syntax highlighting class should be used for this range?
   SyntaxKind syntax_kind = 5;
