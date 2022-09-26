@@ -186,11 +186,10 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
         out << ' '; // For '#'
         out << absl::StrReplaceAll(line, {{"\t", " "}});
         out << '\n';
-        while (occ_i < occurrences.size() && occurrences[occ_i].range()[0] == lineNumber - 1) {
+        for (; occ_i < occurrences.size() && occurrences[occ_i].range()[0] == lineNumber - 1; occ_i++) {
             auto occ = occurrences[occ_i];
             auto range = SCIPRange(occ.range());
             if (range.isMultiline()) { // FIXME(varun): Handle multiline occurrences.
-                occ_i++;
                 continue;
             }
             bool isDefinition = ((unsigned(occ.symbol_roles()) & unsigned(scip::SymbolRole::Definition)) > 0);
@@ -221,7 +220,6 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
             };
             printDocs(occ.override_documentation(), "override_documentation");
             if (!(isDefinition && symbolTable.contains(occ.symbol()))) {
-                occ_i++;
                 continue;
             }
             auto &symbolInfo = symbolTable[occ.symbol()];
@@ -248,7 +246,6 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
                 }
                 out << '\n';
             }
-            occ_i++;
         }
     }
 }
