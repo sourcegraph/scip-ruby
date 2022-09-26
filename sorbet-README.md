@@ -835,9 +835,6 @@ be slow, depending on what needs to be recompiled and updated. Some faster
 commands:
 
 ```bash
-# Only update the `*.exp` files in `test/testdata`
-tools/scripts/update_testdata_exp.sh
-
 # Only update the `*.exp` files in `test/testdata/cfg`
 tools/scripts/update_testdata_exp.sh test/testdata/cfg
 
