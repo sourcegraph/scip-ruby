@@ -10,10 +10,12 @@
 #include "absl/strings/str_replace.h"
 #include "spdlog/fmt/fmt.h"
 
+#include "common/sort.h"
 #include "core/Loc.h"
 #include "main/lsp/lsp.h"
 
 #include "scip_indexer/Debug.h"
+#include "scip_indexer/SCIPProtoExt.h"
 #include "scip_indexer/SCIPSymbolRef.h"
 
 using namespace std;
@@ -143,6 +145,8 @@ void UntypedGenericSymbolRef::saveRelationships(
         rel.set_is_reference(true);
         saveSymbol(mixin, rel);
     }
+
+    fast_sort(rels, [](const auto &r1, const auto &r2) -> bool { return scip::compareRelationship(r1, r2) < 0; });
 }
 
 string GenericSymbolRef::showRaw(const core::GlobalState &gs) const {
