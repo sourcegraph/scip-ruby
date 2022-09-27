@@ -33,6 +33,7 @@
 #include "sorbet_version/sorbet_version.h"
 
 #include "scip_indexer/Debug.h"
+#include "scip_indexer/SCIPProtoExt.h"
 #include "scip_indexer/SCIPSymbolRef.h"
 #include "scip_indexer/SCIPUtils.h"
 
@@ -429,6 +430,8 @@ public:
             for (auto &occurrence : occurrences->second) {
                 *document.add_occurrences() = move(occurrence);
             }
+            fast_sort(*document.mutable_occurrences(),
+                      [](const auto &o1, const auto &o2) -> bool { return scip::compareOccurrence(o1, o2) < 0; });
             this->occurrenceMap.erase(file);
         }
 
@@ -437,6 +440,9 @@ public:
             for (auto &symbol : symbols->second) {
                 *document.add_symbols() = move(symbol);
             }
+            fast_sort(*document.mutable_symbols(), [](const auto &s1, const auto &s2) -> bool {
+                return scip::compareSymbolInformation(s1, s2) < 0;
+            });
             this->symbolMap.erase(file);
         }
 

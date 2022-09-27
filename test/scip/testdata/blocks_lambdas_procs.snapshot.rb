@@ -92,8 +92,8 @@
 #            ^^^ reference [..] `<Class:Proc>`#new().
 #                   ^ definition local 3~#1283111692
      y += x
-#    ^ reference local 1~#1283111692
 #    ^ reference (write) local 1~#1283111692
+#    ^ reference local 1~#1283111692
 #    ^^^^^^ reference local 1~#1283111692
 #         ^ reference local 3~#1283111692
    }

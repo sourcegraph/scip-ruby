@@ -14,8 +14,8 @@
 #       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'allows constants inside of IT'>`().
        CONST = 10
 #      ^^^^^ definition [..] MyTest#CONST.
-#      ^^^^^^^^^^ reference [..] Kernel#raise().
 #      ^^^^^^^^^^ reference [..] Kernel#
+#      ^^^^^^^^^^ reference [..] Kernel#raise().
      end
  
      it "allows let-ed constants inside of IT" do
