@@ -66,8 +66,8 @@
 #  ^^^^^^ reference [..] Kernel#extend().
    cattr_accessor :both, :foo
 #                 ^^^^^ definition [..] CA#`both=`().
-#                 ^^^^^ definition [..] `<Class:CA>`#both().
 #                 ^^^^^ definition [..] `<Class:CA>`#`both=`().
+#                 ^^^^^ definition [..] `<Class:CA>`#both().
 #                 ^^^^^ definition [..] CA#both().
 #                        ^^^^ definition [..] CA#foo().
 #                        ^^^^ definition [..] `<Class:CA>`#foo().
@@ -85,8 +85,8 @@
 #                 ^^^^ definition [..] `<Class:CA>`#bar().
 #                 ^^^^ definition [..] `<Class:CA>`#`bar=`().
 #                       ^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:CA>`#no_instance_writer().
-#                       ^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:CA>`#`no_instance_writer=`().
 #                       ^^^^^^^^^^^^^^^^^^^ definition [..] CA#no_instance_writer().
+#                       ^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:CA>`#`no_instance_writer=`().
  
    sig {void}
    def usages
