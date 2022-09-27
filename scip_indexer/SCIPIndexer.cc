@@ -478,9 +478,6 @@ public:
 
     void finalizeRefOnlySymbolInfos(const core::GlobalState &gs, core::FileRef file) {
         auto &potentialSyms = this->potentialRefOnlySymbols[file];
-        fmt::print(stderr, "potentialSyms = {}\n",
-                   showSet(potentialSyms, [&](UntypedGenericSymbolRef sym) -> string { return sym.showRaw(gs); }));
-        fmt::print(stderr, "relMap = {}\n", showRawRelationshipsMap(gs, this->relationshipsMap[file]));
 
         for (auto symRef : potentialSyms) {
             auto valueOrError = this->saveSymbolString(gs, symRef, nullptr);
@@ -876,8 +873,6 @@ public:
     void traverse(const cfg::CFG &cfg) {
         this->aliasMap.populate(this->ctx, cfg, this->scipState.fieldResolver,
                                 this->scipState.relationshipsMap[ctx.file]);
-        fmt::print(stderr, "log: [traverse] relationshipsMap = {}\n",
-                   showRawRelationshipsMap(this->ctx.state, this->scipState.relationshipsMap[ctx.file]));
         auto &gs = this->ctx.state;
         auto file = this->ctx.file;
         auto method = this->ctx.owner;
