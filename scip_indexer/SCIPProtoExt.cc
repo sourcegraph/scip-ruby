@@ -3,12 +3,12 @@
 #include <string>
 
 namespace scip {
-#define CHECK_CMP(expr)     \
-    {                       \
-        auto cmp = expr;    \
-        if (cmp != 0) {     \
-            return cmp < 0; \
-        }                   \
+#define CHECK_CMP(expr)  \
+    {                    \
+        auto cmp = expr; \
+        if (cmp != 0) {  \
+            return cmp;  \
+        }                \
     }
 
 int compareDiagnostic(const scip::Diagnostic &d1, const scip::Diagnostic &d2) {

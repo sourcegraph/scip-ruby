@@ -22,8 +22,8 @@
    extend T::Sig
 #  ^^^^^^ reference [..] Kernel#extend().
    attr_accessor :inner_array
-#                 ^^^^^^^^^^^ definition [..] MyArray2#inner_array().
 #                 ^^^^^^^^^^^ definition [..] MyArray2#`inner_array=`().
+#                 ^^^^^^^^^^^ definition [..] MyArray2#inner_array().
    extend Forwardable
 #  ^^^^^^ reference [..] Kernel#extend().
 #         ^^^^^^^^^^^ reference [..] Forwardable#
@@ -36,8 +36,8 @@
  class MyArray3
 #      ^^^^^^^^ definition [..] MyArray3#
    attr_accessor :inner_array
-#                 ^^^^^^^^^^^ definition [..] MyArray3#inner_array().
 #                 ^^^^^^^^^^^ definition [..] MyArray3#`inner_array=`().
+#                 ^^^^^^^^^^^ definition [..] MyArray3#inner_array().
    extend Forwardable
 #  ^^^^^^ reference [..] Kernel#extend().
 #         ^^^^^^^^^^^ reference [..] Forwardable#
