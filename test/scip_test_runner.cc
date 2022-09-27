@@ -223,14 +223,8 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
                 continue;
             }
             auto &symbolInfo = symbolTable[occ.symbol()];
-            bool isDefinedByAnother = ([&]() -> bool {
-                for (auto &rel : symbolInfo.relationships()) {
-                    if (rel.is_definition()) {
-                        return true;
-                    }
-                }
-                return false;
-            })();
+            bool isDefinedByAnother =
+                absl::c_any_of(symbolInfo.relationships(), [](const auto &rel) -> bool { return rel.is_definition(); });
             if (!isDefinition && !isDefinedByAnother) {
                 continue;
             }
