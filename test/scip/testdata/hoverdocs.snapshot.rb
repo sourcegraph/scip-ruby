@@ -381,8 +381,8 @@
 #    | @@y (T.untyped)
 #    | ```
      @z += @x
-#    ^^ reference [..] K2#`@z`.
 #    ^^ reference (write) [..] K2#`@z`.
+#    ^^ reference [..] K2#`@z`.
 #    ^^^^^^^^ reference [..] K2#`@z`.
 #          ^^ reference [..] K1#`@x`.
 #          override_documentation

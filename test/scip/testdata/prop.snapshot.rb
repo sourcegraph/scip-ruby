@@ -8,8 +8,8 @@
 #    ^^^^^^^ reference [..] Module#include().
  
      prop :foo, String
-#          ^^^ definition [..] SomeODM#foo().
 #          ^^^ definition [..] SomeODM#`foo=`().
+#          ^^^ definition [..] SomeODM#foo().
 #               ^^^^^^ reference [..] String#
  
      sig {returns(T.nilable(String))}
@@ -40,17 +40,17 @@
      include T::Props
 #    ^^^^^^^ reference [..] Module#include().
      prop :default, String, default: ""
-#          ^^^^^^^ definition [..] AdvancedODM#default().
 #          ^^^^^^^ definition [..] AdvancedODM#`default=`().
+#          ^^^^^^^ definition [..] AdvancedODM#default().
 #                   ^^^^^^ reference [..] String#
      prop :t_nilable, T.nilable(String)
-#          ^^^^^^^^^ definition [..] AdvancedODM#t_nilable().
 #          ^^^^^^^^^ definition [..] AdvancedODM#`t_nilable=`().
+#          ^^^^^^^^^ definition [..] AdvancedODM#t_nilable().
 #                               ^^^^^^ reference [..] String#
  
      prop :array, Array
-#          ^^^^^ definition [..] AdvancedODM#array().
 #          ^^^^^ definition [..] AdvancedODM#`array=`().
+#          ^^^^^ definition [..] AdvancedODM#array().
 #                 ^^^^^ reference [..] Array#
      prop :t_array, T::Array[String]
 #          ^^^^^^^ definition [..] AdvancedODM#`t_array=`().
@@ -76,29 +76,29 @@
  
      prop :foreign_lazy, String, foreign: -> {ForeignClass}
 #    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Boolean.
+#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_lazy=`().
 #          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_lazy_!`().
 #          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_lazy().
-#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_lazy=`().
 #          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_lazy_().
 #                        ^^^^^^ reference [..] String#
-#                                         ^^ reference [..] Kernel#lambda().
 #                                         ^^ reference [..] Kernel#
+#                                         ^^ reference [..] Kernel#lambda().
 #                                             ^^^^^^^^^^^^ reference [..] ForeignClass#
      prop :foreign_proc, String, foreign: proc {ForeignClass}
 #    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Boolean.
+#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_proc=`().
+#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_proc_!`().
 #          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_proc().
 #          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_proc_().
-#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_proc_!`().
-#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_proc=`().
 #                        ^^^^^^ reference [..] String#
 #                                         ^^^^ reference [..] Kernel#proc().
 #                                               ^^^^^^^^^^^^ reference [..] ForeignClass#
      prop :foreign_invalid, String, foreign: proc { :not_a_type }
 #    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Boolean.
+#          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_invalid=`().
 #          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_invalid_!`().
 #          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_invalid().
 #          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_invalid_().
-#          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_invalid=`().
 #                           ^^^^^^ reference [..] String#
 #                                            ^^^^ reference [..] Kernel#proc().
  
@@ -132,13 +132,13 @@
    token_prop
 #  ^^^^^ definition [..] PropHelpers#`token=`().
 #  ^^^^^ definition [..] PropHelpers#token().
-#  ^^^^^^^^^^ reference [..] `<Class:PropHelpers>`#token_prop().
 #  ^^^^^^^^^^ reference [..] String#
+#  ^^^^^^^^^^ reference [..] `<Class:PropHelpers>`#token_prop().
    created_prop
-#  ^^^^^^^ definition [..] PropHelpers#created().
 #  ^^^^^^^ definition [..] PropHelpers#`created=`().
-#  ^^^^^^^^^^^^ reference [..] `<Class:PropHelpers>`#created_prop().
+#  ^^^^^^^ definition [..] PropHelpers#created().
 #  ^^^^^^^^^^^^ reference [..] Float#
+#  ^^^^^^^^^^^^ reference [..] `<Class:PropHelpers>`#created_prop().
  end
  
  class PropHelpers2
@@ -150,8 +150,8 @@
    def self.created_prop(opts={}); end
 #           ^^^^^^^^^^^^ definition [..] `<Class:PropHelpers2>`#created_prop().
    timestamped_token_prop
-#  ^^^^^^^^^^^^^^^^^^^^^^ reference [..] `<Class:PropHelpers2>`#timestamped_token_prop().
 #  ^^^^^^^^^^^^^^^^^^^^^^ reference [..] String#
+#  ^^^^^^^^^^^^^^^^^^^^^^ reference [..] `<Class:PropHelpers2>`#timestamped_token_prop().
 #              ^^^^^ definition [..] PropHelpers2#`token=`().
 #              ^^^^^ definition [..] PropHelpers2#token().
    created_prop(immutable: true)

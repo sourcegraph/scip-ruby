@@ -65,28 +65,28 @@
    extend T::Sig
 #  ^^^^^^ reference [..] Kernel#extend().
    cattr_accessor :both, :foo
+#                 ^^^^^ definition [..] CA#both().
 #                 ^^^^^ definition [..] CA#`both=`().
 #                 ^^^^^ definition [..] `<Class:CA>`#`both=`().
 #                 ^^^^^ definition [..] `<Class:CA>`#both().
-#                 ^^^^^ definition [..] CA#both().
-#                        ^^^^ definition [..] CA#foo().
-#                        ^^^^ definition [..] `<Class:CA>`#foo().
 #                        ^^^^ definition [..] CA#`foo=`().
+#                        ^^^^ definition [..] CA#foo().
 #                        ^^^^ definition [..] `<Class:CA>`#`foo=`().
+#                        ^^^^ definition [..] `<Class:CA>`#foo().
    cattr_accessor :no_instance, instance_accessor: false
-#                 ^^^^^^^^^^^^ definition [..] `<Class:CA>`#no_instance().
 #                 ^^^^^^^^^^^^ definition [..] `<Class:CA>`#`no_instance=`().
+#                 ^^^^^^^^^^^^ definition [..] `<Class:CA>`#no_instance().
    cattr_accessor :no_instance_reader, instance_reader: false
-#                 ^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:CA>`#no_instance_reader().
 #                 ^^^^^^^^^^^^^^^^^^^ definition [..] CA#`no_instance_reader=`().
 #                 ^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:CA>`#`no_instance_reader=`().
+#                 ^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:CA>`#no_instance_reader().
    cattr_accessor :bar, :no_instance_writer, instance_writer: false
 #                 ^^^^ definition [..] CA#bar().
-#                 ^^^^ definition [..] `<Class:CA>`#bar().
 #                 ^^^^ definition [..] `<Class:CA>`#`bar=`().
-#                       ^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:CA>`#no_instance_writer().
+#                 ^^^^ definition [..] `<Class:CA>`#bar().
 #                       ^^^^^^^^^^^^^^^^^^^ definition [..] CA#no_instance_writer().
 #                       ^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:CA>`#`no_instance_writer=`().
+#                       ^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:CA>`#no_instance_writer().
  
    sig {void}
    def usages
