@@ -296,22 +296,12 @@
 #    | @x (T.untyped)
 #    | ```
      @@y = 10
-#    ^^^ definition [..] K1#`@@y`.
-#    documentation
-#    | ```ruby
-#    | @@y (T.untyped)
-#    | ```
-#    relation definition=[..] `<Class:K1>`#`@@y`.
-#    ^^^^^^^^ reference [..] K1#`@@y`.
+#    ^^^ definition [..] `<Class:K1>`#`@@y`.
+#    ^^^^^^^^ reference [..] `<Class:K1>`#`@@y`.
 #    override_documentation
 #    | ```ruby
 #    | @@y (Integer(10))
 #    | ```
-#    documentation
-#    | ```ruby
-#    | @@y (T.untyped)
-#    | ```
-#    relation definition=[..] `<Class:K1>`#`@@y`.
    end
  
    # lorem ipsum, you get it
@@ -326,10 +316,6 @@
 #           | lorem ipsum, you get it
      @z = 10
 #    ^^ definition [..] `<Class:K1>`#`@z`.
-#    documentation
-#    | ```ruby
-#    | @z (T.untyped)
-#    | ```
 #    ^^^^^^^ reference [..] `<Class:K1>`#`@z`.
 #    override_documentation
 #    | ```ruby
@@ -357,12 +343,6 @@
    # doc comment on class var ooh
    @z = 9
 #  ^^ definition [..] `<Class:K2>`#`@z`.
-#  documentation
-#  | ```ruby
-#  | @z (T.untyped)
-#  | ```
-#  documentation
-#  | doc comment on class var ooh
  
    # overrides K1's p1
    def p1
@@ -376,30 +356,22 @@
 #      | overrides K1's p1
      @x = 20
 #    ^^ definition [..] K2#`@x`.
-#    documentation
-#    | ```ruby
-#    | @x (T.untyped)
-#    | ```
 #    relation definition=[..] K1#`@x`.
      @@y = 20
-#    ^^^ definition [..] K2#`@@y`.
+#    ^^^ definition [..] `<Class:K2>`#`@@y`.
 #    documentation
 #    | ```ruby
 #    | @@y (T.untyped)
 #    | ```
 #    relation definition=[..] `<Class:K1>`#`@@y`.
      @z += @x
-#    ^^ reference (write) [..] K2#`@z`.
-#    ^^ reference [..] K2#`@z`.
-#    ^^^^^^^^ reference [..] K2#`@z`.
+#    ^^ reference (write) [..] `<Class:K2>`#`@z`.
+#    ^^ reference [..] `<Class:K2>`#`@z`.
+#    ^^^^^^^^ reference [..] `<Class:K2>`#`@z`.
 #          ^^ reference [..] K2#`@x`.
 #          override_documentation
 #          | ```ruby
 #          | @x (Integer(20))
-#          | ```
-#          documentation
-#          | ```ruby
-#          | @x (T.untyped)
 #          | ```
 #          relation definition=[..] K1#`@x`.
    end

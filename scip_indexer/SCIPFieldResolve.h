@@ -107,6 +107,9 @@ public:
     std::pair<FieldQueryResult, /*cacheHit*/ bool> findUnresolvedFieldTransitive(const core::GlobalState &gs,
                                                                                  core::Loc loc, FieldQuery query);
 
+    static core::ClassOrModuleRef normalizeParentForClassVar(const core::GlobalState &gs, core::ClassOrModuleRef klass,
+                                                             std::string_view name);
+
 private:
     void resetMixins();
 

@@ -29,7 +29,6 @@
 #           ^^ reference [..] C2#`@f`.
 #           relation definition=[..] C1#`@f`.
 #                ^^ reference [..] C2#`@h`.
-#                relation definition=[..] C1#`@h`.
    end
  
    def set_inherited_ivar
@@ -65,6 +64,7 @@
 #         ^^ reference [..] C3#`@g`.
 #         relation definition=[..] C2#`@g`.
 #              ^^ reference [..] C3#`@i`.
+#              relation definition=[..] C1#`@i`.
      return
    end
  end

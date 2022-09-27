@@ -62,6 +62,16 @@ void FieldResolver::findUnresolvedFieldInMixinsTransitive(const core::GlobalStat
     }
 }
 
+core::ClassOrModuleRef FieldResolver::normalizeParentForClassVar(const core::GlobalState &gs,
+                                                                 core::ClassOrModuleRef klass, std::string_view name) {
+    auto isClassVar = name.size() >= 2 && name[0] == '@' && name[1] == '@';
+    if (isClassVar && !klass.data(gs)->isSingletonClass(gs)) {
+        // Triggered when undeclared class variables are accessed from instance methods.
+        return klass.data(gs)->lookupSingletonClass(gs);
+    }
+    return klass;
+}
+
 FieldQueryResult::Data FieldResolver::findUnresolvedFieldInInheritanceChain(const core::GlobalState &gs, core::Loc loc,
                                                                             FieldQuery query) {
     auto start = query.start;
@@ -75,11 +85,7 @@ FieldQueryResult::Data FieldResolver::findUnresolvedFieldInInheritanceChain(cons
     if (isClassInstanceVar) {
         return FieldQueryResult::Data(start);
     }
-    auto isClassVar = fieldText.size() >= 2 && fieldText[0] == '@' && fieldText[1] == '@';
-    if (isClassVar && !start.data(gs)->isSingletonClass(gs)) {
-        // Triggered when undeclared class variables are accessed from instance methods.
-        start = start.data(gs)->lookupSingletonClass(gs);
-    }
+    start = FieldResolver::normalizeParentForClassVar(gs, start, fieldText);
 
     if (gs.unresolvedFields.find(start) == gs.unresolvedFields.end() ||
         !gs.unresolvedFields.find(start)->second.contains(field)) {

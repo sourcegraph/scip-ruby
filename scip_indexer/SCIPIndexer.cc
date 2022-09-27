@@ -604,6 +604,8 @@ public:
                     switch (result.inherited.kind()) {
                         case FieldQueryResult::Kind::FromUndeclared: {
                             checkExists(result.inherited.originalClass().exists(), "class");
+                            klass = FieldResolver::normalizeParentForClassVar(gs, klass.asClassOrModuleRef(),
+                                                                              instr->name.shortName(gs));
                             auto namedSymRef = GenericSymbolRef::undeclaredField(klass, instr->name, bind.bind.type);
                             if (!cacheHit) {
                                 // It may be the case that the mixin values are already stored because of the

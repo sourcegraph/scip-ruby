@@ -132,10 +132,6 @@
 #      | ```
    @k = nil
 #  ^^ definition [..] `<Class:C>`#`@k`.
-#  documentation
-#  | ```ruby
-#  | @k (T.untyped)
-#  | ```
  
    def change_type(b)
 #      ^^^^^^^^^^^ definition [..] C#change_type().
@@ -151,23 +147,10 @@
 #                  | ```
      @f = nil
 #    ^^ definition [..] C#`@f`.
-#    documentation
-#    | ```ruby
-#    | @f (T.untyped)
-#    | ```
      @@g = nil
-#    ^^^ definition [..] C#`@@g`.
-#    documentation
-#    | ```ruby
-#    | @@g (T.untyped)
-#    | ```
-#    relation definition=[..] `<Class:C>`#`@@g`.
+#    ^^^ definition [..] `<Class:C>`#`@@g`.
      @k = nil
-#    ^^ definition [..] C#`@k`.
-#    documentation
-#    | ```ruby
-#    | @k (T.untyped)
-#    | ```
+#    ^^ definition [..] `<Class:C>`#`@k`.
      if b
        @f = 1
 #      ^^ reference (write) [..] C#`@f`.
@@ -176,23 +159,18 @@
 #      | @f (Integer(1))
 #      | ```
        @@g = 1
-#      ^^^ reference (write) [..] C#`@@g`.
+#      ^^^ reference (write) [..] `<Class:C>`#`@@g`.
 #      override_documentation
 #      | ```ruby
 #      | @@g (Integer(1))
 #      | ```
-#      documentation
-#      | ```ruby
-#      | @@g (T.untyped)
-#      | ```
-#      relation definition=[..] `<Class:C>`#`@@g`.
        @k = 1
-#      ^^ reference (write) [..] C#`@k`.
+#      ^^ reference (write) [..] `<Class:C>`#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (Integer(1))
 #      | ```
-#      ^^^^^^ reference [..] C#`@k`.
+#      ^^^^^^ reference [..] `<Class:C>`#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (Integer(1))
@@ -205,23 +183,18 @@
 #      | @f (String("f"))
 #      | ```
        @@g = 'g'
-#      ^^^ reference (write) [..] C#`@@g`.
+#      ^^^ reference (write) [..] `<Class:C>`#`@@g`.
 #      override_documentation
 #      | ```ruby
 #      | @@g (String("g"))
 #      | ```
-#      documentation
-#      | ```ruby
-#      | @@g (T.untyped)
-#      | ```
-#      relation definition=[..] `<Class:C>`#`@@g`.
        @k = 'k'
-#      ^^ reference (write) [..] C#`@k`.
+#      ^^ reference (write) [..] `<Class:C>`#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (String("k"))
 #      | ```
-#      ^^^^^^^^ reference [..] C#`@k`.
+#      ^^^^^^^^ reference [..] `<Class:C>`#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (String("k"))
@@ -264,29 +237,19 @@
 #      | ```
 #      relation definition=[..] C#`@f`.
        @@g = 1
-#      ^^^ definition [..] D#`@@g`.
+#      ^^^ definition [..] `<Class:D>`#`@@g`.
 #      documentation
 #      | ```ruby
 #      | @@g (T.untyped)
 #      | ```
 #      relation definition=[..] `<Class:C>`#`@@g`.
        @k = 1
-#      ^^ definition [..] D#`@k`.
-#      documentation
-#      | ```ruby
-#      | @k (T.untyped)
-#      | ```
-#      relation definition=[..] C#`@k`.
-#      ^^^^^^ reference [..] D#`@k`.
+#      ^^ definition [..] `<Class:D>`#`@k`.
+#      ^^^^^^ reference [..] `<Class:D>`#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (Integer(1))
 #      | ```
-#      documentation
-#      | ```ruby
-#      | @k (T.untyped)
-#      | ```
-#      relation definition=[..] C#`@k`.
      else
        @f = 'f'
 #      ^^ definition [..] D#`@f`.
@@ -296,29 +259,19 @@
 #      | ```
 #      relation definition=[..] C#`@f`.
        @@g = 'g'
-#      ^^^ definition [..] D#`@@g`.
+#      ^^^ definition [..] `<Class:D>`#`@@g`.
 #      documentation
 #      | ```ruby
 #      | @@g (T.untyped)
 #      | ```
 #      relation definition=[..] `<Class:C>`#`@@g`.
        @k = 'k'
-#      ^^ definition [..] D#`@k`.
-#      documentation
-#      | ```ruby
-#      | @k (T.untyped)
-#      | ```
-#      relation definition=[..] C#`@k`.
-#      ^^^^^^^^ reference [..] D#`@k`.
+#      ^^ definition [..] `<Class:D>`#`@k`.
+#      ^^^^^^^^ reference [..] `<Class:D>`#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (String("k"))
 #      | ```
-#      documentation
-#      | ```ruby
-#      | @k (T.untyped)
-#      | ```
-#      relation definition=[..] C#`@k`.
      end
    end
  end
