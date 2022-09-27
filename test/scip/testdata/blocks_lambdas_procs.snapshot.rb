@@ -7,16 +7,16 @@
    [].each { |x|
 #             ^ definition local 2~#1472469056
      y += x
-#    ^ reference local 1~#1472469056
 #    ^ reference (write) local 1~#1472469056
+#    ^ reference local 1~#1472469056
 #    ^^^^^^ reference local 1~#1472469056
 #         ^ reference local 2~#1472469056
    }
    [].each do |x|
 #              ^ definition local 3~#1472469056
      y += x
-#    ^ reference local 1~#1472469056
 #    ^ reference (write) local 1~#1472469056
+#    ^ reference local 1~#1472469056
 #    ^^^^^^ reference local 1~#1472469056
 #         ^ reference local 3~#1472469056
    end
@@ -32,8 +32,8 @@
 #       ^^ reference [..] Kernel#lambda().
 #          ^ definition local 3~#1499497673
      y += x
-#    ^ reference local 1~#1499497673
 #    ^ reference (write) local 1~#1499497673
+#    ^ reference local 1~#1499497673
 #    ^^^^^^ reference local 1~#1499497673
 #         ^ reference local 3~#1499497673
    }
@@ -53,8 +53,8 @@
 #       ^^ reference [..] Kernel#lambda().
 #          ^^ definition local 8~#1499497673
      y += x
-#    ^ reference local 1~#1499497673
 #    ^ reference (write) local 1~#1499497673
+#    ^ reference local 1~#1499497673
 #    ^^^^^^ reference local 1~#1499497673
 #         ^ reference local 8~#1499497673
    }
@@ -63,8 +63,8 @@
 #       ^^^^^^ reference [..] Kernel#lambda().
 #                 ^^ definition local 10~#1499497673
      y += x
-#    ^ reference local 1~#1499497673
 #    ^ reference (write) local 1~#1499497673
+#    ^ reference local 1~#1499497673
 #    ^^^^^^ reference local 1~#1499497673
 #         ^ reference local 10~#1499497673
    }
@@ -102,8 +102,8 @@
 #       ^^^^ reference [..] Kernel#proc().
 #               ^ definition local 5~#1283111692
      y += x
-#    ^ reference local 1~#1283111692
 #    ^ reference (write) local 1~#1283111692
+#    ^ reference local 1~#1283111692
 #    ^^^^^^ reference local 1~#1283111692
 #         ^ reference local 5~#1283111692
    }
@@ -113,8 +113,8 @@
 #            ^^^ reference [..] `<Class:Proc>`#new().
 #                   ^^ definition local 8~#1283111692
      y += x
-#    ^ reference local 1~#1283111692
 #    ^ reference (write) local 1~#1283111692
+#    ^ reference local 1~#1283111692
 #    ^^^^^^ reference local 1~#1283111692
 #         ^ reference local 8~#1283111692
    }
@@ -123,8 +123,8 @@
 #       ^^^^ reference [..] Kernel#proc().
 #               ^^ definition local 10~#1283111692
      y += x
-#    ^ reference local 1~#1283111692
 #    ^ reference (write) local 1~#1283111692
+#    ^ reference local 1~#1283111692
 #    ^^^^^^ reference local 1~#1283111692
 #         ^ reference local 10~#1283111692
    }

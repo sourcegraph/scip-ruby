@@ -6,11 +6,11 @@
  class C1
 #      ^^ definition [..] C1#
    attr_accessor :h
-#                 ^ definition [..] C1#h().
 #                 ^ definition [..] C1#`h=`().
+#                 ^ definition [..] C1#h().
    attr_accessor :i
-#                 ^ definition [..] C1#i().
 #                 ^ definition [..] C1#`i=`().
+#                 ^ definition [..] C1#i().
  
    def set_ivar
 #      ^^^^^^^^ definition [..] C1#set_ivar().

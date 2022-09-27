@@ -7,8 +7,8 @@
 #          ^ reference [..] T#
 #             ^^^^^^ definition [..] T#Struct#
    prop :prop_i, Integer
-#        ^^^^^^ definition [..] S#prop_i().
 #        ^^^^^^ definition [..] S#`prop_i=`().
+#        ^^^^^^ definition [..] S#prop_i().
 #                ^^^^^^^ reference [..] Integer#
    const :const_s, T.nilable(String)
 #         ^^^^^^^ definition [..] S#const_s().
@@ -52,11 +52,11 @@
 #^^^^^^^^^^^^^^^^^^^^ definition local 5~#119448696
 #^^^^^^^^^^^^^^^^^^^^ definition [..] POINT#initialize().
 #                    ^ reference [..] BasicObject#
-#                    ^ definition [..] POINT#x().
 #                    ^ definition [..] POINT#`x=`().
+#                    ^ definition [..] POINT#x().
 #                        ^ reference [..] BasicObject#
-#                        ^ definition [..] POINT#y().
 #                        ^ definition [..] POINT#`y=`().
+#                        ^ definition [..] POINT#y().
    def array
 #      ^^^^^ definition [..] POINT#array().
      [x, y]

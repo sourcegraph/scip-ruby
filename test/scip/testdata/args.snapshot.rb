@@ -12,13 +12,13 @@
 #     ^ reference local 1~#2634721084
 #       ^^ reference [..] BasicObject#`==`().
      z += y
-#    ^ reference local 3~#2634721084
 #    ^ reference (write) local 3~#2634721084
+#    ^ reference local 3~#2634721084
 #         ^ reference local 2~#2634721084
    else
      z += x
-#    ^ reference local 3~#2634721084
 #    ^ reference (write) local 3~#2634721084
+#    ^ reference local 3~#2634721084
 #         ^ reference local 1~#2634721084
    end
    z
