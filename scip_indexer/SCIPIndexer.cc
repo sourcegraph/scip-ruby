@@ -140,7 +140,6 @@ enum class Emitted {
 /// so caches should generally directly or indirectly include a FileRef
 /// as part of key (e.g. via core::Loc).
 class SCIPState {
-    string symbolScratchBuffer;
     UnorderedMap<UntypedGenericSymbolRef, string> symbolStringCache;
 
     /// Cache of occurrences for locals that have been emitted in this function.
@@ -202,7 +201,7 @@ public:
 
 public:
     SCIPState(GemMetadata metadata)
-        : symbolScratchBuffer(), symbolStringCache(), localOccurrenceCache(), symbolOccurrenceCache(),
+        : symbolStringCache(), localOccurrenceCache(), symbolOccurrenceCache(), potentialRefOnlySymbols(),
           gemMetadata(metadata), occurrenceMap(), emittedSymbols(), symbolMap(), documents(), externalSymbols() {}
     ~SCIPState() = default;
     SCIPState(SCIPState &&) = default;
@@ -218,31 +217,35 @@ public:
     /// If the returned value is as success, the pointer is non-null.
     ///
     /// The argument symbol is used instead of recomputing from scratch if it is non-null.
-    absl::StatusOr<const string *> saveSymbolString(const core::GlobalState &gs, UntypedGenericSymbolRef symRef,
-                                                    const scip::Symbol *symbol) {
+    absl::Status saveSymbolString(const core::GlobalState &gs, UntypedGenericSymbolRef symRef,
+                                  const scip::Symbol *symbol, std::string &output) {
         auto pair = this->symbolStringCache.find(symRef);
         if (pair != this->symbolStringCache.end()) {
-            return &pair->second;
+            // Yes, there is a "redundant" string copy here when we could "just"
+            // optimize it to return an interior pointer into the cache. However,
+            // that creates a footgun where this method cannot be safely called
+            // across invocations to non-const method calls on SCIPState.
+            output = pair->second;
+            return absl::OkStatus();
         }
-
-        this->symbolScratchBuffer.clear();
 
         absl::Status status;
         if (symbol) {
-            status = scip::utils::emitSymbolString(*symbol, this->symbolScratchBuffer);
+            status = scip::utils::emitSymbolString(*symbol, output);
         } else {
             scip::Symbol symbol;
             status = symRef.symbolForExpr(gs, this->gemMetadata, {}, symbol);
             if (!status.ok()) {
                 return status;
             }
-            status = scip::utils::emitSymbolString(symbol, this->symbolScratchBuffer);
+            status = scip::utils::emitSymbolString(symbol, output);
         }
         if (!status.ok()) {
             return status;
         }
-        symbolStringCache.insert({symRef, this->symbolScratchBuffer});
-        return &symbolStringCache[symRef];
+        symbolStringCache.insert({symRef, output});
+
+        return absl::OkStatus();
     }
 
 private:
@@ -361,9 +364,8 @@ private:
                            SmallVec<scip::Relationship> &rels) {
         untypedSymRef.saveRelationships(gs, this->relationshipsMap[file], rels,
                                         [this, &gs](UntypedGenericSymbolRef sym, std::string &out) {
-                                            auto status = this->saveSymbolString(gs, sym, nullptr);
+                                            auto status = this->saveSymbolString(gs, sym, nullptr, out);
                                             ENFORCE(status.ok());
-                                            out = *status.value();
                                         });
     }
 
@@ -397,11 +399,11 @@ public:
         if (!status.ok()) {
             return status;
         }
-        absl::StatusOr<const string *> valueOrStatus(this->saveSymbolString(gs, untypedSymRef, &symbol));
-        if (!valueOrStatus.ok()) {
-            return valueOrStatus.status();
+        std::string symbolString;
+        status = this->saveSymbolString(gs, untypedSymRef, &symbol, symbolString);
+        if (!status.ok()) {
+            return status;
         }
-        const string &symbolString = *valueOrStatus.value();
 
         SmallVec<string> docs;
         symRef.saveDocStrings(gs, symRef.definitionType(), occLoc, docs);
@@ -444,11 +446,11 @@ public:
         }
         auto &gs = ctx.state;
         auto file = ctx.file;
-        absl::StatusOr<const string *> valueOrStatus(this->saveSymbolString(gs, symRef.withoutType(), nullptr));
-        if (!valueOrStatus.ok()) {
-            return valueOrStatus.status();
+        std::string symbolString;
+        auto status = this->saveSymbolString(gs, symRef.withoutType(), nullptr, symbolString);
+        if (!status.ok()) {
+            return status;
         }
-        const string &symbolString = *valueOrStatus.value();
 
         SmallVec<string> overrideDocs{};
         using Kind = GenericSymbolRef::Kind;
@@ -479,12 +481,11 @@ public:
     void finalizeRefOnlySymbolInfos(const core::GlobalState &gs, core::FileRef file) {
         auto &potentialSyms = this->potentialRefOnlySymbols[file];
 
+        std::string symbolString;
         for (auto symRef : potentialSyms) {
-            auto valueOrError = this->saveSymbolString(gs, symRef, nullptr);
-            if (!valueOrError.ok()) {
+            if (!this->saveSymbolString(gs, symRef, nullptr, symbolString).ok()) {
                 continue;
             }
-            auto &symbolString = *valueOrError.value();
             // Avoid calling saveRelationships if we already emitted this.
             // saveSymbolInfo does this check too, so it isn't strictly needed.
             if (this->alreadyEmittedSymbolInfo(file, symbolString)) {
