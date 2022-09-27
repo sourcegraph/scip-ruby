@@ -19,8 +19,8 @@
 #  ^^^^^^^^ reference [..] `<Class:Record>`#flatfile().
      from   1..2, :foo
 #    ^^^^ reference [..] `<Class:Record>`#from().
-#                 ^^^^ definition [..] Flatfile#`foo=`().
 #                 ^^^^ definition [..] Flatfile#foo().
+#                 ^^^^ definition [..] Flatfile#`foo=`().
      pattern(/A-Za-z/, :bar)
 #    ^^^^^^^ reference [..] `<Class:Record>`#pattern().
 #            ^^^^^^^^ reference [..] Regexp#
@@ -28,8 +28,8 @@
 #                      ^^^^ definition [..] Flatfile#bar().
      field :baz
 #    ^^^^^ reference [..] `<Class:Record>`#field().
-#          ^^^^ definition [..] Flatfile#baz().
 #          ^^^^ definition [..] Flatfile#`baz=`().
+#          ^^^^ definition [..] Flatfile#baz().
    end
  end
  

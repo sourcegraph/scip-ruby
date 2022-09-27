@@ -8,8 +8,8 @@
 #    ^^^^^^^ reference [..] Module#include().
  
      prop :foo, String
-#          ^^^ definition [..] SomeODM#`foo=`().
 #          ^^^ definition [..] SomeODM#foo().
+#          ^^^ definition [..] SomeODM#`foo=`().
 #               ^^^^^^ reference [..] String#
  
      sig {returns(T.nilable(String))}
@@ -70,54 +70,54 @@
 #                  ^^^^^^ reference [..] String#
  
      prop :enum_prop, String, enum: ["hello", "goodbye"]
-#          ^^^^^^^^^ definition [..] AdvancedODM#enum_prop().
 #          ^^^^^^^^^ definition [..] AdvancedODM#`enum_prop=`().
+#          ^^^^^^^^^ definition [..] AdvancedODM#enum_prop().
 #                     ^^^^^^ reference [..] String#
  
      prop :foreign_lazy, String, foreign: -> {ForeignClass}
 #    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Boolean.
 #          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_lazy_!`().
-#          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_lazy_().
 #          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_lazy().
 #          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_lazy=`().
+#          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_lazy_().
 #                        ^^^^^^ reference [..] String#
-#                                         ^^ reference [..] Kernel#
 #                                         ^^ reference [..] Kernel#lambda().
+#                                         ^^ reference [..] Kernel#
 #                                             ^^^^^^^^^^^^ reference [..] ForeignClass#
      prop :foreign_proc, String, foreign: proc {ForeignClass}
 #    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Boolean.
-#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_proc_!`().
-#          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_proc_().
-#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_proc=`().
 #          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_proc().
+#          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_proc_().
+#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_proc_!`().
+#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_proc=`().
 #                        ^^^^^^ reference [..] String#
 #                                         ^^^^ reference [..] Kernel#proc().
 #                                               ^^^^^^^^^^^^ reference [..] ForeignClass#
      prop :foreign_invalid, String, foreign: proc { :not_a_type }
 #    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Boolean.
 #          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_invalid_!`().
-#          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_invalid=`().
-#          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_invalid_().
 #          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_invalid().
+#          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_invalid_().
+#          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_invalid=`().
 #                           ^^^^^^ reference [..] String#
 #                                            ^^^^ reference [..] Kernel#proc().
  
      prop :ifunset, String, ifunset: ''
-#          ^^^^^^^ definition [..] AdvancedODM#ifunset().
 #          ^^^^^^^ definition [..] AdvancedODM#`ifunset=`().
+#          ^^^^^^^ definition [..] AdvancedODM#ifunset().
 #                   ^^^^^^ reference [..] String#
      prop :ifunset_nilable, T.nilable(String), ifunset: ''
-#          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#ifunset_nilable().
 #          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#`ifunset_nilable=`().
+#          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#ifunset_nilable().
 #                                     ^^^^^^ reference [..] String#
  
      prop :empty_hash_rules, String, {}
-#          ^^^^^^^^^^^^^^^^ definition [..] AdvancedODM#empty_hash_rules().
 #          ^^^^^^^^^^^^^^^^ definition [..] AdvancedODM#`empty_hash_rules=`().
+#          ^^^^^^^^^^^^^^^^ definition [..] AdvancedODM#empty_hash_rules().
 #                            ^^^^^^ reference [..] String#
      prop :hash_rules, String, { enum: ["hello", "goodbye" ] }
-#          ^^^^^^^^^^ definition [..] AdvancedODM#hash_rules().
 #          ^^^^^^^^^^ definition [..] AdvancedODM#`hash_rules=`().
+#          ^^^^^^^^^^ definition [..] AdvancedODM#hash_rules().
 #                      ^^^^^^ reference [..] String#
  end
  
@@ -130,8 +130,8 @@
    def self.created_prop(opts={}); end
 #           ^^^^^^^^^^^^ definition [..] `<Class:PropHelpers>`#created_prop().
    token_prop
-#  ^^^^^ definition [..] PropHelpers#token().
 #  ^^^^^ definition [..] PropHelpers#`token=`().
+#  ^^^^^ definition [..] PropHelpers#token().
 #  ^^^^^^^^^^ reference [..] `<Class:PropHelpers>`#token_prop().
 #  ^^^^^^^^^^ reference [..] String#
    created_prop

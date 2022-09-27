@@ -26,14 +26,14 @@
 #           ^^^^^^^^^^^^^^ definition [..] `<Class:EncryptedProp>`#encrypted_prop().
    encrypted_prop :foo
 #  ^^^^^^^^^^^^^^^^^^^ reference [..] String#
+#                  ^^^ definition [..] EncryptedProp#encrypted_foo().
 #                  ^^^ definition [..] EncryptedProp#`encrypted_foo=`().
 #                  ^^^ definition [..] EncryptedProp#`foo=`().
-#                  ^^^ definition [..] EncryptedProp#encrypted_foo().
 #                  ^^^ definition [..] EncryptedProp#foo().
    encrypted_prop :bar, migrating: true, immutable: true
 #  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] String#
-#                  ^^^ definition [..] EncryptedProp#bar().
 #                  ^^^ definition [..] EncryptedProp#encrypted_bar().
+#                  ^^^ definition [..] EncryptedProp#bar().
  end
  
  

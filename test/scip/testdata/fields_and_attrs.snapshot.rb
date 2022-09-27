@@ -96,8 +96,8 @@
  class P
 #      ^ definition [..] P#
    attr_accessor :a
-#                 ^ definition [..] P#`a=`().
 #                 ^ definition [..] P#a().
+#                 ^ definition [..] P#`a=`().
    attr_reader :r
 #               ^ definition [..] P#r().
    attr_writer :w

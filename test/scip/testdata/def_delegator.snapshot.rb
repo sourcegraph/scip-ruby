@@ -6,8 +6,8 @@
  class MyArray1
 #      ^^^^^^^^ definition [..] MyArray1#
    attr_accessor :inner_array
-#                 ^^^^^^^^^^^ definition [..] MyArray1#inner_array().
 #                 ^^^^^^^^^^^ definition [..] MyArray1#`inner_array=`().
+#                 ^^^^^^^^^^^ definition [..] MyArray1#inner_array().
    extend Forwardable
 #  ^^^^^^ reference [..] Kernel#extend().
 #         ^^^^^^^^^^^ reference [..] Forwardable#
@@ -54,8 +54,8 @@
    extend T::Sig
 #  ^^^^^^ reference [..] Kernel#extend().
    attr_accessor :inner_array
-#                 ^^^^^^^^^^^ definition [..] MyArray4#inner_array().
 #                 ^^^^^^^^^^^ definition [..] MyArray4#`inner_array=`().
+#                 ^^^^^^^^^^^ definition [..] MyArray4#inner_array().
    extend Forwardable
 #  ^^^^^^ reference [..] Kernel#extend().
 #         ^^^^^^^^^^^ reference [..] Forwardable#

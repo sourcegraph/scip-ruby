@@ -66,8 +66,8 @@
 #  ^^^^^^ reference [..] Kernel#extend().
    mattr_accessor :both, :foo
 #                 ^^^^^ definition [..] MA#`both=`().
-#                 ^^^^^ definition [..] `<Class:MA>`#both().
 #                 ^^^^^ definition [..] `<Class:MA>`#`both=`().
+#                 ^^^^^ definition [..] `<Class:MA>`#both().
 #                 ^^^^^ definition [..] MA#both().
 #                        ^^^^ definition [..] MA#foo().
 #                        ^^^^ definition [..] `<Class:MA>`#foo().
@@ -85,8 +85,8 @@
 #                 ^^^^ definition [..] `<Class:MA>`#bar().
 #                 ^^^^ definition [..] `<Class:MA>`#`bar=`().
 #                       ^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:MA>`#no_instance_writer().
-#                       ^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:MA>`#`no_instance_writer=`().
 #                       ^^^^^^^^^^^^^^^^^^^ definition [..] MA#no_instance_writer().
+#                       ^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:MA>`#`no_instance_writer=`().
  
    sig {void}
    def usages

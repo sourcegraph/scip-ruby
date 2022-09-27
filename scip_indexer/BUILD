@@ -31,6 +31,8 @@ cc_library(
         "Debug.cc",
         "Debug.h",
         "SCIPIndexer.cc",
+        "SCIPProtoExt.cc",
+        "SCIPProtoExt.h",
         "SCIPSymbolRef.cc",
         "SCIPSymbolRef.h",
     ],

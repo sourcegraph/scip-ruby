@@ -2,13 +2,13 @@
  
  # From Sorbet docs https://sorbet.org/docs/tstruct
  class S < T::Struct
-#      ^ definition [..] S#initialize().
 #      ^ definition [..] S#
+#      ^ definition [..] S#initialize().
 #          ^ reference [..] T#
 #             ^^^^^^ definition [..] T#Struct#
    prop :prop_i, Integer
-#        ^^^^^^ definition [..] S#`prop_i=`().
 #        ^^^^^^ definition [..] S#prop_i().
+#        ^^^^^^ definition [..] S#`prop_i=`().
 #                ^^^^^^^ reference [..] Integer#
    const :const_s, T.nilable(String)
 #         ^^^^^^^ definition [..] S#const_s().
@@ -48,15 +48,15 @@
  
  POINT = Struct.new(:x, :y) do
 #^^^^^ definition [..] POINT#
-#^^^^^^^^^^^^^^^^^^^^ definition local 5~#119448696
 #^^^^^^^^^^^^^^^^^^^^ definition [..] Struct#
+#^^^^^^^^^^^^^^^^^^^^ definition local 5~#119448696
 #^^^^^^^^^^^^^^^^^^^^ definition [..] POINT#initialize().
+#                    ^ reference [..] BasicObject#
 #                    ^ definition [..] POINT#x().
 #                    ^ definition [..] POINT#`x=`().
-#                    ^ reference [..] BasicObject#
+#                        ^ reference [..] BasicObject#
 #                        ^ definition [..] POINT#y().
 #                        ^ definition [..] POINT#`y=`().
-#                        ^ reference [..] BasicObject#
    def array
 #      ^^^^^ definition [..] POINT#array().
      [x, y]
