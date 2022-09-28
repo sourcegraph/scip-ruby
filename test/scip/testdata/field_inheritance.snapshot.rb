@@ -268,3 +268,26 @@
 #    ^^^^^^^ reference [..] `<Class:E2>`#`@y`.
    end
  end
+ 
+ # Declared fields are inherited the same way as undeclared fields
+ 
+ class F1
+#      ^^ definition [..] F1#
+   def initialize
+#      ^^^^^^^^^^ definition [..] F1#initialize().
+     @x = T.let(0, Integer)
+#    ^^ definition [..] F1#`@x`.
+#    ^^^^^^^^^^^^^^^^^^^^^^ reference [..] F1#`@x`.
+#                  ^^^^^^^ definition local 1~#3465713227
+#                  ^^^^^^^ reference [..] Integer#
+   end
+ end
+ 
+ class F2
+#      ^^ definition [..] F2#
+   def get_x
+#      ^^^^^ definition [..] F2#get_x().
+     @x
+#    ^^ reference [..] F2#`@x`.
+   end
+ end

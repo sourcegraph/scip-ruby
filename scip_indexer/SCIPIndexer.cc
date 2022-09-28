@@ -632,10 +632,21 @@ public:
                     continue;
                 }
                 if (sym.isFieldOrStaticField()) {
+                    // There are 3 possibilities here.
+                    // 1. This is a reference to a non-instance non-class variable.
+                    // 2. This is a reference to an instance or class variable declared by `klass`.
+                    // 3. This is a reference to an instance or class variable declared by one of `klass`'s ancestor
+                    //    classes.
+                    //
+                    // For case 3, we want to emit a scip::Symbol that uses `klass`, not the ancestor.
                     ENFORCE(!bind.loc.empty());
-                    this->map.insert(
-                        {bind.bind.variable,
-                         {GenericSymbolRef::declaredField(instr->what, bind.bind.type), trim(bind.loc), false}});
+                    auto name = instr->what.name(gs);
+                    std::string_view nameText = name.shortName(gs);
+                    auto symRef = GenericSymbolRef::declaredField(instr->what, bind.bind.type);
+                    if (!nameText.empty() && nameText[0] == '@' && instr->what.owner(gs) != klass) {
+                        symRef = GenericSymbolRef::undeclaredField(klass, name, bind.bind.type);
+                    }
+                    this->map.insert({bind.bind.variable, {symRef, trim(bind.loc), false}});
                     continue;
                 }
                 // Outside of definition contexts for classes & modules,

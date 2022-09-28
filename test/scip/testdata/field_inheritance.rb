@@ -134,3 +134,17 @@ class E2 < E1
     @y = 10
   end
 end
+
+# Declared fields are inherited the same way as undeclared fields
+
+class F1
+  def initialize
+    @x = T.let(0, Integer)
+  end
+end
+
+class F2
+  def get_x
+    @x
+  end
+end
