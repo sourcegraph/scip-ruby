@@ -343,6 +343,12 @@
    # doc comment on class var ooh
    @z = 9
 #  ^^ definition [..] `<Class:K2>`#`@z`.
+#  documentation
+#  | ```ruby
+#  | @z (T.untyped)
+#  | ```
+#  documentation
+#  | doc comment on class var ooh
  
    # overrides K1's p1
    def p1
@@ -365,9 +371,9 @@
 #    | ```
 #    relation definition=[..] `<Class:K1>`#`@@y`.
      @z += @x
-#    ^^ reference (write) [..] `<Class:K2>`#`@z`.
-#    ^^ reference [..] `<Class:K2>`#`@z`.
-#    ^^^^^^^^ reference [..] `<Class:K2>`#`@z`.
+#    ^^ reference (write) [..] K2#`@z`.
+#    ^^ reference [..] K2#`@z`.
+#    ^^^^^^^^ reference [..] K2#`@z`.
 #          ^^ reference [..] K2#`@x`.
 #          override_documentation
 #          | ```ruby

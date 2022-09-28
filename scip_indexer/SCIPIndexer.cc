@@ -560,7 +560,7 @@ public:
         this->map = {};
         auto &gs = ctx.state;
         auto method = ctx.owner;
-        auto klass = method.owner(gs);
+        const auto klass = method.owner(gs);
         // Make sure that the offsets we store here match the offsets we use
         // in saveDefinition/saveReference.
         auto trim = [&](core::LocOffsets loc) -> core::LocOffsets {
@@ -602,9 +602,10 @@ public:
                     switch (result.inherited.kind()) {
                         case FieldQueryResult::Kind::FromUndeclared: {
                             checkExists(result.inherited.originalClass().exists(), "class");
-                            klass = FieldResolver::normalizeParentForClassVar(gs, klass.asClassOrModuleRef(),
-                                                                              instr->name.shortName(gs));
-                            auto namedSymRef = GenericSymbolRef::undeclaredField(klass, instr->name, bind.bind.type);
+                            auto normalizedKlass = FieldResolver::normalizeParentForClassVar(
+                                gs, klass.asClassOrModuleRef(), instr->name.shortName(gs));
+                            auto namedSymRef =
+                                GenericSymbolRef::undeclaredField(normalizedKlass, instr->name, bind.bind.type);
                             if (!cacheHit) {
                                 // It may be the case that the mixin values are already stored because of the
                                 // traversal in some other function. In that case, don't bother overriding.
