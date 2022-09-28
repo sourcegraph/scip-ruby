@@ -119,7 +119,7 @@ FieldQueryResult::Data FieldResolver::findUnresolvedFieldInInheritanceChain(cons
             best = cur;
         }
 
-        if (cur == klass->superClass()) { // FIXME(varun): Handle mix-ins
+        if (cur == klass->superClass()) {
             break;
         }
         cur = klass->superClass();
