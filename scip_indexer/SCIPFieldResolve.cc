@@ -63,8 +63,8 @@ core::ClassOrModuleRef FieldResolver::normalizeParentForClassVar(const core::Glo
     return klass;
 }
 
-core::ClassOrModuleRef FieldResolver::findUnresolvedFieldInInheritanceChain(const core::GlobalState &gs, core::Loc loc,
-                                                                            FieldQuery query) {
+core::ClassOrModuleRef FieldResolver::findUnresolvedFieldInInheritanceChain(const core::GlobalState &gs,
+                                                                            FieldQuery query, core::Loc debugLoc) {
     auto start = query.start;
     auto field = query.field;
 
@@ -86,7 +86,7 @@ core::ClassOrModuleRef FieldResolver::findUnresolvedFieldInInheritanceChain(cons
         //     # blah
         //   end
         // which is not supported by Sorbet.
-        LOG_DEBUG(gs, loc,
+        LOG_DEBUG(gs, debugLoc,
                   fmt::format("couldn't find field {} in class {};\n"
                               "are you using a code pattern like def MyClass.method which is unsupported by Sorbet?",
                               field.exists() ? field.toString(gs) : "<non-existent>",
@@ -118,14 +118,14 @@ core::ClassOrModuleRef FieldResolver::findUnresolvedFieldInInheritanceChain(cons
     return best;
 }
 
-pair<FieldQueryResult, bool> FieldResolver::findUnresolvedFieldTransitive(const core::GlobalState &gs, core::Loc loc,
-                                                                          FieldQuery query) {
+pair<FieldQueryResult, bool> FieldResolver::findUnresolvedFieldTransitive(const core::GlobalState &gs, FieldQuery query,
+                                                                          core::Loc debugLoc) {
     ENFORCE(query.field.exists());
     auto cacheIt = this->cache.find(query);
     if (cacheIt != this->cache.end()) {
         return {cacheIt->second, true};
     }
-    auto inherited = this->findUnresolvedFieldInInheritanceChain(gs, loc, query);
+    auto inherited = this->findUnresolvedFieldInInheritanceChain(gs, query, debugLoc);
     vector<core::ClassOrModuleRef> mixins;
     findUnresolvedFieldInMixinsTransitive(gs, query, mixins);
     auto [it, inserted] =

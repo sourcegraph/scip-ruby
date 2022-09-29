@@ -6,22 +6,24 @@
 #include <optional>
 #include <vector>
 
+#include "core/FileRef.h"
 #include "core/NameRef.h"
 #include "core/SymbolRef.h"
 
 namespace sorbet::scip_indexer {
 
 struct FieldQuery final {
+    core::FileRef file;
     sorbet::core::ClassOrModuleRef start;
     sorbet::core::NameRef field;
 
     bool operator==(const FieldQuery &other) const noexcept {
-        return this->start == other.start && this->field == other.field;
+        return this->file == other.file && this->start == other.start && this->field == other.field;
     }
 };
 
 template <typename H> H AbslHashValue(H h, const FieldQuery &q) {
-    return H::combine(std::move(h), q.start, q.field);
+    return H::combine(std::move(h), q.file, q.start, q.field);
 }
 
 struct FieldQueryResult final {
@@ -66,7 +68,7 @@ class FieldResolver final {
 
 public:
     std::pair<FieldQueryResult, /*cacheHit*/ bool> findUnresolvedFieldTransitive(const core::GlobalState &gs,
-                                                                                 core::Loc loc, FieldQuery query);
+                                                                                 FieldQuery query, core::Loc debugLoc);
 
     static core::ClassOrModuleRef normalizeParentForClassVar(const core::GlobalState &gs, core::ClassOrModuleRef klass,
                                                              std::string_view name);
@@ -77,8 +79,8 @@ private:
     void findUnresolvedFieldInMixinsTransitive(const sorbet::core::GlobalState &gs, FieldQuery query,
                                                std::vector<core::ClassOrModuleRef> &out);
 
-    core::ClassOrModuleRef findUnresolvedFieldInInheritanceChain(const core::GlobalState &gs, core::Loc loc,
-                                                                 FieldQuery query);
+    core::ClassOrModuleRef findUnresolvedFieldInInheritanceChain(const core::GlobalState &gs, FieldQuery query,
+                                                                 core::Loc debugLoc);
 };
 
 } // namespace sorbet::scip_indexer

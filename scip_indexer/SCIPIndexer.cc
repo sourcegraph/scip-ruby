@@ -589,7 +589,7 @@ public:
                         continue;
                     }
                     auto [result, cacheHit] = fieldResolver.findUnresolvedFieldTransitive(
-                        ctx, ctx.locAt(bind.loc), {klass.asClassOrModuleRef(), instr->name});
+                        ctx, {ctx.file, klass.asClassOrModuleRef(), instr->name}, ctx.locAt(bind.loc));
                     auto checkExists = [&](bool exists, const std::string &text) {
                         ENFORCE(exists,
                                 "Returned non-existent {} from findUnresolvedFieldTransitive with start={}, "
@@ -632,7 +632,7 @@ public:
                         // miss out on relationships for declared symbols.
                         if (!relMap.contains(symRef.withoutType())) {
                             auto [result, _] = fieldResolver.findUnresolvedFieldTransitive(
-                                ctx, ctx.locAt(bind.loc), {klass.asClassOrModuleRef(), name});
+                                ctx, {ctx.file, klass.asClassOrModuleRef(), name}, ctx.locAt(bind.loc));
                             result.inherited = instr->what.owner(gs).asClassOrModuleRef();
                             relMap.insert({symRef.withoutType(), result});
                         }
