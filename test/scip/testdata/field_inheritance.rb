@@ -106,6 +106,18 @@ def f
   return
 end
 
+## Check that pre-declared class variables work too
+
+class DD1
+  @@x = T.let(0, Integer)
+end
+
+class DD2 < DD1
+  def self.get_x
+    @@x
+  end
+end
+
 # Class instance variables are not inherited.
 
 class E1

@@ -626,15 +626,16 @@ public:
                     std::string_view nameText = name.shortName(gs);
                     auto symRef = GenericSymbolRef::field(instr->what.owner(gs), name, bind.bind.type);
                     if (!nameText.empty() && nameText[0] == '@') {
-                        if (instr->what.owner(gs) != klass) {
-                            symRef = GenericSymbolRef::field(klass, name, bind.bind.type);
-                        }
+                        auto normalizedKlass =
+                            FieldResolver::normalizeParentForClassVar(gs, klass.asClassOrModuleRef(), nameText);
+                        symRef = GenericSymbolRef::field(normalizedKlass, name, bind.bind.type);
                         // Mimic the logic from the Magic_undeclaredFieldStub branch so that we don't
                         // miss out on relationships for declared symbols.
                         if (!relMap.contains(symRef.withoutType())) {
                             auto result = fieldResolver.findUnresolvedFieldTransitive(
                                 ctx, {ctx.file, klass.asClassOrModuleRef(), name}, ctx.locAt(bind.loc));
-                            result.inherited = instr->what.owner(gs).asClassOrModuleRef();
+                            result.inherited =
+                                FieldResolver::normalizeParentForClassVar(gs, result.inherited, nameText);
                             relMap.insert({symRef.withoutType(), result});
                         }
                     }

@@ -224,6 +224,28 @@
    return
  end
  
+ ## Check that pre-declared class variables work too
+ 
+ class DD1
+#      ^^^ definition [..] DD1#
+   @@x = T.let(0, Integer)
+#  ^^^ definition [..] `<Class:DD1>`#`@@x`.
+#  ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] `<Class:DD1>`#`@@x`.
+#                 ^^^^^^^ definition local 1~#119448696
+#                 ^^^^^^^ reference [..] Integer#
+ end
+ 
+ class DD2 < DD1
+#      ^^^ definition [..] DD2#
+#            ^^^ definition [..] DD1#
+   def self.get_x
+#           ^^^^^ definition [..] `<Class:DD2>`#get_x().
+     @@x
+#    ^^^ reference [..] `<Class:DD2>`#`@@x`.
+#    relation definition=[..] `<Class:DD1>`#`@@x`.
+   end
+ end
+ 
  # Class instance variables are not inherited.
  
  class E1
