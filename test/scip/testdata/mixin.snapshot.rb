@@ -75,7 +75,6 @@
 #         ^ definition [..] T0#M#
      def set_f_0; @f = 0; end
 #        ^^^^^^^ definition [..] T0#M#set_f_0().
-#        ^^^^^^^ definition [..] T0#M#set_f_0().
 #                 ^^ definition [..] T0#M#`@f`.
 #                 ^^^^^^ reference [..] T0#M#`@f`.
    end
@@ -162,7 +161,6 @@
 #         ^^ definition [..] T3#M0#
      def set_f_0; @f = 0; end
 #        ^^^^^^^ definition [..] T3#M0#set_f_0().
-#        ^^^^^^^ definition [..] T3#M0#set_f_0().
 #                 ^^ definition [..] T3#M0#`@f`.
 #                 ^^^^^^ reference [..] T3#M0#`@f`.
    end
@@ -187,89 +185,6 @@
  
  # Definition in directly included module & superclass & Self
  
- module T0
-#       ^^ definition [..] T0#
-   module M
-#         ^ definition [..] T0#M#
-     def set_f_0; @f = 0; end
-#                 ^^ definition [..] T0#M#`@f`.
-#                 ^^^^^^ reference [..] T0#M#`@f`.
-   end
- 
-   class C0
-#        ^^ definition [..] T0#C0#
-     def set_f_2; @f = 2; end
-#        ^^^^^^^ definition [..] T0#C0#set_f_2().
-#                 ^^ definition [..] T0#C0#`@f`.
-#                 ^^^^^^ reference [..] T0#C0#`@f`.
-   end
- 
-   class C1 < C0
-#        ^^ definition [..] T0#C1#
-#             ^^ definition [..] T0#C0#
-     include M
-#    ^^^^^^^ reference [..] Module#include().
-#            ^ reference [..] T0#M#
-     def set_f_1; @f = 1; end
-#        ^^^^^^^ definition [..] T0#C1#set_f_1().
-#                 ^^ definition [..] T0#C1#`@f`.
-#                 relation definition=[..] T0#C0#`@f`. reference=[..] T0#M#`@f`.
-#                 ^^^^^^ reference [..] T0#C1#`@f`.
-#                 relation definition=[..] T0#C0#`@f`. reference=[..] T0#M#`@f`.
-     def get_f; @f; end
-#        ^^^^^ definition [..] T0#C1#get_f().
-#               ^^ reference [..] T0#C1#`@f`.
-#               relation definition=[..] T0#C0#`@f`. reference=[..] T0#M#`@f`.
-   end
- end
- 
- # Definition in transitively included module & superclass & Self
- 
- module T3
-#       ^^ definition [..] T3#
-   module M0
-#         ^^ definition [..] T3#M0#
-     def set_f_0; @f = 0; end
-#                 ^^ definition [..] T3#M0#`@f`.
-#                 ^^^^^^ reference [..] T3#M0#`@f`.
-   end
- 
-   module M1
-#         ^^ definition [..] T3#M1#
-     include M0
-#    ^^^^^^^ reference [..] Module#include().
-#            ^^ reference [..] T3#M0#
-   end
- 
-   class C0
-#        ^^ definition [..] T3#C0#
-     def set_f_2; @f = 2; end
-#        ^^^^^^^ definition [..] T3#C0#set_f_2().
-#                 ^^ definition [..] T3#C0#`@f`.
-#                 ^^^^^^ reference [..] T3#C0#`@f`.
-   end
- 
-   class C1 < C0
-#        ^^ definition [..] T3#C1#
-#             ^^ definition [..] T3#C0#
-     include M
-#    ^^^^^^^ reference [..] Module#include().
-#            ^ reference [..] M#
-     def set_f_1; @f = 1; end
-#        ^^^^^^^ definition [..] T3#C1#set_f_1().
-#                 ^^ definition [..] T3#C1#`@f`.
-#                 relation definition=[..] T3#C0#`@f`.
-#                 ^^^^^^ reference [..] T3#C1#`@f`.
-#                 relation definition=[..] T3#C0#`@f`.
-     def get_f; @f; end
-#        ^^^^^ definition [..] T3#C1#get_f().
-#               ^^ reference [..] T3#C1#`@f`.
-#               relation definition=[..] T3#C0#`@f`.
-   end
- end
- 
- # Definition in directly included module & superclass only
- 
  module T4
 #       ^^ definition [..] T4#
    module M
@@ -282,8 +197,8 @@
  
    class C0
 #        ^^ definition [..] T4#C0#
-     def set_f_1; @f = 1; end
-#        ^^^^^^^ definition [..] T4#C0#set_f_1().
+     def set_f_2; @f = 2; end
+#        ^^^^^^^ definition [..] T4#C0#set_f_2().
 #                 ^^ definition [..] T4#C0#`@f`.
 #                 ^^^^^^ reference [..] T4#C0#`@f`.
    end
@@ -291,14 +206,23 @@
    class C1 < C0
 #        ^^ definition [..] T4#C1#
 #             ^^ definition [..] T4#C0#
+     include M
+#    ^^^^^^^ reference [..] Module#include().
+#            ^ reference [..] T4#M#
+     def set_f_1; @f = 1; end
+#        ^^^^^^^ definition [..] T4#C1#set_f_1().
+#                 ^^ definition [..] T4#C1#`@f`.
+#                 relation definition=[..] T4#C0#`@f`. reference=[..] T4#M#`@f`.
+#                 ^^^^^^ reference [..] T4#C1#`@f`.
+#                 relation definition=[..] T4#C0#`@f`. reference=[..] T4#M#`@f`.
      def get_f; @f; end
 #        ^^^^^ definition [..] T4#C1#get_f().
 #               ^^ reference [..] T4#C1#`@f`.
-#               relation definition=[..] T4#C0#`@f`.
+#               relation definition=[..] T4#C0#`@f`. reference=[..] T4#M#`@f`.
    end
  end
  
- # Definition in transitively included module & superclass only
+ # Definition in transitively included module & superclass & Self
  
  module T5
 #       ^^ definition [..] T5#
@@ -319,8 +243,8 @@
  
    class C0
 #        ^^ definition [..] T5#C0#
-     def set_f_1; @f = 1; end
-#        ^^^^^^^ definition [..] T5#C0#set_f_1().
+     def set_f_2; @f = 2; end
+#        ^^^^^^^ definition [..] T5#C0#set_f_2().
 #                 ^^ definition [..] T5#C0#`@f`.
 #                 ^^^^^^ reference [..] T5#C0#`@f`.
    end
@@ -328,6 +252,15 @@
    class C1 < C0
 #        ^^ definition [..] T5#C1#
 #             ^^ definition [..] T5#C0#
+     include M
+#    ^^^^^^^ reference [..] Module#include().
+#            ^ reference [..] M#
+     def set_f_1; @f = 1; end
+#        ^^^^^^^ definition [..] T5#C1#set_f_1().
+#                 ^^ definition [..] T5#C1#`@f`.
+#                 relation definition=[..] T5#C0#`@f`.
+#                 ^^^^^^ reference [..] T5#C1#`@f`.
+#                 relation definition=[..] T5#C0#`@f`.
      def get_f; @f; end
 #        ^^^^^ definition [..] T5#C1#get_f().
 #               ^^ reference [..] T5#C1#`@f`.
@@ -335,7 +268,7 @@
    end
  end
  
- # Definition in module included via superclass & superclass & Self
+ # Definition in directly included module & superclass only
  
  module T6
 #       ^^ definition [..] T6#
@@ -349,25 +282,15 @@
  
    class C0
 #        ^^ definition [..] T6#C0#
-     include M
-#    ^^^^^^^ reference [..] Module#include().
-#            ^ reference [..] T6#M#
      def set_f_1; @f = 1; end
 #        ^^^^^^^ definition [..] T6#C0#set_f_1().
 #                 ^^ definition [..] T6#C0#`@f`.
-#                 relation reference=[..] T6#M#`@f`.
 #                 ^^^^^^ reference [..] T6#C0#`@f`.
    end
  
    class C1 < C0
 #        ^^ definition [..] T6#C1#
 #             ^^ definition [..] T6#C0#
-     def set_f_2; @f = 2; end
-#        ^^^^^^^ definition [..] T6#C1#set_f_2().
-#                 ^^ definition [..] T6#C1#`@f`.
-#                 relation definition=[..] T6#C0#`@f`.
-#                 ^^^^^^ reference [..] T6#C1#`@f`.
-#                 relation definition=[..] T6#C0#`@f`.
      def get_f; @f; end
 #        ^^^^^ definition [..] T6#C1#get_f().
 #               ^^ reference [..] T6#C1#`@f`.
@@ -375,27 +298,30 @@
    end
  end
  
- # Definition in module included via superclass & superclass only
+ # Definition in transitively included module & superclass only
  
  module T7
 #       ^^ definition [..] T7#
-   module M
-#         ^ definition [..] T7#M#
+   module M0
+#         ^^ definition [..] T7#M0#
      def set_f_0; @f = 0; end
-#        ^^^^^^^ definition [..] T7#M#set_f_0().
-#                 ^^ definition [..] T7#M#`@f`.
-#                 ^^^^^^ reference [..] T7#M#`@f`.
+#        ^^^^^^^ definition [..] T7#M0#set_f_0().
+#                 ^^ definition [..] T7#M0#`@f`.
+#                 ^^^^^^ reference [..] T7#M0#`@f`.
+   end
+ 
+   module M1
+#         ^^ definition [..] T7#M1#
+     include M0
+#    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T7#M0#
    end
  
    class C0
 #        ^^ definition [..] T7#C0#
-     include M
-#    ^^^^^^^ reference [..] Module#include().
-#            ^ reference [..] T7#M#
      def set_f_1; @f = 1; end
 #        ^^^^^^^ definition [..] T7#C0#set_f_1().
 #                 ^^ definition [..] T7#C0#`@f`.
-#                 relation reference=[..] T7#M#`@f`.
 #                 ^^^^^^ reference [..] T7#C0#`@f`.
    end
  
@@ -409,7 +335,7 @@
    end
  end
  
- # Definition in module included via superclass & Self
+ # Definition in module included via superclass & superclass & Self
  
  module T8
 #       ^^ definition [..] T8#
@@ -426,6 +352,11 @@
      include M
 #    ^^^^^^^ reference [..] Module#include().
 #            ^ reference [..] T8#M#
+     def set_f_1; @f = 1; end
+#        ^^^^^^^ definition [..] T8#C0#set_f_1().
+#                 ^^ definition [..] T8#C0#`@f`.
+#                 relation reference=[..] T8#M#`@f`.
+#                 ^^^^^^ reference [..] T8#C0#`@f`.
    end
  
    class C1 < C0
@@ -434,14 +365,17 @@
      def set_f_2; @f = 2; end
 #        ^^^^^^^ definition [..] T8#C1#set_f_2().
 #                 ^^ definition [..] T8#C1#`@f`.
+#                 relation definition=[..] T8#C0#`@f`.
 #                 ^^^^^^ reference [..] T8#C1#`@f`.
+#                 relation definition=[..] T8#C0#`@f`.
      def get_f; @f; end
 #        ^^^^^ definition [..] T8#C1#get_f().
 #               ^^ reference [..] T8#C1#`@f`.
+#               relation definition=[..] T8#C0#`@f`.
    end
  end
  
- # Definition in module included via superclass only
+ # Definition in module included via superclass & superclass only
  
  module T9
 #       ^^ definition [..] T9#
@@ -458,6 +392,11 @@
      include M
 #    ^^^^^^^ reference [..] Module#include().
 #            ^ reference [..] T9#M#
+     def set_f_1; @f = 1; end
+#        ^^^^^^^ definition [..] T9#C0#set_f_1().
+#                 ^^ definition [..] T9#C0#`@f`.
+#                 relation reference=[..] T9#M#`@f`.
+#                 ^^^^^^ reference [..] T9#C0#`@f`.
    end
  
    class C1 < C0
@@ -466,107 +405,71 @@
      def get_f; @f; end
 #        ^^^^^ definition [..] T9#C1#get_f().
 #               ^^ reference [..] T9#C1#`@f`.
+#               relation definition=[..] T9#C0#`@f`.
+   end
+ end
+ 
+ # Definition in module included via superclass & Self
+ 
+ module T10
+#       ^^^ definition [..] T10#
+   module M
+#         ^ definition [..] T10#M#
+     def set_f_0; @f = 0; end
+#        ^^^^^^^ definition [..] T10#M#set_f_0().
+#                 ^^ definition [..] T10#M#`@f`.
+#                 ^^^^^^ reference [..] T10#M#`@f`.
+   end
+ 
+   class C0
+#        ^^ definition [..] T10#C0#
+     include M
+#    ^^^^^^^ reference [..] Module#include().
+#            ^ reference [..] T10#M#
+   end
+ 
+   class C1 < C0
+#        ^^ definition [..] T10#C1#
+#             ^^ definition [..] T10#C0#
+     def set_f_2; @f = 2; end
+#        ^^^^^^^ definition [..] T10#C1#set_f_2().
+#                 ^^ definition [..] T10#C1#`@f`.
+#                 ^^^^^^ reference [..] T10#C1#`@f`.
+     def get_f; @f; end
+#        ^^^^^ definition [..] T10#C1#get_f().
+#               ^^ reference [..] T10#C1#`@f`.
+   end
+ end
+ 
+ # Definition in module included via superclass only
+ 
+ module T11
+#       ^^^ definition [..] T11#
+   module M
+#         ^ definition [..] T11#M#
+     def set_f_0; @f = 0; end
+#        ^^^^^^^ definition [..] T11#M#set_f_0().
+#                 ^^ definition [..] T11#M#`@f`.
+#                 ^^^^^^ reference [..] T11#M#`@f`.
+   end
+ 
+   class C0
+#        ^^ definition [..] T11#C0#
+     include M
+#    ^^^^^^^ reference [..] Module#include().
+#            ^ reference [..] T11#M#
+   end
+ 
+   class C1 < C0
+#        ^^ definition [..] T11#C1#
+#             ^^ definition [..] T11#C0#
+     def get_f; @f; end
+#        ^^^^^ definition [..] T11#C1#get_f().
+#               ^^ reference [..] T11#C1#`@f`.
    end
  end
  
  # Definition in multiple transitively included modules & common child & Self
- 
- module T10
-#       ^^^ definition [..] T10#
-   module M0
-#         ^^ definition [..] T10#M0#
-     def set_f_0; @f = 0; end
-#        ^^^^^^^ definition [..] T10#M0#set_f_0().
-#                 ^^ definition [..] T10#M0#`@f`.
-#                 ^^^^^^ reference [..] T10#M0#`@f`.
-   end
- 
-   module M1
-#         ^^ definition [..] T10#M1#
-     def set_f_1; @f = 1; end
-#        ^^^^^^^ definition [..] T10#M1#set_f_1().
-#                 ^^ definition [..] T10#M1#`@f`.
-#                 ^^^^^^ reference [..] T10#M1#`@f`.
-   end
- 
-   module M2
-#         ^^ definition [..] T10#M2#
-     include M0
-#    ^^^^^^^ reference [..] Module#include().
-#            ^^ reference [..] T10#M0#
-     include M1
-#    ^^^^^^^ reference [..] Module#include().
-#            ^^ reference [..] T10#M1#
-     def set_f_2; @f = 2; end
-#        ^^^^^^^ definition [..] T10#M2#set_f_2().
-#                 ^^ definition [..] T10#M2#`@f`.
-#                 relation reference=[..] T10#M0#`@f`. reference=[..] T10#M1#`@f`.
-#                 ^^^^^^ reference [..] T10#M2#`@f`.
-   end
- 
-   class C
-#        ^ definition [..] T10#C#
-     include M2
-#    ^^^^^^^ reference [..] Module#include().
-#            ^^ reference [..] T10#M2#
-     def set_f_3; @f = 3; end
-#        ^^^^^^^ definition [..] T10#C#set_f_3().
-#                 ^^ definition [..] T10#C#`@f`.
-#                 relation reference=[..] T10#M0#`@f`. reference=[..] T10#M1#`@f`. reference=[..] T10#M2#`@f`.
-#                 ^^^^^^ reference [..] T10#C#`@f`.
-     def get_f; @f; end
-#        ^^^^^ definition [..] T10#C#get_f().
-#               ^^ reference [..] T10#C#`@f`.
-   end
- end
- 
- # Definition in multiple transitively included modules & common child only
- 
- module T11
-#       ^^^ definition [..] T11#
-   module M0
-#         ^^ definition [..] T11#M0#
-     def set_f_0; @f = 0; end
-#        ^^^^^^^ definition [..] T11#M0#set_f_0().
-#                 ^^ definition [..] T11#M0#`@f`.
-#                 ^^^^^^ reference [..] T11#M0#`@f`.
-   end
- 
-   module M1
-#         ^^ definition [..] T11#M1#
-     def set_f_1; @f = 1; end
-#        ^^^^^^^ definition [..] T11#M1#set_f_1().
-#                 ^^ definition [..] T11#M1#`@f`.
-#                 ^^^^^^ reference [..] T11#M1#`@f`.
-   end
- 
-   module M2
-#         ^^ definition [..] T11#M2#
-     include M0
-#    ^^^^^^^ reference [..] Module#include().
-#            ^^ reference [..] T11#M0#
-     include M1
-#    ^^^^^^^ reference [..] Module#include().
-#            ^^ reference [..] T11#M1#
-     def set_f_2; @f = 2; end
-#        ^^^^^^^ definition [..] T11#M2#set_f_2().
-#                 ^^ definition [..] T11#M2#`@f`.
-#                 relation reference=[..] T11#M0#`@f`. reference=[..] T11#M1#`@f`.
-#                 ^^^^^^ reference [..] T11#M2#`@f`.
-   end
- 
-   class C
-#        ^ definition [..] T11#C#
-     include M2
-#    ^^^^^^^ reference [..] Module#include().
-#            ^^ reference [..] T11#M2#
-     def get_f; @f; end
-#        ^^^^^ definition [..] T11#C#get_f().
-#               ^^ reference [..] T11#C#`@f`.
-   end
- end
- 
- # Definition in multiple transitively included modules & Self
  
  module T12
 #       ^^^ definition [..] T12#
@@ -594,6 +497,11 @@
      include M1
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] T12#M1#
+     def set_f_2; @f = 2; end
+#        ^^^^^^^ definition [..] T12#M2#set_f_2().
+#                 ^^ definition [..] T12#M2#`@f`.
+#                 relation reference=[..] T12#M0#`@f`. reference=[..] T12#M1#`@f`.
+#                 ^^^^^^ reference [..] T12#M2#`@f`.
    end
  
    class C
@@ -604,7 +512,7 @@
      def set_f_3; @f = 3; end
 #        ^^^^^^^ definition [..] T12#C#set_f_3().
 #                 ^^ definition [..] T12#C#`@f`.
-#                 relation reference=[..] T12#M0#`@f`. reference=[..] T12#M1#`@f`.
+#                 relation reference=[..] T12#M0#`@f`. reference=[..] T12#M1#`@f`. reference=[..] T12#M2#`@f`.
 #                 ^^^^^^ reference [..] T12#C#`@f`.
      def get_f; @f; end
 #        ^^^^^ definition [..] T12#C#get_f().
@@ -612,7 +520,7 @@
    end
  end
  
- # Definition in multiple transitively included modules only
+ # Definition in multiple transitively included modules & common child only
  
  module T13
 #       ^^^ definition [..] T13#
@@ -640,6 +548,11 @@
      include M1
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] T13#M1#
+     def set_f_2; @f = 2; end
+#        ^^^^^^^ definition [..] T13#M2#set_f_2().
+#                 ^^ definition [..] T13#M2#`@f`.
+#                 relation reference=[..] T13#M0#`@f`. reference=[..] T13#M1#`@f`.
+#                 ^^^^^^ reference [..] T13#M2#`@f`.
    end
  
    class C
@@ -653,7 +566,7 @@
    end
  end
  
- # Definition in multiple directly included modules & Self
+ # Definition in multiple transitively included modules & Self
  
  module T14
 #       ^^^ definition [..] T14#
@@ -673,16 +586,23 @@
 #                 ^^^^^^ reference [..] T14#M1#`@f`.
    end
  
-   class C
-#        ^ definition [..] T14#C#
+   module M2
+#         ^^ definition [..] T14#M2#
      include M0
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] T14#M0#
      include M1
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] T14#M1#
-     def set_f_2; @f = 2; end
-#        ^^^^^^^ definition [..] T14#C#set_f_2().
+   end
+ 
+   class C
+#        ^ definition [..] T14#C#
+     include M2
+#    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T14#M2#
+     def set_f_3; @f = 3; end
+#        ^^^^^^^ definition [..] T14#C#set_f_3().
 #                 ^^ definition [..] T14#C#`@f`.
 #                 relation reference=[..] T14#M0#`@f`. reference=[..] T14#M1#`@f`.
 #                 ^^^^^^ reference [..] T14#C#`@f`.
@@ -692,7 +612,7 @@
    end
  end
  
- # Definition in multiple directly included modules only
+ # Definition in multiple transitively included modules only
  
  module T15
 #       ^^^ definition [..] T15#
@@ -712,17 +632,97 @@
 #                 ^^^^^^ reference [..] T15#M1#`@f`.
    end
  
-   class C
-#        ^ definition [..] T15#C#
+   module M2
+#         ^^ definition [..] T15#M2#
      include M0
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] T15#M0#
      include M1
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] T15#M1#
+   end
+ 
+   class C
+#        ^ definition [..] T15#C#
+     include M2
+#    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T15#M2#
      def get_f; @f; end
 #        ^^^^^ definition [..] T15#C#get_f().
 #               ^^ reference [..] T15#C#`@f`.
+   end
+ end
+ 
+ # Definition in multiple directly included modules & Self
+ 
+ module T16
+#       ^^^ definition [..] T16#
+   module M0
+#         ^^ definition [..] T16#M0#
+     def set_f_0; @f = 0; end
+#        ^^^^^^^ definition [..] T16#M0#set_f_0().
+#                 ^^ definition [..] T16#M0#`@f`.
+#                 ^^^^^^ reference [..] T16#M0#`@f`.
+   end
+ 
+   module M1
+#         ^^ definition [..] T16#M1#
+     def set_f_1; @f = 1; end
+#        ^^^^^^^ definition [..] T16#M1#set_f_1().
+#                 ^^ definition [..] T16#M1#`@f`.
+#                 ^^^^^^ reference [..] T16#M1#`@f`.
+   end
+ 
+   class C
+#        ^ definition [..] T16#C#
+     include M0
+#    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T16#M0#
+     include M1
+#    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T16#M1#
+     def set_f_2; @f = 2; end
+#        ^^^^^^^ definition [..] T16#C#set_f_2().
+#                 ^^ definition [..] T16#C#`@f`.
+#                 relation reference=[..] T16#M0#`@f`. reference=[..] T16#M1#`@f`.
+#                 ^^^^^^ reference [..] T16#C#`@f`.
+     def get_f; @f; end
+#        ^^^^^ definition [..] T16#C#get_f().
+#               ^^ reference [..] T16#C#`@f`.
+   end
+ end
+ 
+ # Definition in multiple directly included modules only
+ 
+ module T17
+#       ^^^ definition [..] T17#
+   module M0
+#         ^^ definition [..] T17#M0#
+     def set_f_0; @f = 0; end
+#        ^^^^^^^ definition [..] T17#M0#set_f_0().
+#                 ^^ definition [..] T17#M0#`@f`.
+#                 ^^^^^^ reference [..] T17#M0#`@f`.
+   end
+ 
+   module M1
+#         ^^ definition [..] T17#M1#
+     def set_f_1; @f = 1; end
+#        ^^^^^^^ definition [..] T17#M1#set_f_1().
+#                 ^^ definition [..] T17#M1#`@f`.
+#                 ^^^^^^ reference [..] T17#M1#`@f`.
+   end
+ 
+   class C
+#        ^ definition [..] T17#C#
+     include M0
+#    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T17#M0#
+     include M1
+#    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T17#M1#
+     def get_f; @f; end
+#        ^^^^^ definition [..] T17#C#get_f().
+#               ^^ reference [..] T17#C#`@f`.
    end
  end
  
@@ -812,7 +812,6 @@
 #            ^ reference [..] W2#M#
      def get_fp1; @f + 1; end
 #        ^^^^^^^ definition [..] W2#C1#get_fp1().
-#        ^^^^^^^ definition [..] W2#C1#get_fp1().
 #                 ^^ reference [..] W2#C1#`@f`.
 #                 relation definition=[..] W2#C0#`@f`. reference=[..] W2#M#`@f`.
    end
@@ -820,70 +819,37 @@
  
  # Reference in directly included module with def in superclass
  
- module W2
-#       ^^ definition [..] W2#
+ module W3
+#       ^^ definition [..] W3#
    module M
-#         ^ definition [..] W2#M#
+#         ^ definition [..] W3#M#
      def get_f; @f; end
-#        ^^^^^ definition [..] W2#M#get_f().
-#               ^^ reference [..] W2#M#`@f`.
+#        ^^^^^ definition [..] W3#M#get_f().
+#               ^^ reference [..] W3#M#`@f`.
    end
  
    class C0
-#        ^^ definition [..] W2#C0#
+#        ^^ definition [..] W3#C0#
      def set_f; @f = 0; end
-#        ^^^^^ definition [..] W2#C0#set_f().
-#               ^^ definition [..] W2#C0#`@f`.
-#               ^^^^^^ reference [..] W2#C0#`@f`.
+#        ^^^^^ definition [..] W3#C0#set_f().
+#               ^^ definition [..] W3#C0#`@f`.
+#               ^^^^^^ reference [..] W3#C0#`@f`.
    end
  
    class C1 < C0
-#        ^^ definition [..] W2#C1#
-#             ^^ definition [..] W2#C0#
+#        ^^ definition [..] W3#C1#
+#             ^^ definition [..] W3#C0#
      include M
 #    ^^^^^^^ reference [..] Module#include().
-#            ^ reference [..] W2#M#
+#            ^ reference [..] W3#M#
      def get_fp1; @f + 1; end
-#                 ^^ reference [..] W2#C1#`@f`.
-#                 relation definition=[..] W2#C0#`@f`. reference=[..] W2#M#`@f`.
+#        ^^^^^^^ definition [..] W3#C1#get_fp1().
+#                 ^^ reference [..] W3#C1#`@f`.
+#                 relation definition=[..] W3#C0#`@f`. reference=[..] W3#M#`@f`.
    end
  end
  
  # Reference in transitively included module with def in in-between module
- 
- module W3
-#       ^^ definition [..] W3#
-   module M0
-#         ^^ definition [..] W3#M0#
-     def get_f; @f; end
-#        ^^^^^ definition [..] W3#M0#get_f().
-#               ^^ reference [..] W3#M0#`@f`.
-   end
- 
-   module M1
-#         ^^ definition [..] W3#M1#
-     include M0
-#    ^^^^^^^ reference [..] Module#include().
-#            ^^ reference [..] W3#M0#
-     def set_f; @f = 0; end
-#        ^^^^^ definition [..] W3#M1#set_f().
-#               ^^ definition [..] W3#M1#`@f`.
-#               relation reference=[..] W3#M0#`@f`.
-#               ^^^^^^ reference [..] W3#M1#`@f`.
-   end
- 
-   class C
-#        ^ definition [..] W3#C#
-     include M1
-#    ^^^^^^^ reference [..] Module#include().
-#            ^^ reference [..] W3#M1#
-     def get_fp1; @f + 1; end
-#        ^^^^^^^ definition [..] W3#C#get_fp1().
-#                 ^^ reference [..] W3#C#`@f`.
-   end
- end
- 
- # Reference in one directly included module with def in other directly included module
  
  module W4
 #       ^^ definition [..] W4#
@@ -896,16 +862,18 @@
  
    module M1
 #         ^^ definition [..] W4#M1#
-     def set_f; @f + 1; end
+     include M0
+#    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] W4#M0#
+     def set_f; @f = 0; end
 #        ^^^^^ definition [..] W4#M1#set_f().
-#               ^^ reference [..] W4#M1#`@f`.
+#               ^^ definition [..] W4#M1#`@f`.
+#               relation reference=[..] W4#M0#`@f`.
+#               ^^^^^^ reference [..] W4#M1#`@f`.
    end
  
    class C
 #        ^ definition [..] W4#C#
-     include M0
-#    ^^^^^^^ reference [..] Module#include().
-#            ^^ reference [..] W4#M0#
      include M1
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] W4#M1#
@@ -915,3 +883,34 @@
    end
  end
  
+ # Reference in one directly included module with def in other directly included module
+ 
+ module W5
+#       ^^ definition [..] W5#
+   module M0
+#         ^^ definition [..] W5#M0#
+     def get_f; @f; end
+#        ^^^^^ definition [..] W5#M0#get_f().
+#               ^^ reference [..] W5#M0#`@f`.
+   end
+ 
+   module M1
+#         ^^ definition [..] W5#M1#
+     def set_f; @f + 1; end
+#        ^^^^^ definition [..] W5#M1#set_f().
+#               ^^ reference [..] W5#M1#`@f`.
+   end
+ 
+   class C
+#        ^ definition [..] W5#C#
+     include M0
+#    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] W5#M0#
+     include M1
+#    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] W5#M1#
+     def get_fp1; @f + 1; end
+#        ^^^^^^^ definition [..] W5#C#get_fp1().
+#                 ^^ reference [..] W5#C#`@f`.
+   end
+ end

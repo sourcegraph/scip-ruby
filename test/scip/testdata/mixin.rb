@@ -97,7 +97,7 @@ end
 
 # Definition in directly included module & superclass & Self
 
-module T0
+module T4
   module M
     def set_f_0; @f = 0; end
   end
@@ -115,7 +115,7 @@ end
 
 # Definition in transitively included module & superclass & Self
 
-module T3
+module T5
   module M0
     def set_f_0; @f = 0; end
   end
@@ -137,7 +137,7 @@ end
 
 # Definition in directly included module & superclass only
 
-module T4
+module T6
   module M
     def set_f_0; @f = 0; end
   end
@@ -153,7 +153,7 @@ end
 
 # Definition in transitively included module & superclass only
 
-module T5
+module T7
   module M0
     def set_f_0; @f = 0; end
   end
@@ -173,7 +173,7 @@ end
 
 # Definition in module included via superclass & superclass & Self
 
-module T6
+module T8
   module M
     def set_f_0; @f = 0; end
   end
@@ -191,7 +191,7 @@ end
 
 # Definition in module included via superclass & superclass only
 
-module T7
+module T9
   module M
     def set_f_0; @f = 0; end
   end
@@ -208,7 +208,7 @@ end
 
 # Definition in module included via superclass & Self
 
-module T8
+module T10
   module M
     def set_f_0; @f = 0; end
   end
@@ -225,7 +225,7 @@ end
 
 # Definition in module included via superclass only
 
-module T9
+module T11
   module M
     def set_f_0; @f = 0; end
   end
@@ -241,7 +241,7 @@ end
 
 # Definition in multiple transitively included modules & common child & Self
 
-module T10
+module T12
   module M0
     def set_f_0; @f = 0; end
   end
@@ -265,7 +265,7 @@ end
 
 # Definition in multiple transitively included modules & common child only
 
-module T11
+module T13
   module M0
     def set_f_0; @f = 0; end
   end
@@ -288,7 +288,7 @@ end
 
 # Definition in multiple transitively included modules & Self
 
-module T12
+module T14
   module M0
     def set_f_0; @f = 0; end
   end
@@ -311,7 +311,7 @@ end
 
 # Definition in multiple transitively included modules only
 
-module T13
+module T15
   module M0
     def set_f_0; @f = 0; end
   end
@@ -333,7 +333,7 @@ end
 
 # Definition in multiple directly included modules & Self
 
-module T14
+module T16
   module M0
     def set_f_0; @f = 0; end
   end
@@ -352,7 +352,7 @@ end
 
 # Definition in multiple directly included modules only
 
-module T15
+module T17
   module M0
     def set_f_0; @f = 0; end
   end
@@ -421,7 +421,7 @@ end
 
 # Reference in directly included module with def in superclass
 
-module W2
+module W3
   module M
     def get_f; @f; end
   end
@@ -438,7 +438,7 @@ end
 
 # Reference in transitively included module with def in in-between module
 
-module W3
+module W4
   module M0
     def get_f; @f; end
   end
@@ -456,7 +456,7 @@ end
 
 # Reference in one directly included module with def in other directly included module
 
-module W4
+module W5
   module M0
     def get_f; @f; end
   end
@@ -471,4 +471,3 @@ module W4
     def get_fp1; @f + 1; end
   end
 end
-
