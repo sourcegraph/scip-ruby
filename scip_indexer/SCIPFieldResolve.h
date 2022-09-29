@@ -25,47 +25,8 @@ template <typename H> H AbslHashValue(H h, const FieldQuery &q) {
 }
 
 struct FieldQueryResult final {
-    enum class Kind : bool {
-        FromDeclared,
-        FromUndeclared,
-    };
-
-    class Data {
-        union Storage {
-            core::ClassOrModuleRef owner;
-            core::SymbolRef symbol;
-            Storage() {
-                memset(this, 0, sizeof(Storage));
-            }
-        } storage;
-        Kind _kind;
-
-    public:
-        Data(Data &&) = default;
-        Data(const Data &) = default;
-        Kind kind() const {
-            return this->_kind;
-        }
-        core::ClassOrModuleRef originalClass() const {
-            ENFORCE(this->kind() == Kind::FromUndeclared);
-            return this->storage.owner;
-        }
-        core::SymbolRef originalSymbol() const {
-            ENFORCE(this->kind() == Kind::FromUndeclared);
-            return this->storage.symbol;
-        }
-        Data(core::ClassOrModuleRef klass) : _kind(Kind::FromUndeclared) {
-            this->storage.owner = klass;
-        }
-        Data(core::SymbolRef sym) : _kind(Kind::FromDeclared) {
-            this->storage.symbol = sym;
-        }
-
-        std::string showRaw(const core::GlobalState &) const;
-    };
-
-    Data inherited;
-    std::shared_ptr<std::vector<Data>> mixedIn;
+    core::ClassOrModuleRef inherited;
+    std::shared_ptr<std::vector<core::ClassOrModuleRef>> mixedIn;
 
     std::string showRaw(const core::GlobalState &gs) const;
 };
@@ -114,9 +75,9 @@ private:
     void resetMixins();
 
     void findUnresolvedFieldInMixinsTransitive(const sorbet::core::GlobalState &gs, FieldQuery query,
-                                               std::vector<FieldQueryResult::Data> &out);
+                                               std::vector<core::ClassOrModuleRef> &out);
 
-    FieldQueryResult::Data findUnresolvedFieldInInheritanceChain(const core::GlobalState &gs, core::Loc loc,
+    core::ClassOrModuleRef findUnresolvedFieldInInheritanceChain(const core::GlobalState &gs, core::Loc loc,
                                                                  FieldQuery query);
 };
 

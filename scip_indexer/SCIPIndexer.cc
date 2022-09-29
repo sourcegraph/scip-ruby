@@ -458,8 +458,7 @@ public:
             case Kind::ClassOrModule:
             case Kind::Method:
                 break;
-            case Kind::UndeclaredField:
-            case Kind::DeclaredField:
+            case Kind::Field:
                 if (overrideType.has_value()) {
                     symRef.saveDocStrings(gs, overrideType.value(), loc, overrideDocs);
                 }
@@ -586,7 +585,7 @@ public:
                         auto klass = core::Symbols::rootSingleton();
                         this->map.insert( // no trim(...) because globals can't have a :: prefix
                             {bind.bind.variable,
-                             {GenericSymbolRef::undeclaredField(klass, instr->name, bind.bind.type), bind.loc, false}});
+                             {GenericSymbolRef::field(klass, instr->name, bind.bind.type), bind.loc, false}});
                         continue;
                     }
                     auto [result, cacheHit] = fieldResolver.findUnresolvedFieldTransitive(
@@ -599,36 +598,18 @@ public:
                                 instr->name.exists() ? instr->name.toString(gs) : "<non-existent>",
                                 ctx.file.data(gs).path(), ctx.locAt(bind.loc).showRawLineColumn(gs));
                     };
-                    switch (result.inherited.kind()) {
-                        case FieldQueryResult::Kind::FromUndeclared: {
-                            checkExists(result.inherited.originalClass().exists(), "class");
-                            auto normalizedKlass = FieldResolver::normalizeParentForClassVar(
-                                gs, klass.asClassOrModuleRef(), instr->name.shortName(gs));
-                            auto namedSymRef =
-                                GenericSymbolRef::undeclaredField(normalizedKlass, instr->name, bind.bind.type);
-                            if (!cacheHit) {
-                                // It may be the case that the mixin values are already stored because of the
-                                // traversal in some other function. In that case, don't bother overriding.
-                                relMap.insert({namedSymRef.withoutType(), result});
-                            }
-                            // no trim(...) because undeclared fields shouldn't have ::
-                            this->map.insert({bind.bind.variable, {namedSymRef, bind.loc, false}});
-                            break;
-                        }
-                        case FieldQueryResult::Kind::FromDeclared: {
-                            auto fieldSym = result.inherited.originalSymbol();
-                            checkExists(fieldSym.exists(), "field");
-                            auto namedSymRef =
-                                fieldSym.owner(gs) == klass
-                                    ? GenericSymbolRef::declaredField(fieldSym, bind.bind.type)
-                                    : GenericSymbolRef::undeclaredField(klass, instr->name, bind.bind.type);
-                            if (!cacheHit) {
-                                relMap.insert({namedSymRef.withoutType(), result});
-                            }
-                            this->map.insert({bind.bind.variable, {namedSymRef, trim(bind.loc), false}});
-                            break;
-                        }
+                    checkExists(result.inherited.exists(), "class");
+                    auto normalizedKlass = FieldResolver::normalizeParentForClassVar(gs, klass.asClassOrModuleRef(),
+                                                                                     instr->name.shortName(gs));
+                    auto namedSymRef = GenericSymbolRef::field(normalizedKlass, instr->name, bind.bind.type);
+                    if (!cacheHit) {
+                        // It may be the case that the mixin values are already stored because of the
+                        // traversal in some other function. In that case, don't bother overriding.
+                        relMap.insert({namedSymRef.withoutType(), result});
                     }
+                    // no trim(...) because undeclared fields shouldn't have ::
+                    ENFORCE(trim(bind.loc) == bind.loc);
+                    this->map.insert({bind.bind.variable, {namedSymRef, bind.loc, false}});
                     continue;
                 }
                 if (sym.isFieldOrStaticField()) {
@@ -642,9 +623,19 @@ public:
                     ENFORCE(!bind.loc.empty());
                     auto name = instr->what.name(gs);
                     std::string_view nameText = name.shortName(gs);
-                    auto symRef = GenericSymbolRef::declaredField(instr->what, bind.bind.type);
-                    if (!nameText.empty() && nameText[0] == '@' && instr->what.owner(gs) != klass) {
-                        symRef = GenericSymbolRef::undeclaredField(klass, name, bind.bind.type);
+                    auto symRef = GenericSymbolRef::field(instr->what.owner(gs), name, bind.bind.type);
+                    if (!nameText.empty() && nameText[0] == '@') {
+                        if (instr->what.owner(gs) != klass) {
+                            symRef = GenericSymbolRef::field(klass, name, bind.bind.type);
+                        }
+                        // Mimic the logic from the Magic_undeclaredFieldStub branch so that we don't
+                        // miss out on relationships for declared symbols.
+                        if (!relMap.contains(symRef.withoutType())) {
+                            auto [result, _] = fieldResolver.findUnresolvedFieldTransitive(
+                                ctx, ctx.locAt(bind.loc), {klass.asClassOrModuleRef(), name});
+                            result.inherited = instr->what.owner(gs).asClassOrModuleRef();
+                            relMap.insert({symRef.withoutType(), result});
+                        }
                     }
                     this->map.insert({bind.bind.variable, {symRef, trim(bind.loc), false}});
                     continue;

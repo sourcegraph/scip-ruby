@@ -78,12 +78,12 @@ public:
         return H::combine(std::move(h), x.selfOrOwner, x.name);
     }
 
-    static UntypedGenericSymbolRef declared(sorbet::core::SymbolRef sym) {
+    static UntypedGenericSymbolRef methodOrClassOrModule(sorbet::core::SymbolRef sym) {
         ENFORCE(sym.exists());
         return UntypedGenericSymbolRef(sym, {});
     }
 
-    static UntypedGenericSymbolRef undeclared(sorbet::core::ClassOrModuleRef klass, sorbet::core::NameRef name) {
+    static UntypedGenericSymbolRef field(sorbet::core::ClassOrModuleRef klass, sorbet::core::NameRef name) {
         ENFORCE(klass.exists());
         ENFORCE(name.exists())
         return UntypedGenericSymbolRef(klass, name);
@@ -125,8 +125,7 @@ class GenericSymbolRef final {
 public:
     enum class Kind {
         ClassOrModule,
-        UndeclaredField,
-        DeclaredField,
+        Field,
         Method,
     };
 
@@ -138,11 +137,7 @@ private:
                 ENFORCE(s.isClassOrModule());
                 ENFORCE(!n.exists());
                 return;
-            case Kind::DeclaredField:
-                ENFORCE(s.isFieldOrStaticField());
-                ENFORCE(!n.exists());
-                return;
-            case Kind::UndeclaredField:
+            case Kind::Field:
                 ENFORCE(s.isClassOrModule());
                 ENFORCE(n.exists());
                 return;
@@ -175,12 +170,8 @@ public:
         return GenericSymbolRef(self, {}, {}, Kind::ClassOrModule);
     }
 
-    static GenericSymbolRef undeclaredField(core::SymbolRef owner, core::NameRef name, core::TypePtr type) {
-        return GenericSymbolRef(owner, name, type, Kind::UndeclaredField);
-    }
-
-    static GenericSymbolRef declaredField(core::SymbolRef self, core::TypePtr type) {
-        return GenericSymbolRef(self, {}, type, Kind::DeclaredField);
+    static GenericSymbolRef field(core::SymbolRef owner, core::NameRef name, core::TypePtr type) {
+        return GenericSymbolRef(owner, name, type, Kind::Field);
     }
 
     static GenericSymbolRef method(core::SymbolRef self) {
@@ -193,10 +184,7 @@ public:
 
     Kind kind() const {
         if (this->name.exists()) {
-            return Kind::UndeclaredField;
-        }
-        if (this->selfOrOwner.isFieldOrStaticField()) {
-            return Kind::DeclaredField;
+            return Kind::Field;
         }
         if (this->selfOrOwner.isMethod()) {
             return Kind::Method;
@@ -206,13 +194,12 @@ public:
 
     UntypedGenericSymbolRef withoutType() const {
         switch (this->kind()) {
-            case Kind::UndeclaredField:
+            case Kind::Field:
                 ENFORCE(this->selfOrOwner.isClassOrModule());
-                return UntypedGenericSymbolRef::undeclared(this->selfOrOwner.asClassOrModuleRef(), this->name);
+                return UntypedGenericSymbolRef::field(this->selfOrOwner.asClassOrModuleRef(), this->name);
             case Kind::Method:
             case Kind::ClassOrModule:
-            case Kind::DeclaredField:
-                return UntypedGenericSymbolRef::declared(this->selfOrOwner);
+                return UntypedGenericSymbolRef::methodOrClassOrModule(this->selfOrOwner);
         }
     }
 
@@ -220,7 +207,7 @@ public:
     std::string showRaw(const core::GlobalState &gs) const;
 
     core::SymbolRef asSymbolRef() const {
-        ENFORCE(this->kind() != Kind::UndeclaredField);
+        ENFORCE(this->kind() != Kind::Field);
         return this->selfOrOwner;
     }
 
@@ -230,8 +217,7 @@ private:
 public:
     bool isSorbetInternalClassOrMethod(const core::GlobalState &gs) const {
         switch (this->kind()) {
-            case Kind::UndeclaredField:
-            case Kind::DeclaredField:
+            case Kind::Field:
                 return false;
             case Kind::ClassOrModule:
             case Kind::Method:

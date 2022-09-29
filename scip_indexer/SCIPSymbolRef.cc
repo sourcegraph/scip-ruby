@@ -24,8 +24,9 @@ namespace sorbet::scip_indexer {
 
 string showRawRelationshipsMap(const core::GlobalState &gs, const RelationshipsMap &relMap) {
     return showMap(relMap, [&gs](const UntypedGenericSymbolRef &ugsr, const auto &result) -> string {
-        return fmt::format("{}: (inherited={}, mixins={})", ugsr.showRaw(gs), result.inherited.showRaw(gs),
-                           showVec(*result.mixedIn, [&gs](const auto &mixin) -> string { return mixin.showRaw(gs); }));
+        return fmt::format(
+            "{}: (inherited={}, mixins={})", ugsr.showRaw(gs), result.inherited.showFullName(gs),
+            showVec(*result.mixedIn, [&gs](const auto &mixin) -> string { return mixin.showFullName(gs); }));
     });
 }
 
@@ -108,33 +109,18 @@ void UntypedGenericSymbolRef::saveRelationships(
     if (it == relationshipMap.end()) {
         return;
     }
-    using Kind = FieldQueryResult::Kind;
-    auto saveSymbol = [&](FieldQueryResult::Data data, scip::Relationship &rel) {
-        switch (data.kind()) {
-            case Kind::FromUndeclared:
-                saveSymbolString(UntypedGenericSymbolRef::undeclared(data.originalClass(), this->name),
-                                 *rel.mutable_symbol());
-                break;
-            case Kind::FromDeclared:
-                saveSymbolString(UntypedGenericSymbolRef::declared(data.originalSymbol()), *rel.mutable_symbol());
-                break;
+    auto saveSymbol = [&](core::ClassOrModuleRef klass, scip::Relationship &rel) {
+        if (!this->name.exists()) {
+            fmt::print(stderr, "problematic symbol {}\n", this->selfOrOwner.toStringFullName(gs));
         }
+        saveSymbolString(UntypedGenericSymbolRef::field(klass, this->name), *rel.mutable_symbol());
         ENFORCE(!rel.symbol().empty());
         rels.push_back(move(rel));
     };
 
     auto result = it->second;
 
-    bool saveInherited = false;
-    switch (result.inherited.kind()) {
-        case Kind::FromUndeclared:
-            saveInherited = core::SymbolRef(result.inherited.originalClass()) != this->selfOrOwner;
-            break;
-        case Kind::FromDeclared:
-            saveInherited = result.inherited.originalSymbol().owner(gs) != this->selfOrOwner;
-    }
-
-    if (saveInherited) {
+    if (core::SymbolRef(result.inherited) != this->selfOrOwner) {
         scip::Relationship rel;
         rel.set_is_definition(true);
         saveSymbol(result.inherited, rel);
@@ -151,11 +137,9 @@ void UntypedGenericSymbolRef::saveRelationships(
 
 string GenericSymbolRef::showRaw(const core::GlobalState &gs) const {
     switch (this->kind()) {
-        case Kind::UndeclaredField:
+        case Kind::Field:
             return fmt::format("UndeclaredField(owner: {}, name: {})", this->selfOrOwner.showFullName(gs),
                                this->name.toString(gs));
-        case Kind::DeclaredField:
-            return fmt::format("DeclaredField {}", this->selfOrOwner.showFullName(gs));
         case Kind::ClassOrModule:
             return fmt::format("ClassOrModule {}", this->selfOrOwner.showFullName(gs));
         case Kind::Method:
@@ -191,15 +175,8 @@ void GenericSymbolRef::saveDocStrings(const core::GlobalState &gs, core::TypePtr
 
     string markdown = "";
     switch (this->kind()) {
-        case Kind::UndeclaredField: {
+        case Kind::Field: {
             auto name = this->name.show(gs);
-            checkType(fieldType, name);
-            markdown = fmt::format("{} ({})", name, fieldType.show(gs));
-            break;
-        }
-        case Kind::DeclaredField: {
-            auto fieldRef = this->selfOrOwner.asFieldRef();
-            auto name = fieldRef.showFullName(gs);
             checkType(fieldType, name);
             markdown = fmt::format("{} ({})", name, fieldType.show(gs));
             break;
@@ -252,9 +229,8 @@ core::Loc GenericSymbolRef::symbolLoc(const core::GlobalState &gs) const {
             return method->nameLoc;
         }
         case Kind::ClassOrModule:
-        case Kind::DeclaredField:
             return this->selfOrOwner.loc(gs);
-        case Kind::UndeclaredField:
+        case Kind::Field:
             ENFORCE(false, "case UndeclaredField should not be triggered here");
             return core::Loc();
     }

@@ -14,21 +14,13 @@ using namespace std;
 
 namespace sorbet::scip_indexer {
 
-string FieldQueryResult::Data::showRaw(const core::GlobalState &gs) const {
-    switch (this->kind()) {
-        case Kind::FromDeclared:
-            return this->originalSymbol().showRaw(gs);
-        case Kind::FromUndeclared:
-            return fmt::format("In({})", absl::StripAsciiWhitespace(this->originalClass().showFullName(gs)));
-    }
-}
-
 string FieldQueryResult::showRaw(const core::GlobalState &gs) const {
     if (this->mixedIn->empty()) {
-        return fmt::format("FieldQueryResult(inherited: {})", this->inherited.showRaw(gs));
+        return fmt::format("FieldQueryResult(inherited: {})", this->inherited.showFullName(gs));
     }
-    return fmt::format("FieldQueryResult(inherited: {}, mixins: {})", this->inherited.showRaw(gs),
-                       showVec(*this->mixedIn.get(), [&gs](const auto &mixin) -> string { return mixin.showRaw(gs); }));
+    return fmt::format(
+        "FieldQueryResult(inherited: {}, mixins: {})", this->inherited.showFullName(gs),
+        showVec(*this->mixedIn.get(), [&gs](const auto &mixin) -> string { return mixin.showFullName(gs); }));
 }
 
 void FieldResolver::resetMixins() {
@@ -41,23 +33,22 @@ void FieldResolver::resetMixins() {
 // both M1 and M2 will be included in the results (this avoids any kind of postprocessing
 // of a transitive closure of relationships at the cost of a larger index).
 void FieldResolver::findUnresolvedFieldInMixinsTransitive(const core::GlobalState &gs, FieldQuery query,
-                                                          vector<FieldQueryResult::Data> &out) {
+                                                          vector<core::ClassOrModuleRef> &out) {
     this->mixinQueue.clear();
     for (auto mixin : query.start.data(gs)->mixins()) {
         this->mixinQueue.push_back(mixin);
     }
     auto field = query.field;
-    using Data = FieldQueryResult::Data;
     while (auto m = this->mixinQueue.try_pop_front()) {
         auto mixin = m.value();
         auto sym = mixin.data(gs)->findMember(gs, field);
         if (sym.exists()) {
-            out.push_back(Data(sym));
+            out.push_back(mixin);
             continue;
         }
         auto it = gs.unresolvedFields.find(mixin);
         if (it != gs.unresolvedFields.end() && it->second.contains(field)) {
-            out.push_back(Data(mixin));
+            out.push_back(mixin);
         }
     }
 }
@@ -72,7 +63,7 @@ core::ClassOrModuleRef FieldResolver::normalizeParentForClassVar(const core::Glo
     return klass;
 }
 
-FieldQueryResult::Data FieldResolver::findUnresolvedFieldInInheritanceChain(const core::GlobalState &gs, core::Loc loc,
+core::ClassOrModuleRef FieldResolver::findUnresolvedFieldInInheritanceChain(const core::GlobalState &gs, core::Loc loc,
                                                                             FieldQuery query) {
     auto start = query.start;
     auto field = query.field;
@@ -83,7 +74,7 @@ FieldQueryResult::Data FieldResolver::findUnresolvedFieldInInheritanceChain(cons
     // Class instance variables are not inherited, unlike ordinary instance
     // variables or class variables.
     if (isClassInstanceVar) {
-        return FieldQueryResult::Data(start);
+        return start;
     }
     start = FieldResolver::normalizeParentForClassVar(gs, start, fieldText);
 
@@ -102,7 +93,7 @@ FieldQueryResult::Data FieldResolver::findUnresolvedFieldInInheritanceChain(cons
                               start.exists() ? start.showFullName(gs) : "<non-existent>"));
         // As a best-effort guess, assume that the definition is
         // in this class but we somehow missed it.
-        return FieldQueryResult::Data(start);
+        return start;
     }
 
     auto best = start;
@@ -112,7 +103,7 @@ FieldQueryResult::Data FieldResolver::findUnresolvedFieldInInheritanceChain(cons
         auto sym = klass->findMember(gs, field);
         if (sym.exists()) { // TODO(varun): Is this early exit justified?
                             // Maybe it is possible to hit this in multiple ancestors?
-            return FieldQueryResult::Data(sym);
+            return cur;
         }
         auto it = gs.unresolvedFields.find(cur);
         if (it != gs.unresolvedFields.end() && it->second.contains(field)) {
@@ -124,21 +115,21 @@ FieldQueryResult::Data FieldResolver::findUnresolvedFieldInInheritanceChain(cons
         }
         cur = klass->superClass();
     }
-    return FieldQueryResult::Data(best);
+    return best;
 }
 
 pair<FieldQueryResult, bool> FieldResolver::findUnresolvedFieldTransitive(const core::GlobalState &gs, core::Loc loc,
                                                                           FieldQuery query) {
+    ENFORCE(query.field.exists());
     auto cacheIt = this->cache.find(query);
     if (cacheIt != this->cache.end()) {
         return {cacheIt->second, true};
     }
     auto inherited = this->findUnresolvedFieldInInheritanceChain(gs, loc, query);
-    using Data = FieldQueryResult::Data;
-    vector<Data> mixins;
+    vector<core::ClassOrModuleRef> mixins;
     findUnresolvedFieldInMixinsTransitive(gs, query, mixins);
     auto [it, inserted] =
-        this->cache.insert({query, FieldQueryResult{inherited, make_shared<vector<Data>>(move(mixins))}});
+        this->cache.insert({query, FieldQueryResult{inherited, make_shared<decltype(mixins)>(move(mixins))}});
     ENFORCE(inserted);
     return {it->second, false};
 }

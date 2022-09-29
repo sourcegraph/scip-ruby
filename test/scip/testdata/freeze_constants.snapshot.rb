@@ -5,25 +5,25 @@
 #^ definition [..] X.
 #documentation
 #| ```ruby
-#| ::X (T.untyped)
+#| X (T.untyped)
 #| ```
  Y = 'Y'.freeze
 #^ definition [..] Y.
 #documentation
 #| ```ruby
-#| ::Y (T.untyped)
+#| Y (T.untyped)
 #| ```
  A = %w[X Y].freeze
 #^ definition [..] A.
 #documentation
 #| ```ruby
-#| ::A (T.untyped)
+#| A (T.untyped)
 #| ```
  B = %W[#{X} Y].freeze
 #^ definition [..] B.
 #documentation
 #| ```ruby
-#| ::B (T.untyped)
+#| B (T.untyped)
 #| ```
 #         ^ reference [..] X.
  
@@ -37,19 +37,19 @@
 #  ^ definition [..] M#Z.
 #  documentation
 #  | ```ruby
-#  | ::M::Z (T.untyped)
+#  | Z (T.untyped)
 #  | ```
    A = %w[X Y Z].freeze
 #  ^ definition [..] M#A.
 #  documentation
 #  | ```ruby
-#  | ::M::A (T.untyped)
+#  | A (T.untyped)
 #  | ```
    B = %W[#{X} Y Z].freeze
 #  ^ definition [..] M#B.
 #  documentation
 #  | ```ruby
-#  | ::M::B (T.untyped)
+#  | B (T.untyped)
 #  | ```
 #           ^ reference [..] X.
  end
