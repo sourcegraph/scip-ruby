@@ -9,6 +9,8 @@ int compareOccurrence(const scip::Occurrence &o1, const scip::Occurrence &o2);
 int compareRelationship(const scip::Relationship &r1, const scip::Relationship &r2);
 
 int compareSymbolInformation(const scip::SymbolInformation &s1, const scip::SymbolInformation &s2);
+
+std::string showRawRelationship(const scip::Relationship &rel);
 } // namespace scip
 
 #endif // SORBET_SCIP_PROTO_EXT
