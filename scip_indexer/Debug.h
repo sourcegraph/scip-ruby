@@ -42,7 +42,7 @@ template <typename T, typename Fn> std::string showSet(const sorbet::UnorderedSe
     return out.str();
 }
 
-template <typename T, typename Fn> std::string showVec(const std::vector<T> &v, Fn f) {
+template <typename V, typename Fn> std::string showVec(const V &v, Fn f) {
     std::ostringstream out;
     out << "[";
     for (auto i = 0; i < v.size(); ++i) {
