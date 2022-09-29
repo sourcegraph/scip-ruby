@@ -588,23 +588,24 @@ public:
                              {GenericSymbolRef::field(klass, instr->name, bind.bind.type), bind.loc, false}});
                         continue;
                     }
-                    auto [result, cacheHit] = fieldResolver.findUnresolvedFieldTransitive(
-                        ctx, {ctx.file, klass.asClassOrModuleRef(), instr->name}, ctx.locAt(bind.loc));
-                    auto checkExists = [&](bool exists, const std::string &text) {
-                        ENFORCE(exists,
-                                "Returned non-existent {} from findUnresolvedFieldTransitive with start={}, "
-                                "field={}, file={}, loc={}",
-                                text, klass.exists() ? klass.toStringFullName(gs) : "<non-existent>",
-                                instr->name.exists() ? instr->name.toString(gs) : "<non-existent>",
-                                ctx.file.data(gs).path(), ctx.locAt(bind.loc).showRawLineColumn(gs));
-                    };
-                    checkExists(result.inherited.exists(), "class");
+                    // There are 4 possibilities here.
+                    // 1. This is an undeclared field logically defined by `klass`.
+                    // 2. This is declared in one of the modules transitively included by `klass`.
+                    // 3. This is an undeclared field logically defined by one of `klass`'s ancestor classes.
+                    // 4. This is an undeclared field logically defined by one of the modules transitively included by
+                    //    `klass`.
                     auto normalizedKlass = FieldResolver::normalizeParentForClassVar(gs, klass.asClassOrModuleRef(),
                                                                                      instr->name.shortName(gs));
                     auto namedSymRef = GenericSymbolRef::field(normalizedKlass, instr->name, bind.bind.type);
-                    if (!cacheHit) {
-                        // It may be the case that the mixin values are already stored because of the
-                        // traversal in some other function. In that case, don't bother overriding.
+                    if (!relMap.contains(namedSymRef.withoutType())) {
+                        auto result = fieldResolver.findUnresolvedFieldTransitive(
+                            ctx, {ctx.file, klass.asClassOrModuleRef(), instr->name}, ctx.locAt(bind.loc));
+                        ENFORCE(result.inherited.exists(),
+                                "Returned non-existent class from findUnresolvedFieldTransitive with start={}, "
+                                "field={}, file={}, loc={}",
+                                klass.exists() ? klass.toStringFullName(gs) : "<non-existent>",
+                                instr->name.exists() ? instr->name.toString(gs) : "<non-existent>",
+                                ctx.file.data(gs).path(), ctx.locAt(bind.loc).showRawLineColumn(gs))
                         relMap.insert({namedSymRef.withoutType(), result});
                     }
                     // no trim(...) because undeclared fields shouldn't have ::
@@ -631,7 +632,7 @@ public:
                         // Mimic the logic from the Magic_undeclaredFieldStub branch so that we don't
                         // miss out on relationships for declared symbols.
                         if (!relMap.contains(symRef.withoutType())) {
-                            auto [result, _] = fieldResolver.findUnresolvedFieldTransitive(
+                            auto result = fieldResolver.findUnresolvedFieldTransitive(
                                 ctx, {ctx.file, klass.asClassOrModuleRef(), name}, ctx.locAt(bind.loc));
                             result.inherited = instr->what.owner(gs).asClassOrModuleRef();
                             relMap.insert({symRef.withoutType(), result});

@@ -67,8 +67,7 @@ class FieldResolver final {
     BasicQueue<sorbet::core::ClassOrModuleRef> mixinQueue;
 
 public:
-    std::pair<FieldQueryResult, /*cacheHit*/ bool> findUnresolvedFieldTransitive(const core::GlobalState &gs,
-                                                                                 FieldQuery query, core::Loc debugLoc);
+    FieldQueryResult findUnresolvedFieldTransitive(const core::GlobalState &gs, FieldQuery query, core::Loc debugLoc);
 
     static core::ClassOrModuleRef normalizeParentForClassVar(const core::GlobalState &gs, core::ClassOrModuleRef klass,
                                                              std::string_view name);

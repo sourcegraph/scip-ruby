@@ -118,12 +118,12 @@ core::ClassOrModuleRef FieldResolver::findUnresolvedFieldInInheritanceChain(cons
     return best;
 }
 
-pair<FieldQueryResult, bool> FieldResolver::findUnresolvedFieldTransitive(const core::GlobalState &gs, FieldQuery query,
-                                                                          core::Loc debugLoc) {
+FieldQueryResult FieldResolver::findUnresolvedFieldTransitive(const core::GlobalState &gs, FieldQuery query,
+                                                              core::Loc debugLoc) {
     ENFORCE(query.field.exists());
     auto cacheIt = this->cache.find(query);
     if (cacheIt != this->cache.end()) {
-        return {cacheIt->second, true};
+        return cacheIt->second;
     }
     auto inherited = this->findUnresolvedFieldInInheritanceChain(gs, query, debugLoc);
     vector<core::ClassOrModuleRef> mixins;
@@ -131,7 +131,7 @@ pair<FieldQueryResult, bool> FieldResolver::findUnresolvedFieldTransitive(const 
     auto [it, inserted] =
         this->cache.insert({query, FieldQueryResult{inherited, make_shared<decltype(mixins)>(move(mixins))}});
     ENFORCE(inserted);
-    return {it->second, false};
+    return it->second;
 }
 
 } // namespace sorbet::scip_indexer
