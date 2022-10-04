@@ -57,7 +57,9 @@ public:
 
     void preTransformMethodDef(core::Context ctx, ast::ExpressionPtr &tree) {
         auto &m = ast::cast_tree_nonnull<ast::MethodDef>(tree);
-        if (ctx.file.data(ctx).strictLevel < core::StrictLevel::True || m.symbol.data(ctx)->flags.isOverloaded ||
+        // With scip-ruby, we might as well try making progress with untyped code.
+        auto minStrictLevel = ctx.state.isSCIPRuby ? core::StrictLevel::False : core::StrictLevel::True;
+        if (ctx.file.data(ctx).strictLevel < minStrictLevel || m.symbol.data(ctx)->flags.isOverloaded ||
             (m.symbol.data(ctx)->flags.isAbstract && ctx.file.data(ctx).compiledLevel != core::CompiledLevel::True)) {
             return;
         }
