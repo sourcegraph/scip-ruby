@@ -106,6 +106,18 @@ def f
   return
 end
 
+## Check that pre-declared class variables work too
+
+class DD1
+  @@x = T.let(0, Integer)
+end
+
+class DD2 < DD1
+  def self.get_x
+    @@x
+  end
+end
+
 # Class instance variables are not inherited.
 
 class E1
@@ -132,5 +144,19 @@ class E2 < E1
 
   def self.set_y_2
     @y = 10
+  end
+end
+
+# Declared fields are inherited the same way as undeclared fields
+
+class F1
+  def initialize
+    @x = T.let(0, Integer)
+  end
+end
+
+class F2
+  def get_x
+    @x
   end
 end

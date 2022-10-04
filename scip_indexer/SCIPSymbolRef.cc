@@ -6,16 +6,29 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/str_replace.h"
+#include "spdlog/fmt/fmt.h"
 
+#include "common/sort.h"
 #include "core/Loc.h"
 #include "main/lsp/lsp.h"
 
+#include "scip_indexer/Debug.h"
+#include "scip_indexer/SCIPProtoExt.h"
 #include "scip_indexer/SCIPSymbolRef.h"
 
 using namespace std;
 
 namespace sorbet::scip_indexer {
+
+string showRawRelationshipsMap(const core::GlobalState &gs, const RelationshipsMap &relMap) {
+    return showMap(relMap, [&gs](const UntypedGenericSymbolRef &ugsr, const auto &result) -> string {
+        return fmt::format(
+            "{}: (inherited={}, mixins={})", ugsr.showRaw(gs), result.inherited.showFullName(gs),
+            showVec(*result.mixedIn, [&gs](const auto &mixin) -> string { return mixin.showFullName(gs); }));
+    });
+}
 
 // Try to compute a scip::Symbol for this value.
 absl::Status UntypedGenericSymbolRef::symbolForExpr(const core::GlobalState &gs, const GemMetadata &metadata,
@@ -83,18 +96,50 @@ absl::Status UntypedGenericSymbolRef::symbolForExpr(const core::GlobalState &gs,
 
 string UntypedGenericSymbolRef::showRaw(const core::GlobalState &gs) const {
     if (this->name.exists()) {
-        return fmt::format("UGSR(owner: {}, name: {})", this->selfOrOwner.showFullName(gs), this->name.toString(gs));
+        return fmt::format("UGSR({}.{})", absl::StripAsciiWhitespace(this->selfOrOwner.showFullName(gs)),
+                           this->name.toString(gs));
     }
-    return fmt::format("UGSR(symbol: {})", this->selfOrOwner.showFullName(gs));
+    return fmt::format("UGSR({})", absl::StripAsciiWhitespace(this->selfOrOwner.showFullName(gs)));
+}
+
+void UntypedGenericSymbolRef::saveRelationships(
+    const core::GlobalState &gs, const RelationshipsMap &relationshipMap, SmallVec<scip::Relationship> &rels,
+    const absl::FunctionRef<void(UntypedGenericSymbolRef, std::string &)> &saveSymbolString) const {
+    auto it = relationshipMap.find(*this);
+    if (it == relationshipMap.end()) {
+        return;
+    }
+    auto saveSymbol = [&](core::ClassOrModuleRef klass, scip::Relationship &rel) {
+        if (!this->name.exists()) {
+            fmt::print(stderr, "problematic symbol {}\n", this->selfOrOwner.toStringFullName(gs));
+        }
+        saveSymbolString(UntypedGenericSymbolRef::field(klass, this->name), *rel.mutable_symbol());
+        ENFORCE(!rel.symbol().empty());
+        rels.push_back(move(rel));
+    };
+
+    auto result = it->second;
+
+    if (core::SymbolRef(result.inherited) != this->selfOrOwner) {
+        scip::Relationship rel;
+        rel.set_is_definition(true);
+        saveSymbol(result.inherited, rel);
+    }
+
+    for (auto mixin : *result.mixedIn) {
+        scip::Relationship rel;
+        rel.set_is_reference(true);
+        saveSymbol(mixin, rel);
+    }
+
+    fast_sort(rels, [](const auto &r1, const auto &r2) -> bool { return scip::compareRelationship(r1, r2) < 0; });
 }
 
 string GenericSymbolRef::showRaw(const core::GlobalState &gs) const {
     switch (this->kind()) {
-        case Kind::UndeclaredField:
+        case Kind::Field:
             return fmt::format("UndeclaredField(owner: {}, name: {})", this->selfOrOwner.showFullName(gs),
                                this->name.toString(gs));
-        case Kind::DeclaredField:
-            return fmt::format("DeclaredField {}", this->selfOrOwner.showFullName(gs));
         case Kind::ClassOrModule:
             return fmt::format("ClassOrModule {}", this->selfOrOwner.showFullName(gs));
         case Kind::Method:
@@ -130,15 +175,8 @@ void GenericSymbolRef::saveDocStrings(const core::GlobalState &gs, core::TypePtr
 
     string markdown = "";
     switch (this->kind()) {
-        case Kind::UndeclaredField: {
+        case Kind::Field: {
             auto name = this->name.show(gs);
-            checkType(fieldType, name);
-            markdown = fmt::format("{} ({})", name, fieldType.show(gs));
-            break;
-        }
-        case Kind::DeclaredField: {
-            auto fieldRef = this->selfOrOwner.asFieldRef();
-            auto name = fieldRef.showFullName(gs);
             checkType(fieldType, name);
             markdown = fmt::format("{} ({})", name, fieldType.show(gs));
             break;
@@ -191,9 +229,8 @@ core::Loc GenericSymbolRef::symbolLoc(const core::GlobalState &gs) const {
             return method->nameLoc;
         }
         case Kind::ClassOrModule:
-        case Kind::DeclaredField:
             return this->selfOrOwner.loc(gs);
-        case Kind::UndeclaredField:
+        case Kind::Field:
             ENFORCE(false, "case UndeclaredField should not be triggered here");
             return core::Loc();
     }
