@@ -69,8 +69,8 @@ static bool isTemporary(const core::GlobalState &gs, const core::LocalVariable &
     }
     auto n = var._name;
     return n == Names::blockPreCallTemp() || n == Names::blockTemp() || n == Names::blockPassTemp() ||
-           n == Names::blkArg() || n == Names::blockCall() || n == Names::blockBreakAssign() || n == Names::forTemp() ||
-           n == Names::keepForCfgTemp() ||
+           n == Names::blkArg() || n == Names::blockCall() || n == Names::blockBreakAssign() ||
+           n == Names::argPresent() || n == Names::forTemp() || n == Names::keepForCfgTemp() ||
            // Insert checks because sometimes temporaries are initialized with a 0 unique value. 😬
            n == Names::finalReturn() || n == NameRef::noName() || n == Names::blockCall() || n == Names::selfLocal() ||
            n == Names::unconditional();
