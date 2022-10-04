@@ -49,3 +49,15 @@ def prc
   p3.call(x: 3)
   p4.call(x: 4)
 end
+
+def call_block(&blk)
+  blk.call
+end
+
+def use_block_with_defaults
+  call_block do |oops: nil|
+  end
+
+  call_block do |oops = "nil"|
+  end
+end
