@@ -16,3 +16,9 @@ class C
 end
 
 puts $c
+
+$d = T.let(0, Integer)
+
+def g
+  $d
+end

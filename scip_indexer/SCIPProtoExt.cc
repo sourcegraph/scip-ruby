@@ -1,5 +1,11 @@
 #include "scip_indexer/SCIPProtoExt.h"
+// Include first because it uses poisoned identifiers.
 
+#include "spdlog/fmt/fmt.h"
+
+#include "scip_indexer/Debug.h"
+
+#include <ostream>
 #include <string>
 
 namespace scip {
@@ -68,4 +74,22 @@ int compareSymbolInformation(const scip::SymbolInformation &s1, const scip::Symb
     return 0;
 }
 #undef CHECK_CMP
+
+std::string showRawRelationship(const scip::Relationship &rel) {
+    std::vector<std::string> info;
+    if (rel.is_reference()) {
+        info.push_back("ref");
+    }
+    if (rel.is_implementation()) {
+        info.push_back("impl");
+    }
+    if (rel.is_type_definition()) {
+        info.push_back("type_def");
+    }
+    if (rel.is_definition()) {
+        info.push_back("def");
+    }
+    return fmt::format("Rel(to: {}, {})", rel.symbol(),
+                       sorbet::scip_indexer::showVec(info, [](const auto &s) { return s; }));
+}
 } // namespace scip

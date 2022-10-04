@@ -151,22 +151,10 @@
 #                  | ```
      @f = nil
 #    ^^ definition [..] C#`@f`.
-#    documentation
-#    | ```ruby
-#    | @f (T.untyped)
-#    | ```
      @@g = nil
 #    ^^^ definition [..] `<Class:C>`#`@@g`.
-#    documentation
-#    | ```ruby
-#    | @@g (T.untyped)
-#    | ```
      @k = nil
 #    ^^ definition [..] C#`@k`.
-#    documentation
-#    | ```ruby
-#    | @k (T.untyped)
-#    | ```
      if b
        @f = 1
 #      ^^ reference (write) [..] C#`@f`.
@@ -246,52 +234,52 @@
 #       ^ reference [..] BasicObject#`!`().
 #        ^ reference local 1~#2066187318
        @f = 1
-#      ^^ definition [..] C#`@f`.
+#      ^^ definition [..] D#`@f`.
 #      documentation
 #      | ```ruby
 #      | @f (T.untyped)
 #      | ```
+#      relation definition=[..] C#`@f`.
        @@g = 1
-#      ^^^ definition [..] `<Class:C>`#`@@g`.
+#      ^^^ definition [..] `<Class:D>`#`@@g`.
 #      documentation
 #      | ```ruby
 #      | @@g (T.untyped)
 #      | ```
+#      relation definition=[..] `<Class:C>`#`@@g`.
        @k = 1
-#      ^^ definition [..] C#`@k`.
-#      documentation
-#      | ```ruby
-#      | @k (T.untyped)
-#      | ```
-#      ^^^^^^ reference [..] C#`@k`.
+#      ^^ definition [..] D#`@k`.
+#      relation definition=[..] C#`@k`.
+#      ^^^^^^ reference [..] D#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (Integer(1))
 #      | ```
+#      relation definition=[..] C#`@k`.
      else
        @f = 'f'
-#      ^^ definition [..] C#`@f`.
+#      ^^ definition [..] D#`@f`.
 #      documentation
 #      | ```ruby
 #      | @f (T.untyped)
 #      | ```
+#      relation definition=[..] C#`@f`.
        @@g = 'g'
-#      ^^^ definition [..] `<Class:C>`#`@@g`.
+#      ^^^ definition [..] `<Class:D>`#`@@g`.
 #      documentation
 #      | ```ruby
 #      | @@g (T.untyped)
 #      | ```
+#      relation definition=[..] `<Class:C>`#`@@g`.
        @k = 'k'
-#      ^^ definition [..] C#`@k`.
-#      documentation
-#      | ```ruby
-#      | @k (T.untyped)
-#      | ```
-#      ^^^^^^^^ reference [..] C#`@k`.
+#      ^^ definition [..] D#`@k`.
+#      relation definition=[..] C#`@k`.
+#      ^^^^^^^^ reference [..] D#`@k`.
 #      override_documentation
 #      | ```ruby
 #      | @k (String("k"))
 #      | ```
+#      relation definition=[..] C#`@k`.
      end
    end
  end

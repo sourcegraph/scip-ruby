@@ -26,14 +26,17 @@
    def get_inherited_ivar
 #      ^^^^^^^^^^^^^^^^^^ definition [..] C2#get_inherited_ivar().
      return @f + @h
-#           ^^ reference [..] C1#`@f`.
-#                ^^ reference [..] C1#`@h`.
+#           ^^ reference [..] C2#`@f`.
+#           relation definition=[..] C1#`@f`.
+#                ^^ reference [..] C2#`@h`.
+#                relation definition=[..] C1#`@h`.
    end
  
    def set_inherited_ivar
 #      ^^^^^^^^^^^^^^^^^^ definition [..] C2#set_inherited_ivar().
      @f = 10
-#    ^^ definition [..] C1#`@f`.
+#    ^^ definition [..] C2#`@f`.
+#    relation definition=[..] C1#`@f`.
      return
    end
  
@@ -57,9 +60,12 @@
    def refs
 #      ^^^^ definition [..] C3#refs().
      @f = @g + @i
-#    ^^ definition [..] C1#`@f`.
-#         ^^ reference [..] C2#`@g`.
-#              ^^ reference [..] C1#`@i`.
+#    ^^ definition [..] C3#`@f`.
+#    relation definition=[..] C1#`@f`.
+#         ^^ reference [..] C3#`@g`.
+#         relation definition=[..] C2#`@g`.
+#              ^^ reference [..] C3#`@i`.
+#              relation definition=[..] C1#`@i`.
      return
    end
  end
@@ -148,10 +154,13 @@
 #           ^^^ definition [..] `<Class:D2>`#get().
      @@d2_x = @@d1_v + @@d1_x
 #    ^^^^^^ definition [..] `<Class:D2>`#`@@d2_x`.
-#             ^^^^^^ reference [..] `<Class:D1>`#`@@d1_v`.
-#                      ^^^^^^ reference [..] `<Class:D1>`#`@@d1_x`.
+#             ^^^^^^ reference [..] `<Class:D2>`#`@@d1_v`.
+#             relation definition=[..] `<Class:D1>`#`@@d1_v`.
+#                      ^^^^^^ reference [..] `<Class:D2>`#`@@d1_x`.
+#                      relation definition=[..] `<Class:D1>`#`@@d1_x`.
      @@d1_y + @@d1_z
-#    ^^^^^^ reference [..] `<Class:D1>`#`@@d1_y`.
+#    ^^^^^^ reference [..] `<Class:D2>`#`@@d1_y`.
+#    relation definition=[..] `<Class:D1>`#`@@d1_y`.
 #             ^^^^^^ reference [..] `<Class:D2>`#`@@d1_z`.
      return
    end
@@ -163,13 +172,18 @@
    def self.get_2
 #           ^^^^^ definition [..] `<Class:D3>`#get_2().
      @@d1_v + @@d1_x
-#    ^^^^^^ reference [..] `<Class:D1>`#`@@d1_v`.
-#             ^^^^^^ reference [..] `<Class:D1>`#`@@d1_x`.
+#    ^^^^^^ reference [..] `<Class:D3>`#`@@d1_v`.
+#    relation definition=[..] `<Class:D1>`#`@@d1_v`.
+#             ^^^^^^ reference [..] `<Class:D3>`#`@@d1_x`.
+#             relation definition=[..] `<Class:D1>`#`@@d1_x`.
      @@d1_y + @@d1_z
-#    ^^^^^^ reference [..] `<Class:D1>`#`@@d1_y`.
-#             ^^^^^^ reference [..] `<Class:D2>`#`@@d1_z`.
+#    ^^^^^^ reference [..] `<Class:D3>`#`@@d1_y`.
+#    relation definition=[..] `<Class:D1>`#`@@d1_y`.
+#             ^^^^^^ reference [..] `<Class:D3>`#`@@d1_z`.
+#             relation definition=[..] `<Class:D2>`#`@@d1_z`.
      @@d2_x
-#    ^^^^^^ reference [..] `<Class:D2>`#`@@d2_x`.
+#    ^^^^^^ reference [..] `<Class:D3>`#`@@d2_x`.
+#    relation definition=[..] `<Class:D2>`#`@@d2_x`.
      return
    end
  end
@@ -208,6 +222,28 @@
 #  ^^ reference [..] D3#
 #     ^^^^^^^^^^^^^^^^^^ reference [..] Module#class_variable_get().
    return
+ end
+ 
+ ## Check that pre-declared class variables work too
+ 
+ class DD1
+#      ^^^ definition [..] DD1#
+   @@x = T.let(0, Integer)
+#  ^^^ definition [..] `<Class:DD1>`#`@@x`.
+#  ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] `<Class:DD1>`#`@@x`.
+#                 ^^^^^^^ definition local 1~#119448696
+#                 ^^^^^^^ reference [..] Integer#
+ end
+ 
+ class DD2 < DD1
+#      ^^^ definition [..] DD2#
+#            ^^^ definition [..] DD1#
+   def self.get_x
+#           ^^^^^ definition [..] `<Class:DD2>`#get_x().
+     @@x
+#    ^^^ reference [..] `<Class:DD2>`#`@@x`.
+#    relation definition=[..] `<Class:DD1>`#`@@x`.
+   end
  end
  
  # Class instance variables are not inherited.
@@ -252,5 +288,28 @@
      @y = 10
 #    ^^ definition [..] `<Class:E2>`#`@y`.
 #    ^^^^^^^ reference [..] `<Class:E2>`#`@y`.
+   end
+ end
+ 
+ # Declared fields are inherited the same way as undeclared fields
+ 
+ class F1
+#      ^^ definition [..] F1#
+   def initialize
+#      ^^^^^^^^^^ definition [..] F1#initialize().
+     @x = T.let(0, Integer)
+#    ^^ definition [..] F1#`@x`.
+#    ^^^^^^^^^^^^^^^^^^^^^^ reference [..] F1#`@x`.
+#                  ^^^^^^^ definition local 1~#3465713227
+#                  ^^^^^^^ reference [..] Integer#
+   end
+ end
+ 
+ class F2
+#      ^^ definition [..] F2#
+   def get_x
+#      ^^^^^ definition [..] F2#get_x().
+     @x
+#    ^^ reference [..] F2#`@x`.
    end
  end

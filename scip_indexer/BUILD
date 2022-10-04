@@ -30,6 +30,8 @@ cc_library(
     srcs = [
         "Debug.cc",
         "Debug.h",
+        "SCIPFieldResolve.cc",
+        "SCIPFieldResolve.h",
         "SCIPIndexer.cc",
         "SCIPProtoExt.cc",
         "SCIPProtoExt.h",

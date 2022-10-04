@@ -30,3 +30,14 @@
  puts $c
 #^^^^ reference [..] Kernel#puts().
 #     ^^ reference [..] `<Class:<root>>`#$c.
+ 
+ $d = T.let(0, Integer)
+#^^ definition [..] `<Class:<root>>`#$d.
+#              ^^^^^^^ definition local 3~#119448696
+#              ^^^^^^^ reference [..] Integer#
+ 
+ def g
+#    ^ definition [..] Object#g().
+   $d
+#  ^^ reference [..] `<Class:<root>>`#$d.
+ end
