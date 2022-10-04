@@ -141,3 +141,23 @@
 #  ^^ reference local 11~#1283111692
 #     ^^^^ reference [..] Proc#call().
  end
+ 
+ def call_block(&blk)
+#    ^^^^^^^^^^ definition [..] Object#call_block().
+#                ^^^ definition local 1~#1487178087
+   blk.call
+#  ^^^ reference local 1~#1487178087
+ end
+ 
+ def use_block_with_defaults
+#    ^^^^^^^^^^^^^^^^^^^^^^^ definition [..] Object#use_block_with_defaults().
+   call_block do |oops: nil|
+#  ^^^^^^^^^^ reference [..] Object#call_block().
+#                 ^^^^^ definition local 1~#4118119342
+   end
+ 
+   call_block do |oops = "nil"|
+#  ^^^^^^^^^^ reference [..] Object#call_block().
+#                 ^^^^ definition local 2~#4118119342
+   end
+ end
