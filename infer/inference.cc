@@ -12,7 +12,7 @@ using namespace std;
 namespace sorbet::infer {
 
 bool Inference::willRun(core::Context ctx, core::LocOffsets loc, core::MethodRef method) {
-    if (ctx.file.data(ctx).strictLevel < core::StrictLevel::True) {
+    if (ctx.file.data(ctx).strictLevel < (ctx.state.isSCIPRuby ? core::StrictLevel::False : core::StrictLevel::True)) {
         return false;
     }
 
