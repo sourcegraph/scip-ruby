@@ -265,6 +265,7 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
                           cxxopts::value<string>()->default_value(empty.inlineInput), "string");
     options.add_options()("files", "Input files", cxxopts::value<vector<string>>());
     options.add_options()("q,quiet", "Silence all non-critical errors");
+    options.add_options()("unquiet", "(scip-ruby) Show non-critical errors, which are hidden by default");
     options.add_options()("v,verbose", "Verbosity level [0-3]");
     options.add_options()("h", "Show short help");
     options.add_options()("help", "Show long help");
@@ -808,9 +809,14 @@ void readOptions(Options &opts,
         opts.stopAfterPhase = extractStopAfter(raw, logger);
 
         opts.silenceErrors = raw["quiet"].as<bool>();
+        opts.unsilenceErrors = raw["unquiet"].as<bool>();
+        if (opts.silenceErrors && opts.unsilenceErrors) {
+            logger->error("You can't pass both `{}` and `{}`", "--unquiet", "--quiet");
+            throw EarlyReturnWithCode(1);
+        }
         opts.autocorrect = raw["autocorrect"].as<bool>();
         opts.inlineInput = raw["e"].as<string>();
-        if (opts.autocorrect && opts.silenceErrors) {
+        if (opts.autocorrect && opts.silenceErrors && !opts.unsilenceErrors) {
             logger->error("You may not use autocorrect when silencing errors.");
             throw EarlyReturnWithCode(1);
         }
