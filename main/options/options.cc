@@ -398,6 +398,7 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
     section = groupToString(Group::OUTPUT);
     // TODO(jez) What is critical error? How does this affect the exit code?
     options.add_options(section)("q,quiet", "Silence all non-critical errors");
+    options.add_options()("unquiet", "(scip-ruby) Show non-critical errors, which are hidden by default");
     options.add_options(section)("P,progress", "Draw progressbar");
     options.add_options(section)("color", "Use color output. For `auto`: use color if stderr is a tty",
                                  cxxopts::value<string>()->default_value("auto"), "{always,never,[auto]}");
@@ -1060,11 +1061,16 @@ void readOptions(Options &opts,
         }
 
         opts.silenceErrors = raw["quiet"].as<bool>();
+        opts.unsilenceErrors = raw["unquiet"].as<bool>();
+        if (opts.silenceErrors && opts.unsilenceErrors) {
+            logger->error("You can't pass both `{}` and `{}`", "--unquiet", "--quiet");
+            throw EarlyReturnWithCode(1);
+        }
         opts.autocorrect = raw["autocorrect"].as<bool>();
         opts.didYouMean = raw["did-you-mean"].as<bool>();
         opts.inlineInput = raw["e"].as<string>();
         opts.inlineRBIInput = raw["e-rbi"].as<string>();
-        if (opts.autocorrect && opts.silenceErrors) {
+        if (opts.autocorrect && opts.silenceErrors && !opts.unsilenceErrors) {
             logger->error("You may not use autocorrect when silencing errors.");
             throw EarlyReturnWithCode(1);
         }

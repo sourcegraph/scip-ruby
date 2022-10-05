@@ -182,8 +182,10 @@ string Error::toString(const GlobalState &gs) const {
     // obvious. For example, showing the autocorrect at the top level and nesting the error underneath.
     auto autocorrectApplied = gs.autocorrect && !autocorrects.empty();
     buf << FILE_POS_STYLE << loc.filePosToString(gs) << RESET_STYLE << ": " << ERROR_COLOR
-        << restoreColors(header, autocorrectApplied ? RESET_COLOR : ERROR_COLOR) << RESET_COLOR << LOW_NOISE_COLOR
-        << " " << gs.errorUrlBase << what.code << RESET_COLOR;
+        << restoreColors(header, autocorrectApplied ? RESET_COLOR : ERROR_COLOR) << RESET_COLOR;
+    if (what.code != 25900) { // SCIPRubyDebug
+        buf << LOW_NOISE_COLOR << " " << gs.errorUrlBase << what.code << RESET_COLOR;
+    }
     if (loc.exists()) {
         auto fileLength = loc.file().data(gs).source().size();
         if (loc.beginPos() > fileLength || loc.endPos() > fileLength) {

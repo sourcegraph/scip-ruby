@@ -2007,6 +2007,8 @@ bool GlobalState::unfreezeSymbolTable() {
 }
 
 void GlobalState::copyOptions(const core::GlobalState &other) {
+    this->isSCIPRuby = other.isSCIPRuby;
+    this->unsilenceErrors = other.unsilenceErrors;
     this->silenceErrors = other.silenceErrors;
     this->autocorrect = other.autocorrect;
     this->didYouMean = other.didYouMean;
@@ -2365,8 +2367,13 @@ bool GlobalState::shouldReportErrorOn(FileRef file, ErrorClass what) const {
     if (what.minLevel == StrictLevel::Internal) {
         return true;
     }
-    if (this->silenceErrors) {
+    if (this->silenceErrors && !this->unsilenceErrors) {
         return false;
+    }
+    if (this->isSCIPRuby && !this->unsilenceErrors) {
+        if (what.code != 25900) { // SCIPRubyDebug
+            return false;
+        }
     }
     if (suppressedErrorClasses.count(what.code) != 0) {
         return false;

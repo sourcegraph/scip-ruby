@@ -60,6 +60,7 @@ void setGlobalStateOptions(core::GlobalState &gs, const options::Options &opts) 
     if (opts.silenceErrors) {
         gs.silenceErrors = true;
     }
+    gs.unsilenceErrors = opts.unsilenceErrors;
     gs.autocorrect = opts.autocorrect;
     gs.didYouMean = opts.didYouMean;
     if (opts.censorForSnapshotTests) {

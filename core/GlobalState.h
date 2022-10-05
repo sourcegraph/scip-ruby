@@ -528,6 +528,7 @@ public:
     UnorderedMap<core::ClassOrModuleRef, UnorderedSet<core::NameRef>> unresolvedFields;
 
     bool silenceErrors = false;
+    bool unsilenceErrors = false;
     bool autocorrect = false;
     bool didYouMean = true;
     TrackUntyped trackUntyped = TrackUntyped::Nowhere;
