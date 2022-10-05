@@ -1959,6 +1959,7 @@ unique_ptr<GlobalState> GlobalState::deepCopy(bool keepId) const {
     auto result = make_unique<GlobalState>(this->errorQueue, this->epochManager);
 
     result->silenceErrors = this->silenceErrors;
+    result->unsilenceErrors = this->unsilenceErrors;
     result->autocorrect = this->autocorrect;
     result->ensureCleanStrings = this->ensureCleanStrings;
     result->runningUnderAutogen = this->runningUnderAutogen;
@@ -2055,6 +2056,7 @@ unique_ptr<GlobalState> GlobalState::copyForIndex() const {
     result->files = this->files;
     result->fileRefByPath = this->fileRefByPath;
     result->silenceErrors = this->silenceErrors;
+    result->unsilenceErrors = this->unsilenceErrors;
     result->autocorrect = this->autocorrect;
     result->ensureCleanStrings = this->ensureCleanStrings;
     result->runningUnderAutogen = this->runningUnderAutogen;
@@ -2141,8 +2143,13 @@ bool GlobalState::shouldReportErrorOn(Loc loc, ErrorClass what) const {
     if (what.minLevel == StrictLevel::Internal) {
         return true;
     }
-    if (this->silenceErrors) {
+    if (this->silenceErrors && !this->unsilenceErrors) {
         return false;
+    }
+    if (this->isSCIPRuby && !this->unsilenceErrors) {
+        if (what.code != 25900) { // SCIPRubyDebug
+            return false;
+        }
     }
     if (suppressedErrorClasses.count(what.code) != 0) {
         return false;

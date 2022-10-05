@@ -488,6 +488,7 @@ int realmain(int argc, char *argv[]) {
     if (opts.silenceErrors) {
         gs->silenceErrors = true;
     }
+    gs->unsilenceErrors = opts.unsilenceErrors;
     if (opts.autocorrect) {
         gs->autocorrect = true;
     }

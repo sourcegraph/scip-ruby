@@ -223,6 +223,7 @@ public:
 
     int globalStateId;
     bool silenceErrors = false;
+    bool unsilenceErrors = false;
     bool autocorrect = false;
 
     // We have a lot of internal names of form `<something>` that's chosen with `<` and `>` as you can't make
