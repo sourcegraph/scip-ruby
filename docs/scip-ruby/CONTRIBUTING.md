@@ -25,6 +25,7 @@ see the [Design Decisions doc][].
     - [Debugging Bazel](#debugging-bazel)
     - [Debugging on Linux](#debugging-on-linux)
 - [Creating PRs](#creating-prs)
+- [Syncing Sorbet upstream](#syncing-sorbet-upstream)
 - [Cutting a release](#cutting-a-release)
 - Troubleshooting
   - [Known build issues][]
@@ -322,10 +323,30 @@ gh pr create -R sourcegraph/scip-ruby
 
 This will correctly use the `scip-ruby/master` branch as the target.
 
+## Syncing Sorbet upstream
+
+1. Create a temporary branch and perform a merge. It doesn't matter
+   if the code compiles or not, only try to fix conflicts reasonably.
+   Do NOT modify existing commits/rewrite history here.
+2. Create a new commit updating the `scip_ruby_sync_upstream_sorbet_sha` value.
+3. If there are compilation/test failures, fix them in a single follow-up commit.
+   In total, we will have N+1 or N+2 commits in the PR, with N from Sorbet.
+4. Once tests are passing, temporarily turn on 'Allow merge commits' in the admin settings.
+   Merge the PR and turn off merging in the admin settings.
+
 ## Cutting a release
 
-Push a tag matching `scip-ruby-v*` to `scip-ruby/master`.
-A CI job should automatically trigger a release.
+1. Add release notes to the [CHANGELOG](/CHANGELOG.md).
+2. Bump `scip_ruby_version` in `SCIPIndexer.cc`.
+
+Run the release script:
+
+```bash
+NEW_VERSION=M.N.P ./tools/scripts/publish-scip-ruby.sh
+```
+
+If there are any errors, fix those and re-run.
+A CI job will be kicked off to trigger a release.
 See the [release workflow](/.github/workflows/release.yml) for details.
 
 ## Troubleshooting

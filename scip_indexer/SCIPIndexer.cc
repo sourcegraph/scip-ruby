@@ -22,6 +22,7 @@
 #include "ast/Trees.h"
 #include "ast/treemap/treemap.h"
 #include "cfg/CFG.h"
+#include "common/EarlyReturnWithCode.h"
 #include "common/common.h"
 #include "common/sort.h"
 #include "core/Error.h"
@@ -57,6 +58,11 @@ static uint32_t fnv1a_32(const string &s) {
     }
     return h;
 }
+
+const char scip_ruby_version[] = "0.1.2";
+
+// Last updated: https://github.com/sourcegraph/scip-ruby/pull/104
+const char scip_ruby_sync_upstream_sorbet_sha[] = "bb35f6d1d075b27c3296c2eee85cba5c2de8c60f";
 
 namespace sorbet::scip_indexer {
 
@@ -1157,7 +1163,7 @@ public:
         }
         scip::ToolInfo toolInfo;
         toolInfo.set_name("scip-ruby");
-        toolInfo.set_version(sorbet_version);
+        toolInfo.set_version(scip_ruby_version);
         *toolInfo.add_arguments() = "FIXME"; // FIXME(varun): GlobalState doesn't have access to CLI arguments. 🙁
 
         scip::Metadata metadata;
@@ -1263,6 +1269,16 @@ public:
             cxxopts::value<string>());
     };
     unique_ptr<SemanticExtension> readOptions(cxxopts::ParseResult &providedOptions) const override {
+        if (providedOptions.count("version") > 0) {
+            // HACK: Just modify the version in place instead of duplicating the logic in sorbet_version.c
+            // There is some 'sed' replacement going on in that file.
+            fmt::print("scip-ruby {}\nBased on Sorbet {} {}\n",
+                       absl::StrReplaceAll(sorbet_full_version_string,
+                                           {{sorbet_version, scip_ruby_version},
+                                            {fmt::format(".{}", sorbet_build_scm_commit_count), ""}}),
+                       sorbet_version, scip_ruby_sync_upstream_sorbet_sha);
+            throw sorbet::EarlyReturnWithCode(0);
+        }
         if (providedOptions.count("index-file") > 0) {
             return make_unique<SCIPSemanticExtension>(
                 providedOptions["index-file"].as<string>(),
