@@ -4,10 +4,10 @@
 #include "common/sort.h"
 #include "core/FileHash.h"
 #include "core/lsp/QueryResponse.h"
+#include "main/lsp/LSPLoop.h"
 #include "main/lsp/LSPOutput.h"
 #include "main/lsp/LSPQuery.h"
 #include "main/lsp/json_types.h"
-#include "main/lsp/lsp.h"
 
 namespace sorbet::realmain::lsp {
 using namespace std;
@@ -166,6 +166,10 @@ ConstExprStr LSPTask::methodString() const {
             return "sorbet.showSymbol";
         case LSPMethod::SorbetWatchmanFileChange:
             return "sorbet.watchmanFileChange";
+        case LSPMethod::SorbetWatchmanStateEnter:
+            return "sorbet.watchmanStateEnter";
+        case LSPMethod::SorbetWatchmanStateLeave:
+            return "sorbet.watchmanStateLeave";
         case LSPMethod::SorbetWorkspaceEdit:
         case LSPMethod::TextDocumentDidChange:
         case LSPMethod::TextDocumentDidClose:

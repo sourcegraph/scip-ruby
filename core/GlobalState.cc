@@ -1777,6 +1777,8 @@ void GlobalState::deleteMethodSymbol(MethodRef what) {
 }
 
 // Before using this method, double check the disclaimer on GlobalState::deleteMethodSymbol above.
+//
+// NOTE: This method does double duty, deleting both static-field and field symbols.
 void GlobalState::deleteFieldSymbol(FieldRef what) {
     ENFORCE(what.data(*this)->flags.isField);
     const auto &whatData = what.data(*this);
@@ -1966,6 +1968,7 @@ unique_ptr<GlobalState> GlobalState::deepCopy(bool keepId) const {
     result->censorForSnapshotTests = this->censorForSnapshotTests;
     result->sleepInSlowPathSeconds = this->sleepInSlowPathSeconds;
     result->requiresAncestorEnabled = this->requiresAncestorEnabled;
+    result->ruby3KeywordArgs = this->ruby3KeywordArgs;
     result->lspExperimentalFastPathEnabled = this->lspExperimentalFastPathEnabled;
     result->isSCIPRuby = this->isSCIPRuby;
 
@@ -2065,6 +2068,7 @@ unique_ptr<GlobalState> GlobalState::copyForIndex() const {
     result->isSCIPRuby = this->isSCIPRuby;
     result->sleepInSlowPathSeconds = this->sleepInSlowPathSeconds;
     result->requiresAncestorEnabled = this->requiresAncestorEnabled;
+    result->ruby3KeywordArgs = this->ruby3KeywordArgs;
     result->kvstoreUuid = this->kvstoreUuid;
     result->errorUrlBase = this->errorUrlBase;
     result->suppressedErrorClasses = this->suppressedErrorClasses;

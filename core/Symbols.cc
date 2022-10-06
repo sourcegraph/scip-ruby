@@ -1534,6 +1534,21 @@ const InlinedVector<Loc, 2> &SymbolRef::locs(const GlobalState &gs) const {
     }
 }
 
+void SymbolRef::removeLocsForFile(GlobalState &gs, core::FileRef file) const {
+    switch (kind()) {
+        case SymbolRef::Kind::ClassOrModule:
+            return asClassOrModuleRef().data(gs)->removeLocsForFile(file);
+        case SymbolRef::Kind::Method:
+            return asMethodRef().data(gs)->removeLocsForFile(file);
+        case SymbolRef::Kind::FieldOrStaticField:
+            return asFieldRef().data(gs)->removeLocsForFile(file);
+        case SymbolRef::Kind::TypeArgument:
+            return asTypeArgumentRef().data(gs)->removeLocsForFile(file);
+        case SymbolRef::Kind::TypeMember:
+            return asTypeMemberRef().data(gs)->removeLocsForFile(file);
+    }
+}
+
 const TypePtr &SymbolRef::resultType(const GlobalState &gs) const {
     switch (kind()) {
         case SymbolRef::Kind::ClassOrModule:
@@ -2471,6 +2486,12 @@ void addLocInternal(const core::GlobalState &gs, core::Loc loc, core::Loc mainLo
         locs.insert(locs.end() - 1, loc);
     }
 }
+
+void removeLocsForFileImpl(SymbolRef::LOC_store &locs, core::FileRef file) {
+    auto it = remove_if(locs.begin(), locs.end(), [&](const auto loc) { return loc.file() == file; });
+    locs.erase(it, locs.end());
+}
+
 } // namespace
 
 void Method::addLoc(const core::GlobalState &gs, core::Loc loc) {
@@ -2482,8 +2503,7 @@ void Method::addLoc(const core::GlobalState &gs, core::Loc loc) {
 }
 
 void Method::removeLocsForFile(core::FileRef file) {
-    auto it = remove_if(locs_.begin(), locs_.end(), [&](const auto loc) { return loc.file() == file; });
-    locs_.erase(it, locs_.end());
+    removeLocsForFileImpl(this->locs_, file);
 }
 
 void Field::addLoc(const core::GlobalState &gs, core::Loc loc) {
@@ -2495,8 +2515,7 @@ void Field::addLoc(const core::GlobalState &gs, core::Loc loc) {
 }
 
 void Field::removeLocsForFile(core::FileRef file) {
-    auto it = remove_if(locs_.begin(), locs_.end(), [&](const auto loc) { return loc.file() == file; });
-    locs_.erase(it, locs_.end());
+    removeLocsForFileImpl(this->locs_, file);
 }
 
 void TypeParameter::addLoc(const core::GlobalState &gs, core::Loc loc) {
@@ -2505,6 +2524,10 @@ void TypeParameter::addLoc(const core::GlobalState &gs, core::Loc loc) {
     }
 
     addLocInternal(gs, loc, this->loc(), locs_);
+}
+
+void TypeParameter::removeLocsForFile(core::FileRef file) {
+    removeLocsForFileImpl(this->locs_, file);
 }
 
 void ClassOrModule::addLoc(const core::GlobalState &gs, core::Loc loc) {
@@ -2518,6 +2541,10 @@ void ClassOrModule::addLoc(const core::GlobalState &gs, core::Loc loc) {
     ENFORCE(ref(gs) != Symbols::PackageSpecRegistry());
 
     addLocInternal(gs, loc, this->loc(), locs_);
+}
+
+void ClassOrModule::removeLocsForFile(core::FileRef file) {
+    removeLocsForFileImpl(this->locs_, file);
 }
 
 vector<std::pair<NameRef, SymbolRef>> ClassOrModule::membersStableOrderSlow(const GlobalState &gs) const {
