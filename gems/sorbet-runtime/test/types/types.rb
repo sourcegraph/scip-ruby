@@ -16,6 +16,10 @@ module Opus::Types::Test
       GC.stat[:total_allocated_objects] - before - 1 # Subtract one for the allocation by GC.stat itself
     end
 
+    private def check_alloc_counts
+      @check_alloc_counts = Gem::Version.new(RUBY_VERSION) < Gem::Version.new('3.0')
+    end
+
     # this checks that both the recursive and nonrecursive path should
     # have the same behavior
     private def check_error_message_for_obj(type, value)
@@ -66,6 +70,7 @@ module Opus::Types::Test
       end
 
       it 'valid? does not allocate' do
+        skip unless check_alloc_counts
         allocs_when_valid = counting_allocations {@type.valid?(0)}
         assert_equal(0, allocs_when_valid)
 
@@ -128,34 +133,84 @@ module Opus::Types::Test
     end
 
     describe "Union" do
-      before do
-        @type = T.nilable(Integer)
+      describe "with simple nilable type" do
+        before do
+          @type = T.nilable(Integer)
+        end
+
+        it "passes a validation with a non-nil value" do
+          msg = check_error_message_for_obj(@type, 1)
+          assert_nil(msg)
+        end
+
+        it "passes a validation with a nil value" do
+          msg = check_error_message_for_obj(@type, nil)
+          assert_nil(msg)
+        end
+
+        it "fails a validation with a different type" do
+          msg = check_error_message_for_obj(@type, "1")
+          assert_equal("Expected type T.nilable(Integer), got type String with value \"1\"", msg)
+        end
+
+        it 'valid? does not allocate' do
+          skip unless check_alloc_counts
+          allocs_when_valid = counting_allocations {@type.valid?(0)}
+          assert_equal(0, allocs_when_valid)
+
+          allocs_when_invalid = counting_allocations {@type.valid?(0.1)}
+          assert_equal(0, allocs_when_invalid)
+        end
+
+        it 'can hand back its underlying types' do
+          value = @type.types.map(&:raw_type)
+          assert_equal([Integer, NilClass], value)
+        end
       end
 
-      it "passes a validation with a non-nil value" do
-        msg = check_error_message_for_obj(@type, 1)
-        assert_nil(msg)
-      end
+      describe "with complex type" do
+        before do
+          @type = T.nilable(T.any(Integer, T::Boolean))
+        end
 
-      it "passes a validation with a nil value" do
-        msg = check_error_message_for_obj(@type, nil)
-        assert_nil(msg)
-      end
+        it "passes a validation with a non-nil value" do
+          msg = check_error_message_for_obj(@type, 1)
+          assert_nil(msg)
+        end
 
-      it "fails a validation with a different type" do
-        msg = check_error_message_for_obj(@type, "1")
-        assert_equal("Expected type T.nilable(Integer), got type String with value \"1\"", msg)
+        it "passes a validation with a nil value" do
+          msg = check_error_message_for_obj(@type, nil)
+          assert_nil(msg)
+        end
+
+        it "fails a validation with a different type" do
+          msg = check_error_message_for_obj(@type, "1")
+          assert_equal("Expected type T.nilable(T.any(Integer, T::Boolean)), got type String with value \"1\"", msg)
+        end
+
+        it 'valid? does not allocate' do
+          skip unless check_alloc_counts
+          allocs_when_valid = counting_allocations {@type.valid?(0)}
+          assert_equal(0, allocs_when_valid)
+
+          allocs_when_invalid = counting_allocations {@type.valid?(0.1)}
+          assert_equal(0, allocs_when_invalid)
+        end
+
+        it 'can hand back its underlying types' do
+          value = @type.types.map(&:raw_type)
+          assert_equal([Integer, TrueClass, FalseClass, NilClass], value)
+        end
       end
 
       it "simplifies a union containing another union" do
-        type = T.any(@type, T.nilable(String))
+        type = T.any(T.nilable(Integer), T.nilable(String))
         assert_equal("T.nilable(T.any(Integer, String))", type.name)
       end
 
-      it 'can hand back its underlying types' do
-        type = T.any(Integer, T::Boolean, NilClass)
-        value = type.types.map(&:raw_type)
-        assert_equal([Integer, TrueClass, FalseClass, NilClass], value)
+      it "simplifies doubly-nested union" do
+        type = T.any(T.nilable(T.any(Integer, Float)), String)
+        assert_equal("T.nilable(T.any(Float, Integer, String))", type.name)
       end
 
       it "does not crash on anonymous classes" do
@@ -168,18 +223,20 @@ module Opus::Types::Test
         assert_equal("T.any(Integer, String)", type.name)
       end
 
-      it 'valid? does not allocate' do
-        allocs_when_valid = counting_allocations {@type.valid?(0)}
-        assert_equal(0, allocs_when_valid)
-
-        allocs_when_invalid = counting_allocations {@type.valid?(0.1)}
-        assert_equal(0, allocs_when_invalid)
-      end
-
       it 'uses structural, not reference, equality' do
         x = T::Types::Union.new([String, NilClass])
         y = T::Types::Union.new([String, NilClass])
         refute_equal(x.object_id, y.object_id)
+        assert_equal(x, y)
+        assert_equal(x.hash, y.hash)
+      end
+
+      it 'handles equality between simple pair and complex unions' do
+        x = T::Types::Union.new([String, NilClass])
+        y = T::Private::Types::SimplePairUnion.new(
+          T::Utils.coerce(String),
+          T::Utils.coerce(NilClass),
+        )
         assert_equal(x, y)
         assert_equal(x.hash, y.hash)
       end
@@ -194,6 +251,31 @@ module Opus::Types::Test
           T::Utils.coerce(NilClass),
         )
         assert_equal(x.object_id, y.object_id)
+        assert_equal(
+          T::Private::Types::SimplePairUnion,
+          x.class,
+        )
+      end
+
+      it 'uses fast path for T::Boolean' do
+        assert_equal(
+          T::Private::Types::SimplePairUnion,
+          T::Boolean.aliased_type.class,
+        )
+      end
+
+      it 'deduplicates type, fast path' do
+        assert_equal(
+          'Integer',
+          T.any(Integer, Integer).name,
+        )
+      end
+
+      it 'deduplicates type, slow path' do
+        assert_equal(
+          'T.all(Opus::Types::Test::TypesTest::Mixin1, Opus::Types::Test::TypesTest::Mixin2)',
+          T.any(T.all(Mixin1, Mixin2), T.all(Mixin1, Mixin2)).name,
+        )
       end
     end
 
@@ -243,6 +325,7 @@ module Opus::Types::Test
       end
 
       it 'valid? does not allocate' do
+        skip unless check_alloc_counts
         @klass.include(Mixin1)
         @klass.include(Mixin2)
 
@@ -280,6 +363,7 @@ module Opus::Types::Test
       end
 
       it 'valid? does not allocate' do
+        skip unless check_alloc_counts
         arr = ["foo", false]
         allocs_when_valid = counting_allocations {@type.valid?(arr)}
         assert_equal(0, allocs_when_valid)
@@ -331,6 +415,7 @@ module Opus::Types::Test
       end
 
       it 'valid? does not allocate' do
+        skip unless check_alloc_counts
         h = {a: 'foo', b: false, c: nil}
         allocs_when_valid = counting_allocations {@type.valid?(h)}
         assert_equal(0, allocs_when_valid)
@@ -477,6 +562,7 @@ module Opus::Types::Test
       end
 
       it 'valid? does not allocate' do
+        skip unless check_alloc_counts
         type = T::Array[Integer]
         valid = [1]
         invalid = {}
@@ -559,6 +645,7 @@ module Opus::Types::Test
       end
 
       it 'valid? does not allocate' do
+        skip unless check_alloc_counts
         type = T::Hash[String, Integer]
         valid = {'one' => 1}
         invalid = []

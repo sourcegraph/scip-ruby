@@ -12,7 +12,7 @@
 
 #include "common/sort.h"
 #include "core/Loc.h"
-#include "main/lsp/lsp.h"
+#include "main/lsp/LSPLoop.h"
 
 #include "scip_indexer/Debug.h"
 #include "scip_indexer/SCIPProtoExt.h"

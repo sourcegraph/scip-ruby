@@ -61,8 +61,8 @@ static uint32_t fnv1a_32(const string &s) {
 
 const char scip_ruby_version[] = "0.1.2";
 
-// Last updated: https://github.com/sourcegraph/scip-ruby/pull/104
-const char scip_ruby_sync_upstream_sorbet_sha[] = "bb35f6d1d075b27c3296c2eee85cba5c2de8c60f";
+// Last updated: https://github.com/sourcegraph/scip-ruby/pull/137
+const char scip_ruby_sync_upstream_sorbet_sha[] = "b6f88820ac40b8ded18589d78e965e82899c7b0a";
 
 namespace sorbet::scip_indexer {
 

@@ -1,8 +1,16 @@
+#include "main/lsp/LSPLoop.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/synchronization/notification.h"
 #include "common/EarlyReturnWithCode.h"
 #include "common/Timer.h"
+#include "common/concurrency/WorkerPool.h"
+#include "common/kvstore/KeyValueStore.h"
+#include "common/statsd/statsd.h"
 #include "common/web_tracer_framework/tracing.h"
+#include "core/errors/internal.h"
+#include "core/errors/namer.h"
+#include "core/errors/resolver.h"
+#include "core/lsp/PreemptionTaskManager.h"
 #include "core/lsp/TypecheckEpochManager.h"
 #include "main/lsp/LSPConfiguration.h"
 #include "main/lsp/LSPInput.h"
@@ -10,38 +18,76 @@
 #include "main/lsp/LSPPreprocessor.h"
 #include "main/lsp/LSPTask.h"
 #include "main/lsp/json_types.h"
-#include "main/lsp/lsp.h"
+#include "main/lsp/notifications/sorbet_workspace_edit.h"
 #include "main/lsp/watchman/WatchmanProcess.h"
+#include "sorbet_version/sorbet_version.h"
 
 using namespace std;
 namespace spd = spdlog;
 
 namespace sorbet::realmain::lsp {
 
+LSPLoop::LSPLoop(std::unique_ptr<core::GlobalState> initialGS, WorkerPool &workers,
+                 const std::shared_ptr<LSPConfiguration> &config, std::unique_ptr<KeyValueStore> kvstore)
+    : config(config), taskQueue(make_shared<TaskQueue>()), epochManager(initialGS->epochManager),
+      preprocessor(config, taskQueue),
+      typecheckerCoord(config, make_shared<core::lsp::PreemptionTaskManager>(initialGS->epochManager), workers,
+                       taskQueue),
+      indexer(config, move(initialGS), move(kvstore)), emptyWorkers(WorkerPool::create(0, *config->logger)),
+      lastMetricUpdateTime(chrono::steady_clock::now()) {}
+
+constexpr chrono::minutes STATSD_INTERVAL = chrono::minutes(5);
+
+bool LSPLoop::shouldSendCountersToStatsd(chrono::time_point<chrono::steady_clock> currentTime) const {
+    return !config->opts.statsdHost.empty() && (currentTime - lastMetricUpdateTime) > STATSD_INTERVAL;
+}
+
+void LSPLoop::sendCountersToStatsd(chrono::time_point<chrono::steady_clock> currentTime) {
+    Timer timeit(config->logger, "LSPLoop::sendCountersToStatsd");
+    ENFORCE(this_thread::get_id() == mainThreadId, "sendCounterToStatsd can only be called from the main LSP thread.");
+    const auto &opts = config->opts;
+    // Record process and version stats. Do this BEFORE clearing the thread counters!
+    StatsD::addStandardMetrics();
+    auto counters = getAndClearThreadCounters();
+    if (!opts.statsdHost.empty()) {
+        lastMetricUpdateTime = currentTime;
+        auto prefix = fmt::format("{}.lsp.counters", opts.statsdPrefix);
+        StatsD::submitCounters(counters, opts.statsdHost, opts.statsdPort, prefix);
+    }
+
+    if (!opts.webTraceFile.empty()) {
+        timeit.setTag("webtracefile", "true");
+        web_tracer_framework::Tracing::storeTraces(counters, opts.webTraceFile);
+    } else {
+        timeit.setTag("webtracefile", "false");
+    }
+}
+
 namespace {
-class NotifyOnDestruction {
-    absl::Mutex &mutex;
-    bool &flag;
+class TypecheckCountTask : public LSPTask {
+    int &count;
 
 public:
-    NotifyOnDestruction(absl::Mutex &mutex, bool &flag) : mutex(mutex), flag(flag){};
-    ~NotifyOnDestruction() {
-        absl::MutexLock lck(&mutex);
-        flag = true;
+    TypecheckCountTask(const LSPConfiguration &config, int &count)
+        : LSPTask(config, LSPMethod::SorbetError), count(count) {}
+
+    bool canPreempt(const LSPIndexer &indexer) const override {
+        return false;
+    }
+
+    void run(LSPTypecheckerInterface &tc) override {
+        count = tc.state().lspTypecheckCount;
     }
 };
+} // namespace
 
-class TerminateOnDestruction final {
-    TaskQueue &queue;
+int LSPLoop::getTypecheckCount() {
+    int count = 0;
+    typecheckerCoord.syncRun(make_unique<TypecheckCountTask>(*config, count));
+    return count;
+}
 
-public:
-    TerminateOnDestruction(TaskQueue &queue) : queue{queue} {}
-    ~TerminateOnDestruction() {
-        absl::MutexLock lck(queue.getMutex());
-        queue.terminate();
-    }
-};
-
+namespace {
 class NotifyNotificationOnDestruction {
     absl::Notification &notification;
 
@@ -66,50 +112,145 @@ void tagNewRequest(spd::logger &logger, LSPMessage &msg) {
                                           initializer_list<int>{50, 100, 250, 500, 1000, 1500, 2000, 2500, 5000, 10000,
                                                                 15000, 20000, 25000, 30000, 35000, 40000});
 }
+
+class LSPWatchmanProcess final : public watchman::WatchmanProcess {
+    MessageQueueState &messageQueue;
+    absl::Mutex &messageQueueMutex;
+    absl::Notification &initializedNotification;
+    const std::shared_ptr<const LSPConfiguration> config;
+
+    void enqueueNotification(std::unique_ptr<NotificationMessage> notification) {
+        auto msg = make_unique<LSPMessage>(move(notification));
+        // Don't start enqueueing requests until LSP is initialized.
+        initializedNotification.WaitForNotification();
+        {
+            absl::MutexLock lck(&messageQueueMutex);
+            tagNewRequest(*logger, *msg);
+            messageQueue.counters = mergeCounters(move(messageQueue.counters));
+            messageQueue.pendingRequests.push_back(move(msg));
+        }
+    }
+
+public:
+    LSPWatchmanProcess(std::shared_ptr<spdlog::logger> logger, std::string_view watchmanPath,
+                       std::string_view workSpace, std::vector<std::string> extensions, MessageQueueState &messageQueue,
+                       absl::Mutex &messageQueueMutex, absl::Notification &initializedNotification,
+                       std::shared_ptr<const LSPConfiguration> config)
+        : WatchmanProcess(std::move(logger), watchmanPath, workSpace, std::move(extensions)),
+          messageQueue(messageQueue), messageQueueMutex(messageQueueMutex),
+          initializedNotification(initializedNotification), config(std::move(config)) {}
+
+    virtual void processQueryResponse(std::unique_ptr<WatchmanQueryResponse> response) {
+        auto notifMsg = make_unique<NotificationMessage>("2.0", LSPMethod::SorbetWatchmanFileChange, move(response));
+        enqueueNotification(move(notifMsg));
+    }
+
+    virtual void processStateEnter(std::unique_ptr<sorbet::realmain::lsp::WatchmanStateEnter> stateEnter) {
+        auto notification =
+            make_unique<NotificationMessage>("2.0", LSPMethod::SorbetWatchmanStateEnter, move(stateEnter));
+        enqueueNotification(move(notification));
+    }
+
+    virtual void processStateLeave(std::unique_ptr<sorbet::realmain::lsp::WatchmanStateLeave> stateLeave) {
+        auto notification =
+            make_unique<NotificationMessage>("2.0", LSPMethod::SorbetWatchmanStateLeave, move(stateLeave));
+        enqueueNotification(move(notification));
+    }
+
+    virtual void processExit(int watchmanExitCode, const std::optional<std::string> &msg) {
+        {
+            absl::MutexLock lck(&messageQueueMutex);
+            if (!messageQueue.terminate) {
+                messageQueue.terminate = true;
+                messageQueue.errorCode = watchmanExitCode;
+                if (watchmanExitCode != 0 && msg.has_value()) {
+                    auto params = make_unique<ShowMessageParams>(MessageType::Error, msg.value());
+                    config->output->write(make_unique<LSPMessage>(
+                        make_unique<NotificationMessage>("2.0", LSPMethod::WindowShowMessage, move(params))));
+                }
+            }
+            logger->debug("Watchman terminating");
+        }
+    }
+};
 } // namespace
 
-unique_ptr<Joinable> LSPPreprocessor::runPreprocessor(MessageQueueState &messageQueue, absl::Mutex &messageQueueMutex) {
-    return runInAThread("lspPreprocess", [this, &messageQueue, &messageQueueMutex] {
-        // Propagate the termination flag across the two queues.
-        NotifyOnDestruction notifyIncoming(messageQueueMutex, messageQueue.terminate);
-        TerminateOnDestruction notifyProcessing(*taskQueue);
-        owner = this_thread::get_id();
-        while (true) {
-            unique_ptr<LSPMessage> msg;
-            {
-                absl::MutexLock lck(&messageQueueMutex);
-                messageQueueMutex.Await(absl::Condition(
-                    +[](MessageQueueState *messageQueue) -> bool {
-                        return messageQueue->terminate || !messageQueue->pendingRequests.empty();
-                    },
-                    &messageQueue));
-                // Only terminate once incoming queue is drained.
-                if (messageQueue.terminate && messageQueue.pendingRequests.empty()) {
-                    config->logger->debug("Preprocessor terminating");
-                    return;
-                }
-                msg = move(messageQueue.pendingRequests.front());
-                messageQueue.pendingRequests.pop_front();
-                // Combine counters with this thread's counters.
-                if (!messageQueue.counters.hasNullCounters()) {
-                    counterConsume(move(messageQueue.counters));
-                }
-            }
+void LSPLoop::processRequest(const string &json) {
+    vector<unique_ptr<LSPMessage>> messages;
+    messages.push_back(LSPMessage::fromClient(json));
+    LSPLoop::processRequests(move(messages));
+}
 
-            preprocessAndEnqueue(move(msg));
+void LSPLoop::processRequest(std::unique_ptr<LSPMessage> msg) {
+    vector<unique_ptr<LSPMessage>> messages;
+    messages.push_back(move(msg));
+    processRequests(move(messages));
+}
 
-            {
-                absl::MutexLock lck(taskQueue->getMutex());
-                // Merge the counters from all of the worker threads with those stored in
-                // taskQueue.
-                taskQueue->getCounters() = mergeCounters(move(taskQueue->getCounters()));
-                if (taskQueue->isTerminated()) {
-                    // We must have processed an exit notification, or one of the downstream threads exited.
-                    return;
-                }
+void LSPLoop::processRequests(vector<unique_ptr<LSPMessage>> messages) {
+    for (auto &message : messages) {
+        preprocessor.preprocessAndEnqueue(move(message));
+    }
+
+    std::vector<std::unique_ptr<LSPTask>> tasks;
+    while (true) {
+        {
+            absl::MutexLock lck(taskQueue->getMutex());
+            ENFORCE(!taskQueue->isPaused(), "__PAUSE__ not supported in single-threaded mode.");
+            auto &queuedTasks = taskQueue->tasks();
+            tasks.reserve(queuedTasks.size());
+            for (auto &task : queuedTasks) {
+                tasks.emplace_back(move(task));
             }
+            queuedTasks.clear();
         }
-    });
+
+        if (tasks.empty()) {
+            break;
+        }
+
+        for (auto &task : tasks) {
+            runTask(std::move(task));
+        }
+        tasks.clear();
+    }
+}
+
+void LSPLoop::runTask(unique_ptr<LSPTask> task) {
+    prodCategoryCounterInc("lsp.messages.processed", task->methodString());
+    {
+        Timer timeit(config->logger, "LSPTask::index");
+        timeit.setTag("method", task->methodString());
+        task->index(this->indexer);
+    }
+    if (task->finalPhase() == LSPTask::Phase::INDEX) {
+        // Task doesn't need the typechecker.
+        return;
+    }
+
+    // Check if the task is a dangerous task, as those are scheduled specially.
+    if (auto *dangerousTask = dynamic_cast<LSPDangerousTypecheckerTask *>(task.get())) {
+        if (auto *editTask = dynamic_cast<SorbetWorkspaceEditTask *>(dangerousTask)) {
+            unique_ptr<SorbetWorkspaceEditTask> edit(editTask);
+            (void)task.release();
+            if (edit->canTakeFastPath(indexer)) {
+                // Can run on fast path synchronously; it should complete quickly.
+                typecheckerCoord.syncRun(move(edit));
+            } else {
+                // Must run on slow path; this method is async in multithreaded environments, and blocks in
+                // single threaded environments.
+                typecheckerCoord.typecheckOnSlowPath(move(edit));
+            }
+        } else {
+            // Must be a new type of dangerous task we don't know about.
+            // Please do not add new dangerous tasks to the codebase. Try to surface whatever functionality you
+            // require safely through LSPTypecheckerCoordinator.
+            ENFORCE(false);
+        }
+    } else {
+        // Run synchronously.
+        typecheckerCoord.syncRun(move(task));
+    }
 }
 
 optional<unique_ptr<core::GlobalState>> LSPLoop::runLSP(shared_ptr<LSPInput> input) {
@@ -140,46 +281,16 @@ optional<unique_ptr<core::GlobalState>> LSPLoop::runLSP(shared_ptr<LSPInput> inp
             throw EarlyReturnWithCode(1);
         }
 
-        // The lambda below intentionally does not capture `this`.
-        watchmanProcess = make_unique<watchman::WatchmanProcess>(
-            logger, opts.watchmanPath, opts.rawInputDirNames.at(0), vector<string>({"rb", "rbi"}),
-            [&messageQueueMutex, &messageQueue, logger = logger,
-             &initializedNotification](std::unique_ptr<WatchmanQueryResponse> response) {
-                auto notifMsg =
-                    make_unique<NotificationMessage>("2.0", LSPMethod::SorbetWatchmanFileChange, move(response));
-                auto msg = make_unique<LSPMessage>(move(notifMsg));
-                // Don't start enqueueing requests until LSP is initialized.
-                initializedNotification.WaitForNotification();
-                {
-                    absl::MutexLock lck(&messageQueueMutex);
-                    tagNewRequest(*logger, *msg);
-                    messageQueue.counters = mergeCounters(move(messageQueue.counters));
-                    messageQueue.pendingRequests.push_back(move(msg));
-                }
-            },
-            [&messageQueue, &messageQueueMutex, logger = logger,
-             config = this->config](int watchmanExitCode, const optional<string> &msg) -> void {
-                {
-                    absl::MutexLock lck(&messageQueueMutex);
-                    if (!messageQueue.terminate) {
-                        messageQueue.terminate = true;
-                        messageQueue.errorCode = watchmanExitCode;
-                        if (watchmanExitCode != 0 && msg.has_value()) {
-                            auto params = make_unique<ShowMessageParams>(MessageType::Error, msg.value());
-                            config->output->write(make_unique<LSPMessage>(
-                                make_unique<NotificationMessage>("2.0", LSPMethod::WindowShowMessage, move(params))));
-                        }
-                    }
-                    logger->debug("Watchman terminating");
-                }
-            });
+        watchmanProcess = make_unique<LSPWatchmanProcess>(logger, opts.watchmanPath, opts.rawInputDirNames.at(0),
+                                                          vector<string>({"rb", "rbi"}), messageQueue,
+                                                          messageQueueMutex, initializedNotification, this->config);
     }
 
     auto readerThread =
         runInAThread("lspReader", [&messageQueue, &messageQueueMutex, logger = logger, input = move(input)] {
             // Thread that executes this lambda is called reader thread.
             // This thread _intentionally_ does not capture `this`.
-            NotifyOnDestruction notify(messageQueueMutex, messageQueue.terminate);
+            MessageQueueState::NotifyOnDestruction notify(messageQueue, messageQueueMutex);
             auto timeit = make_unique<Timer>(logger, "getNewRequest");
             while (true) {
                 auto readResult = input->read();
@@ -215,7 +326,7 @@ optional<unique_ptr<core::GlobalState>> LSPLoop::runLSP(shared_ptr<LSPInput> inp
         // Ensure Watchman thread gets unstuck when thread exits prior to initialization.
         NotifyNotificationOnDestruction notify(initializedNotification);
         // Ensure preprocessor, reader, and watchman threads get unstuck when thread exits.
-        NotifyOnDestruction notifyIncoming(messageQueueMutex, messageQueue.terminate);
+        MessageQueueState::NotifyOnDestruction notifyIncoming(messageQueue, messageQueueMutex);
         while (true) {
             unique_ptr<LSPTask> task;
             {
