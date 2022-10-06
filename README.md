@@ -5,7 +5,7 @@ enabling precise code navigation for Ruby —
 Go to definition, Find references, hover docs etc. –
 in Sourcegraph.
 
-![Example showing cross-file Find references for a type type from the shopify-api-ruby codebase](https://user-images.githubusercontent.com/93103176/185077342-77172ac8-a363-49e4-9d7a-babb541281b1.png)
+![Example showing cross-file Find references for a type from the shopify-api-ruby codebase](https://user-images.githubusercontent.com/93103176/194205214-2e2d64da-d02c-4ab3-8636-2497e4d46628.png)
 
 If you have any questions, bug reports, feature requests or feedback,
 please [file an issue](https://github.com/sourcegraph/scip-ruby/issues/new/choose).
@@ -14,8 +14,12 @@ please [file an issue](https://github.com/sourcegraph/scip-ruby/issues/new/choos
 
 scip-ruby builds on top of
 the [Sorbet](https://github.com/sorbet/sorbet) type-checker.
-If you use Sorbet in your project, follow the instructions below.
-Projects which do not use Sorbet are not supported.
+It is primarily meant for use in projects which have started adopting Sorbet.
+Higher Sorbet adoption (`# typed: true` or higher) is likely to lead to
+a better code navigation experience.
+However, scip-ruby can also index `# typed: false` files on a best-effort basis.
+Like Sorbet, scip-ruby treats files without a `# typed:` sigil
+as implicitly being `# typed: false`.
 
 Currently, we have gems and binaries available for x86\_64 Linux and x86\_64 macOS (supported on arm64 macOS via Rosetta).
 
