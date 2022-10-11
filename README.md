@@ -56,16 +56,31 @@ Run `scip-ruby` along with some information about your gem.
 
 <!-- TODO: Add support for defaulting. -->
 
-```bash
-# Uses the latest revision as the version - prefer this if you will index every commit
-bundle exec scip-ruby --index-file index.scip --gem-metadata "my-gem-name@$(git rev-parse HEAD)"
+- If you have a `sorbet/config` file, that will be picked up
+  automatically to determine which files to index.
+    ```bash
+    # Uses the latest revision as the version - prefer this if you will index every commit
+    bundle exec scip-ruby --index-file index.scip --gem-metadata "my-gem-name@$(git rev-parse HEAD)"
 
-# Uses the latest tag as the version - prefer this if you're only indexing specific tags
-bundle exec scip-ruby --index-file index.scip --gem-metadata "my-gem-name@$(git describe --tags --abbrev=0)"
-```
+    # Uses the latest tag as the version - prefer this if you're only indexing specific tags
+    bundle exec scip-ruby --index-file index.scip --gem-metadata "my-gem-name@$(git describe --tags --abbrev=0)"
+    ```
+- If you don't have a `sorbet/config` file, add an extra path argument
+  to index all files in the project.
+    ```bash
+    # Uses the latest revision as the version - prefer this if you will index every commit
+    bundle exec scip-ruby . --index-file index.scip --gem-metadata "my-gem-name@$(git rev-parse HEAD)"
+
+    # Uses the latest tag as the version - prefer this if you're only indexing specific tags
+    bundle exec scip-ruby . --index-file index.scip --gem-metadata "my-gem-name@$(git describe --tags --abbrev=0)"
+    ```
 
 The generated `index.scip` file can be uploaded
 to a Sourcegraph instance using the [Sourcegraph CLI](https://github.com/sourcegraph/src-cli).
+
+If you're curious about the internals of the index,
+such as which files were indexed,
+check out the [SCIP CLI](https://github.com/sourcegraph/scip/blob/main/docs/CLI.md).
 
 ## Download binary and index
 
