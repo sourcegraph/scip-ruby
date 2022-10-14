@@ -1115,6 +1115,7 @@ using LocalSymbolTable = UnorderedMap<core::LocalVariable, core::Loc>;
 class SCIPSemanticExtension : public SemanticExtension {
 public:
     string indexFilePath;
+    string gemMetadataString;
     scip_indexer::GemMetadata gemMetadata;
 
     using SCIPState = sorbet::scip_indexer::SCIPState;
@@ -1148,6 +1149,24 @@ public:
     }
 
     void run(core::MutableContext &ctx, ast::ClassDef *cd) const override {}
+
+    virtual void prepareForTypechecking(const core::GlobalState &gs) override {
+        auto maybeMetadata = scip_indexer::GemMetadata::tryParse(this->gemMetadataString);
+        if (maybeMetadata.has_value()) {
+            this->gemMetadata = maybeMetadata.value();
+        } // TODO: Issue error for incorrect format in string...
+        if (this->gemMetadata.name().empty() || this->gemMetadata.version().empty()) {
+            auto [metadata, errors] = scip_indexer::GemMetadata::readFromConfig(OSFileSystem());
+            this->gemMetadata = metadata;
+            for (auto &error : errors) {
+                if (auto e = gs.beginError(core::Loc(), scip_indexer::SCIPRubyDebug)) {
+                    e.setHeader("{}: {}",
+                                error.kind == scip_indexer::GemMetadataError::Kind::Error ? "error" : "warning",
+                                error.message);
+                }
+            }
+        }
+    };
 
     virtual void finishTypecheckFile(const core::GlobalState &gs, const core::FileRef &file) const override {
         if (this->doNothing()) {
@@ -1251,12 +1270,13 @@ public:
     }
 
     virtual unique_ptr<SemanticExtension> deepCopy(const core::GlobalState &from, core::GlobalState &to) override {
-        return make_unique<SCIPSemanticExtension>(this->indexFilePath, this->gemMetadata);
+        return make_unique<SCIPSemanticExtension>(this->indexFilePath, this->gemMetadataString, this->gemMetadata);
     };
     virtual void merge(const core::GlobalState &from, core::GlobalState &to, core::NameSubstitution &subst) override{};
 
-    SCIPSemanticExtension(string indexFilePath, scip_indexer::GemMetadata metadata)
-        : indexFilePath(indexFilePath), gemMetadata(metadata), mutableState() {}
+    SCIPSemanticExtension(string indexFilePath, string gemMetadataString, scip_indexer::GemMetadata gemMetadata)
+        : indexFilePath(indexFilePath), gemMetadataString(gemMetadataString), gemMetadata(gemMetadata), mutableState() {
+    }
     ~SCIPSemanticExtension() {}
 };
 
@@ -1285,13 +1305,12 @@ public:
         } else {
             indexFilePath = "index.scip";
         }
-        return make_unique<SCIPSemanticExtension>(
-            indexFilePath,
-            scip_indexer::GemMetadata::tryParseOrDefault(
-                providedOptions.count("gem-metadata") > 0 ? providedOptions["gem-metadata"].as<string>() : ""));
+        auto gemMetadataString =
+            providedOptions.count("gem-metadata") > 0 ? providedOptions["gem-metadata"].as<string>() : "";
+        return make_unique<SCIPSemanticExtension>(indexFilePath, gemMetadataString, scip_indexer::GemMetadata());
     };
     virtual unique_ptr<SemanticExtension> defaultInstance() const override {
-        return make_unique<SCIPSemanticExtension>("index.scip", scip_indexer::GemMetadata::tryParseOrDefault(""));
+        return make_unique<SCIPSemanticExtension>("index.scip", "", scip_indexer::GemMetadata());
     };
     static vector<SemanticExtensionProvider *> getProviders();
     virtual ~SCIPSemanticExtensionProvider() = default;

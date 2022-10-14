@@ -12,6 +12,10 @@ void OSFileSystem::writeFile(string_view filename, string_view text) {
     return FileOps::write(filename, text);
 }
 
+std::string OSFileSystem::getCurrentDir() const {
+    return FileOps::getCurrentDir();
+}
+
 vector<string> OSFileSystem::listFilesInDir(string_view path, const UnorderedSet<std::string> &extensions,
                                             bool recursive, const std::vector<std::string> &absoluteIgnorePatterns,
                                             const std::vector<std::string> &relativeIgnorePatterns) const {

@@ -55,6 +55,8 @@ template <typename V, typename Fn> std::string showVec(const V &v, Fn f) {
     return out.str();
 }
 
+extern const sorbet::core::ErrorClass SCIPRubyDebug;
+
 void _log_debug(const sorbet::core::GlobalState &gs, sorbet::core::Loc loc, std::string s);
 } // namespace sorbet::scip_indexer
 

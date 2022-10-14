@@ -27,6 +27,7 @@ class CFG;
 namespace pipeline::semantic_extension {
 class SemanticExtension {
 public:
+    virtual void prepareForTypechecking(const core::GlobalState &) = 0;
     virtual void finishTypecheckFile(const core::GlobalState &, const core::FileRef &) const = 0;
     virtual void finishTypecheck(const core::GlobalState &) const = 0;
     virtual void typecheck(const core::GlobalState &, core::FileRef file, cfg::CFG &, ast::MethodDef &) const = 0;

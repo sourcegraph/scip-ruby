@@ -3,6 +3,7 @@
 
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -26,19 +27,41 @@ namespace sorbet::scip_indexer {
 
 template <typename T> using SmallVec = InlinedVector<T, 2>;
 
+struct GemMetadataError {
+    enum class Kind { Error, Warning } kind;
+    std::string message;
+
+    template <typename H> friend H AbslHashValue(H h, const GemMetadataError &x) {
+        return H::combine(std::move(h), x.kind, x.message);
+    }
+
+    bool operator==(const GemMetadataError &other) const {
+        return this->kind == other.kind && this->message == other.message;
+    }
+};
+
+extern GemMetadataError configNotFoundError, multipleGemspecWarning, failedToParseGemspecWarning,
+    failedToParseGemspecWarning, failedToParseNameFromGemspecWarning, failedToParseVersionFromGemspecWarning,
+    failedToParseGemfileLockWarning;
+
+struct GemMetadataInferenceTestCase;
+
 class GemMetadata final {
     std::string _name;
     std::string _version;
 
     GemMetadata(std::string name, std::string version) : _name(name), _version(version) {}
 
+    friend GemMetadataInferenceTestCase;
+
 public:
+    GemMetadata() = default;
     GemMetadata &operator=(const GemMetadata &) = default;
 
-    static GemMetadata tryParseOrDefault(std::string metadata) {
-        std::vector<std::string> v = absl::StrSplit(metadata, '@');
+    static std::optional<GemMetadata> tryParse(const std::string &nameAndVersion) {
+        std::vector<std::string> v = absl::StrSplit(nameAndVersion, '@');
         if (v.size() != 2 || v[0].empty() || v[1].empty()) {
-            return GemMetadata{"TODO", "TODO"};
+            return std::nullopt;
         }
         return GemMetadata{v[0], v[1]};
     }
@@ -50,6 +73,15 @@ public:
     const std::string &version() const {
         return this->_version;
     }
+
+    bool operator==(const GemMetadata &other) const {
+        return this->name() == other.name() && this->version() == other.version();
+    }
+
+    // HACK: Do a best-effort parse of any config files to extract the name and version.
+    static std::pair<GemMetadata, std::vector<GemMetadataError>> readFromConfig(const FileSystem &fs);
+    static std::pair<GemMetadata, std::vector<GemMetadataError>> readFromGemfileLock(const std::string &);
+    static std::pair<GemMetadata, std::vector<GemMetadataError>> readFromGemspec(const std::string &);
 };
 
 class UntypedGenericSymbolRef;

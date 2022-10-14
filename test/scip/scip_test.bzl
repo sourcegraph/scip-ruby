@@ -27,6 +27,7 @@ def scip_test_suite(paths, multifile_paths):
         else:
             file_groups[d] = [p]
 
+    tests.append(scip_unit_tests())
     for dir, files in file_groups.items():
         names = scip_multifile_test(dir, files)
         tests.append(names[0])
@@ -40,6 +41,18 @@ def scip_test_suite(paths, multifile_paths):
         name = "update",
         tests = updates,
     )
+
+def scip_unit_tests():
+    test_name = "unit_tests"
+    args = ["unit_tests"]
+    native.sh_test(
+        name = "unit_tests",
+        srcs = ["scip_test_runner.sh"],
+        args = ["only_unit_tests"],
+        data = ["//test:scip_test_runner"],
+        size = "small",
+    )
+    return "unit_tests"
 
 def scip_test(path):
     if not path.endswith(".rb") or path.endswith(".snapshot.rb"):

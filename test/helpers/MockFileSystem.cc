@@ -1,3 +1,8 @@
+#include <vector>
+
+#include "absl/strings/match.h"
+#include "absl/strings/strip.h"
+
 #include "test/helpers/MockFileSystem.h"
 
 using namespace std;
@@ -41,9 +46,28 @@ void MockFileSystem::deleteFile(string_view filename) {
     }
 }
 
+std::string MockFileSystem::getCurrentDir() const {
+    return rootPath;
+}
+
 vector<string> MockFileSystem::listFilesInDir(string_view path, const UnorderedSet<string> &extensions, bool recursive,
                                               const vector<string> &absoluteIgnorePatterns,
                                               const vector<string> &relativeIgnorePatterns) const {
-    Exception::raise("Not implemented.");
+    if (path != "." || !absoluteIgnorePatterns.empty() || !relativeIgnorePatterns.empty() || recursive) {
+        Exception::raise("Not implemented full support for all parameters in MockFileSystem::listFilesInDir");
+    }
+    vector<string> out{};
+    for (auto &[filePath, _] : contents) {
+        auto relativePath = absl::StripPrefix(absl::StripPrefix(filePath, rootPath), "/");
+        if (absl::StrContains(relativePath, '/')) {
+            continue;
+        }
+        for (auto &ext : extensions) {
+            if (absl::EndsWith(relativePath, ext)) {
+                out.push_back(std::string(relativePath));
+            }
+        }
+    }
+    return out;
 }
 } // namespace sorbet::test

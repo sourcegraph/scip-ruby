@@ -1125,6 +1125,9 @@ void typecheck(const core::GlobalState &gs, vector<ast::ParsedFile> what, const 
 
         {
             ProgressIndicator cfgInferProgress(opts.showProgress, "CFG+Inference", what.size());
+            for (auto &extension : gs.semanticExtensions) {
+                extension->prepareForTypechecking(gs);
+            }
             workers.multiplexJob("typecheck", [&gs, &opts, epoch, &epochManager, &preemptionManager, fileq, outputq,
                                                cancelable, intentionallyLeakASTs]() {
                 vector<core::FileRef> processedFiles;
