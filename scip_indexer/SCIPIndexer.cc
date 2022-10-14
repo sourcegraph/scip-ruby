@@ -1279,16 +1279,19 @@ public:
                        sorbet_version, scip_ruby_sync_upstream_sorbet_sha);
             throw sorbet::EarlyReturnWithCode(0);
         }
+        string indexFilePath{};
         if (providedOptions.count("index-file") > 0) {
-            return make_unique<SCIPSemanticExtension>(
-                providedOptions["index-file"].as<string>(),
-                scip_indexer::GemMetadata::tryParseOrDefault(
-                    providedOptions.count("gem-metadata") > 0 ? providedOptions["gem-metadata"].as<string>() : ""));
+            indexFilePath = providedOptions["index-file"].as<string>();
+        } else {
+            indexFilePath = "index.scip";
         }
-        return this->defaultInstance();
+        return make_unique<SCIPSemanticExtension>(
+            indexFilePath,
+            scip_indexer::GemMetadata::tryParseOrDefault(
+                providedOptions.count("gem-metadata") > 0 ? providedOptions["gem-metadata"].as<string>() : ""));
     };
     virtual unique_ptr<SemanticExtension> defaultInstance() const override {
-        return make_unique<SCIPSemanticExtension>("", scip_indexer::GemMetadata::tryParseOrDefault(""));
+        return make_unique<SCIPSemanticExtension>("index.scip", scip_indexer::GemMetadata::tryParseOrDefault(""));
     };
     static vector<SemanticExtensionProvider *> getProviders();
     virtual ~SCIPSemanticExtensionProvider() = default;
