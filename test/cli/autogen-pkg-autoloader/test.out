@@ -150,6 +150,8 @@ Opus::Require.on_autoload('RootPackage::Nested')
 module RootPackage::Nested
 end
 
+Opus::Require.pbal_register_package(RootPackage::Nested, 'test/cli/autogen-pkg-autoloader/nested/')
+
 Opus::Require.for_autoload(RootPackage::Nested, "test/cli/autogen-pkg-autoloader/nested/nested.rb")
 
 --- output/RootPackage/Yabba.rb

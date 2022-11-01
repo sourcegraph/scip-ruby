@@ -13,7 +13,6 @@
 #include "core/Types.h"
 
 // improve debugging.
-template class std::shared_ptr<sorbet::core::Type>;
 template class std::shared_ptr<sorbet::core::TypeConstraint>;
 template class std::shared_ptr<sorbet::core::SendAndBlockLink>;
 template class std::vector<sorbet::core::Loc>;
@@ -103,6 +102,11 @@ TypePtr Types::hashOfUntyped() {
 
 TypePtr Types::procClass() {
     return make_type<ClassType>(Symbols::Proc());
+}
+
+TypePtr Types::nilableProcClass() {
+    static auto res = OrType::make_shared(nilClass(), procClass());
+    return res;
 }
 
 TypePtr Types::classClass() {

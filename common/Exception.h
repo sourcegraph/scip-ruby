@@ -16,19 +16,14 @@ public:
     SorbetException(const char *message) : logic_error(message) {}
 };
 
-class FileNotFoundException : SorbetException {
+class FileNotFoundException : public SorbetException {
 public:
-    FileNotFoundException() : SorbetException("File not found") {}
+    FileNotFoundException(const std::string &message) : SorbetException(message) {}
 };
 
 class FileNotDirException : SorbetException {
 public:
     FileNotDirException() : SorbetException("File is not a directory") {}
-};
-
-class FileReadException : SorbetException {
-public:
-    FileReadException(const std::string &message) : SorbetException(message) {}
 };
 
 class CreateDirException : SorbetException {

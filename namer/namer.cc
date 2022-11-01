@@ -69,6 +69,11 @@ core::ClassOrModuleRef contextClass(const core::GlobalState &gs, core::SymbolRef
     }
 }
 
+bool isMangleRenameUniqueName(core::GlobalState &gs, core::NameRef name) {
+    return name.kind() == core::NameKind::UNIQUE &&
+           name.dataUnique(gs)->uniqueNameKind == core::UniqueNameKind::MangleRename;
+}
+
 /**
  * Used with TreeWalk to locate all of the class, method, static field, and type member symbols defined in the tree.
  * Does not mutate GlobalState, which allows us to parallelize this process.
@@ -136,15 +141,15 @@ class SymbolFinder {
     }
 
     // Returns index to foundDefs containing the given name. Recursively inserts class refs for its owners.
-    core::FoundDefinitionRef squashNames(core::Context ctx, const ast::ExpressionPtr &node) {
+    core::FoundDefinitionRef squashNames(const ast::ExpressionPtr &node) {
         if (auto *id = ast::cast_tree<ast::ConstantLit>(node)) {
             // Already defined. Insert a foundname so we can reference it.
-            auto sym = id->symbol.dealias(ctx);
+            auto sym = id->symbol;
             ENFORCE(sym.exists());
             return foundDefs->addSymbol(sym);
         } else if (auto constLit = ast::cast_tree<ast::UnresolvedConstantLit>(node)) {
             core::FoundClassRef found;
-            found.owner = squashNames(ctx, constLit->scope);
+            found.owner = squashNames(constLit->scope);
             found.name = constLit->cnst;
             found.loc = constLit->loc;
             return foundDefs->addClassRef(move(found));
@@ -180,7 +185,7 @@ public:
             found.klass = foundDefs->addClassRef(move(foundRef));
         } else {
             if (klass.symbol == core::Symbols::todo()) {
-                found.klass = squashNames(ctx, klass.name);
+                found.klass = squashNames(klass.name);
             } else {
                 // Desugar populates a top-level root() ClassDef.
                 // Nothing else should have been typeAlias by now.
@@ -461,7 +466,7 @@ public:
 
         core::FoundStaticField found;
         found.owner = getOwner();
-        found.scopeClass = squashNames(ctx, lhs.scope);
+        found.scopeClass = squashNames(lhs.scope);
         found.name = lhs.cnst;
         found.asgnLoc = asgn.loc;
         found.lhsLoc = lhs.loc;
@@ -723,41 +728,38 @@ private:
         emitRedefinedConstantError(ctx, errorLoc, symbol.name(ctx), symbol.kind(), prevSymbol);
     }
 
-    core::ClassOrModuleRef ensureIsClass(core::MutableContext ctx, core::SymbolRef scope, core::NameRef name,
-                                         core::LocOffsets loc) {
+    core::ClassOrModuleRef ensureScopeIsClass(core::MutableContext ctx, core::SymbolRef scope,
+                                              core::NameRef nameForErrors, core::LocOffsets loc) {
         // Common case: Everything is fine, user is trying to define a symbol on a class or module.
         if (scope.isClassOrModule()) {
-            // Check if original symbol was mangled away. If so, complain.
-            auto renamedSymbol = ctx.state.findRenamedSymbol(scope.asClassOrModuleRef().data(ctx)->owner, scope);
-            if (renamedSymbol.exists()) {
-                if (auto e = ctx.beginError(loc, core::errors::Namer::InvalidClassOwner)) {
-                    auto constLitName = name.show(ctx);
-                    auto scopeName = scope.show(ctx);
-                    e.setHeader("Can't nest `{}` under `{}` because `{}` is not a class or module", constLitName,
-                                scopeName, scopeName);
-                    e.addErrorLine(renamedSymbol.loc(ctx), "`{}` defined here", scopeName);
-                }
-            }
+            ENFORCE(!isMangleRenameUniqueName(ctx, scope.name(ctx)));
             return scope.asClassOrModuleRef();
         }
 
         // Check if class was already mangled.
         auto klassSymbol = ctx.state.lookupClassSymbol(scope.owner(ctx).asClassOrModuleRef(), scope.name(ctx));
         if (klassSymbol.exists()) {
+            ENFORCE(isMangleRenameUniqueName(ctx, klassSymbol.data(ctx)->name));
+            if (auto e = ctx.beginError(loc, core::errors::Namer::InvalidClassOwner)) {
+                auto constLitName = nameForErrors.show(ctx);
+                auto scopeName = scope.show(ctx);
+                e.setHeader("Can't nest `{}` under `{}` because `{}` is not a class or module", constLitName, scopeName,
+                            scopeName);
+                e.addErrorLine(klassSymbol.data(ctx)->loc(), "`{}` defined here", scopeName);
+            }
             return klassSymbol;
         }
 
         if (auto e = ctx.beginError(loc, core::errors::Namer::InvalidClassOwner)) {
-            auto constLitName = name.show(ctx);
+            auto constLitName = nameForErrors.show(ctx);
             auto newOwnerName = scope.show(ctx);
             e.setHeader("Can't nest `{}` under `{}` because `{}` is not a class or module", constLitName, newOwnerName,
                         newOwnerName);
             e.addErrorLine(scope.loc(ctx), "`{}` defined here", newOwnerName);
         }
-        // Mangle this one out of the way, and re-enter a symbol with this name as a class.
-        auto scopeName = scope.name(ctx);
-        ctx.state.mangleRenameSymbol(scope, scopeName);
-        auto scopeKlass = ctx.state.enterClassSymbol(ctx.locAt(loc), scope.owner(ctx).asClassOrModuleRef(), scopeName);
+        auto scopeOwner = scope.owner(ctx).asClassOrModuleRef();
+        auto scopeName = ctx.state.nextMangledName(scopeOwner, scope.name(ctx));
+        auto scopeKlass = ctx.state.enterClassSymbol(ctx.locAt(loc), scopeOwner, scopeName);
         scopeKlass.data(ctx)->singletonClass(ctx); // force singleton class into existance
         return scopeKlass;
     }
@@ -768,7 +770,7 @@ private:
             return ctx.owner.enclosingClass(ctx).data(ctx)->singletonClass(ctx);
         }
 
-        auto scope = ensureIsClass(ctx, ctx.owner, name, loc);
+        auto scope = ensureScopeIsClass(ctx, ctx.owner, name, loc);
         core::SymbolRef existing = scope.data(ctx)->findMember(ctx, name);
         if (!existing.exists()) {
             existing = ctx.state.enterClassSymbol(ctx.locAt(loc), scope, name);
@@ -982,7 +984,7 @@ private:
                 // existing one and create a new one
                 if (!isIntrinsic(sym.data(ctx))) {
                     paramMismatchErrors(ctx.withOwner(sym), declLoc, parsedArgs);
-                    ctx.state.mangleRenameSymbol(sym, method.name);
+                    ctx.state.mangleRenameMethod(sym, method.name);
                     // Re-enter a new symbol.
                     sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name, ctx.locAt(method.nameLoc));
                 } else {
@@ -993,7 +995,7 @@ private:
             } else {
                 // if the symbol does exist, then we're running in incremental mode, and we need to compare it to
                 // the previously defined equivalent to re-report any errors
-                auto replacedSym = ctx.state.findRenamedSymbol(owner, matchingSym);
+                auto replacedSym = ctx.state.findRenamedSymbol(owner, matchingSym); // OK, this is a method
                 if (replacedSym.exists() && !paramsMatch(ctx, replacedSym.asMethodRef(), parsedArgs) &&
                     !isIntrinsic(replacedSym.asMethodRef().data(ctx))) {
                     paramMismatchErrors(ctx.withOwner(replacedSym), declLoc, parsedArgs);
@@ -1093,21 +1095,21 @@ private:
     core::ClassOrModuleRef getClassSymbol(core::MutableContext ctx, const core::FoundClass &klass) {
         core::SymbolRef symbol = squashNames(ctx, klass.klass, ctx.owner.enclosingClass(ctx));
         ENFORCE(symbol.exists());
+        auto owner = symbol.owner(ctx).asClassOrModuleRef();
 
         const bool isModule = klass.classKind == ast::ClassDef::Kind::Module;
         auto declLoc = ctx.locAt(klass.declLoc);
         if (!symbol.isClassOrModule()) {
             // we might have already mangled the class symbol, so see if we have a symbol that is a class already
-            auto klassSymbol = ctx.state.lookupClassSymbol(symbol.owner(ctx).asClassOrModuleRef(), symbol.name(ctx));
+            auto klassSymbol = ctx.state.lookupClassSymbol(owner, symbol.name(ctx));
             if (klassSymbol.exists()) {
                 return klassSymbol;
             }
 
             emitRedefinedConstantError(ctx, klass.loc, symbol.name(ctx), core::SymbolRef::Kind::ClassOrModule, symbol);
 
-            auto origName = symbol.name(ctx);
-            ctx.state.mangleRenameSymbol(symbol, symbol.name(ctx));
-            klassSymbol = ctx.state.enterClassSymbol(declLoc, symbol.owner(ctx).asClassOrModuleRef(), origName);
+            auto name = ctx.state.nextMangledName(owner, symbol.name(ctx));
+            klassSymbol = ctx.state.enterClassSymbol(declLoc, owner, name);
             klassSymbol.data(ctx)->setIsModule(isModule);
 
             auto oldSymCount = ctx.state.classAndModulesUsed();
@@ -1131,8 +1133,10 @@ private:
             }
         } else {
             klassSymbol.data(ctx)->setIsModule(isModule);
-            auto renamed = ctx.state.findRenamedSymbol(klassSymbol.data(ctx)->owner, symbol);
-            if (renamed.exists()) {
+            auto name = klassSymbol.data(ctx)->name;
+            if (isMangleRenameUniqueName(ctx, name)) {
+                // TODO(jez) is `symbol.name(ctx)` the correct name to look up with?
+                auto renamed = ctx.state.lookupSymbol(owner, symbol.name(ctx));
                 emitRedefinedConstantError(ctx, klass.loc, symbol, renamed);
             }
         }
@@ -1256,23 +1260,24 @@ private:
     core::FieldRef insertStaticField(core::MutableContext ctx, const core::FoundStaticField &staticField) {
         ENFORCE(ctx.owner.isClassOrModule());
 
-        auto scope = ensureIsClass(ctx, squashNames(ctx, staticField.scopeClass, contextClass(ctx, ctx.owner)),
-                                   staticField.name, staticField.asgnLoc);
-        auto sym = ctx.state.lookupStaticFieldSymbol(scope, staticField.name);
-        auto currSym = ctx.state.lookupSymbol(scope, staticField.name);
+        auto scope = ensureScopeIsClass(ctx, squashNames(ctx, staticField.scopeClass, contextClass(ctx, ctx.owner)),
+                                        staticField.name, staticField.asgnLoc);
+        auto name = staticField.name;
+        auto sym = ctx.state.lookupStaticFieldSymbol(scope, name);
+        auto currSym = ctx.state.lookupSymbol(scope, name);
         if (!sym.exists() && currSym.exists()) {
-            emitRedefinedConstantError(ctx, staticField.asgnLoc, staticField.name,
-                                       core::SymbolRef::Kind::FieldOrStaticField, currSym);
-            ctx.state.mangleRenameSymbol(currSym, currSym.name(ctx));
+            emitRedefinedConstantError(ctx, staticField.asgnLoc, name, core::SymbolRef::Kind::FieldOrStaticField,
+                                       currSym);
+            name = ctx.state.nextMangledName(scope, name);
         }
         if (sym.exists()) {
             ENFORCE(currSym.exists());
-            auto renamedSym = ctx.state.findRenamedSymbol(scope, sym);
-            if (renamedSym.exists()) {
-                emitRedefinedConstantError(ctx, staticField.asgnLoc, sym, renamedSym);
+            name = sym.data(ctx)->name;
+            if (isMangleRenameUniqueName(ctx, name)) {
+                ENFORCE(currSym != sym);
+                emitRedefinedConstantError(ctx, staticField.asgnLoc, sym, currSym);
             }
         }
-        auto name = sym.exists() ? sym.data(ctx)->name : staticField.name;
         sym = ctx.state.enterStaticFieldSymbol(ctx.locAt(staticField.lhsLoc), scope, name);
         // Reset resultType to nullptr for idempotency on the fast path--it will always be
         // re-entered in resolver.
@@ -1336,8 +1341,9 @@ private:
             // otherwise, we're looking at a type member defined in this class in the same file, which means all we
             // need to do is find out whether there was a redefinition the first time, and in that case display the
             // same error
-            auto oldSym = ctx.state.findRenamedSymbol(onSymbol, existingTypeMember);
-            if (oldSym.exists()) {
+            auto name = existingTypeMember.data(ctx)->name;
+            if (isMangleRenameUniqueName(ctx, name)) {
+                auto oldSym = ctx.state.lookupSymbol(onSymbol, typeMember.name);
                 emitRedefinedConstantError(ctx, typeMember.nameLoc, existingTypeMember, oldSym);
             }
             // if we have more than one type member with the same name, then we have messed up somewhere
@@ -1349,31 +1355,34 @@ private:
             }
             sym = existingTypeMember;
         } else {
-            auto oldSym = onSymbol.data(ctx)->findMemberNoDealias(ctx, typeMember.name);
+            auto name = typeMember.name;
+            auto oldSym = onSymbol.data(ctx)->findMemberNoDealias(ctx, name);
             if (oldSym.exists()) {
                 emitRedefinedConstantError(ctx, typeMember.nameLoc, oldSym.name(ctx), core::SymbolRef::Kind::TypeMember,
                                            oldSym);
-                ctx.state.mangleRenameSymbol(oldSym, oldSym.name(ctx));
+                name = ctx.state.nextMangledName(onSymbol, name);
             }
-            sym = ctx.state.enterTypeMember(ctx.locAt(typeMember.asgnLoc), onSymbol, typeMember.name, variance);
+            sym = ctx.state.enterTypeMember(ctx.locAt(typeMember.asgnLoc), onSymbol, name, variance);
 
             // The todo bounds will be fixed by the resolver in ResolveTypeParamsWalk.
             auto todo = core::make_type<core::ClassType>(core::Symbols::todo());
             sym.data(ctx)->resultType = core::make_type<core::LambdaParam>(sym, todo, todo);
 
             if (isTypeTemplate) {
+                auto typeTemplateAliasName = typeMember.name;
                 auto context = ctx.owner.enclosingClass(ctx);
-                oldSym = context.data(ctx)->findMemberNoDealias(ctx, typeMember.name);
+                auto oldSym = context.data(ctx)->findMemberNoDealias(ctx, typeTemplateAliasName);
                 if (oldSym.exists() &&
                     !(oldSym.loc(ctx) == ctx.locAt(typeMember.asgnLoc) || oldSym.loc(ctx).isTombStoned(ctx))) {
-                    emitRedefinedConstantError(ctx, typeMember.nameLoc, typeMember.name,
-                                               core::SymbolRef::Kind::TypeMember, oldSym);
-                    ctx.state.mangleRenameSymbol(oldSym, typeMember.name);
+                    emitRedefinedConstantError(ctx, typeMember.nameLoc, name, core::SymbolRef::Kind::TypeMember,
+                                               oldSym);
+                    typeTemplateAliasName = ctx.state.nextMangledName(context, typeTemplateAliasName);
                 }
                 // This static field with an AliasType is how we get `MyTypeTemplate` to resolve,
                 // because resolver does not usually look on the singleton class to resolve constant
                 // literals, but type_template's are only ever entered on the singleton class.
-                auto alias = ctx.state.enterStaticFieldSymbol(ctx.locAt(typeMember.asgnLoc), context, typeMember.name);
+                auto alias =
+                    ctx.state.enterStaticFieldSymbol(ctx.locAt(typeMember.asgnLoc), context, typeTemplateAliasName);
                 alias.data(ctx)->resultType = core::make_type<core::AliasType>(core::SymbolRef(sym));
             }
         }
@@ -1594,8 +1603,6 @@ using ClassBehaviorLocsMap = UnorderedMap<core::ClassOrModuleRef, BehaviorLocs>;
 class TreeSymbolizer {
     friend class Namer;
 
-    bool bestEffort;
-
     core::SymbolRef squashNamesInner(core::Context ctx, core::SymbolRef owner, ast::ExpressionPtr &node,
                                      bool firstName) {
         auto constLit = ast::cast_tree<ast::UnresolvedConstantLit>(node);
@@ -1625,10 +1632,7 @@ class TreeSymbolizer {
 
         const bool firstNameRecursive = false;
         auto newOwner = squashNamesInner(ctx, owner, constLit->scope, firstNameRecursive);
-        if (!newOwner.exists()) {
-            ENFORCE(this->bestEffort);
-            return core::Symbols::noSymbol();
-        }
+        ENFORCE(newOwner.exists());
 
         core::SymbolRef existing = ctx.state.lookupClassSymbol(newOwner.asClassOrModuleRef(), constLit->cnst);
         if (firstName && !existing.exists() && newOwner.isClassOrModule()) {
@@ -1638,24 +1642,16 @@ class TreeSymbolizer {
             }
         }
 
-        // NameInserter should have created this symbol, unless we're running in bestEffort mode (stale GlobalState).
-        if (!existing.exists()) {
-            ENFORCE(this->bestEffort);
-            return core::Symbols::noSymbol();
-        }
+        // NameInserter should have created this symbol
+        ENFORCE(existing.exists());
 
         node = ast::make_expression<ast::ConstantLit>(constLit->loc, existing, std::move(node));
         return existing;
     }
 
-    optional<core::SymbolRef> squashNames(core::Context ctx, core::SymbolRef owner, ast::ExpressionPtr &node) {
+    core::SymbolRef squashNames(core::Context ctx, core::SymbolRef owner, ast::ExpressionPtr &node) {
         const bool firstName = true;
-        auto result = squashNamesInner(ctx, owner, node, firstName);
-
-        // Explicitly convert to optional (unlike what we usually do with SymbolRef's), because
-        // the bestEffort mode is subtle, and can easily break invariants that old code used to
-        // assume, so hopefully the type system catches them more easily.
-        return result.exists() ? make_optional<core::SymbolRef>(result) : nullopt;
+        return squashNamesInner(ctx, owner, node, firstName);
     }
 
     ast::ExpressionPtr arg2Symbol(int pos, const core::ParsedArg &parsedArg, ast::ExpressionPtr arg) {
@@ -1733,7 +1729,7 @@ class TreeSymbolizer {
     }
 
 public:
-    TreeSymbolizer(bool bestEffort) : bestEffort(bestEffort) {}
+    TreeSymbolizer() {}
 
     void preTransformClassDef(core::Context ctx, ast::ExpressionPtr &tree) {
         auto &klass = ast::cast_tree_nonnull<ast::ClassDef>(tree);
@@ -1748,16 +1744,8 @@ public:
             auto symbol = klass.symbol;
             if (symbol == core::Symbols::todo()) {
                 auto squashedSymbol = squashNames(ctx, ctx.owner.enclosingClass(ctx), klass.name);
-                if (squashedSymbol.has_value()) {
-                    klass.symbol = squashedSymbol.value().asClassOrModuleRef();
-                } else {
-                    ENFORCE(this->bestEffort);
-                    // In bestEffort mode, we allow symbols to not exist because we attempted to run
-                    // only the non-mutating namer passes (e.g., no SymbolDefiner). We'll delete
-                    // this whole node once we get to postTransformClassDef, but in the mean time
-                    // delete the RHS so we get there faster.
-                    klass.rhs.clear();
-                }
+                ENFORCE(squashedSymbol.exists());
+                klass.symbol = squashedSymbol.asClassOrModuleRef();
             } else {
                 // Desugar populates a top-level root() ClassDef.
                 // Nothing else should have been typeAlias by now.
@@ -1782,28 +1770,15 @@ public:
     void postTransformClassDef(core::Context ctx, ast::ExpressionPtr &tree) {
         auto &klass = ast::cast_tree_nonnull<ast::ClassDef>(tree);
 
-        if (klass.symbol == core::Symbols::todo()) {
-            ENFORCE(this->bestEffort);
-            // bestEffort mode runs with a constant GlobalState and does not first run SymbolDefiner
-            // (useful for serving LSP queries quickly on stale data). This class wasn't given a
-            // symbol in preTransformClassDef. Now that we're in postTransformClassDef, we're
-            // allowed to return something that's not a ClassDef node, which we can use to delete
-            // the tree.
-            tree = ast::MK::EmptyTree();
-            return;
-        }
+        ENFORCE(klass.symbol != core::Symbols::todo());
 
         // NameDefiner should have forced this class's singleton class into existence.
         ENFORCE(klass.symbol.data(ctx)->lookupSingletonClass(ctx).exists());
 
+        // This is an invariant that namer must introduce (all ClassDef's have `<static-init>` methods).
+        // ENFORCE'ing it here makes certain errors apparent earlier.
         auto allowMissing = true;
-        if (!ctx.state.lookupStaticInitForClass(klass.symbol, allowMissing).exists()) {
-            ENFORCE(this->bestEffort);
-            // Even though we found a symbol for this, we don't have a <static-init> for it, which is
-            // an invariant that namer must introduce (all ClassDef's have `<static-init>` methods).
-            tree = ast::MK::EmptyTree();
-            return;
-        }
+        ENFORCE(ctx.state.lookupStaticInitForClass(klass.symbol, allowMissing).exists());
 
         for (auto &exp : klass.rhs) {
             addAncestor(ctx, klass, exp);
@@ -1867,24 +1842,14 @@ public:
         auto owner = methodOwner(ctx, ctx.owner, method.flags.isSelfMethod);
         auto parsedArgs = ast::ArgParsing::parseArgs(method.args);
         auto sym = ctx.state.lookupMethodSymbolWithHash(owner, method.name, ast::ArgParsing::hashArgs(ctx, parsedArgs));
-        if (!sym.exists()) {
-            ENFORCE(this->bestEffort);
-            // We're going to delete this tree when we get to the postTransformMethodDef.
-            // Drop the RHS to make it get there faster.
-            method.rhs = ast::MK::EmptyTree();
-            return;
-        }
+        ENFORCE(sym.exists());
         method.symbol = sym;
         method.args = fillInArgs(move(parsedArgs), std::move(method.args));
     }
 
     void postTransformMethodDef(core::Context ctx, ast::ExpressionPtr &tree) {
         auto &method = ast::cast_tree_nonnull<ast::MethodDef>(tree);
-        if (method.symbol == core::Symbols::todoMethod() && this->bestEffort) {
-            // See the similar code in postTransformClassDef for an explanation.
-            tree = ast::MK::EmptyTree();
-            return;
-        }
+        ENFORCE(method.symbol != core::Symbols::todoMethod());
 
         ENFORCE(method.args.size() == method.symbol.data(ctx)->arguments.size(), "{}: {} != {}",
                 method.name.showRaw(ctx), method.args.size(), method.symbol.data(ctx)->arguments.size());
@@ -1894,15 +1859,8 @@ public:
         auto &asgn = ast::cast_tree_nonnull<ast::Assign>(tree);
         auto &lhs = ast::cast_tree_nonnull<ast::UnresolvedConstantLit>(asgn.lhs);
 
-        auto maybeMaybeScope = squashNames(ctx, contextClass(ctx, ctx.owner), lhs.scope);
-        if (!maybeMaybeScope.has_value()) {
-            ENFORCE(this->bestEffort);
-            // SymbolDefiner will define a name that squashNames will find in all cases except when
-            // we're running in non-mutating mode (LSP) and thus couldn't define new symbols.
-            // In that case, just delete this assignment.
-            return ast::MK::EmptyTree();
-        }
-        auto maybeScope = maybeMaybeScope.value();
+        auto maybeScope = squashNames(ctx, contextClass(ctx, ctx.owner), lhs.scope);
+        ENFORCE(maybeScope.exists());
 
         if (!maybeScope.isClassOrModule()) {
             auto scopeName = maybeScope.name(ctx);
@@ -1911,10 +1869,7 @@ public:
         auto scope = maybeScope.asClassOrModuleRef();
 
         core::SymbolRef cnst = ctx.state.lookupStaticFieldSymbol(scope, lhs.cnst);
-        if (!cnst.exists()) {
-            ENFORCE(this->bestEffort);
-            return ast::MK::EmptyTree();
-        }
+        ENFORCE(cnst.exists());
         auto loc = lhs.loc;
         asgn.lhs = ast::make_expression<ast::ConstantLit>(loc, cnst, std::move(asgn.lhs));
 
@@ -2006,15 +1961,9 @@ public:
         bool isTypeTemplate = send->fun == core::Names::typeTemplate();
         auto onSymbol =
             isTypeTemplate ? ctx.owner.asClassOrModuleRef().data(ctx)->lookupSingletonClass(ctx) : ctx.owner;
-        if (!onSymbol.exists()) {
-            ENFORCE(this->bestEffort);
-            return ast::MK::EmptyTree();
-        }
+        ENFORCE(onSymbol.exists());
         core::SymbolRef sym = ctx.state.lookupTypeMemberSymbol(onSymbol.asClassOrModuleRef(), typeName->cnst);
-        if (!sym.exists()) {
-            ENFORCE(this->bestEffort);
-            return ast::MK::EmptyTree();
-        }
+        ENFORCE(sym.exists());
 
         // Simulates how squashNames in handleAssignment also creates a ConstantLit
         // (simpler than squashNames, because type members are not allowed to use any sort of
@@ -2210,12 +2159,16 @@ void populateFoundDefHashes(core::Context ctx, core::FoundDefinitions &foundDefs
     foundHashesOut.fieldHashes.reserve(foundDefs.fields().size());
     for (const auto &method : foundDefs.methods()) {
         auto owner = method.owner;
+        ENFORCE(owner.kind() == core::FoundDefinitionRef::Kind::Class, "kind={}",
+                core::FoundDefinitionRef::kindToString(owner.kind()));
         auto fullNameHash = core::FullNameHash(ctx, method.name);
         foundHashesOut.methodHashes.emplace_back(owner.idx(), method.flags.isSelfMethod, fullNameHash,
                                                  method.arityHash);
     }
     for (const auto &field : foundDefs.fields()) {
         auto owner = field.owner;
+        ENFORCE(owner.kind() == core::FoundDefinitionRef::Kind::Class, "kind={}",
+                core::FoundDefinitionRef::kindToString(owner.kind()));
         auto fullNameHash = core::FullNameHash(ctx, field.name);
         foundHashesOut.fieldHashes.emplace_back(owner.idx(), field.onSingletonClass,
                                                 field.kind == core::FoundField::Kind::InstanceVariable,
@@ -2341,8 +2294,8 @@ void findConflictingClassDefs(const core::GlobalState &gs, ClassBehaviorLocsMap 
     }
 }
 
-vector<ast::ParsedFile> symbolizeTrees(const core::GlobalState &gs, vector<ast::ParsedFile> trees, WorkerPool &workers,
-                                       bool bestEffort) {
+vector<ast::ParsedFile> symbolizeTrees(const core::GlobalState &gs, vector<ast::ParsedFile> trees,
+                                       WorkerPool &workers) {
     Timer timeit(gs.tracer(), "naming.symbolizeTrees");
     auto resultq = make_shared<BlockingBoundedQueue<SymbolizeTreesResult>>(trees.size());
     auto fileq = make_shared<ConcurrentBoundedQueue<ast::ParsedFile>>(trees.size());
@@ -2350,9 +2303,9 @@ vector<ast::ParsedFile> symbolizeTrees(const core::GlobalState &gs, vector<ast::
         fileq->push(move(tree), 1);
     }
 
-    workers.multiplexJob("symbolizeTrees", [&gs, fileq, resultq, bestEffort]() {
+    workers.multiplexJob("symbolizeTrees", [&gs, fileq, resultq]() {
         Timer timeit(gs.tracer(), "naming.symbolizeTreesWorker");
-        TreeSymbolizer inserter(bestEffort);
+        TreeSymbolizer inserter;
         SymbolizeTreesResult output;
         ast::ParsedFile job;
         for (auto result = fileq->try_pop(job); !result.done(); result = fileq->try_pop(job)) {
@@ -2390,22 +2343,6 @@ vector<ast::ParsedFile> symbolizeTrees(const core::GlobalState &gs, vector<ast::
 
 } // namespace
 
-// Designed to be "run as much of namer as is possible with a const GlobalState".
-//
-// The whole point of `defineSymbols` is to mutate GlobalState, so it clearly makes no sense to run.
-// And the whole point of `findSymbols` is to create the FoundDefinition vector that feeds into
-// defineSymbols, so that becomes not useful to run either.
-//
-// That leaves just symbolizeTrees.
-//
-// The "best effort" indicates that this is currently only used for the sake of serving LSP requests
-// with a potentially-stale GlobalState.
-ast::ParsedFilesOrCancelled Namer::symbolizeTreesBestEffort(const core::GlobalState &gs, vector<ast::ParsedFile> trees,
-                                                            WorkerPool &workers) {
-    auto bestEffort = true;
-    return symbolizeTrees(gs, move(trees), workers, bestEffort);
-}
-
 ast::ParsedFilesOrCancelled
 Namer::runInternal(core::GlobalState &gs, vector<ast::ParsedFile> trees, WorkerPool &workers,
                    UnorderedMap<core::FileRef, core::FoundDefHashes> &&oldFoundHashesForFiles,
@@ -2426,8 +2363,7 @@ Namer::runInternal(core::GlobalState &gs, vector<ast::ParsedFile> trees, WorkerP
     if (!result.hasResult()) {
         return result;
     }
-    auto bestEffort = false;
-    trees = symbolizeTrees(gs, move(result.result()), workers, bestEffort);
+    trees = symbolizeTrees(gs, move(result.result()), workers);
     return trees;
 }
 

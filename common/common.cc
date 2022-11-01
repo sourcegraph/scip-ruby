@@ -46,11 +46,11 @@ string sorbet::FileOps::read(string_view filename) {
         fclose(fp);
         if (readBytes != contents.size()) {
             // Error reading file?
-            throw sorbet::FileNotFoundException();
+            throw sorbet::FileNotFoundException(fmt::format("Error reading file: `{}`: {}", filename, errno));
         }
         return contents;
     }
-    throw sorbet::FileNotFoundException();
+    throw sorbet::FileNotFoundException(fmt::format("Cannot open file `{}`", filename));
 }
 
 void sorbet::FileOps::write(string_view filename, const vector<uint8_t> &data) {
@@ -60,7 +60,7 @@ void sorbet::FileOps::write(string_view filename, const vector<uint8_t> &data) {
         fclose(fp);
         return;
     }
-    throw sorbet::FileNotFoundException();
+    throw sorbet::FileNotFoundException(fmt::format("Cannot open file `{}` for writing", filename));
 }
 
 bool sorbet::FileOps::dirExists(string_view path) {
@@ -115,7 +115,7 @@ void sorbet::FileOps::write(string_view filename, string_view text) {
         fclose(fp);
         return;
     }
-    throw sorbet::FileNotFoundException();
+    throw sorbet::FileNotFoundException(fmt::format("Cannot open file `{}` for writing", filename));
 }
 
 bool sorbet::FileOps::writeIfDifferent(string_view filename, string_view text) {
@@ -133,7 +133,7 @@ void sorbet::FileOps::append(string_view filename, string_view text) {
         fclose(fp);
         return;
     }
-    throw sorbet::FileNotFoundException();
+    throw sorbet::FileNotFoundException(fmt::format("Cannot open file `{}` for writing", filename));
 }
 
 string_view sorbet::FileOps::getFileName(string_view path) {
@@ -268,28 +268,42 @@ void appendFilesInDir(string_view basePath, const string &path, const sorbet::Un
                 throw sorbet::FileNotDirException();
             default:
                 // Mirrors other FileOps functions: Assume other errors are from FileNotFound.
-                throw sorbet::FileNotFoundException();
+                throw sorbet::FileNotFoundException(fmt::format("Couldn't open directory `{}`", path));
         }
     }
 
     while ((entry = readdir(dir)) != nullptr) {
-        auto fullPath = fmt::format("{}/{}", path, entry->d_name);
-        if (sorbet::FileOps::isFileIgnored(basePath, fullPath, absoluteIgnorePatterns, relativeIgnorePatterns)) {
-            continue;
-        } else if (entry->d_type == DT_DIR) {
-            if (!recursive || strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+        const auto namelen = strlen(entry->d_name);
+        string_view nameview{entry->d_name, namelen};
+        if (entry->d_type == DT_DIR) {
+            if (!recursive) {
                 continue;
             }
+            if (nameview == "."sv || nameview == ".."sv) {
+                continue;
+            }
+        } else {
+            auto dotLocation = nameview.rfind('.');
+            if (dotLocation == string_view::npos) {
+                continue;
+            }
+
+            string_view ext = nameview.substr(dotLocation);
+            if (!extensions.contains(ext)) {
+                continue;
+            }
+        }
+
+        auto fullPath = fmt::format("{}/{}", path, nameview);
+        if (sorbet::FileOps::isFileIgnored(basePath, fullPath, absoluteIgnorePatterns, relativeIgnorePatterns)) {
+            continue;
+        }
+
+        if (entry->d_type == DT_DIR) {
             appendFilesInDir(basePath, fullPath, extensions, recursive, result, absoluteIgnorePatterns,
                              relativeIgnorePatterns);
         } else {
-            auto dotLocation = fullPath.rfind('.');
-            if (dotLocation != string::npos) {
-                string_view ext(fullPath.c_str() + dotLocation, fullPath.size() - dotLocation);
-                if (extensions.contains(ext)) {
-                    result.push_back(move(fullPath));
-                }
-            }
+            result.push_back(move(fullPath));
         }
     }
     closedir(dir);

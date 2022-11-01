@@ -115,6 +115,7 @@ struct AutoloaderConfig {
     std::string rootObject;
     std::vector<std::string> requireExcludes;
     std::vector<std::vector<std::string>> sameFileModules;
+    std::vector<std::vector<std::string>> pbalNamespaces;
     std::vector<std::string> stripPrefixes;
 
     std::vector<std::string> absoluteIgnorePatterns;
@@ -265,7 +266,6 @@ struct Options {
     bool lspDocumentSymbolEnabled = false;
     bool lspDocumentFormatRubyfmtEnabled = false;
     bool lspSignatureHelpEnabled = false;
-    bool lspStaleStateEnabled = false;
     bool lspExperimentalFastPathEnabled = false;
 
     // Experimental feature `requires_ancestor`
