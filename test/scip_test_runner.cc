@@ -43,18 +43,88 @@
 #include "payload/binary/binary.h"
 #include "resolver/resolver.h"
 #include "rewriter/rewriter.h"
+#include "scip_indexer/Debug.h"
 #include "scip_indexer/SCIPIndexer.h"
+#include "scip_indexer/SCIPSymbolRef.h"
+#include "test/helpers/MockFileSystem.h"
 #include "test/helpers/expectations.h"
 #include "test/helpers/position_assertions.h"
 
-// NOTE: This code in this file is largely copied from parser_test_runner.cc.
+namespace sorbet::scip_indexer {
+using namespace std;
 
+struct GemMetadataInferenceTestCase {
+    string fileName;
+    string content;
+    GemMetadata expectedMetadata;
+    std::vector<GemMetadataError> expectedErrors;
+
+    static GemMetadata makeMetadata(string name, string version) {
+        return GemMetadata(name, version);
+    }
+
+    GemMetadataInferenceTestCase(string fileName, GemMetadata metadata, std::vector<GemMetadataError> expectedErrors,
+                                 string content)
+        : fileName(fileName), content(content), expectedMetadata(metadata), expectedErrors(expectedErrors) {}
+};
+} // namespace sorbet::scip_indexer
+
+// NOTE: This code in this file is largely copied from parser_test_runner.cc.
 namespace sorbet::test {
 using namespace std;
 
 bool update;
 string inputFileOrDir;
 string outputFileOrDir;
+bool onlyRunUnitTests;
+
+TEST_CASE("GemMetadataInference") {
+    if (!onlyRunUnitTests) {
+        return;
+    }
+    using namespace scip_indexer;
+    auto metadata = [](auto &name, auto &version) { return GemMetadataInferenceTestCase::makeMetadata(name, version); };
+    auto emptyNameGem = GemMetadataInferenceTestCase::makeMetadata("", "0.1");
+    auto emptyVersionGem = GemMetadataInferenceTestCase::makeMetadata("sciptest", "");
+    auto bothEmptyGem = GemMetadataInferenceTestCase::makeMetadata("", "");
+    // TODO: Create a MockFilesystem here, add a file to that, and then test readFromConfig instead.
+    std::vector<GemMetadataInferenceTestCase> testCases{
+        GemMetadataInferenceTestCase("Gemfile.lock", metadata("sciptest", "0.2"), {}, R"(
+PATH
+  remote: .
+    specs:
+      sciptest (0.2)
+            )"),
+        GemMetadataInferenceTestCase("sciptest.gemspec", metadata("sciptest", "0.2"), {}, R"(
+  spec.name = "sciptest"
+  spec.version = "0.2"
+            )"),
+        // Check different fallback codepaths.
+        GemMetadataInferenceTestCase("Gemfile.lock", metadata("lolz", "latest"), {failedToParseGemfileLockWarning}, ""),
+        GemMetadataInferenceTestCase("sciptest.gemspec", metadata("sciptest", "0.1"),
+                                     {failedToParseNameFromGemspecWarning}, R"(
+  s.name = NOT_A_LITERAL_OOPS
+  s.version = "0.1"
+            )"),
+        GemMetadataInferenceTestCase("sciptest.gemspec", metadata("sciptest", "latest"),
+                                     {failedToParseVersionFromGemspecWarning}, R"(
+  s.name = "sciptest"
+  s.version = NOT_A_LITERAL_OOPS
+            )")};
+    for (auto &testCase : testCases) {
+        MockFileSystem fs("/lolz");
+        fs.writeFile(testCase.fileName, testCase.content);
+        auto [metadata, actualErrors] = GemMetadata::readFromConfig(fs);
+        UnorderedSet<GemMetadataError> actualErrorSet(actualErrors.begin(), actualErrors.end());
+        UnorderedSet<GemMetadataError> expectedErrorSet(testCase.expectedErrors.begin(), testCase.expectedErrors.end());
+        auto showError = [](const auto &err) -> string { return err.message + "\n"; };
+        ENFORCE(actualErrorSet == expectedErrorSet, "expected errors = {}\nobtained errors = {}\n",
+                showSet(expectedErrorSet, showError), showSet(actualErrorSet, showError));
+        ENFORCE(metadata == testCase.expectedMetadata, "\nexpected metadata = {}@{}\nobtained metadata = {}@{}\n",
+                testCase.expectedMetadata.name(), testCase.expectedMetadata.version(), metadata.name(),
+                metadata.version());
+    }
+}
 
 // Copied from pipeline_test_runner.cc
 class CFGCollectorAndTyper { // TODO(varun): Copy this over to scip_test_runner.cc
@@ -172,7 +242,7 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
     });
     auto formatSymbol = [](const std::string &symbol) -> string {
         // Strip out repeating information and placeholder names.
-        return absl::StrReplaceAll(symbol, {{"scip-ruby gem ", ""}, {"TODO TODO", "[..]"}});
+        return absl::StrReplaceAll(symbol, {{"scip-ruby gem ", ""}, {"placeholder_name placeholder_version", "[..]"}});
     };
     size_t occ_i = 0;
     std::ifstream input(document.relative_path());
@@ -369,11 +439,9 @@ void test_one_gem(Expectations &test, const TestSettings &settings) {
     cxxopts::Options options{"scip-ruby-snapshot-test"};
     scipProvider->injectOptions(options);
     std::vector<const char *> argv = {"scip-ruby-snapshot-test", "--index-file", indexFilePath.c_str()};
-    if (settings.gemMetadata.has_value()) {
-        argv.push_back("--gem-metadata");
-        ENFORCE(!settings.gemMetadata.value().empty());
-        argv.push_back(settings.gemMetadata.value().data());
-    }
+    auto metadata = settings.gemMetadata.value_or("placeholder_name@placeholder_version");
+    argv.push_back("--gem-metadata");
+    argv.push_back(metadata.c_str());
     argv.push_back(nullptr);
     auto parseResult = options.parse(argv.size() - 1, argv.data());
 
@@ -396,6 +464,10 @@ void test_one_gem(Expectations &test, const TestSettings &settings) {
 
         trees = move(namer::Namer::run(gs, move(trees), *workers, nullptr).result());
         trees = move(resolver::Resolver::run(gs, move(trees), *workers).result());
+
+        for (auto &extension : gs.semanticExtensions) {
+            extension->prepareForTypechecking(gs);
+        }
         for (auto &resolvedTree : trees) {
             sorbet::core::MutableContext ctx(gs, core::Symbols::root(), resolvedTree.file);
             resolvedTree = class_flatten::runOne(ctx, move(resolvedTree));
@@ -458,6 +530,9 @@ void test_one_gem(Expectations &test, const TestSettings &settings) {
 // (the directory layout, any expectations of ordering, how Sorbet is run)
 // before setting up testing infrastructure and explicit feature support.
 TEST_CASE("SCIPTest") {
+    if (onlyRunUnitTests) {
+        return;
+    }
     Expectations test = Expectations::getExpectations(inputFileOrDir);
 
     TestSettings settings;
@@ -506,6 +581,12 @@ int main(int argc, char *argv[]) {
         "update-snapshots", "should the snapshot files be overwritten if there are changes");
     auto res = options.parse(argc, argv);
     auto unmatched = res.unmatched();
+
+    if (unmatched.size() == 1 && unmatched.front() == "only_unit_tests") {
+        sorbet::test::onlyRunUnitTests = true;
+        doctest::Context context(argc, argv);
+        return context.run();
+    }
 
     if (unmatched.size() != 1) {
         std::fprintf(stderr, "error: runner expected single input file with .rb extension or folder");

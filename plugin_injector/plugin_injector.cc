@@ -186,6 +186,8 @@ public:
 
     virtual void run(core::MutableContext &ctx, ast::ClassDef *klass) const override{};
 
+    virtual void prepareForTypechecking(const core::GlobalState &gs) override{};
+
     virtual void typecheck(const core::GlobalState &gs, core::FileRef file, cfg::CFG &cfg,
                            ast::MethodDef &md) const override {
         if (!shouldCompile(gs, file)) {

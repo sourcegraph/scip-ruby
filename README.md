@@ -54,28 +54,20 @@ to download and install fetch `scip-ruby`.
 
 Run `scip-ruby` along with some information about your gem.
 
-<!-- TODO: Add support for defaulting. -->
-
 - If you have a `sorbet/config` file, that will be picked up
   automatically to determine which files to index.
     ```bash
-    # Uses the latest revision as the version - prefer this if you will index every commit
-    bundle exec scip-ruby --gem-metadata "my-gem-name@$(git rev-parse HEAD)"
-
-    # Uses the latest tag as the version - prefer this if you're only indexing specific tags
-    bundle exec scip-ruby --gem-metadata "my-gem-name@$(git describe --tags --abbrev=0)"
+    bundle exec scip-ruby
     ```
 - If you don't have a `sorbet/config` file, add an extra path argument
   to index all files in the project.
     ```bash
-    # Uses the latest revision as the version - prefer this if you will index every commit
-    bundle exec scip-ruby . --gem-metadata "my-gem-name@$(git rev-parse HEAD)"
-
-    # Uses the latest tag as the version - prefer this if you're only indexing specific tags
-    bundle exec scip-ruby . --gem-metadata "my-gem-name@$(git describe --tags --abbrev=0)"
+    bundle exec scip-ruby .
     ```
 
 These commands will output a SCIP index to `index.scip` (overridable via `--index-file`).
+The gem name and version will be inferred from config files (overridable via `--gem-metadata`).
+
 The SCIP index can be uploaded to a Sourcegraph instance
 using the [Sourcegraph CLI](https://github.com/sourcegraph/src-cli)'s
 [upload command](https://docs.sourcegraph.com/cli/references/code-intel/upload).
@@ -97,7 +89,7 @@ curl -L "https://github.com/sourcegraph/scip-ruby/releases/latest/download/scip-
 # If using in CI with 'set -e', make sure to wrap the
 # scip-ruby invocation in 'set +e' followed by 'set -e'
 # so that indexing failures are non-blocking.
-./scip-ruby --index-file index.scip --gem-metadata "my-gem-name@M.N.P"
+./scip-ruby
 ```
 
 The generated index can be uploaded to a Sourcegraph instance
