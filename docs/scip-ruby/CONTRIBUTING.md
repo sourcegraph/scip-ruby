@@ -147,7 +147,13 @@ scip-ruby myfile.rb --index-file index.scip
 
 ### Running tests
 
-Run snapshot tests, which are self-contained:
+There are currently 3 kinds of tests:
+- Snapshot tests: These cover indexer output.
+- Unit tests: These cover some internals which are not possible
+  to test via snapshots.
+- Repo/Integration tests: These try to index an OSS repo using scip-ruby.
+
+To run snapshot tests, which are self-contained:
 
 ```
 ./bazel test //test/scip --config=dbg
@@ -157,6 +163,12 @@ Updating snapshots:
 
 ```
 ./bazel test //test/scip:update --config=dbg
+```
+
+You can run unit tests using:
+
+```
+./bazel test //test/scip:unit_tests --config=dbg
 ```
 
 WARNING: Repo tests are kinda' broken right now; they're disabled
@@ -181,6 +193,11 @@ you add a new test, you should create matching `.snapshot.rb` files
 (which may be empty) for all new `.rb` files,
 since those are used as inputs to Bazel.
 If you know of a way to get rid of that annoyance, submit a PR.
+
+### Writing a new unit test
+
+See the existing unit tests in `scip_test_runner.cc`
+and follow the same structure.
 
 ### Writing a new repo test
 

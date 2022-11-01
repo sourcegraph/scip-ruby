@@ -1540,6 +1540,9 @@ void typecheck(const core::GlobalState &gs, vector<ast::ParsedFile> &&what, cons
 
         {
             ProgressIndicator cfgInferProgress(opts.showProgress, "CFG+Inference", what.size());
+            for (auto &extension : gs.semanticExtensions) {
+                extension->prepareForTypechecking(gs);
+            }
             workers.multiplexJob("typecheck", [&gs, &opts, epoch, &epochManager, &preemptionManager, &recordedErrors,
                                                fileq, outputq, cancelable, relevantPackages, checkRelevantPackages,
                                                intentionallyLeakASTs]() {

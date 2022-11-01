@@ -35,6 +35,8 @@ public:
     // NOTE: This does not create parent directories if they exist.
     static bool ensureDir(const std::string &path);
 
+    static std::string getCurrentDir();
+
     // NOTE: this is a minimal wrapper around rmdir, and as such will raise an exception if the directory is not empty
     // when it's removed.
     static void removeDir(const std::string &path);
