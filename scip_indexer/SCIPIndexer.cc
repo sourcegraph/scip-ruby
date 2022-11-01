@@ -35,6 +35,7 @@
 
 #include "scip_indexer/Debug.h"
 #include "scip_indexer/SCIPFieldResolve.h"
+#include "scip_indexer/SCIPGemMetadata.h"
 #include "scip_indexer/SCIPProtoExt.h"
 #include "scip_indexer/SCIPSymbolRef.h"
 #include "scip_indexer/SCIPUtils.h"
