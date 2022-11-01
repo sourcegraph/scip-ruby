@@ -573,12 +573,23 @@ not exist.
 > This error is specific to Stripe's custom `--stripe-packages` mode. If you are
 > at Stripe, please see [go/modularity](http://go/modularity) for more.
 
+### Import/export statements
+
 All `import` and `export` lines in a `__package.rb` file must have constant
 literals as their argument. Doing arbitrary computation of imports and exports
 is not allowed in `__package.rb` files.
 
 Also note that all `import` declarations must be unique, with no duplicated
 imports.
+
+### autoloader_compatibility declarations
+
+> See [go/pbal](http://go/pbal) for more details.
+
+`autoloader_compatibility` declarations must take a single String argument,
+specifically either `legacy` or `strict`. These declarations annotate a package
+as compatible for path-based autoloading and are used by our Ruby code loading
+pipeline.
 
 ## 3707
 
@@ -3858,6 +3869,33 @@ variables are annotated with a `T.let`.
 For how to fix, see [Type Annotations](type-annotations.md).
 
 See also: [5028](#5028), [6002](#6002), [7017](#7017), [7027](#7027).
+
+## 7044
+
+Sorbet has built-in support for the `dig` method on `Array` and `Hash`. In
+certain cases, Sorbet can detect that there have been too many arguments
+provided to a `dig` call. For example:
+
+```ruby
+arr = T::Array[NilClass].new
+arr.dig(0, 0)
+```
+
+This tries to get the 0<sup>th</sup> element of the 0<sup>th</sup> element of
+the array, if it exists.
+
+However, Sorbet can know that the 0<sup>th</sup> element of the first array is
+always `nil` if it exists, so the second 0<sup>th</sup> element will never be
+accessed, and is thus redundant.
+
+To fix this, either delete the redundant arguments, or use an
+[Escape Hatch](troubleshooting.md#escape-hatches) to hide the call to `dig` from
+Sorbet:
+
+```ruby
+arr = T::Array[NilClass].new
+T.unsafe(arr).dig(0, 0)
+```
 
 <!-- -->
 

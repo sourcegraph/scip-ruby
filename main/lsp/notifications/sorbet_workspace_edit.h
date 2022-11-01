@@ -2,6 +2,7 @@
 #define RUBY_TYPER_LSP_NOTIFICATIONS_SORBET_WORKSPACE_EDIT_H
 
 #include "absl/synchronization/notification.h"
+#include "main/lsp/LSPIndexer.h"
 #include "main/lsp/LSPTask.h"
 
 namespace sorbet::realmain::lsp {
@@ -14,7 +15,7 @@ class SorbetWorkspaceEditTask final : public LSPDangerousTypecheckerTask {
     std::unique_ptr<SorbetWorkspaceEditParams> params;
     // Caches the fast path decision for the provided update. Becomes invalidated when the update changes.
     mutable bool cachedFastPathDecisionValid = false;
-    mutable bool cachedFastPathDecision = false;
+    mutable PathType cachedFastPathDecision = PathType::Slow;
     // HACK: In the event that this edit is too large to index serially, stash the indexer here for use in `runSpecial`.
     LSPIndexer *indexer = nullptr;
 
@@ -30,12 +31,12 @@ public:
     void mergeNewer(SorbetWorkspaceEditTask &task);
     void preprocess(LSPPreprocessor &preprocess) override;
     void index(LSPIndexer &indexer) override;
-    void run(LSPTypecheckerInterface &typechecker) override;
+    void run(LSPTypecheckerDelegate &typechecker) override;
     void runSpecial(LSPTypechecker &typechecker, WorkerPool &workers) override;
     void schedulerWaitUntilReady() override;
 
     bool canPreempt(const LSPIndexer &index) const override;
-    bool canTakeFastPath(const LSPIndexer &index) const;
+    PathType getTypecheckingPath(const LSPIndexer &index) const;
     bool needsMultithreading(const LSPIndexer &index) const override;
 };
 

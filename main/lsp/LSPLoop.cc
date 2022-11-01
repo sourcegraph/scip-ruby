@@ -23,7 +23,6 @@
 #include "sorbet_version/sorbet_version.h"
 
 using namespace std;
-namespace spd = spdlog;
 
 namespace sorbet::realmain::lsp {
 
@@ -75,7 +74,7 @@ public:
         return false;
     }
 
-    void run(LSPTypecheckerInterface &tc) override {
+    void run(LSPTypecheckerDelegate &tc) override {
         count = tc.state().lspTypecheckCount;
     }
 };
@@ -107,7 +106,7 @@ CounterState mergeCounters(CounterState counters) {
     return getAndClearThreadCounters();
 }
 
-void tagNewRequest(spd::logger &logger, LSPMessage &msg) {
+void tagNewRequest(spdlog::logger &logger, LSPMessage &msg) {
     msg.latencyTimer = make_unique<Timer>(logger, "task_latency",
                                           initializer_list<int>{50, 100, 250, 500, 1000, 1500, 2000, 2500, 5000, 10000,
                                                                 15000, 20000, 25000, 30000, 35000, 40000});
@@ -233,7 +232,7 @@ void LSPLoop::runTask(unique_ptr<LSPTask> task) {
         if (auto *editTask = dynamic_cast<SorbetWorkspaceEditTask *>(dangerousTask)) {
             unique_ptr<SorbetWorkspaceEditTask> edit(editTask);
             (void)task.release();
-            if (edit->canTakeFastPath(indexer)) {
+            if (edit->getTypecheckingPath(indexer) == PathType::Fast) {
                 // Can run on fast path synchronously; it should complete quickly.
                 typecheckerCoord.syncRun(move(edit));
             } else {
@@ -346,54 +345,10 @@ optional<unique_ptr<core::GlobalState>> LSPLoop::runLSP(shared_ptr<LSPInput> inp
                 }
 
                 // Before giving up the lock, check if the typechecker is running a slow path and if the task at the
-                // head of the queue can either operate on stale data (i.e., the GlobalState just prior to the change
-                // that required the slow path to run) or preempt the currently running slow path. (Note that we don't
-                // bother with either one in cases where we only need the indexer. TODO(aprocter): is that restriction
-                // actually appropriate for stale-data tasks?)
+                // head of the queue can preempt. If it is, we may be able to schedule a preemption.
+                // Don't bother scheduling tasks to preempt that only need the indexer.
+                // N.B.: We check `canPreempt` last as it is mildly expensive for edits (it hashes the files)
                 auto &frontTask = taskQueue->tasks().front();
-
-                // Note that running on stale data is an experimental feature, so we hide it behind the
-                // --enable-experimental-lsp-stale-state flag.
-                if (opts.lspStaleStateEnabled && frontTask->finalPhase() == LSPTask::Phase::RUN &&
-                    epochManager->getStatus().slowPathRunning && frontTask->canUseStaleData()) {
-                    logger->debug("Trying to run on stale data");
-
-                    frontTask = typecheckerCoord.syncRunOnStaleState(move(frontTask));
-
-                    // If the coordinator has consumed the task, we know it was able to run it on stale state. Pop it
-                    // and move on to the next task.
-                    if (frontTask == nullptr) {
-                        logger->debug("Succeeded in running on stale data");
-                        taskQueue->tasks().pop_front();
-                    }
-                    // If the coordinator has not consumed the task, that means it was not able to run it on stale
-                    // state, because no cancellationUndoState was present. There are (we think! see below) two
-                    // possibilities here:
-                    //
-                    //   1. by the time we acquired the cancellationUndoState lock, the typechecker had already
-                    //      finished the slow path and nulled out the cancellationUndoState; or
-                    //   2. (not sure if this case is actually possible!) we acquired the lock between the time
-                    //      slowPathRunning became true and the time that the typechecker actually initialized the
-                    //      cancellationUndoState.
-                    //
-                    // In case 1, we should be able to process the task as normal shortly, since slowPathRunning has
-                    // become (or is about to become) false.
-                    //
-                    // In case 2, we should be able to process the task on stale state once the typechecker initializes
-                    // cancellationUndoState.
-                    //
-                    // To handle both of these cases, we insert a short sleep before heading around for another turn of
-                    // the loop.
-                    //
-                    // TODO(aprocter): Investigate whether case 2 is actually possible, and consider if there's a
-                    // better way to handle all of this than sleep-and-retry.
-                    else {
-                        logger->debug("Failed to grab the stale state, will try again in 100ms");
-                        Timer::timedSleep(100ms, *logger, "stale_state.sleep");
-                    }
-
-                    continue;
-                }
 
                 // If the task can preempt, we may be able to schedule a preemption. Don't bother scheduling tasks to
                 // preempt that only need the indexer.

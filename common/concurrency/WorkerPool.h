@@ -1,9 +1,7 @@
 #ifndef SORBET_WORKERPOOL_H
 #define SORBET_WORKERPOOL_H
 
-#include "common/common.h"
 #include "spdlog/spdlog.h"
-namespace spd = spdlog;
 namespace sorbet {
 class WorkerPool {
 public:
@@ -14,7 +12,7 @@ public:
         return 20ms;
     }
     using Task = std::function<void()>;
-    static std::unique_ptr<WorkerPool> create(int size, spd::logger &logger);
+    static std::unique_ptr<WorkerPool> create(int size, spdlog::logger &logger);
     virtual void multiplexJob(std::string_view taskName, Task t) = 0;
     virtual ~WorkerPool() = 0;
     virtual int size() = 0;

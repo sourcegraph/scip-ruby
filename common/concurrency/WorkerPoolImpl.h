@@ -1,13 +1,11 @@
 #ifndef SORBET_WORKERPOOL_IMPL_H
 #define SORBET_WORKERPOOL_IMPL_H
 #include "blockingconcurrentqueue.h"
-#include "common/common.h"
 #include "common/concurrency/WorkerPool.h"
 #include "common/os/os.h"
 #include "spdlog/spdlog.h"
 #include <memory>
 #include <vector>
-namespace spd = spdlog;
 namespace sorbet {
 class WorkerPoolImpl : public WorkerPool {
     int _size;
@@ -81,12 +79,12 @@ class WorkerPoolImpl : public WorkerPool {
     // ORDER IS IMPORTANT. threads must be killed before Queues.
     std::vector<std::unique_ptr<Queue>> threadQueues;
     std::vector<std::unique_ptr<Joinable>> threads;
-    spd::logger &logger;
+    spdlog::logger &logger;
 
     void multiplexJob_(Task_ t);
 
 public:
-    WorkerPoolImpl(int size, spd::logger &logger);
+    WorkerPoolImpl(int size, spdlog::logger &logger);
     ~WorkerPoolImpl();
 
     void multiplexJob(std::string_view taskName, Task t) override;

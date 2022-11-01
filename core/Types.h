@@ -15,7 +15,6 @@
 #include <string>
 namespace sorbet::core {
 /** Dmitry: unlike in Dotty, those types are always dealiased. For now */
-class Type;
 class AppliedType;
 class IntrinsicMethod;
 class TypeConstraint;
@@ -113,6 +112,7 @@ public:
     static TypePtr rangeOfUntyped();
     static TypePtr hashOfUntyped();
     static TypePtr procClass();
+    static TypePtr nilableProcClass();
     static TypePtr classClass();
     static TypePtr declBuilderForProcsSingletonClass();
     static TypePtr falsyTypes();
@@ -669,6 +669,7 @@ private:
      * constructor, so the friend declaration doesn't work), we provide the
      * `make_shared` helper here.
      */
+    friend TypePtr Types::nilableProcClass();
     friend TypePtr Types::falsyTypes();
     friend TypePtr Types::Boolean();
     friend class NameSubstitution;

@@ -334,7 +334,6 @@ NameDef names[] = {
     {"classMethods", "class_methods"},
 
     {"blockTemp", "<block>"},
-    {"blockRetrunType", "<block-return-type>"},
     {"blockPreCallTemp", "<block-pre-call-temp>"},
     {"blockPassTemp", "<block-pass>"},
     {"forTemp"},
@@ -408,6 +407,7 @@ NameDef names[] = {
     {"max"},
     {"sum"},
     {"sample"},
+    {"at"},
 
     // Argument forwarding
     {"fwdArgs", "<fwd-args>"},
@@ -417,7 +417,8 @@ NameDef names[] = {
     // Enumerable#flat_map has special-case logic in Infer
     {"flatMap", "flat_map"},
 
-    // Array#flatten, #product, #compact and #zip are also custom-implemented
+    // Array#dig, Array#flatten, #product, #compact and #zip are also custom-implemented
+    {"dig"},
     {"flatten"},
     {"product"},
     {"compact"},
@@ -444,6 +445,9 @@ NameDef names[] = {
     {"test_import"},
     {"export_", "export"},
     {"restrict_to_service"},
+    {"autoloader_compatibility"},
+    {"legacy"},
+    {"strict"},
     {"PackageSpec", "PackageSpec", true},
     {"PackageSpecRegistry", "<PackageSpecRegistry>", true},
 
