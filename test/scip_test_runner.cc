@@ -44,8 +44,8 @@
 #include "resolver/resolver.h"
 #include "rewriter/rewriter.h"
 #include "scip_indexer/Debug.h"
+#include "scip_indexer/SCIPGemMetadata.h"
 #include "scip_indexer/SCIPIndexer.h"
-#include "scip_indexer/SCIPSymbolRef.h"
 #include "test/helpers/MockFileSystem.h"
 #include "test/helpers/expectations.h"
 #include "test/helpers/position_assertions.h"
@@ -58,10 +58,6 @@ struct GemMetadataInferenceTestCase {
     string content;
     GemMetadata expectedMetadata;
     std::vector<GemMetadataError> expectedErrors;
-
-    static GemMetadata makeMetadata(string name, string version) {
-        return GemMetadata(name, version);
-    }
 
     GemMetadataInferenceTestCase(string fileName, GemMetadata metadata, std::vector<GemMetadataError> expectedErrors,
                                  string content)
@@ -83,10 +79,7 @@ TEST_CASE("GemMetadataInference") {
         return;
     }
     using namespace scip_indexer;
-    auto metadata = [](auto &name, auto &version) { return GemMetadataInferenceTestCase::makeMetadata(name, version); };
-    auto emptyNameGem = GemMetadataInferenceTestCase::makeMetadata("", "0.1");
-    auto emptyVersionGem = GemMetadataInferenceTestCase::makeMetadata("sciptest", "");
-    auto bothEmptyGem = GemMetadataInferenceTestCase::makeMetadata("", "");
+    auto metadata = [](auto &name, auto &version) { return GemMetadata::forTest(name, version); };
     // TODO: Create a MockFilesystem here, add a file to that, and then test readFromConfig instead.
     std::vector<GemMetadataInferenceTestCase> testCases{
         GemMetadataInferenceTestCase("Gemfile.lock", metadata("sciptest", "0.2"), {}, R"(
