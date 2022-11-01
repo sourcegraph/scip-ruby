@@ -1285,7 +1285,9 @@ public:
     void injectOptions(cxxopts::Options &optsBuilder) const override {
         optsBuilder.add_options("indexer")("index-file", "Output SCIP index to a directory, which must already exist",
                                            cxxopts::value<string>())(
-            "gem-metadata", "Metadata in 'name@version' format to be used for cross-repository code navigation.",
+            "gem-metadata",
+            "Metadata in 'name@version' format to be used for cross-repository code navigation. For repositories which "
+            "index every commit, the SHA should be used for the version instead of a git tag (or equivalent).",
             cxxopts::value<string>());
     };
     unique_ptr<SemanticExtension> readOptions(cxxopts::ParseResult &providedOptions) const override {
