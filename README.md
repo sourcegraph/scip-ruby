@@ -62,7 +62,6 @@ Run `scip-ruby` along with some information about your gem.
 - If you don't have a `sorbet/config` file, add an extra path argument
   to index all files in the project.
     ```bash
-    # Uses the latest revision as the version - prefer this if you will index every commit
     bundle exec scip-ruby .
     ```
 
