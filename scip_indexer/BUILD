@@ -32,6 +32,8 @@ cc_library(
         "Debug.h",
         "SCIPFieldResolve.cc",
         "SCIPFieldResolve.h",
+        "SCIPGemMetadata.cc",
+        "SCIPGemMetadata.h",
         "SCIPIndexer.cc",
         "SCIPProtoExt.cc",
         "SCIPProtoExt.h",
