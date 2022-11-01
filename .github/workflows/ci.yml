@@ -41,6 +41,8 @@ jobs:
         with:
           name: ci-build-log
           path: log
+      - name: "🏋️‍♂️ Run unit tests"
+        run: rm log && ./bazel test //test/scip:unit_tests --config=dbg
       - name: "🏋️‍♂️ Run snapshot tests"
         run: rm log && ./bazel test //test/scip --config=dbg
       # Repo tests are kinda' broken right now because the bundle cache step needs synchronization
