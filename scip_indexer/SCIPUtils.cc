@@ -6,7 +6,7 @@
 
 #include "proto/SCIP.pb.h"
 
-namespace scip::utils {
+namespace sorbet::scip_indexer::utils {
 
 using namespace std;
 
@@ -111,4 +111,4 @@ absl::Status emitSymbolString(const scip::Symbol &symbol, string &out) {
     return absl::OkStatus();
 }
 
-}; // end namespace scip::utils
+}; // namespace sorbet::scip_indexer::utils

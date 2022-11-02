@@ -30,12 +30,13 @@
 #include "core/Loc.h"
 #include "core/SymbolRef.h"
 #include "core/Symbols.h"
-#include "main/pipeline/semantic_extension/SemanticExtension.h"
+#include "core/errors/scip_ruby.h"
 #include "sorbet_version/sorbet_version.h"
 
 #include "scip_indexer/Debug.h"
 #include "scip_indexer/SCIPFieldResolve.h"
 #include "scip_indexer/SCIPGemMetadata.h"
+#include "scip_indexer/SCIPIndexer.h"
 #include "scip_indexer/SCIPProtoExt.h"
 #include "scip_indexer/SCIPSymbolRef.h"
 #include "scip_indexer/SCIPUtils.h"
@@ -181,7 +182,7 @@ class SCIPState {
     //
     // FIXME(varun): This seems redundant, get rid of it.
 
-    GemMetadata gemMetadata;
+    GemMapping gemMap;
 
 public:
     UnorderedMap<core::FileRef, vector<scip::Occurrence>> occurrenceMap;
@@ -207,9 +208,9 @@ public:
     vector<scip::SymbolInformation> externalSymbols;
 
 public:
-    SCIPState(GemMetadata metadata)
+    SCIPState(GemMapping gemMap)
         : symbolStringCache(), localOccurrenceCache(), symbolOccurrenceCache(), potentialRefOnlySymbols(),
-          gemMetadata(metadata), occurrenceMap(), emittedSymbols(), symbolMap(), documents(), externalSymbols() {}
+          gemMap(gemMap), occurrenceMap(), emittedSymbols(), symbolMap(), documents(), externalSymbols() {}
     ~SCIPState() = default;
     SCIPState(SCIPState &&) = default;
     SCIPState &operator=(SCIPState &&other) = default;
@@ -224,8 +225,8 @@ public:
     /// If the returned value is as success, the pointer is non-null.
     ///
     /// The argument symbol is used instead of recomputing from scratch if it is non-null.
-    absl::Status saveSymbolString(const core::GlobalState &gs, UntypedGenericSymbolRef symRef,
-                                  const scip::Symbol *symbol, std::string &output) {
+    utils::Result saveSymbolString(const core::GlobalState &gs, UntypedGenericSymbolRef symRef,
+                                   const scip::Symbol *symbol, std::string &output) {
         auto pair = this->symbolStringCache.find(symRef);
         if (pair != this->symbolStringCache.end()) {
             // Yes, there is a "redundant" string copy here when we could "just"
@@ -233,26 +234,26 @@ public:
             // that creates a footgun where this method cannot be safely called
             // across invocations to non-const method calls on SCIPState.
             output = pair->second;
-            return absl::OkStatus();
+            return utils::Result::okValue();
         }
 
         absl::Status status;
         if (symbol) {
-            status = scip::utils::emitSymbolString(*symbol, output);
+            status = utils::emitSymbolString(*symbol, output);
         } else {
             scip::Symbol symbol;
-            status = symRef.symbolForExpr(gs, this->gemMetadata, {}, symbol);
-            if (!status.ok()) {
-                return status;
+            auto result = symRef.symbolForExpr(gs, this->gemMap, {}, symbol);
+            if (!result.ok()) {
+                return result;
             }
-            status = scip::utils::emitSymbolString(symbol, output);
+            status = utils::emitSymbolString(symbol, output);
         }
         if (!status.ok()) {
-            return status;
+            return utils::Result::statusValue(status);
         }
         symbolStringCache.insert({symRef, output});
 
-        return absl::OkStatus();
+        return utils::Result::okValue();
     }
 
 private:
@@ -372,7 +373,7 @@ private:
         untypedSymRef.saveRelationships(gs, this->relationshipsMap[file], rels,
                                         [this, &gs](UntypedGenericSymbolRef sym, std::string &out) {
                                             auto status = this->saveSymbolString(gs, sym, nullptr, out);
-                                            ENFORCE(status.ok());
+                                            ENFORCE(status.skip() || status.ok());
                                         });
     }
 
@@ -402,14 +403,18 @@ public:
         auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs);
         scip::Symbol symbol;
         auto untypedSymRef = symRef.withoutType();
-        auto status = untypedSymRef.symbolForExpr(gs, this->gemMetadata, occLoc, symbol);
-        if (!status.ok()) {
-            return status;
+        auto result = untypedSymRef.symbolForExpr(gs, this->gemMap, occLoc, symbol);
+        if (result.skip()) {
+            return absl::OkStatus();
+        }
+        if (!result.ok()) {
+            return result.status();
         }
         std::string symbolString;
-        status = this->saveSymbolString(gs, untypedSymRef, &symbol, symbolString);
-        if (!status.ok()) {
-            return status;
+        result = this->saveSymbolString(gs, untypedSymRef, &symbol, symbolString);
+        ENFORCE(!result.skip(), "Should've skipped earlier");
+        if (!result.ok()) {
+            return result.status();
         }
 
         SmallVec<string> docs;
@@ -454,9 +459,12 @@ public:
         auto &gs = ctx.state;
         auto file = ctx.file;
         std::string symbolString;
-        auto status = this->saveSymbolString(gs, symRef.withoutType(), nullptr, symbolString);
-        if (!status.ok()) {
-            return status;
+        auto result = this->saveSymbolString(gs, symRef.withoutType(), nullptr, symbolString);
+        if (result.skip()) {
+            return absl::OkStatus();
+        }
+        if (!result.ok()) {
+            return result.status();
         }
 
         SmallVec<string> overrideDocs{};
@@ -507,7 +515,14 @@ public:
         scip::Document document;
         // TODO(varun): Double-check the path code and maybe document it,
         // to make sure its guarantees match what SCIP expects.
-        document.set_relative_path(string(file.data(gs).path()));
+        ENFORCE(file.exists());
+        auto path = file.data(gs).path();
+        ENFORCE(!path.empty());
+        if (path.front() == '/') {
+            document.set_relative_path(filesystem::path(path).lexically_relative(filesystem::current_path()));
+        } else {
+            document.set_relative_path(string(path));
+        }
 
         auto occurrences = this->occurrenceMap.find(file);
         if (occurrences != this->occurrenceMap.end()) {
@@ -1114,18 +1129,37 @@ namespace sorbet::pipeline::semantic_extension {
 using LocalSymbolTable = UnorderedMap<core::LocalVariable, core::Loc>;
 
 class SCIPSemanticExtension : public SemanticExtension {
-public:
     string indexFilePath;
-    string gemMetadataString;
-    scip_indexer::GemMetadata gemMetadata;
+    scip_indexer::Config config;
+    scip_indexer::GemMapping gemMap;
 
     using SCIPState = sorbet::scip_indexer::SCIPState;
 
+public:
+    using StateMap = UnorderedMap<thread::id, shared_ptr<SCIPState>>;
+
+private:
     mutable struct {
-        UnorderedMap<thread::id, shared_ptr<SCIPState>> states;
+        StateMap states;
         absl::Mutex mtx;
     } mutableState;
 
+public:
+    SCIPSemanticExtension(string indexFilePath, scip_indexer::Config config, scip_indexer::GemMapping gemMap,
+                          StateMap states)
+        : indexFilePath(indexFilePath), config(config), gemMap(gemMap), mutableState{states, {}} {}
+
+    ~SCIPSemanticExtension() {}
+
+    virtual unique_ptr<SemanticExtension> deepCopy(const core::GlobalState &from, core::GlobalState &to) override {
+        // FIXME: Technically, this would copy the state too, but we haven't implemented
+        // deep-copying for it because it doesn't matter for scip-ruby.
+        StateMap map;
+        return make_unique<SCIPSemanticExtension>(this->indexFilePath, this->config, this->gemMap, map);
+    };
+    virtual void merge(const core::GlobalState &from, core::GlobalState &to, core::NameSubstitution &subst) override{};
+
+private:
     // Return a shared_ptr here as we need a stable address to avoid an invalid reference
     // on table resizing, and we need to maintain at least two pointers,
     // an "owning ref" from the table and a mutable borrow from the caller.
@@ -1141,7 +1175,7 @@ public:
 
             // We will move the state out later, so use a no-op deleter.
             return mutableState.states[this_thread::get_id()] =
-                       shared_ptr<SCIPState>(new SCIPState(gemMetadata), [](SCIPState *) {});
+                       shared_ptr<SCIPState>(new SCIPState(gemMap), [](SCIPState *) {});
         }
     }
 
@@ -1149,23 +1183,29 @@ public:
         return this->indexFilePath.empty();
     }
 
+public:
     void run(core::MutableContext &ctx, ast::ClassDef *cd) const override {}
 
     virtual void prepareForTypechecking(const core::GlobalState &gs) override {
-        auto maybeMetadata = scip_indexer::GemMetadata::tryParse(this->gemMetadataString);
+        auto maybeMetadata = scip_indexer::GemMetadata::tryParse(this->config.gemMetadata);
+        scip_indexer::GemMetadata currentGem;
         if (maybeMetadata.has_value()) {
-            this->gemMetadata = maybeMetadata.value();
+            currentGem = maybeMetadata.value();
         } // TODO: Issue error for incorrect format in string...
-        if (this->gemMetadata.name().empty() || this->gemMetadata.version().empty()) {
-            auto [metadata, errors] = scip_indexer::GemMetadata::readFromConfig(OSFileSystem());
-            this->gemMetadata = metadata;
+        if (currentGem.name().empty() || currentGem.version().empty()) {
+            auto [gem, errors] = scip_indexer::GemMetadata::readFromConfig(OSFileSystem());
+            currentGem = gem;
             for (auto &error : errors) {
-                if (auto e = gs.beginError(core::Loc(), scip_indexer::SCIPRubyDebug)) {
+                if (auto e = gs.beginError(core::Loc(), scip_indexer::errors::SCIPRubyDebug)) {
                     e.setHeader("{}: {}",
                                 error.kind == scip_indexer::GemMetadataError::Kind::Error ? "error" : "warning",
                                 error.message);
                 }
             }
+        }
+        this->gemMap.markCurrentGem(currentGem);
+        if (!this->config.gemMapPath.empty()) {
+            this->gemMap.populateFromNDJSON(gs, OSFileSystem(), this->config.gemMapPath);
         }
     };
 
@@ -1269,26 +1309,22 @@ public:
         traversal.traverse(cfg);
         scipStateRef.clearFunctionLocalCaches();
     }
-
-    virtual unique_ptr<SemanticExtension> deepCopy(const core::GlobalState &from, core::GlobalState &to) override {
-        return make_unique<SCIPSemanticExtension>(this->indexFilePath, this->gemMetadataString, this->gemMetadata);
-    };
-    virtual void merge(const core::GlobalState &from, core::GlobalState &to, core::NameSubstitution &subst) override{};
-
-    SCIPSemanticExtension(string indexFilePath, string gemMetadataString, scip_indexer::GemMetadata gemMetadata)
-        : indexFilePath(indexFilePath), gemMetadataString(gemMetadataString), gemMetadata(gemMetadata), mutableState() {
-    }
-    ~SCIPSemanticExtension() {}
 };
 
 class SCIPSemanticExtensionProvider : public SemanticExtensionProvider {
 public:
     void injectOptions(cxxopts::Options &optsBuilder) const override {
         optsBuilder.add_options("indexer")("index-file", "Output SCIP index to a directory, which must already exist",
-                                           cxxopts::value<string>())(
+                                           cxxopts::value<string>());
+        optsBuilder.add_options("indexer")(
             "gem-metadata",
             "Metadata in 'name@version' format to be used for cross-repository code navigation. For repositories which "
             "index every commit, the SHA should be used for the version instead of a git tag (or equivalent).",
+            cxxopts::value<string>());
+        optsBuilder.add_options("indexer")(
+            "gem-map-path",
+            "Path to newline-delimited JSON file which describes how to map paths to gem name and versions. See the"
+            " scip-ruby docs on GitHub for information about the JSON schema.",
             cxxopts::value<string>());
     };
     unique_ptr<SemanticExtension> readOptions(cxxopts::ParseResult &providedOptions) const override {
@@ -1308,12 +1344,22 @@ public:
         } else {
             indexFilePath = "index.scip";
         }
-        auto gemMetadataString =
-            providedOptions.count("gem-metadata") > 0 ? providedOptions["gem-metadata"].as<string>() : "";
-        return make_unique<SCIPSemanticExtension>(indexFilePath, gemMetadataString, scip_indexer::GemMetadata());
+        scip_indexer::Config config{};
+        if (providedOptions.count("gem-map-path") > 0) {
+            config.gemMapPath = providedOptions["gem-map-path"].as<string>();
+        }
+        if (providedOptions.count("gem-metadata") > 0) {
+            config.gemMetadata = providedOptions["gem-metadata"].as<string>();
+        }
+        scip_indexer::GemMapping gemMap{};
+        SCIPSemanticExtension::StateMap stateMap;
+        return make_unique<SCIPSemanticExtension>(indexFilePath, config, gemMap, stateMap);
     };
     virtual unique_ptr<SemanticExtension> defaultInstance() const override {
-        return make_unique<SCIPSemanticExtension>("index.scip", "", scip_indexer::GemMetadata());
+        scip_indexer::GemMapping gemMap{};
+        scip_indexer::Config config{};
+        SCIPSemanticExtension::StateMap stateMap;
+        return make_unique<SCIPSemanticExtension>("index.scip", config, gemMap, stateMap);
     };
     static vector<SemanticExtensionProvider *> getProviders();
     virtual ~SCIPSemanticExtensionProvider() = default;
