@@ -65,8 +65,10 @@ Run `scip-ruby` along with some information about your gem.
     bundle exec scip-ruby .
     ```
 
-These commands will output a SCIP index to `index.scip` (overridable via `--index-file`).
-The gem name and version will be inferred from config files (overridable via `--gem-metadata`).
+These commands will output a SCIP index to `index.scip`.
+Any other needed information will be inferred from directory layout.
+For customizing how `scip-ruby` interprets your configuration,
+see the [CLI reference](docs/scip-ruby/CLI.md).
 
 The SCIP index can be uploaded to a Sourcegraph instance
 using the [Sourcegraph CLI](https://github.com/sourcegraph/src-cli)'s
@@ -101,6 +103,12 @@ SRC_ACCESS_TOKEN="your token" SRC_ENDPOINT="url for Sourcegraph instance" src co
 ```
 
 For more details, see the Sourcegraph CLI docs.
+
+## Building from source for indexing
+
+See the [Contributing docs](./docs/scip-ruby/CONTRIBUTING.md)
+for build instructions.
+Once the `scip-ruby` binary is built, you can index it as described above.
 
 ## Contributing
 
