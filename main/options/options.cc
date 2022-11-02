@@ -442,6 +442,7 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
     options.add_options("dev")("p,print", to_string(all_prints), cxxopts::value<vector<string>>(), "type");
     options.add_options("dev")("trace-lexer", "Emit the lexer's token stream in a debug format");
     options.add_options("dev")("trace-parser", "Enable bison's parser trace functionality");
+    options.add_options("dev")("log-recorded-filepaths", "Emit paths recorded for different files");
     options.add_options("dev")("autogen-subclasses-parent",
                                "Parent classes for which generate a list of subclasses. "
                                "This option must be used in conjunction with -p autogen-subclasses",
@@ -817,6 +818,7 @@ void readOptions(Options &opts,
             logger->error("You can't pass both `{}` and `{}`", "--unquiet", "--quiet");
             throw EarlyReturnWithCode(1);
         }
+        opts.logRecordedFilepaths = raw["log-recorded-filepaths"].as<bool>();
         opts.autocorrect = raw["autocorrect"].as<bool>();
         opts.inlineInput = raw["e"].as<string>();
         if (opts.autocorrect && opts.silenceErrors && !opts.unsilenceErrors) {

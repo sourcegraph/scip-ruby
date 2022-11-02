@@ -1658,6 +1658,9 @@ FileRef GlobalState::enterFile(const shared_ptr<File> &file) {
             }
         }
     })
+    if (this->logRecordedFilepaths) {
+        this->errorQueue->logger.debug("recording file with path: {}", file->path());
+    }
 
     files.emplace_back(file);
     auto ret = FileRef(filesUsed() - 1);
@@ -1961,6 +1964,7 @@ unique_ptr<GlobalState> GlobalState::deepCopy(bool keepId) const {
 
     result->silenceErrors = this->silenceErrors;
     result->unsilenceErrors = this->unsilenceErrors;
+    result->logRecordedFilepaths = this->logRecordedFilepaths;
     result->autocorrect = this->autocorrect;
     result->ensureCleanStrings = this->ensureCleanStrings;
     result->runningUnderAutogen = this->runningUnderAutogen;
@@ -2059,6 +2063,7 @@ unique_ptr<GlobalState> GlobalState::copyForIndex() const {
     result->fileRefByPath = this->fileRefByPath;
     result->silenceErrors = this->silenceErrors;
     result->unsilenceErrors = this->unsilenceErrors;
+    result->logRecordedFilepaths = this->logRecordedFilepaths;
     result->autocorrect = this->autocorrect;
     result->ensureCleanStrings = this->ensureCleanStrings;
     result->runningUnderAutogen = this->runningUnderAutogen;
