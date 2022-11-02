@@ -108,6 +108,7 @@ see the [Design Decisions doc][].
 ## Building
 
 ```
+# Optionally replace 'dbg' with 'release-linux' or 'release-mac'
 ./bazel build //main:scip-ruby --config=dbg
 ```
 
