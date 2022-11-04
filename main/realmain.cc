@@ -492,6 +492,7 @@ int realmain(int argc, char *argv[]) {
         gs->silenceErrors = true;
     }
     gs->unsilenceErrors = opts.unsilenceErrors;
+    gs->logRecordedFilepaths = opts.logRecordedFilepaths;
     if (opts.autocorrect) {
         gs->autocorrect = true;
     }
