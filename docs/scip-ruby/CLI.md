@@ -23,7 +23,7 @@ instead (`git rev-parse HEAD`).
 ## `--gem-map-path <arg>`
 
 At the moment, scip-ruby requires an extra step for cross-repo
-code navigation; you need to supply information about which.
+code navigation; you need to supply information about which
 file belongs to which gem explicitly, using a newline-delimited
 JSON file in the following format:
 
