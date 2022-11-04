@@ -9,6 +9,9 @@ in Sourcegraph.
 
 If you have any questions, bug reports, feature requests or feedback,
 please [file an issue](https://github.com/sourcegraph/scip-ruby/issues/new/choose).
+The most common indexing workflows are discussed below;
+you can also consult the [CLI reference docs](docs/scip-ruby/CLI.md)
+for more information.
 
 ## Supported Configurations
 
