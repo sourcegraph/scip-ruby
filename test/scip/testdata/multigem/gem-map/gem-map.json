@@ -1,0 +1,2 @@
+{"path": "downstream.rb", "gem": "my_downstream_gem@1"}
+{"gem": "my_upstream_gem@1", "path": "upstream.rb"}
