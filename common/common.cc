@@ -11,6 +11,7 @@
 #include <cxxabi.h>
 #include <dirent.h>
 #include <exception>
+#include <filesystem>
 #include <memory>
 #include <sys/param.h>
 #include <vector>
@@ -89,9 +90,7 @@ bool sorbet::FileOps::ensureDir(string_view path) {
 }
 
 std::string sorbet::FileOps::getCurrentDir() {
-    char buf[MAXPATHLEN + 1];
-    getcwd(buf, sizeof(buf));
-    return std::string(buf);
+    return std::filesystem::current_path();
 }
 
 void sorbet::FileOps::removeDir(string_view path) {
