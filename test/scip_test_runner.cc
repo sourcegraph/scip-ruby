@@ -71,7 +71,6 @@ using namespace std;
 
 bool update;
 string inputFileOrDir;
-string outputFileOrDir;
 bool onlyRunUnitTests;
 
 TEST_CASE("GemMetadataInference") {
@@ -450,7 +449,7 @@ pair<scip_indexer::Config, FormatOptions> readMagicComments(string_view path) {
         } else if (absl::StrContains(line, "# gem-map: ")) {
             auto s = absl::StripPrefix(line, "# gem-map: ");
             ENFORCE(!s.empty());
-            config.gemMapPath = std::string(std::filesystem::path(path).parent_path().append(s));
+            config.gemMapPath = s;
         } else if (absl::StrContains(line, "# options: ")) {
             auto s = absl::StripPrefix(line, "# options: ");
             ENFORCE(!s.empty());
@@ -595,6 +594,14 @@ TEST_CASE("SCIPTest") {
     if (onlyRunUnitTests) {
         return;
     }
+    if (std::filesystem::is_directory(inputFileOrDir)) {
+        std::filesystem::current_path(inputFileOrDir);
+        inputFileOrDir = ".";
+    } else {
+        auto inputPath = std::filesystem::path(inputFileOrDir);
+        std::filesystem::current_path(inputPath.parent_path());
+        inputFileOrDir = inputPath.filename();
+    }
     Expectations test = Expectations::getExpectations(inputFileOrDir);
 
     TestSettings settings;
@@ -639,7 +646,6 @@ int main(int argc, char *argv[]) {
     cxxopts::Options options("test_corpus_scip", "SCIP test corpus for Sorbet typechecker");
     options.allow_unrecognised_options();
     options.add_options()("input", "path to input file to directory", cxxopts::value<std::string>());
-    options.add_options()("output", "path to output file or directory", cxxopts::value<std::string>());
     options.add_options()("update-snapshots", "should the snapshot files be overwritten if there are changes");
     options.add_options()("only-unit-tests", "only run unit tests, skip snapshot tests");
     auto res = options.parse(argc, argv);
@@ -658,10 +664,8 @@ int main(int argc, char *argv[]) {
     }
 
     ENFORCE(res.count("input") == 1);
-    ENFORCE(res.count("output") == 1);
     sorbet::test::update = res.count("update-snapshots") > 0;
     sorbet::test::inputFileOrDir = res["input"].as<std::string>();
-    sorbet::test::outputFileOrDir = res["output"].as<std::string>();
     doctest::Context context(argc, argv);
     return context.run();
 }

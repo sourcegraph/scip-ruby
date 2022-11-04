@@ -150,7 +150,11 @@ Expectations getExpectationsForTest(string_view parentDir, string_view testName)
     bool found = false;
     Expectations exp;
     exp.isFolderTest = false;
-    exp.basename = testName.substr(parentDir.size() + 1);
+    if (absl::StartsWith(testName, parentDir)) {
+        exp.basename = testName.substr(parentDir.size() + 1);
+    } else {
+        exp.basename = testName;
+    }
     exp.folder = parentDir;
     exp.folder += "/";
     exp.testName = testName;
