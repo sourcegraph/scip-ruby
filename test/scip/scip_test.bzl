@@ -62,12 +62,12 @@ def scip_test(path):
         return None
     test_name = basename(path)[:-3]
     snapshot_path = path[:-3] + ".snapshot.rb"
-    args = ["--input=$(location {})".format(path), "--output=$(location {})".format(snapshot_path)]
+    args = ["--input=$(location {})".format(path)]
     data = [path, snapshot_path, "//test:scip_test_runner"]
     return _make_test(test_name, args, data)
 
 def scip_multifile_test(dir, filepaths):
-    args = ["--input=$(location {})".format(dir), "--output=$(location {})".format(dir)]
+    args = ["--input=$(location {})".format(dir)]
     data = ["//test:scip_test_runner", "//test/scip:{}".format(dir)]
     for filepath in filepaths:
         path_without_ext, ext = split_extension(filepath)
