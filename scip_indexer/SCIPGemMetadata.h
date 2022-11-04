@@ -1,6 +1,7 @@
 #ifndef SORBET_SCIP_GEM_METADATA
 #define SORBET_SCIP_GEM_METADATA
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <utility>
@@ -8,6 +9,9 @@
 #include "absl/strings/str_split.h"
 
 #include "common/FileSystem.h"
+#include "common/common.h"
+#include "core/FileRef.h"
+#include "core/GlobalState.h"
 
 namespace sorbet::scip_indexer {
 
@@ -69,6 +73,25 @@ public:
 private:
     static std::pair<GemMetadata, std::vector<GemMetadataError>> readFromGemfileLock(const std::string &);
     static std::pair<GemMetadata, std::vector<GemMetadataError>> readFromGemspec(const std::string &);
+};
+
+// Type carrying gem information for each file, which is used during
+// symbol emission to ensure correct symbol names for cross-repo.
+class GemMapping final {
+    std::optional<std::shared_ptr<GemMetadata>> currentGem;
+    UnorderedMap<core::FileRef, std::shared_ptr<GemMetadata>> map;
+    std::shared_ptr<GemMetadata> stdlibGem;
+
+public:
+    std::shared_ptr<GemMetadata> globalPlaceholderGem;
+
+    GemMapping();
+
+    std::optional<std::shared_ptr<GemMetadata>> lookupGemForFile(const core::GlobalState &gs, core::FileRef file) const;
+
+    void populateFromNDJSON(const core::GlobalState &, const FileSystem &fs, const std::string &ndjsonPath);
+
+    void markCurrentGem(GemMetadata gem);
 };
 
 } // namespace sorbet::scip_indexer

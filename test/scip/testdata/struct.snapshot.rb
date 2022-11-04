@@ -51,12 +51,12 @@
 #^^^^^^^^^^^^^^^^^^^^ definition [..] Struct#
 #^^^^^^^^^^^^^^^^^^^^ definition local 5~#119448696
 #^^^^^^^^^^^^^^^^^^^^ definition [..] POINT#initialize().
-#                    ^ reference [..] BasicObject#
 #                    ^ definition [..] POINT#`x=`().
 #                    ^ definition [..] POINT#x().
-#                        ^ reference [..] BasicObject#
+#                    ^ reference [..] BasicObject#
 #                        ^ definition [..] POINT#`y=`().
 #                        ^ definition [..] POINT#y().
+#                        ^ reference [..] BasicObject#
    def array
 #      ^^^^^ definition [..] POINT#array().
      [x, y]

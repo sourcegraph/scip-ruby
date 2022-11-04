@@ -16,3 +16,4 @@
 #include "core/errors/parser.h"
 #include "core/errors/resolver.h"
 #include "core/errors/rewriter.h"
+#include "core/errors/scip_ruby.h"

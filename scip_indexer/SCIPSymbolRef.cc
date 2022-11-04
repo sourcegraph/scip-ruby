@@ -19,6 +19,7 @@
 #include "scip_indexer/SCIPGemMetadata.h"
 #include "scip_indexer/SCIPProtoExt.h"
 #include "scip_indexer/SCIPSymbolRef.h"
+#include "scip_indexer/SCIPUtils.h"
 
 using namespace std;
 
@@ -32,14 +33,37 @@ string showRawRelationshipsMap(const core::GlobalState &gs, const RelationshipsM
     });
 }
 
+bool isGlobal(const core::GlobalState &gs, core::NameRef name) {
+    if (!name.exists())
+        return false;
+    auto shortName = name.shortName(gs);
+    return !shortName.empty() && shortName.front() == '$';
+}
+
 // Try to compute a scip::Symbol for this value.
-absl::Status UntypedGenericSymbolRef::symbolForExpr(const core::GlobalState &gs, const GemMetadata &metadata,
-                                                    optional<core::Loc> loc, scip::Symbol &symbol) const {
+utils::Result UntypedGenericSymbolRef::symbolForExpr(const core::GlobalState &gs, const GemMapping &gemMap,
+                                                     optional<core::Loc> loc, scip::Symbol &symbol) const {
+    optional<shared_ptr<GemMetadata>> metadata;
+    if (isGlobal(gs, this->name)) {
+        metadata = gemMap.globalPlaceholderGem;
+    } else {
+        auto owningFile = loc.has_value() ? loc->file() : this->selfOrOwner.loc(gs).file();
+        if (!owningFile.exists()) {
+            // Synthetic symbols and built-in like constructs do not have a source location.
+            return utils::Result::skipValue();
+        }
+        metadata = gemMap.lookupGemForFile(gs, owningFile);
+        ENFORCE(metadata.has_value(), "missing gem information for file {} which contains symbol {}",
+                owningFile.data(gs).path(), this->showRaw(gs));
+        if (!metadata.has_value()) {
+            return utils::Result::skipValue();
+        }
+    }
     // Don't set symbol.scheme and package.manager here because
     // those are hard-coded to 'scip-ruby' and 'gem' anyways.
     scip::Package package;
-    package.set_name(metadata.name());
-    package.set_version(metadata.version());
+    package.set_name(metadata.value()->name());
+    package.set_version(metadata.value()->version());
     *symbol.mutable_package() = move(package);
 
     InlinedVector<scip::Descriptor, 4> descriptors;
@@ -77,7 +101,8 @@ absl::Status UntypedGenericSymbolRef::symbolForExpr(const core::GlobalState &gs,
                 descriptor.set_suffix(scip::Descriptor::Type);
                 break;
             default:
-                return absl::InvalidArgumentError("unexpected expr type for symbol computation");
+                return utils::Result::statusValue(
+                    absl::InvalidArgumentError("unexpected expr type for symbol computation"));
         }
         descriptors.push_back(move(descriptor));
         cur = cur.owner(gs);
@@ -93,7 +118,7 @@ absl::Status UntypedGenericSymbolRef::symbolForExpr(const core::GlobalState &gs,
         ENFORCE(!descriptor.name().empty());
         *symbol.add_descriptors() = move(descriptor);
     }
-    return absl::OkStatus();
+    return utils::Result::okValue();
 }
 
 string UntypedGenericSymbolRef::showRaw(const core::GlobalState &gs) const {
