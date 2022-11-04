@@ -22,7 +22,6 @@
  
    # Helper method to direct calls to `test` instead of Kernel#test
    sig { params(args: T.untyped, block: T.nilable(T.proc.void)).void }
-#                                                        ^^^^ reference [..] `<Class:<DeclBuilderForProcs>>`#void().
    def self.test(*args, &block)
 #           ^^^^ definition [..] `<Class:MyTest>`#test().
    end
@@ -50,12 +49,10 @@
 #  ^^^^^^ reference [..] Kernel#extend().
  
    sig { params(block: T.proc.void).void }
-#                             ^^^^ reference [..] `<Class:<DeclBuilderForProcs>>`#void().
    def self.setup(&block); end
 #           ^^^^^ definition [..] `<Class:NoMatchTest>`#setup().
  
    sig { params(block: T.proc.void).void }
-#                             ^^^^ reference [..] `<Class:<DeclBuilderForProcs>>`#void().
    def self.teardown(&block); end
 #           ^^^^^^^^ definition [..] `<Class:NoMatchTest>`#teardown().
  end
@@ -66,12 +63,10 @@
 #  ^^^^^^ reference [..] Kernel#extend().
  
    sig { params(block: T.proc.void).void }
-#                             ^^^^ reference [..] `<Class:<DeclBuilderForProcs>>`#void().
    def self.setup(&block); end
 #           ^^^^^ definition [..] `<Class:NoParentClass>`#setup().
  
    sig { params(block: T.proc.void).void }
-#                             ^^^^ reference [..] `<Class:<DeclBuilderForProcs>>`#void().
    def self.teardown(&block); end
 #           ^^^^^^^^ definition [..] `<Class:NoParentClass>`#teardown().
  

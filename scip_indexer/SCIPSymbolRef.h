@@ -18,6 +18,7 @@
 
 #include "scip_indexer/SCIPFieldResolve.h"
 #include "scip_indexer/SCIPGemMetadata.h"
+#include "scip_indexer/SCIPUtils.h"
 
 namespace scip { // Avoid needlessly including protobuf header here.
 class Symbol;
@@ -66,8 +67,8 @@ public:
     }
 
     // Try to compute a scip::Symbol for this value.
-    absl::Status symbolForExpr(const core::GlobalState &gs, const GemMetadata &metadata, std::optional<core::Loc> loc,
-                               scip::Symbol &symbol) const;
+    utils::Result symbolForExpr(const core::GlobalState &gs, const GemMapping &gemMap, std::optional<core::Loc> loc,
+                                scip::Symbol &symbol) const;
 
     void
     saveRelationships(const core::GlobalState &gs, const RelationshipsMap &relationshipMap,

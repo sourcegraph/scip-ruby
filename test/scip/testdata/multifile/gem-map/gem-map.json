@@ -1,0 +1,2 @@
+{"path": "test/scip/testdata/multifile/gem-map/downstream.rb", "gem": "my_downstream_gem@1"}
+{"gem": "my_upstream_gem@1", "path": "test/scip/testdata/multifile/gem-map/upstream.rb"}

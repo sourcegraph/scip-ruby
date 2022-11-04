@@ -124,7 +124,7 @@ string Error::toString(const GlobalState &gs) const {
     stringstream buf;
     buf << RESET_STYLE << FILE_POS_STYLE << loc.filePosToString(gs) << RESET_STYLE << ": " << ERROR_COLOR
         << restoreColors(header, ERROR_COLOR) << RESET_COLOR;
-    if (what.code != 25900) { // SCIPRubyDebug
+    if (what != scip_indexer::errors::SCIPRubyDebug && what != scip_indexer::errors::SCIPRuby) {
         buf << LOW_NOISE_COLOR << " " << gs.errorUrlBase << what.code << RESET_COLOR;
     }
     if (loc.exists()) {

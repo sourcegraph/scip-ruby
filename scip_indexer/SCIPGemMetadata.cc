@@ -8,6 +8,15 @@
 #include <vector>
 
 #include "absl/strings/str_replace.h"
+
+#include "common/FileSystem.h"
+#include "common/common.h"
+#include "core/FileRef.h"
+#include "core/errors/scip_ruby.h"
+
+// Uses ENFORCE as defined by common/common.h, so put this later
+#include "rapidjson/document.h"
+
 #include "scip_indexer/SCIPGemMetadata.h"
 
 using namespace std;
@@ -167,6 +176,97 @@ pair<GemMetadata, vector<GemMetadataError>> GemMetadata::readFromConfig(const Fi
         name = string(absl::StripSuffix(components.back(), ".gemspec"));
     }
     return {GemMetadata(name.value_or(currentDirName()), version.value_or("latest")), errors};
+}
+
+// The 'ruby' namespace is reserved by RubyGems.org, so we won't run into any
+// actual gem called 'ruby', so we use that here. 'stdlib' would not be appropriate
+// as Sorbet contains RBIs for both core and stdlib modules.
+// For the version, we're not really doing any versioning for core & stdlib RBIs,
+// (e.g. handling both 2.7 and 3) so let's stick to latest for now.
+GemMapping::GemMapping()
+    : currentGem(), map(), stdlibGem(make_shared<GemMetadata>(GemMetadata::tryParse("ruby@latest").value())),
+      globalPlaceholderGem(make_shared<GemMetadata>(GemMetadata::tryParse("_global_@latest").value())) {}
+
+optional<shared_ptr<GemMetadata>> GemMapping::lookupGemForFile(const core::GlobalState &gs, core::FileRef file) const {
+    ENFORCE(file.exists());
+    auto it = this->map.find(file);
+    if (it != this->map.end()) {
+        return it->second;
+    }
+    auto filepath = file.data(gs).path();
+    if (absl::StartsWith(filepath, core::File::URL_PREFIX)) {
+        return this->stdlibGem;
+    }
+    if (this->currentGem.has_value()) {
+        // TODO Should we enforce here in debug builds?
+        // Fallback to this if set, to avoid collisions with other gems.
+        return this->currentGem.value();
+    }
+    return nullopt;
+}
+
+void GemMapping::populateFromNDJSON(const core::GlobalState &gs, const FileSystem &fs, const std::string &ndjsonPath) {
+    istringstream input(fs.readFile(ndjsonPath));
+    auto currentDir = filesystem::path(fs.getCurrentDir());
+    unsigned errorCount = 0;
+    for (string line; getline(input, line);) {
+        auto jsonLine = std::string(absl::StripAsciiWhitespace(line));
+        if (jsonLine.empty()) {
+            continue;
+        }
+        rapidjson::Document document;
+        document.Parse(jsonLine);
+        if (document.HasParseError() || !document.IsObject()) {
+            continue;
+        }
+        if (document.HasMember("path") && document["path"].IsString() && document.HasMember("gem") &&
+            document["gem"].IsString()) {
+            auto jsonPath = document["path"].GetString();
+            auto fileRef = gs.findFileByPath(jsonPath);
+            if (!fileRef.exists()) {
+                vector<string> alternatePaths;
+                auto path = filesystem::path(jsonPath);
+                // [NOTE: scip-ruby-path-normalization]
+                // We normalize paths upon entry into GlobalState, so it is sufficient to only check
+                // different normalized combinations here. One common situation where normalization is
+                // necessary is if you pass '.' as the directory argument, without normalization,
+                // the entered paths would be './'-prefixed, but you could reasonably forget to add
+                // the same in the JSON file.
+                auto normalizedPath = path.lexically_normal();
+                if (normalizedPath != path) {
+                    alternatePaths.push_back(normalizedPath);
+                }
+                if (normalizedPath.is_absolute()) {
+                    alternatePaths.push_back(string(normalizedPath.lexically_relative(currentDir).lexically_normal()));
+                } else {
+                    alternatePaths.push_back(string((currentDir / normalizedPath).lexically_normal()));
+                }
+                bool foundFile = absl::c_any_of(alternatePaths, [&](auto &altPath) -> bool {
+                    fileRef = gs.findFileByPath(altPath);
+                    return fileRef.exists();
+                });
+                if (!foundFile) {
+                    errorCount++;
+                    if (errorCount < 5) {
+                        if (auto e = gs.beginError(core::Loc(), errors::SCIPRuby)) {
+                            e.setHeader("File path in JSON map doesn't match known paths: {}", jsonPath);
+                            e.addErrorNote("Use --debug-log-filepaths to check the paths being recorded by scip-ruby");
+                        }
+                    }
+                    continue;
+                }
+            }
+            auto gemMetadata = GemMetadata::tryParse(document["gem"].GetString());
+            if (!gemMetadata.has_value()) {
+                continue;
+            }
+            this->map[fileRef] = make_shared<GemMetadata>(move(gemMetadata.value()));
+        }
+    }
+}
+
+void GemMapping::markCurrentGem(GemMetadata gem) {
+    this->currentGem = make_shared<GemMetadata>(gem);
 }
 
 } // namespace sorbet::scip_indexer

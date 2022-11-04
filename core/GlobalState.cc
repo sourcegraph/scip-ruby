@@ -13,6 +13,7 @@
 #include "core/hashing/hashing.h"
 #include "core/lsp/Task.h"
 #include "core/lsp/TypecheckEpochManager.h"
+#include <filesystem>
 #include <utility>
 
 #include "absl/strings/str_cat.h"
@@ -1663,14 +1664,21 @@ FileRef GlobalState::enterFile(const shared_ptr<File> &file) {
     }
 
     files.emplace_back(file);
+    // GlobalState initialization guarantees the 0 slot will be taken, so this is OK.
     auto ret = FileRef(filesUsed() - 1);
     fileRefByPath[string(file->path())] = ret;
     return ret;
 }
 
 FileRef GlobalState::enterFile(string_view path, string_view source) {
+    string pathBuf;
+    if (this->isSCIPRuby && !absl::StartsWith(path, "https://")) { // See [NOTE: scip-ruby-path-normalization]
+        pathBuf = string(std::filesystem::path(path).lexically_normal());
+    } else {
+        pathBuf = string(path);
+    }
     return GlobalState::enterFile(
-        make_shared<File>(string(path.begin(), path.end()), string(source.begin(), source.end()), File::Type::Normal));
+        make_shared<File>(move(pathBuf), string(source.begin(), source.end()), File::Type::Normal));
 }
 
 FileRef GlobalState::enterNewFileAt(const shared_ptr<File> &file, FileRef id) {
@@ -1686,7 +1694,13 @@ FileRef GlobalState::enterNewFileAt(const shared_ptr<File> &file, FileRef id) {
 }
 
 FileRef GlobalState::reserveFileRef(string path) {
-    return GlobalState::enterFile(make_shared<File>(move(path), "", File::Type::NotYetRead));
+    std::string pathBuf;
+    if (this->isSCIPRuby && !absl::StartsWith(path, "https://")) { // See [NOTE: scip-ruby-path-normalization]
+        pathBuf = string(std::filesystem::path(path).lexically_normal());
+    } else {
+        pathBuf = move(path);
+    }
+    return GlobalState::enterFile(make_shared<File>(move(pathBuf), "", File::Type::NotYetRead));
 }
 
 NameRef GlobalState::nextMangledName(ClassOrModuleRef owner, NameRef origName) {
@@ -2155,7 +2169,7 @@ bool GlobalState::shouldReportErrorOn(Loc loc, ErrorClass what) const {
         return false;
     }
     if (this->isSCIPRuby && !this->unsilenceErrors) {
-        if (what.code != 25900) { // SCIPRubyDebug
+        if (what != scip_indexer::errors::SCIPRubyDebug && what != scip_indexer::errors::SCIPRuby) {
             return false;
         }
     }

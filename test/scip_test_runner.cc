@@ -119,6 +119,64 @@ PATH
     }
 }
 
+TEST_CASE("GemMapParsing") {
+    if (!onlyRunUnitTests) {
+        return;
+    }
+    vector<unique_ptr<core::Error>> errors;
+
+    auto logger = spdlog::stderr_color_mt("file-to-gem-map-test");
+    auto errorCollector = make_shared<core::ErrorCollector>();
+    auto errorQueue = make_shared<core::ErrorQueue>(*logger, *logger, errorCollector);
+    core::GlobalState gs(errorQueue);
+    gs.initEmpty(); // needed for proper file table access
+
+    core::FileRef nested, flippedOrder, missing, absolute1, absolute2, absolute3, unnormalized1, unnormalized2;
+    {
+        core::UnfreezeFileTable fileTableAccess(gs);
+        nested = gs.enterFile("nes/ted", "");
+        flippedOrder = gs.enterFile("flippedOrder", "");
+        missing = gs.enterFile("missing", "");
+        absolute1 = gs.enterFile("/gem-map/absolute1", "");
+        absolute2 = gs.enterFile("/gem-map/absolute2", "");
+        absolute3 = gs.enterFile("absolute3", "");
+        unnormalized1 = gs.enterFile("./unnormalized1", "");
+        unnormalized2 = gs.enterFile("unnormalized2", "");
+    }
+
+    std::string testJSON = R"(
+{"path": "nes/ted", "gem": "start@0"}
+{"gem": "blah@1.1", "path": "flippedOrder"}
+{"path": "/gem-map/absolute1", "gem": "abs@0"}
+{"path": "absolute2", "gem": "abs@0"}
+{"path": "/gem-map/absolute3", "gem": "abs@0"}
+{"path": "unnormalized1", "gem": "un@0"}
+{"path": "./unnormalized2", "gem": "un@0"}
+)";
+
+    scip_indexer::GemMapping gemMap{};
+
+    MockFileSystem fs("/gem-map");
+    fs.writeFile("gem-map.json", testJSON);
+    gemMap.populateFromNDJSON(gs, fs, "gem-map.json");
+
+    auto nestedGem = gemMap.lookupGemForFile(gs, nested);
+    ENFORCE(nestedGem.has_value());
+    ENFORCE(*nestedGem->get() == scip_indexer::GemMetadata::forTest("start", "0"));
+
+    auto flippedOrderGem = gemMap.lookupGemForFile(gs, flippedOrder);
+    ENFORCE(flippedOrderGem.has_value());
+    ENFORCE(*flippedOrderGem->get() == scip_indexer::GemMetadata::forTest("blah", "1.1"));
+
+    ENFORCE(!gemMap.lookupGemForFile(gs, missing).has_value());
+
+    ENFORCE(gemMap.lookupGemForFile(gs, absolute1).has_value());
+    ENFORCE(gemMap.lookupGemForFile(gs, absolute2).has_value());
+    ENFORCE(gemMap.lookupGemForFile(gs, absolute3).has_value());
+    ENFORCE(gemMap.lookupGemForFile(gs, unnormalized1).has_value());
+    ENFORCE(gemMap.lookupGemForFile(gs, unnormalized2).has_value());
+}
+
 // Copied from pipeline_test_runner.cc
 class CFGCollectorAndTyper { // TODO(varun): Copy this over to scip_test_runner.cc
 public:
@@ -235,10 +293,10 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
     });
     auto formatSymbol = [](const std::string &symbol) -> string {
         // Strip out repeating information for cleaner snapshots.
-        return absl::StrReplaceAll(symbol, {
-                                               {"scip-ruby gem ", ""},                           // indexer prefix
-                                               {"placeholder_name placeholder_version", "[..]"}, // test placeholder
-                                           });
+        return absl::StrReplaceAll(symbol, {{"scip-ruby gem ", ""},                           // indexer prefix
+                                            {"placeholder_name placeholder_version", "[..]"}, // test placeholder
+                                            {"ruby latest", "[..]"},                          // core and stdlib
+                                            {"_global_ latest", "[global]"}});
     };
     size_t occ_i = 0;
     std::ifstream input(document.relative_path());
@@ -339,7 +397,7 @@ string snapshot_path(string source_file_path) {
 }
 
 struct TestSettings {
-    optional<string> gemMetadata;
+    scip_indexer::Config config;
     UnorderedMap</*root-relative path*/ string, FormatOptions> formatOptions;
 };
 
@@ -380,17 +438,20 @@ void compareSnapshots(const scip::Index &index, const TestSettings &settings,
     }
 }
 
-pair<optional<string>, FormatOptions> readMagicComments(string_view path) {
-    optional<string> gemMetadata = nullopt;
+pair<scip_indexer::Config, FormatOptions> readMagicComments(string_view path) {
+    scip_indexer::Config config;
     FormatOptions options{.showDocs = false};
     ifstream input(path);
     for (string line; getline(input, line);) {
         if (absl::StrContains(line, "# gem-metadata: ")) {
             auto s = absl::StripPrefix(line, "# gem-metadata: ");
             ENFORCE(!s.empty());
-            gemMetadata = s;
-        }
-        if (absl::StrContains(line, "# options: ")) {
+            config.gemMetadata = s;
+        } else if (absl::StrContains(line, "# gem-map: ")) {
+            auto s = absl::StripPrefix(line, "# gem-map: ");
+            ENFORCE(!s.empty());
+            config.gemMapPath = std::string(std::filesystem::path(path).parent_path().append(s));
+        } else if (absl::StrContains(line, "# options: ")) {
             auto s = absl::StripPrefix(line, "# options: ");
             ENFORCE(!s.empty());
             if (absl::StrContains(s, "showDocs")) {
@@ -398,7 +459,7 @@ pair<optional<string>, FormatOptions> readMagicComments(string_view path) {
             }
         }
     }
-    return {gemMetadata, options};
+    return {config, options};
 }
 
 void test_one_gem(Expectations &test, const TestSettings &settings) {
@@ -435,9 +496,14 @@ void test_one_gem(Expectations &test, const TestSettings &settings) {
     cxxopts::Options options{"scip-ruby-snapshot-test"};
     scipProvider->injectOptions(options);
     std::vector<const char *> argv = {"scip-ruby-snapshot-test", "--index-file", indexFilePath.c_str()};
-    auto metadata = settings.gemMetadata.value_or("placeholder_name@placeholder_version");
+    auto &cfg = settings.config;
+    auto gemMetadata = cfg.gemMetadata.empty() ? "placeholder_name@placeholder_version" : cfg.gemMetadata;
     argv.push_back("--gem-metadata");
-    argv.push_back(metadata.c_str());
+    argv.push_back(gemMetadata.c_str());
+    if (!cfg.gemMapPath.empty()) {
+        argv.push_back("--gem-map-path");
+        argv.push_back(cfg.gemMapPath.c_str());
+    }
     argv.push_back(nullptr);
     auto parseResult = options.parse(argv.size() - 1, argv.data());
 
@@ -532,11 +598,10 @@ TEST_CASE("SCIPTest") {
     Expectations test = Expectations::getExpectations(inputFileOrDir);
 
     TestSettings settings;
-    settings.gemMetadata = nullopt;
     if (test.isFolderTest) {
         auto argsFilePath = test.folder + "scip-ruby-args.rb";
         if (FileOps::exists(argsFilePath)) {
-            settings.gemMetadata = readMagicComments(argsFilePath).first;
+            settings.config = readMagicComments(argsFilePath).first;
         }
         ENFORCE(test.sourceFiles.size() > 0);
         for (auto &sourceFile : test.sourceFiles) {
@@ -548,7 +613,7 @@ TEST_CASE("SCIPTest") {
         ENFORCE(test.sourceFiles.size() == 1);
         auto path = test.folder + test.sourceFiles[0];
         auto &options = settings.formatOptions[path];
-        std::tie(settings.gemMetadata, options) = readMagicComments(path);
+        std::tie(settings.config, options) = readMagicComments(path);
     }
 
     test_one_gem(test, settings);
