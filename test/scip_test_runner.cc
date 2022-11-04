@@ -234,8 +234,11 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
         return isSCIPRangeLess(occ1.range(), occ2.range());
     });
     auto formatSymbol = [](const std::string &symbol) -> string {
-        // Strip out repeating information and placeholder names.
-        return absl::StrReplaceAll(symbol, {{"scip-ruby gem ", ""}, {"placeholder_name placeholder_version", "[..]"}});
+        // Strip out repeating information for cleaner snapshots.
+        return absl::StrReplaceAll(symbol, {
+                                               {"scip-ruby gem ", ""},                           // indexer prefix
+                                               {"placeholder_name placeholder_version", "[..]"}, // test placeholder
+                                           });
     };
     size_t occ_i = 0;
     std::ifstream input(document.relative_path());
@@ -569,27 +572,31 @@ bool ends_with(const std::string &s, const std::string &suffix) {
 
 int main(int argc, char *argv[]) {
     cxxopts::Options options("test_corpus_scip", "SCIP test corpus for Sorbet typechecker");
-    options.allow_unrecognised_options().add_options()("output", "path to output file or directory",
-                                                       cxxopts::value<std::string>()->default_value(""), "path")(
-        "update-snapshots", "should the snapshot files be overwritten if there are changes");
+    options.allow_unrecognised_options();
+    options.add_options()("input", "path to input file to directory", cxxopts::value<std::string>());
+    options.add_options()("output", "path to output file or directory", cxxopts::value<std::string>());
+    options.add_options()("update-snapshots", "should the snapshot files be overwritten if there are changes");
+    options.add_options()("only-unit-tests", "only run unit tests, skip snapshot tests");
     auto res = options.parse(argc, argv);
-    auto unmatched = res.unmatched();
 
-    if (unmatched.size() == 1 && unmatched.front() == "only_unit_tests") {
+    auto unmatched = res.unmatched();
+    if (!unmatched.empty()) {
+        fmt::print(stderr, "error: unexpected arguments passed to test runner {}",
+                   sorbet::scip_indexer::showVec(unmatched, [](auto &s) { return s; }));
+        return 1;
+    }
+
+    if (res.count("only-unit-tests") > 0) {
         sorbet::test::onlyRunUnitTests = true;
         doctest::Context context(argc, argv);
         return context.run();
     }
 
-    if (unmatched.size() != 1) {
-        std::fprintf(stderr, "error: runner expected single input file with .rb extension or folder");
-        return 1;
-    }
-
+    ENFORCE(res.count("input") == 1);
+    ENFORCE(res.count("output") == 1);
     sorbet::test::update = res.count("update-snapshots") > 0;
-    sorbet::test::inputFileOrDir = unmatched[0];
+    sorbet::test::inputFileOrDir = res["input"].as<std::string>();
     sorbet::test::outputFileOrDir = res["output"].as<std::string>();
-
     doctest::Context context(argc, argv);
     return context.run();
 }
