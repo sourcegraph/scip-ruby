@@ -1671,8 +1671,8 @@ FileRef GlobalState::enterFile(const shared_ptr<File> &file) {
 }
 
 FileRef GlobalState::enterFile(string_view path, string_view source) {
-    std::string pathBuf;
-    if (this->isSCIPRuby) { // See [NOTE: scip-ruby-path-normalization]
+    string pathBuf;
+    if (this->isSCIPRuby && !absl::StartsWith(path, "https://")) { // See [NOTE: scip-ruby-path-normalization]
         pathBuf = string(std::filesystem::path(path).lexically_normal());
     } else {
         pathBuf = string(path);
@@ -1695,7 +1695,7 @@ FileRef GlobalState::enterNewFileAt(const shared_ptr<File> &file, FileRef id) {
 
 FileRef GlobalState::reserveFileRef(string path) {
     std::string pathBuf;
-    if (this->isSCIPRuby) { // See [NOTE: scip-ruby-path-normalization]
+    if (this->isSCIPRuby && !absl::StartsWith(path, "https://")) { // See [NOTE: scip-ruby-path-normalization]
         pathBuf = string(std::filesystem::path(path).lexically_normal());
     } else {
         pathBuf = move(path);

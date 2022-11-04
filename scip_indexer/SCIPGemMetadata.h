@@ -78,11 +78,13 @@ private:
 // Type carrying gem information for each file, which is used during
 // symbol emission to ensure correct symbol names for cross-repo.
 class GemMapping final {
-    std::shared_ptr<GemMetadata> stdlibGem;
     std::optional<std::shared_ptr<GemMetadata>> currentGem;
     UnorderedMap<core::FileRef, std::shared_ptr<GemMetadata>> map;
+    std::shared_ptr<GemMetadata> stdlibGem;
 
 public:
+    std::shared_ptr<GemMetadata> globalPlaceholderGem;
+
     GemMapping();
 
     std::optional<std::shared_ptr<GemMetadata>> lookupGemForFile(const core::GlobalState &gs, core::FileRef file) const;

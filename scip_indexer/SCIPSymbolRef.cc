@@ -33,27 +33,37 @@ string showRawRelationshipsMap(const core::GlobalState &gs, const RelationshipsM
     });
 }
 
+bool isGlobal(const core::GlobalState &gs, core::NameRef name) {
+    if (!name.exists())
+        return false;
+    auto shortName = name.shortName(gs);
+    return !shortName.empty() && shortName.front() == '$';
+}
+
 // Try to compute a scip::Symbol for this value.
 utils::Result UntypedGenericSymbolRef::symbolForExpr(const core::GlobalState &gs, const GemMapping &gemMap,
                                                      optional<core::Loc> loc, scip::Symbol &symbol) const {
+    optional<shared_ptr<GemMetadata>> metadata;
+    if (isGlobal(gs, this->name)) {
+        metadata = gemMap.globalPlaceholderGem;
+    } else {
+        auto owningFile = loc.has_value() ? loc->file() : this->selfOrOwner.loc(gs).file();
+        if (!owningFile.exists()) {
+            // Synthetic symbols and built-in like constructs do not have a source location.
+            return utils::Result::skipValue();
+        }
+        metadata = gemMap.lookupGemForFile(gs, owningFile);
+        ENFORCE(metadata.has_value(), "missing gem information for file {} which contains symbol {}",
+                owningFile.data(gs).path(), this->showRaw(gs));
+        if (!metadata.has_value()) {
+            return utils::Result::skipValue();
+        }
+    }
     // Don't set symbol.scheme and package.manager here because
     // those are hard-coded to 'scip-ruby' and 'gem' anyways.
     scip::Package package;
-    auto owningFile = this->selfOrOwner.loc(gs).file();
-    // Synthetic symbols and built-in like constructs do not have a source location.
-    if (!owningFile.exists()) {
-        return utils::Result::skipValue();
-    }
-    auto metadata = gemMap.lookupGemForFile(gs, owningFile);
-    ENFORCE(metadata.has_value(), "missing gem information for file {} which contains symbol {}",
-            owningFile.data(gs).path(), this->showRaw(gs));
-    if (metadata.has_value()) {
-        package.set_name(metadata.value()->name());
-        package.set_version(metadata.value()->version());
-    } else {
-        package.set_name("__scip-ruby-bug__");
-        package.set_version("bug");
-    }
+    package.set_name(metadata.value()->name());
+    package.set_version(metadata.value()->version());
     *symbol.mutable_package() = move(package);
 
     InlinedVector<scip::Descriptor, 4> descriptors;

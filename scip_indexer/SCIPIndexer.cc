@@ -399,7 +399,6 @@ public:
                                 optional<core::LocOffsets> loc = nullopt) {
         // In practice, there doesn't seem to be any situation which triggers
         // a duplicate definition being emitted, so skip calling cacheOccurrence here.
-
         auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs);
         scip::Symbol symbol;
         auto untypedSymRef = symRef.withoutType();

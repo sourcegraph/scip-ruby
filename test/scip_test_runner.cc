@@ -293,11 +293,10 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
     });
     auto formatSymbol = [](const std::string &symbol) -> string {
         // Strip out repeating information for cleaner snapshots.
-        return absl::StrReplaceAll(symbol, {
-                                               {"scip-ruby gem ", ""},                           // indexer prefix
-                                               {"placeholder_name placeholder_version", "[..]"}, // test placeholder
-                                               {"ruby latest", "[..]"}                           // core and stdlib
-                                           });
+        return absl::StrReplaceAll(symbol, {{"scip-ruby gem ", ""},                           // indexer prefix
+                                            {"placeholder_name placeholder_version", "[..]"}, // test placeholder
+                                            {"ruby latest", "[..]"},                          // core and stdlib
+                                            {"_global_ latest", "[global]"}});
     };
     size_t occ_i = 0;
     std::ifstream input(document.relative_path());

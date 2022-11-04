@@ -35,7 +35,6 @@
    end
  
    sig { params(C, T::Boolean).returns(T::Boolean) }
-#               ^ reference [..] `T.untyped`#
 #                     ^^^^^^^ reference [..] T#Boolean.
 #                                         ^^^^^^^ reference [..] T#Boolean.
    def m3(c, b)
@@ -101,7 +100,6 @@
    # And...
    # ...one more doc comment
    sig { params(C, T::Boolean).returns(T::Boolean) }
-#               ^ reference [..] `T.untyped`#
 #                     ^^^^^^^ reference [..] T#Boolean.
 #                                         ^^^^^^^ reference [..] T#Boolean.
    def m6(c, b)
@@ -226,7 +224,6 @@
 #^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #      ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #              ^ reference [..] T#
-#                 ^^^^^^^ reference [..] `T.untyped`#
 #                 ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
  def f2
 #    ^^ definition [..] Object#f2().
@@ -258,7 +255,6 @@
 #^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #      ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #              ^ reference [..] T#
-#                 ^^^^^^^ reference [..] `T.untyped`#
 #                 ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
  def f4 # another undocumented global function
 #    ^^ definition [..] Object#f4().

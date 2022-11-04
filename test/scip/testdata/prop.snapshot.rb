@@ -132,13 +132,13 @@
    token_prop
 #  ^^^^^ definition [..] PropHelpers#`token=`().
 #  ^^^^^ definition [..] PropHelpers#token().
-#  ^^^^^^^^^^ reference [..] String#
 #  ^^^^^^^^^^ reference [..] `<Class:PropHelpers>`#token_prop().
+#  ^^^^^^^^^^ reference [..] String#
    created_prop
 #  ^^^^^^^ definition [..] PropHelpers#`created=`().
 #  ^^^^^^^ definition [..] PropHelpers#created().
-#  ^^^^^^^^^^^^ reference [..] Float#
 #  ^^^^^^^^^^^^ reference [..] `<Class:PropHelpers>`#created_prop().
+#  ^^^^^^^^^^^^ reference [..] Float#
  end
  
  class PropHelpers2
@@ -150,8 +150,8 @@
    def self.created_prop(opts={}); end
 #           ^^^^^^^^^^^^ definition [..] `<Class:PropHelpers2>`#created_prop().
    timestamped_token_prop
-#  ^^^^^^^^^^^^^^^^^^^^^^ reference [..] String#
 #  ^^^^^^^^^^^^^^^^^^^^^^ reference [..] `<Class:PropHelpers2>`#timestamped_token_prop().
+#  ^^^^^^^^^^^^^^^^^^^^^^ reference [..] String#
 #              ^^^^^ definition [..] PropHelpers2#`token=`().
 #              ^^^^^ definition [..] PropHelpers2#token().
    created_prop(immutable: true)

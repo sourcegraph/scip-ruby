@@ -178,14 +178,14 @@ pair<GemMetadata, vector<GemMetadataError>> GemMetadata::readFromConfig(const Fi
     return {GemMetadata(name.value_or(currentDirName()), version.value_or("latest")), errors};
 }
 
-GemMapping::GemMapping() {
-    // The 'ruby' namespace is reserved by RubyGems.org, so we won't run into any
-    // actual gem called 'ruby', so we use that here. 'stdlib' would not be appropriate
-    // as Sorbet contains RBIs for both core and stdlib modules.
-    // For the version, we're not really doing any versioning for core & stdlib RBIs,
-    // (e.g. handling both 2.7 and 3) so let's stick to latest for now.
-    this->stdlibGem = make_shared<GemMetadata>(GemMetadata::tryParse("ruby@latest").value());
-}
+// The 'ruby' namespace is reserved by RubyGems.org, so we won't run into any
+// actual gem called 'ruby', so we use that here. 'stdlib' would not be appropriate
+// as Sorbet contains RBIs for both core and stdlib modules.
+// For the version, we're not really doing any versioning for core & stdlib RBIs,
+// (e.g. handling both 2.7 and 3) so let's stick to latest for now.
+GemMapping::GemMapping()
+    : currentGem(), map(), stdlibGem(make_shared<GemMetadata>(GemMetadata::tryParse("ruby@latest").value())),
+      globalPlaceholderGem(make_shared<GemMetadata>(GemMetadata::tryParse("_global_@latest").value())) {}
 
 optional<shared_ptr<GemMetadata>> GemMapping::lookupGemForFile(const core::GlobalState &gs, core::FileRef file) const {
     ENFORCE(file.exists());
