@@ -61,6 +61,7 @@ void setGlobalStateOptions(core::GlobalState &gs, const options::Options &opts) 
         gs.silenceErrors = true;
     }
     gs.unsilenceErrors = opts.unsilenceErrors;
+    gs.logRecordedFilepaths = opts.logRecordedFilepaths;
     gs.autocorrect = opts.autocorrect;
     gs.didYouMean = opts.didYouMean;
     if (opts.censorForSnapshotTests) {

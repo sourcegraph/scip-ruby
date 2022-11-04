@@ -1688,6 +1688,9 @@ FileRef GlobalState::enterFile(shared_ptr<File> file) {
     })
 
     symbolsReferencedByFile.emplace_back();
+    if (this->logRecordedFilepaths) {
+        this->errorQueue->logger.debug("recording file with path: {}", file->path());
+    }
     return files->emplace(std::move(file));
 }
 
@@ -2009,6 +2012,7 @@ bool GlobalState::unfreezeSymbolTable() {
 void GlobalState::copyOptions(const core::GlobalState &other) {
     this->isSCIPRuby = other.isSCIPRuby;
     this->unsilenceErrors = other.unsilenceErrors;
+    this->logRecordedFilepaths = other.logRecordedFilepaths;
     this->silenceErrors = other.silenceErrors;
     this->autocorrect = other.autocorrect;
     this->didYouMean = other.didYouMean;

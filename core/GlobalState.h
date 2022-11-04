@@ -529,6 +529,7 @@ public:
 
     bool silenceErrors = false;
     bool unsilenceErrors = false;
+    bool logRecordedFilepaths = false;
     bool autocorrect = false;
     bool didYouMean = true;
     TrackUntyped trackUntyped = TrackUntyped::Nowhere;

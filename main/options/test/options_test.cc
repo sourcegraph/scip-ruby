@@ -28,6 +28,7 @@ TEST_CASE("DefaultConstructorMatchesReadOptions") {
     CHECK_EQ(empty.suggestTyped, opts.suggestTyped);
     CHECK_EQ(empty.silenceErrors, opts.silenceErrors);
     CHECK_EQ(empty.unsilenceErrors, opts.unsilenceErrors);
+    CHECK_EQ(empty.logRecordedFilepaths, opts.logRecordedFilepaths);
     CHECK_EQ(empty.silenceDevMessage, opts.silenceDevMessage);
     CHECK_EQ(empty.suppressNonCriticalErrors, opts.suppressNonCriticalErrors);
     CHECK_EQ(empty.runLSP, opts.runLSP);

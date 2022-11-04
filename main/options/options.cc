@@ -698,6 +698,7 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
                                  "Force Sorbet to calculate file hashes, even from the CLI. Useful for profiling.");
     options.add_options(section)("trace-lexer", "Emit the lexer's token stream in a debug format");
     options.add_options(section)("trace-parser", "Enable bison's parser trace functionality");
+    options.add_options("dev")("log-recorded-filepaths", "Emit paths recorded for different files");
     auto partitioned_print_options = print_options;
     auto stableEnd = absl::c_stable_partition(partitioned_print_options, [](const auto &po) { return po.stable; });
     fmt::memory_buffer print_help;
@@ -1062,6 +1063,7 @@ void readOptions(Options &opts,
 
         opts.silenceErrors = raw["quiet"].as<bool>();
         opts.unsilenceErrors = raw["unquiet"].as<bool>();
+        opts.logRecordedFilepaths = raw["log-recorded-filepaths"].as<bool>();
         if (opts.silenceErrors && opts.unsilenceErrors) {
             logger->error("You can't pass both `{}` and `{}`", "--unquiet", "--quiet");
             throw EarlyReturnWithCode(1);
