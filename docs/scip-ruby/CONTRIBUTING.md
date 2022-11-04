@@ -154,25 +154,32 @@ There are currently 3 kinds of tests:
   to test via snapshots.
 - Repo/Integration tests: These try to index an OSS repo using scip-ruby.
 
-To run snapshot tests, which are self-contained:
+Here are some example test invocations:
 
 ```
-./bazel test //test/scip --config=dbg
+# Run both snapshot tests and unit tests
+./bazel test --config=dbg //test/scip
+
+# Run only unit tests
+./bazel test --config=dbg //test/scip:unit_tests
+
+# Run a specific snapshot test, e.g. 'testdata/alias.rb'
+./bazel test --config=dbg //test/scip:alias
 ```
 
-Updating snapshots:
+You can add `--test_output=errors` to see diffs for snapshot mismatches.
+
+Snapshot outputs can be easily updated:
 
 ```
-./bazel test //test/scip:update --config=dbg
+# Update all snapshots
+./bazel test --config=dbg //test/scip:update
+
+# Update snapshot for a single test
+./bazel test --config=dbg //test/scip:update_alias
 ```
 
-You can run unit tests using:
-
-```
-./bazel test //test/scip:unit_tests --config=dbg
-```
-
-WARNING: Repo tests are kinda' broken right now; they're disabled
+Repo tests are kinda' broken right now; they're disabled
 in CI (see ci.yml), and may or may not work on your machine.
 
 If you want to run repo tests, first complete the
@@ -258,7 +265,7 @@ to the root and run:
 ```
 
 Alternately, it may be useful to create a `tmp.rb`
-file under the `test/scip/snapshots/` directory
+file under the `test/scip/testdata/` directory
 (it will be gitignored) and run:
 
 ```bash

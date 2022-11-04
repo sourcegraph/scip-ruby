@@ -1,8 +1,11 @@
 def basename(p):
     return p.rpartition("/")[-1]
 
-def dirname(p):
-    return p.rpartition("/")[0]
+def ancestor_path(p, parent):
+    """Extract components of p until the second-last component is parent."""
+    before, middle, after = p.rpartition(parent + "/")
+    child, _, _ = after.partition("/")
+    return before + middle + child
 
 def split_extension(p):
     (before, _, ext) = p.rpartition(".")
@@ -11,30 +14,30 @@ def split_extension(p):
     return (before, ext)
 
 def scip_test_suite(paths, multifile_paths):
-    tests = []
+    tests = scip_unit_tests()
     updates = []
+
     for path in paths:
         names = scip_test(path)
         if names:
             tests.append(names[0])
             updates.append(names[1])
 
-    file_groups = {}
+    multifile_groups = {}
     for p in multifile_paths:
-        d = dirname(p)
-        if d in file_groups:
-            file_groups[d].append(p)
+        d = ancestor_path(p, parent = "multifile")
+        if d in multifile_groups:
+            multifile_groups[d].append(p)
         else:
-            file_groups[d] = [p]
+            multifile_groups[d] = [p]
 
-    tests.append(scip_unit_tests())
-    for dir, files in file_groups.items():
+    for dir, files in multifile_groups.items():
         names = scip_multifile_test(dir, files)
         tests.append(names[0])
         updates.append(names[1])
 
     native.test_suite(
-        name = "scip",
+        name = "scip",  # both unit tests and snapshot tests
         tests = tests,
     )
     native.test_suite(
@@ -48,23 +51,23 @@ def scip_unit_tests():
     native.sh_test(
         name = "unit_tests",
         srcs = ["scip_test_runner.sh"],
-        args = ["only_unit_tests"],
+        args = ["--only-unit-tests"],
         data = ["//test:scip_test_runner"],
         size = "small",
     )
-    return "unit_tests"
+    return ["unit_tests"]
 
 def scip_test(path):
     if not path.endswith(".rb") or path.endswith(".snapshot.rb"):
         return None
     test_name = basename(path)[:-3]
     snapshot_path = path[:-3] + ".snapshot.rb"
-    args = ["$(location {})".format(path), "--output=$(location {})".format(snapshot_path)]
+    args = ["--input=$(location {})".format(path), "--output=$(location {})".format(snapshot_path)]
     data = [path, snapshot_path, "//test:scip_test_runner"]
     return _make_test(test_name, args, data)
 
 def scip_multifile_test(dir, filepaths):
-    args = ["$(location {})".format(dir), "--output=$(location {})".format(dir)]
+    args = ["--input=$(location {})".format(dir), "--output=$(location {})".format(dir)]
     data = ["//test:scip_test_runner", "//test/scip:{}".format(dir)]
     for filepath in filepaths:
         path_without_ext, ext = split_extension(filepath)
@@ -73,10 +76,10 @@ def scip_multifile_test(dir, filepaths):
             if not filepath.endswith("scip-ruby-args.rb"):  # Special file for reading Gem-level args.
                 data.append(path_without_ext + ".snapshot." + ext)
     if not dir.startswith("testdata/multifile/"):
-        fail("Expected directory to be under multifile/")
+        fail("Expected directory to be under multifile/ but found: " + dir)
     dir = dir[len("testdata/multifile/"):]
     if "/" in dir:
-        fail("Expected directory to be 1-level deep under multifile/")
+        fail("Expected test root directory to be 1-level deep under multifile/ but found: " + dir)
 
     test_name = "multifile_" + dir
     return _make_test(test_name, args, data)
