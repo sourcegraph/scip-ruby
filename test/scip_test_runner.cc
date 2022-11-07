@@ -176,6 +176,9 @@ TEST_CASE("GemMapParsing") {
     ENFORCE(gemMap.lookupGemForFile(gs, unnormalized2).has_value());
 }
 
+// This test might feel a little redundant since we also have a similar integration test.
+// However, the integration test is making sure that the emitted index has the right
+// gem info, which is not checked by this test.
 TEST_CASE("GemInference") {
     if (!onlyRunUnitTests) {
         return;
