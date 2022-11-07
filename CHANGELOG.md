@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## v0.3.0
+
+### Feature additions
+
+- Added preliminary support for cross-repo code navigation.
+  scip-ruby can now understand which files belong to which gems (name + version pairs).
+  - By default, information about external gems will be inferred from
+    standard filesystem layout. (https://github.com/sourcegraph/scip-ruby/pull/155)
+  - Optionally, one can specify file to gem mapping explicitly
+    using a JSON file when using non-standard directory layout. (https://github.com/sourcegraph/scip-ruby/pull/149)
+- Information about the current gem can be inferred from
+  Gemfile.lock and gemspec files on a best-effort basis,
+  reducing the need to specify the `--gem-metadata` flag explicitly. (https://github.com/sourcegraph/scip-ruby/pull/143)
+- Indexes are saved to `index.scip` when the `--index-file` argument is not specified. (https://github.com/sourcegraph/scip-ruby/pull/142)
+- Added a new [CLI reference doc](docs/scip-ruby/CLI.md),
+  which describes scip-ruby flags in more detail and includes examples.
+
+### Sorbet sync
+
+- Updated with changes from upstream Sorbet as of Nov 1 2022. (bc92a0f55897bda974df401a3a1b4d2191e0877b)
+
 ## v0.2.0
 
 ### Feature additions
@@ -22,4 +43,4 @@
 
 ### Sorbet sync
 
-- Updated with changes from upstream Sorbet as of Sep 23. (3ded54be85d1951f5fc73135912b8c30468adf3b)
+- Updated with changes from upstream Sorbet as of Sep 23 2022. (3ded54be85d1951f5fc73135912b8c30468adf3b)
