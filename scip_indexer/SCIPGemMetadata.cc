@@ -187,6 +187,28 @@ GemMapping::GemMapping()
     : currentGem(), map(), stdlibGem(make_shared<GemMetadata>(GemMetadata::tryParse("ruby@latest").value())),
       globalPlaceholderGem(make_shared<GemMetadata>(GemMetadata::tryParse("_global_@latest").value())) {}
 
+optional<shared_ptr<GemMetadata>> tryParseFilepath(std::string_view filepath) {
+    auto filenameStartIndex = filepath.find_last_of('/') + 1;
+    // E.g. foo/bar,
+    //      0123456 ; startIndex = 4, size = 7
+    auto filename = filepath.substr(filenameStartIndex, filepath.size() - filenameStartIndex);
+    auto dotIndex = filename.find_last_of('.');
+    if (dotIndex == std::string::npos) {
+        // Should have .rbi files here
+        return nullopt;
+    }
+    auto basename = filename.substr(0, dotIndex);
+    if (absl::StrContains(basename, '@')) {
+        auto metadata = GemMetadata::tryParse(basename);
+        ENFORCE(metadata.has_value());
+        return make_shared<GemMetadata>(metadata.value());
+    }
+    // TODO: Can we do better here by getting dependency versions from somewhere
+    // else, like Gemfile.lock? In practice, it looks like files under gems/ have associated
+    // versions, whereas files under annotations/ and gems/ do  not have versions.
+    return make_shared<GemMetadata>(GemMetadata::forTest(string(basename), "latest"));
+}
+
 optional<shared_ptr<GemMetadata>> GemMapping::lookupGemForFile(const core::GlobalState &gs, core::FileRef file) const {
     ENFORCE(file.exists());
     auto it = this->map.find(file);
@@ -196,6 +218,19 @@ optional<shared_ptr<GemMetadata>> GemMapping::lookupGemForFile(const core::Globa
     auto filepath = file.data(gs).path();
     if (absl::StartsWith(filepath, core::File::URL_PREFIX)) {
         return this->stdlibGem;
+    }
+    // See https://sorbet.org/docs/rbi#quickref for description of the standard layout.
+    // Based on some Sourcegraph searches, it looks like RBI files can be named either
+    // gem_name.rbi or gem_name@version.rbi.
+    if (absl::StrContains(filepath, "sorbet/rbi/")) {
+        if (absl::StrContains(filepath, "sorbet/rbi/gems/") || absl::StrContains(filepath, "sorbet/rbi/annotations/") ||
+            absl::StrContains(filepath, "sorbet/rbi/dsl/")) {
+            auto metadata = tryParseFilepath(filepath);
+            if (metadata.has_value()) {
+                return metadata;
+            }
+        }
+        // hidden-definitions and todo.rbi get treated as part of the current gem
     }
     if (this->currentGem.has_value()) {
         // TODO Should we enforce here in debug builds?

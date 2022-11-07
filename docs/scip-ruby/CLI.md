@@ -22,10 +22,14 @@ instead (`git rev-parse HEAD`).
 
 ## `--gem-map-path <arg>`
 
-At the moment, scip-ruby requires an extra step for cross-repo
-code navigation; you need to supply information about which
-file belongs to which gem explicitly, using a newline-delimited
-JSON file in the following format:
+For cross-repo navigation, scip-ruby needs to know which files
+belong to which gem. By default, scip-ruby will attempt to
+infer this from filepaths, assuming that files under `sorbet/rbi/{gems,annotations,dsl}/`
+belong to external gems as per the [standard layout](https://sorbet.org/docs/rbi#quickref).
+
+If you have files that contain definitions belonging to other gems,
+but are placed in non-standard directories, you can specify the correct gem information
+using a newline-delimited JSON file in the following format:
 
 <!-- 
 TODO: Uncomment this
@@ -46,16 +50,16 @@ newline-delimited JSON file in the following format:
 ...
 ```
 
-Then pass the path to the JSON file:
+Pass the path to the JSON file:
 
 ```bash
 scip-ruby --gem-map-path path/to/cross-repo-metadata.json
 ```
 
-Paths are interpreted relative to the working directory
+Paths in the JSON file are interpreted relative to the working directory
 for the `scip-ruby` invocation.
 
-If information about the gem being indexed
+If information about the primary gem being indexed (i.e. the one corresponding to the project root)
 cannot be inferred from the filesystem, then you can supply
 the `--gem-metadata` argument as described earlier.
 
@@ -69,7 +73,7 @@ and paths created by traversing directories.
 
 The path for emitting the SCIP index. Defaults to `index.scip`.
 
-## `--unquiet-errors`
+## `--unquiet`
 
 scip-ruby defaults to running in Sorbet's quiet mode, as scip-ruby supports
 indexing `# typed: false` files on a best-effort basis, but Sorbet may

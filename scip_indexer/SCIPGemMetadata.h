@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "absl/strings/str_split.h"
@@ -47,12 +48,12 @@ public:
         return GemMetadata(name, version);
     }
 
-    static std::optional<GemMetadata> tryParse(const std::string &nameAndVersion) {
-        std::vector<std::string> v = absl::StrSplit(nameAndVersion, '@');
+    static std::optional<GemMetadata> tryParse(const std::string_view nameAndVersion) {
+        std::vector<std::string_view> v = absl::StrSplit(nameAndVersion, '@');
         if (v.size() != 2 || v[0].empty() || v[1].empty()) {
             return std::nullopt;
         }
-        return GemMetadata{v[0], v[1]};
+        return GemMetadata{std::string(v[0]), std::string(v[1])};
     }
 
     const std::string &name() const {
