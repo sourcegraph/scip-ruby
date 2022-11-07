@@ -205,7 +205,10 @@ optional<shared_ptr<GemMetadata>> tryParseFilepath(std::string_view filepath) {
     }
     // TODO: Can we do better here by getting dependency versions from somewhere
     // else, like Gemfile.lock? In practice, it looks like files under gems/ have associated
-    // versions, whereas files under annotations/ and gems/ do  not have versions.
+    // versions, whereas files under annotations/ and gems/ do not have versions.
+    // Another potential option is to do two passes over the list of files; first collecting
+    // all external gem names+versions based on sorbet/rbi/gems, and then checking
+    // if the name here matches any known external gem name.
     return make_shared<GemMetadata>(GemMetadata::forTest(string(basename), "latest"));
 }
 
