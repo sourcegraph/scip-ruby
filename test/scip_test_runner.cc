@@ -176,6 +176,51 @@ TEST_CASE("GemMapParsing") {
     ENFORCE(gemMap.lookupGemForFile(gs, unnormalized2).has_value());
 }
 
+// This test might feel a little redundant since we also have a similar integration test.
+// However, the integration test is making sure that the emitted index has the right
+// gem info, which is not checked by this test.
+TEST_CASE("GemInference") {
+    if (!onlyRunUnitTests) {
+        return;
+    }
+    vector<unique_ptr<core::Error>> errors;
+
+    auto logger = spdlog::stderr_color_mt("gem-inference-test");
+    auto errorCollector = make_shared<core::ErrorCollector>();
+    auto errorQueue = make_shared<core::ErrorQueue>(*logger, *logger, errorCollector);
+    core::GlobalState gs(errorQueue);
+    gs.initEmpty(); // needed for proper file table access
+
+    core::FileRef externalGemRBI, annotationsRBI, dslRBI, todoRBI, hiddenDefsRBI, notSorbetRBI;
+    {
+        core::UnfreezeFileTable fileTableAccess(gs);
+        externalGemRBI = gs.enterFile("./sorbet/rbi/gems/extgem@0.rbi", "");
+        annotationsRBI = gs.enterFile("./sorbet/rbi/annotations/myannot.rbi", "");
+        dslRBI = gs.enterFile("sorbet/rbi/dsl/myrails.rbi", "");
+        todoRBI = gs.enterFile("./sorbet/rbi/todo.rbi", "");
+        hiddenDefsRBI = gs.enterFile("./sorbet/rbi/hidden-definitions/hidden.rbi", "");
+        notSorbetRBI = gs.enterFile("myproject/x.rbi", "");
+    }
+
+    scip_indexer::GemMapping gemMap{};
+    gemMap.markCurrentGem(scip_indexer::GemMetadata::forTest("mygem", "33"));
+
+    auto checkGem = [&](core::FileRef file, string name, string version) {
+        auto gem = gemMap.lookupGemForFile(gs, file);
+        ENFORCE(gem.has_value());
+        ENFORCE(*gem->get() == scip_indexer::GemMetadata::forTest(name, version),
+                "\nexpected: name {}, version {}\nobtained: name {}, version {}", name, version, gem->get()->name(),
+                gem->get()->version());
+    };
+
+    checkGem(externalGemRBI, "extgem", "0");
+    checkGem(annotationsRBI, "myannot", "latest");
+    checkGem(dslRBI, "myrails", "latest");
+    checkGem(todoRBI, "mygem", "33");
+    checkGem(hiddenDefsRBI, "mygem", "33");
+    checkGem(notSorbetRBI, "mygem", "33");
+}
+
 // Copied from pipeline_test_runner.cc
 class CFGCollectorAndTyper { // TODO(varun): Copy this over to scip_test_runner.cc
 public:
