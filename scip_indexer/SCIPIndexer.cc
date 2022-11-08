@@ -1187,24 +1187,32 @@ public:
 
     virtual void prepareForTypechecking(const core::GlobalState &gs) override {
         auto maybeMetadata = scip_indexer::GemMetadata::tryParse(this->config.gemMetadata);
+        scip_indexer::GemDependencies deps;
         scip_indexer::GemMetadata currentGem;
         if (maybeMetadata.has_value()) {
-            currentGem = maybeMetadata.value();
-        } // TODO: Issue error for incorrect format in string...
-        if (currentGem.name().empty() || currentGem.version().empty()) {
-            auto [gem, errors] = scip_indexer::GemMetadata::readFromConfig(OSFileSystem());
-            currentGem = gem;
-            for (auto &error : errors) {
-                if (auto e = gs.beginError(core::Loc(), scip_indexer::errors::SCIPRubyDebug)) {
-                    e.setHeader("{}: {}",
-                                error.kind == scip_indexer::GemMetadataError::Kind::Error ? "error" : "warning",
-                                error.message);
-                }
+            deps.currentGem = move(maybeMetadata.value());
+        }
+        auto errors = deps.populateFromConfig(OSFileSystem());
+        for (auto &error : errors) {
+            if (auto e = gs.beginError(core::Loc(), scip_indexer::errors::SCIPRubyDebug)) {
+                e.setHeader("{}: {}", error.kind == scip_indexer::GemMetadataError::Kind::Error ? "error" : "warning",
+                            error.message);
             }
         }
-        this->gemMap.markCurrentGem(currentGem);
+        this->gemMap.addGemDependencies(move(deps));
         if (!this->config.gemMapPath.empty()) {
             this->gemMap.populateFromNDJSON(gs, OSFileSystem(), this->config.gemMapPath);
+        }
+        // Eagerly compute gem information from paths if necessary here,
+        // to avoid synchronization when trying to access gem information
+        // from multiple threads.
+        int i = -1;
+        for (auto file : gs.getFiles()) {
+            i++;
+            if (i == 0) {
+                continue;
+            }
+            this->gemMap.populateCache(core::FileRef(i), file);
         }
     };
 

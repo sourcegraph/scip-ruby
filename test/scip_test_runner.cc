@@ -106,7 +106,8 @@ PATH
     for (auto &testCase : testCases) {
         MockFileSystem fs("/lolz");
         fs.writeFile(testCase.fileName, testCase.content);
-        auto [metadata, actualErrors] = GemMetadata::readFromConfig(fs);
+        GemDependencies deps;
+        auto actualErrors = deps.populateFromConfig(fs);
         UnorderedSet<GemMetadataError> actualErrorSet(actualErrors.begin(), actualErrors.end());
         UnorderedSet<GemMetadataError> expectedErrorSet(testCase.expectedErrors.begin(), testCase.expectedErrors.end());
         auto showError = [](const auto &err) -> string { return err.message + "\n"; };
@@ -202,8 +203,10 @@ TEST_CASE("GemInference") {
         notSorbetRBI = gs.enterFile("myproject/x.rbi", "");
     }
 
+    scip_indexer::GemDependencies deps;
+    deps.addCurrentGem(scip_indexer::GemMetadata::forTest("mygem", "33"));
     scip_indexer::GemMapping gemMap{};
-    gemMap.markCurrentGem(scip_indexer::GemMetadata::forTest("mygem", "33"));
+    gemMap.addGemDependencies(std::move(deps));
 
     auto checkGem = [&](core::FileRef file, string name, string version) {
         auto gem = gemMap.lookupGemForFile(gs, file);
