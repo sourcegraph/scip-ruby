@@ -1,4 +1,4 @@
-name: Release
+name: Release # This name is used by the publish-docker workflow
 on:
   push:
     tags:
