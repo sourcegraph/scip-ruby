@@ -47,6 +47,6 @@ jobs:
           push: true
           tags: |
             sourcegraph/scip-ruby:autoindex
-            sourcegraph/scip-typescript:autoindex-${{ env.PATCH }}
-            sourcegraph/scip-typescript:autoindex-${{ env.MINOR }}
-            sourcegraph/scip-typescript:autoindex-${{ env.MAJOR }}
+            sourcegraph/scip-ruby:autoindex-${{ env.PATCH }}
+            sourcegraph/scip-ruby:autoindex-${{ env.MINOR }}
+            sourcegraph/scip-ruby:autoindex-${{ env.MAJOR }}
