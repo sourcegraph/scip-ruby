@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 ruby:alpine3.16@sha256:a36324de633d5405923b087132c7728af0ec5f7c0f4efee72130b32520edcb44
+FROM --platform=linux/amd64 ruby:2.7.6-alpine3.16@sha256:b014cf3e792d7130daec772241a211c40be009fc7f00e2b728ffe26805649575
 
 RUN apk add --no-cache bash wget make libstdc++ gcc g++ automake autoconf gcompat
 
