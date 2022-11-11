@@ -22,11 +22,14 @@ jobs:
               | tail --lines=1 \
               | cut --delimiter='/' --fields=3)"
           fi
+          PATCH="${TAG/scip-ruby-v/}"
+          MINOR="${PATCH%.*}"
+          MAJOR="${MINOR%.*}"
           {
             echo "TAG=$TAG"
-            echo "PATCH=${TAG/scip-ruby-v/}"
-            echo "MINOR=${PATCH%.*}"
-            echo "MAJOR=${MINOR%.*}"
+            echo "PATCH=$PATCH"
+            echo "MINOR=$MINOR"
+            echo "MAJOR=$MAJOR"
           } >> "$GITHUB_ENV"
         env:
           TAG: ${{ inputs.tag }}
