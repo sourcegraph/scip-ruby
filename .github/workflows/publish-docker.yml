@@ -1,0 +1,52 @@
+name: 'Publish Docker'
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish Docker image for (scip-ruby-vM.N.P)'
+  workflow_run:
+    workflows: ['Release']
+    types:
+      - completed
+
+jobs:
+  release-image:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [ -z "$TAG" ]; then
+            # From https://stackoverflow.com/questions/10649814/get-last-git-tag-from-a-remote-repo-without-cloning
+            TAG="$(git -c 'versionsort.suffix=-' \
+              ls-remote --exit-code --refs --sort='version:refname' --tags https://github.com/sourcegraph/scip-ruby.git 'scip-ruby-v*' \
+              | tail --lines=1 \
+              | cut --delimiter='/' --fields=3)"
+          fi
+          {
+            echo "TAG=$TAG"
+            echo "PATCH=${TAG/scip-ruby-v/}"
+            echo "MINOR=${PATCH%.*}"
+            echo "MAJOR=${MINOR%.*}"
+          } >> "$GITHUB_ENV"
+        env:
+          TAG: ${{ inputs.tag }}
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ env.TAG }}
+      - uses: docker/setup-buildx-action@v2
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Build and push
+        id: docker_build_autoindex
+        uses: docker/build-push-action@v3
+        with:
+          file: Dockerfile.autoindex
+          push: true
+          tags: |
+            sourcegraph/scip-ruby:autoindex
+            sourcegraph/scip-typescript:autoindex-${{ env.PATCH }}
+            sourcegraph/scip-typescript:autoindex-${{ env.MINOR }}
+            sourcegraph/scip-typescript:autoindex-${{ env.MAJOR }}

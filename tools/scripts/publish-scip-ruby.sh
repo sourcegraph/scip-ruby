@@ -21,6 +21,11 @@ if ! grep -q "const char scip_ruby_version\[\] = \"$NEW_VERSION\"" scip_indexer/
   exit 1
 fi
 
+if ! grep -q "download/scip-ruby-$NEW_VERSION" Dockerfile.autoindex; then
+  echo "error: scip-ruby version in Dockerfile is not the latest release version."
+  exit 1
+fi
+
 if ! git diff --quiet; then
   echo "error: Found unstaged changes; aborting."
   exit 1

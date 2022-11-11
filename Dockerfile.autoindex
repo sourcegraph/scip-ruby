@@ -1,0 +1,20 @@
+FROM --platform=linux/amd64 ruby:2.7.6-alpine3.16@sha256:b014cf3e792d7130daec772241a211c40be009fc7f00e2b728ffe26805649575
+
+# This Docker image is meant for auto-indexing support in Sourcegraph
+# and is not recommended for third-party use.
+
+# gcompat is a glibc-musl compat library (scip-ruby links in glibc)
+# Other deps are to help build C extensions in gems.
+RUN apk add --no-cache bash wget make libstdc++ gcc g++ automake autoconf gcompat
+
+# Use a release binary instead of building from source
+# because release builds are very time-consuming.
+#
+# The release version is verified by tools/scripts/publish-scip-ruby.sh
+RUN wget https://github.com/sourcegraph/scip-ruby/releases/download/scip-ruby-v0.3.0/scip-ruby-x86_64-linux -O /usr/bin/scip-ruby && chmod +x /usr/bin/scip-ruby
+
+COPY scip_indexer/autoindex.sh /usr/bin/scip-ruby-autoindex
+
+RUN chmod +x /usr/bin/scip-ruby-autoindex
+
+CMD ["/bin/sh"]
