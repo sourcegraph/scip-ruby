@@ -27,6 +27,7 @@ see the [Design Decisions doc][].
 - [Creating PRs](#creating-prs)
 - [Syncing Sorbet upstream](#syncing-sorbet-upstream)
 - [Cutting a release](#cutting-a-release)
+- [Auto-indexing support](#auto-indexing-support)
 - Troubleshooting
   - [Known build issues][]
   - [Known RubyGems related issues](#known-rubygems-related-issues)
@@ -363,6 +364,7 @@ This will correctly use the `scip-ruby/master` branch as the target.
 
 1. Add release notes to the [CHANGELOG](/CHANGELOG.md).
 2. Bump `scip_ruby_version` in `SCIPIndexer.cc`.
+3. Bump the release version in `Dockerfile.autoindex`.
 
 Run the release script:
 
@@ -373,6 +375,36 @@ NEW_VERSION=M.N.P ./tools/scripts/publish-scip-ruby.sh
 If there are any errors, fix those and re-run.
 A CI job will be kicked off to trigger a release.
 See the [release workflow](/.github/workflows/release.yml) for details.
+
+## Auto-indexing support
+
+scip-ruby includes has a [Docker image](/Dockerfile.autoindex) for auto-indexing support in Sourcegraph.
+From my testing, this doesn't work under Docker on macOS for some reason
+with a loading error (despite accounting for the glibc-musl mismatch with gcompat).
+It does work on Linux. You can build the Docker image for testing using:
+
+```bash
+docker build . --file Dockerfile.autoindex --platform linux/amd64 --tag scip-ruby-testing
+docker run --platform linux/amd64 --rm -it scip-ruby-testing /bin/bash
+```
+
+Auto-indexing is controlled via a [wrapper script](/scip_indexer/autoindex.sh),
+so that we can handle special cases like RubyGems packages in Sourcegraph,
+without putting that logic into the indexer itself.
+
+You can mimic the workflow of auto-indexing a package by running:
+
+```bash
+PACKAGE=activesupport-7.0.1
+mkdir "$PACKAGE" && cd "$PACKAGE"
+wget "https://rubygems.org/gems/$PACKAGE.gem"
+tar -xf "$PACKAGE.gem"
+tar -xzf data.tar.gz && gunzip metadata.gz && mv metadata rubygems-metadata.yml
+
+scip-ruby-autoindex
+```
+
+For a source repo, cloning the repo and running `scip-ruby-autoindex` should do the trick.
 
 ## Troubleshooting
 
