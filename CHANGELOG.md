@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0.3.1
+
+No user-facing changes; this is a synthetic release
+for publishing the Docker image for auto-indexing.
+
 ## v0.3.0
 
 ### Feature additions
