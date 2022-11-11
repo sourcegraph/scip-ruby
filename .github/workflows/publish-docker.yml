@@ -22,10 +22,12 @@ jobs:
               | tail --lines=1 \
               | cut --delimiter='/' --fields=3)"
           fi
-          echo "TAG=$TAG" >> "$GITHUB_ENV"
-          echo "PATCH=${TAG/scip-ruby-v/}" >> "$GITHUB_ENV"
-          echo "MINOR=${PATCH%.*}" >> "$GITHUB_ENV"
-          echo "MAJOR=${MINOR%.*}" >> "$GITHUB_ENV"
+          {
+            echo "TAG=$TAG"
+            echo "PATCH=${TAG/scip-ruby-v/}"
+            echo "MINOR=${PATCH%.*}"
+            echo "MAJOR=${MINOR%.*}"
+          } >> "$GITHUB_ENV"
         env:
           TAG: ${{ inputs.tag }}
       - uses: actions/checkout@v3
