@@ -27,6 +27,10 @@ cc_library(
 
 cc_library(
     name = "doctest_custom_main",
+    # NOTE(varun): sprintf has been deprecated in newer macOS SDKs, and
+    # I was running into puzzling include related issues when upgrading
+    # to doctest 2.4.9, so temporarily silence these warnings.
+    copts = ["-Wno-deprecated-declarations"],
     testonly = True,
     srcs = glob(["doctest/**/*.h"]) + ["dummy-main.cc"],
     local_defines = ["DOCTEST_CONFIG_IMPLEMENT"],
