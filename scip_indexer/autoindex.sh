@@ -36,13 +36,19 @@ initialize_package() {
   # Assume that current directory is the gem root.
   # `gem lock` will emit the current gem too, but we don't want that,
   # as the root already has the source code.
-  #
+
   # FIXME: Allow passing in gem source from the outside
   # Blocked on https://github.com/sourcegraph/sourcegraph/issues/44204
+  #
+  # Not entirely sure in Bundler respects sources in .gemrc
+  # or not, because this issue was closed:
+  #   https://github.com/rubygems/bundler/issues/6633
+  # So we may need to modify both .gemrc and Gemfile.
+  echo "source 'https://rubygems.org'" > Gemfile
+ 
   gem lock "$GEM_NAME-$GEM_VERSION" \
    | grep -v "gem '$GEM_NAME'" \
-   | sed -E 's|^gem|source "https://rubygems.org"\ngem|' \
-   > Gemfile
+   >> Gemfile
 
   initialize_sorbet
 }
