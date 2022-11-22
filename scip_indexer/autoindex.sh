@@ -22,6 +22,15 @@ while [[ $# -gt 0 ]]; do
 done
 
 initialize_sorbet() {
+  echo "group :development do
+  gem 'tapioca', require: false
+end" >> Gemfile
+
+  bundle install
+  bundle exec tapioca init
+}
+
+initialize_package() {
   gem install "$GEM_NAME" -v "$GEM_VERSION"
 
   # Assume that current directory is the gem root.
@@ -35,12 +44,17 @@ initialize_sorbet() {
    | sed -E 's|^gem|source "https://rubygems.org"\ngem|' \
    > Gemfile
 
-  echo "group :development do
-  gem 'tapioca', require: false
-end" >> Gemfile
+  initialize_sorbet
+}
 
-  bundle install
-  bundle exec tapioca init
+check_index_and_exit() {
+  if [ -f "index.scip" ]; then
+    echo "Emitted index.scip successfully."
+    exit 0
+  else
+    echo "Failed to emit index.scip."
+    exit 1
+  fi
 }
 
 # FIXME: Modify the global gem sources list to use the configured host
@@ -58,10 +72,10 @@ if [ -n "${IS_PACKAGE_REPO:-}" ]; then
   if [ -z "${GEM_VERSION:-}" ]; then
     GEM_VERSION="$(grep '  version:' rubygems-metadata.yml | head -n 1 | sed -e 's/  version: //')"
   fi
-  initialize_sorbet
   set +e
+  initialize_package
   scip-ruby . --gem-metadata "$GEM_NAME@$GEM_VERSION"
-  exit 0
+  check_index_and_exit
 fi
 
 if [ -f "sorbet/config" ]; then
@@ -71,11 +85,11 @@ if [ -f "sorbet/config" ]; then
   else
     scip-ruby
   fi
-  exit 0
+  check_index_and_exit
 fi
 
-
 set +e
+initialize_sorbet
 # Can remove this once the 'default to using .' problem in
 # https://github.com/sourcegraph/scip-ruby/issues/133 is fixed.
 if [ -n "${GEM_NAME:-}" ] && [ -n "${GEM_VERSION:-}" ]; then
@@ -83,3 +97,4 @@ if [ -n "${GEM_NAME:-}" ] && [ -n "${GEM_VERSION:-}" ]; then
 else
   scip-ruby .
 fi
+check_index_and_exit
