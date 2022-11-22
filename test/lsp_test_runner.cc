@@ -546,6 +546,7 @@ TEST_CASE("LSPTest") {
         opts->noStdlib = BooleanPropertyAssertion::getValue("no-stdlib", assertions).value_or(false);
         opts->ruby3KeywordArgs =
             BooleanPropertyAssertion::getValue("experimental-ruby3-keyword-args", assertions).value_or(false);
+        opts->stripeMode = BooleanPropertyAssertion::getValue("stripe-mode", assertions).value_or(false);
         opts->requiresAncestorEnabled =
             BooleanPropertyAssertion::getValue("enable-experimental-requires-ancestor", assertions).value_or(false);
         opts->stripePackages = BooleanPropertyAssertion::getValue("enable-packager", assertions).value_or(false);
@@ -640,8 +641,7 @@ TEST_CASE("LSPTest") {
             vector<unique_ptr<LSPMessage>> updates;
             for (auto &filename : filenames) {
                 auto textDocContents = test.sourceFileContents[filename]->source();
-                updates.push_back(
-                    makeChange(testFileUris[filename], string(textDocContents.begin(), textDocContents.end()), 2 + i));
+                updates.push_back(makeChange(testFileUris[filename], textDocContents, 2 + i));
             }
             auto responses = getLSPResponsesFor(*lspWrapper, move(updates));
             updateDiagnostics(config, testFileUris, responses, diagnostics);

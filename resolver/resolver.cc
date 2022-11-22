@@ -869,7 +869,7 @@ private:
                 e.addErrorLine(rhsSym.loc(ctx), "Originally defined here");
                 auto rhsLoc = ctx.locAt(it.rhs->loc);
                 if (rhsLoc.exists()) {
-                    e.replaceWith("Declare as type alias", rhsLoc, "T.type_alias {{{}}}", rhsLoc.source(ctx).value());
+                    e.replaceWith("Declare as type alias", rhsLoc, "T.type_alias {{ {} }}", rhsLoc.source(ctx).value());
                 }
             }
             it.lhs.setResultType(ctx, core::Types::untypedUntracked());
@@ -3432,7 +3432,7 @@ private:
             defParams.push_back(local);
 
             auto spec = absl::c_find_if(sig.argTypes, [&](const auto &spec) { return spec.name == treeArgName; });
-            bool isSyntheticBlkArg = arg.name == core::Names::blkArg();
+            bool isSyntheticBlkArg = arg.isSyntheticBlockArgument();
             bool isBlkArg = arg.flags.isBlock;
 
             if (spec != sig.argTypes.end()) {
@@ -3488,7 +3488,7 @@ private:
                     // Only error if we have any types
                     if (auto e = ctx.state.beginError(arg.loc, core::errors::Resolver::InvalidMethodSignature)) {
                         e.setHeader("Malformed `{}`. Type not specified for argument `{}`", "sig",
-                                    treeArgName.show(ctx));
+                                    arg.argumentName(ctx.state));
                         e.addErrorLine(ctx.locAt(exprLoc), "Signature");
                     }
                 }
@@ -4136,6 +4136,10 @@ ast::ParsedFilesOrCancelled Resolver::runIncremental(core::GlobalState &gs, vect
     trees = ResolveConstantsWalk::resolveConstants(gs, std::move(trees), *workers);
     // NOTE: Linearization does not need to be recomputed as we do not mutate mixins() during incremental resolve.
     verifyLinearizationComputed(gs);
+    // (verifyLinearizationComputed vs finalizeAncestors is currently the only difference between
+    // `run` and `runIncremental`. If we ever change the fast path in a way that needs linearization
+    // to be recomputed, we can simply make `runIncremental` be `run`.)
+    Resolver::finalizeSymbols(gs);
     auto rtmafResult = ResolveTypeMembersAndFieldsWalk::run(gs, std::move(trees), *workers);
     auto result = resolveSigs(gs, std::move(rtmafResult.trees), *workers);
     ResolveTypeMembersAndFieldsWalk::resolvePendingCastItems(gs, rtmafResult.todoResolveCastItems);
