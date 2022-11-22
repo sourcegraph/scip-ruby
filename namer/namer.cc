@@ -140,23 +140,24 @@ class SymbolFinder {
         return getOwnerSkippingMethods().first;
     }
 
-    // Returns index to foundDefs containing the given name. Recursively inserts class refs for its owners.
-    core::FoundDefinitionRef squashNames(const ast::ExpressionPtr &node) {
+    core::FoundDefinitionRef defineScope(core::FoundDefinitionRef owner, const ast::ExpressionPtr &node) {
         if (auto *id = ast::cast_tree<ast::ConstantLit>(node)) {
             // Already defined. Insert a foundname so we can reference it.
             auto sym = id->symbol;
             ENFORCE(sym.exists());
-            return foundDefs->addSymbol(sym);
+            return foundDefs->addSymbol(sym.asClassOrModuleRef());
         } else if (auto constLit = ast::cast_tree<ast::UnresolvedConstantLit>(node)) {
-            core::FoundClassRef found;
-            found.owner = squashNames(constLit->scope);
+            core::FoundClass found;
+            found.owner = defineScope(owner, constLit->scope);
             found.name = constLit->cnst;
             found.loc = constLit->loc;
-            return foundDefs->addClassRef(move(found));
+            found.declLoc = constLit->loc;
+            found.classKind = core::FoundClass::Kind::Unknown;
+            return foundDefs->addClass(move(found));
         } else {
-            // `class <<self`, `::Foo`, `self::Foo`
-            // Return non-existent nameref as placeholder.
-            return core::FoundDefinitionRef();
+            // Either EmptyTree (no more scope) or something is ill-formed (arbitrary expr for const scope?)
+            // Fall back to just using `owner`.
+            return owner;
         }
     }
 
@@ -172,25 +173,26 @@ public:
         auto &klass = ast::cast_tree_nonnull<ast::ClassDef>(tree);
 
         core::FoundClass found;
-        found.owner = getOwner();
-        found.classKind = klass.kind;
+        found.classKind = ast::ClassDef::kindToFoundClassKind(klass.kind);
         found.loc = klass.loc;
         found.declLoc = klass.declLoc;
 
         auto *ident = ast::cast_tree<ast::UnresolvedIdent>(klass.name);
         if ((ident != nullptr) && ident->name == core::Names::singleton()) {
-            core::FoundClassRef foundRef;
-            foundRef.name = ident->name;
-            foundRef.loc = ident->loc;
-            found.klass = foundDefs->addClassRef(move(foundRef));
+            found.owner = getOwner();
+            found.name = ident->name;
         } else {
             if (klass.symbol == core::Symbols::todo()) {
-                found.klass = squashNames(klass.name);
+                const auto &constLit = ast::cast_tree_nonnull<ast::UnresolvedConstantLit>(klass.name);
+                found.owner = defineScope(getOwner(), constLit.scope);
+                found.name = constLit.cnst;
             } else {
                 // Desugar populates a top-level root() ClassDef.
                 // Nothing else should have been typeAlias by now.
                 ENFORCE(klass.symbol == core::Symbols::root());
-                found.klass = foundDefs->addSymbol(klass.symbol);
+                auto owner = foundDefs->addSymbol(klass.symbol);
+                found.owner = owner;
+                found.name = klass.symbol.data(ctx)->name;
             }
         }
 
@@ -465,8 +467,7 @@ public:
         auto &lhs = ast::cast_tree_nonnull<ast::UnresolvedConstantLit>(asgn.lhs);
 
         core::FoundStaticField found;
-        found.owner = getOwner();
-        found.scopeClass = squashNames(lhs.scope);
+        found.owner = defineScope(getOwner(), lhs.scope);
         found.name = lhs.cnst;
         found.asgnLoc = asgn.loc;
         found.lhsLoc = lhs.loc;
@@ -612,7 +613,6 @@ public:
     struct State {
         // See getOwnerSymbol for how both of these work.
         vector<core::ClassOrModuleRef> definedClasses;
-        vector<core::MethodRef> definedMethods;
 
         State() = default;
         State(const State &) = delete;
@@ -622,35 +622,11 @@ public:
     };
 
 private:
-    State state;
     const core::FoundDefinitions &foundDefs;
     const optional<core::FoundDefHashes> oldFoundHashes;
 
-    // Returns a symbol to the referenced name. Name must be a class or module.
-    // Prerequisite: Owner is a class or module.
-    core::SymbolRef squashNames(core::MutableContext ctx, core::FoundDefinitionRef ref, core::ClassOrModuleRef owner) {
-        switch (ref.kind()) {
-            case core::FoundDefinitionRef::Kind::Empty:
-                return owner;
-            case core::FoundDefinitionRef::Kind::Symbol: {
-                return ref.symbol();
-            }
-            case core::FoundDefinitionRef::Kind::ClassRef: {
-                auto &klassRef = ref.klassRef(foundDefs);
-                auto newOwner = squashNames(ctx, klassRef.owner, owner);
-                return getOrDefineSymbol(ctx.withOwner(newOwner), klassRef.name, klassRef.loc);
-            }
-            case core::FoundDefinitionRef::Kind::Class:
-            case core::FoundDefinitionRef::Kind::Method:
-            case core::FoundDefinitionRef::Kind::StaticField:
-            case core::FoundDefinitionRef::Kind::TypeMember:
-            case core::FoundDefinitionRef::Kind::Field:
-                Exception::raise("Invalid name reference {}", core::FoundDefinitionRef::kindToString(ref.kind()));
-        }
-    }
-
     // Get the symbol for an already-defined owner. Limited to refs that can own things (classes and methods).
-    core::SymbolRef getOwnerSymbol(core::FoundDefinitionRef ref) {
+    core::ClassOrModuleRef getOwnerSymbol(const SymbolDefiner::State &state, core::FoundDefinitionRef ref) {
         switch (ref.kind()) {
             case core::FoundDefinitionRef::Kind::Symbol:
                 return ref.symbol();
@@ -659,7 +635,6 @@ private:
                 return state.definedClasses[ref.idx()];
             case core::FoundDefinitionRef::Kind::Method:
             case core::FoundDefinitionRef::Kind::Empty:
-            case core::FoundDefinitionRef::Kind::ClassRef:
             case core::FoundDefinitionRef::Kind::StaticField:
             case core::FoundDefinitionRef::Kind::TypeMember:
             case core::FoundDefinitionRef::Kind::Field:
@@ -726,58 +701,6 @@ private:
     void emitRedefinedConstantError(core::MutableContext ctx, core::LocOffsets errorLoc, core::SymbolRef symbol,
                                     core::SymbolRef prevSymbol) {
         emitRedefinedConstantError(ctx, errorLoc, symbol.name(ctx), symbol.kind(), prevSymbol);
-    }
-
-    core::ClassOrModuleRef ensureScopeIsClass(core::MutableContext ctx, core::SymbolRef scope,
-                                              core::NameRef nameForErrors, core::LocOffsets loc) {
-        // Common case: Everything is fine, user is trying to define a symbol on a class or module.
-        if (scope.isClassOrModule()) {
-            ENFORCE(!isMangleRenameUniqueName(ctx, scope.name(ctx)));
-            return scope.asClassOrModuleRef();
-        }
-
-        // Check if class was already mangled.
-        auto klassSymbol = ctx.state.lookupClassSymbol(scope.owner(ctx).asClassOrModuleRef(), scope.name(ctx));
-        if (klassSymbol.exists()) {
-            ENFORCE(isMangleRenameUniqueName(ctx, klassSymbol.data(ctx)->name));
-            if (auto e = ctx.beginError(loc, core::errors::Namer::InvalidClassOwner)) {
-                auto constLitName = nameForErrors.show(ctx);
-                auto scopeName = scope.show(ctx);
-                e.setHeader("Can't nest `{}` under `{}` because `{}` is not a class or module", constLitName, scopeName,
-                            scopeName);
-                e.addErrorLine(klassSymbol.data(ctx)->loc(), "`{}` defined here", scopeName);
-            }
-            return klassSymbol;
-        }
-
-        if (auto e = ctx.beginError(loc, core::errors::Namer::InvalidClassOwner)) {
-            auto constLitName = nameForErrors.show(ctx);
-            auto newOwnerName = scope.show(ctx);
-            e.setHeader("Can't nest `{}` under `{}` because `{}` is not a class or module", constLitName, newOwnerName,
-                        newOwnerName);
-            e.addErrorLine(scope.loc(ctx), "`{}` defined here", newOwnerName);
-        }
-        auto scopeOwner = scope.owner(ctx).asClassOrModuleRef();
-        auto scopeName = ctx.state.nextMangledName(scopeOwner, scope.name(ctx));
-        auto scopeKlass = ctx.state.enterClassSymbol(ctx.locAt(loc), scopeOwner, scopeName);
-        scopeKlass.data(ctx)->singletonClass(ctx); // force singleton class into existance
-        return scopeKlass;
-    }
-
-    // Gets the symbol with the given name, or defines it as a class if it does not exist.
-    core::SymbolRef getOrDefineSymbol(core::MutableContext ctx, core::NameRef name, core::LocOffsets loc) {
-        if (name == core::Names::singleton()) {
-            return ctx.owner.enclosingClass(ctx).data(ctx)->singletonClass(ctx);
-        }
-
-        auto scope = ensureScopeIsClass(ctx, ctx.owner, name, loc);
-        core::SymbolRef existing = scope.data(ctx)->findMember(ctx, name);
-        if (!existing.exists()) {
-            existing = ctx.state.enterClassSymbol(ctx.locAt(loc), scope, name);
-            existing.asClassOrModuleRef().data(ctx)->singletonClass(ctx); // force singleton class into existance
-        }
-
-        return existing;
     }
 
     void defineArg(core::MutableContext ctx, core::MethodData &methodData, int pos, const core::ParsedArg &parsedArg) {
@@ -1019,12 +942,22 @@ private:
         if (name.kind() == core::NameKind::UNIQUE &&
             name.dataUnique(ctx)->uniqueNameKind == core::UniqueNameKind::MangleRenameOverload) {
             // These name kinds are only created in resolver, which means that we must be running on
-            // the fast path with an existing GlobalState.
-            // When modifyMethod is called later, it won't be able to find the correct method entry.
-            // Let's leave the method visibility what it was.
-            // TODO(jez) After #5808 lands, can we delete this check?
-            // TODO(jez) The change to only populate oldFoundHashesForFiles if something
-            // actually changed means that no, we actually can't remove this quite yet.
+            // the fast path but not with the incremental namer.
+            // If we let the rest of insertMethod run, it will mark this method as public even if it was
+            // already private. Then modifyMethod will attempt to mark a method private by name
+            // (instead of by name and arity hash), which will have the effect of NOT re-marking the
+            // MangleRenameOverload method as private (it will remain public). Then later in
+            // resolver, the visibility of the MangleRenameOverload is propagated to all overloads,
+            // which will make them all public.
+            //
+            // Any case where the visibility would have actually changed would have come via an
+            // edit, which would then trigger an incremental namer run. So we know that this
+            // typecheck is only for the purpose of e.g. answering a hover, and we don't actually
+            // need to mutate GlobalState for any changes. So we can just short circuit.
+            //
+            // One way to change this in the future might be to make FoundModifier attempt to record
+            // something about the method arity in addition to just the method's name. But for the
+            // time being this hack suffices. (See the commit where this comment was added a test)
             return symbol;
         }
 
@@ -1092,61 +1025,50 @@ private:
         }
     }
 
-    core::ClassOrModuleRef getClassSymbol(core::MutableContext ctx, const core::FoundClass &klass) {
-        core::SymbolRef symbol = squashNames(ctx, klass.klass, ctx.owner.enclosingClass(ctx));
-        ENFORCE(symbol.exists());
-        auto owner = symbol.owner(ctx).asClassOrModuleRef();
-
-        const bool isModule = klass.classKind == ast::ClassDef::Kind::Module;
-        auto declLoc = ctx.locAt(klass.declLoc);
-        if (!symbol.isClassOrModule()) {
-            // we might have already mangled the class symbol, so see if we have a symbol that is a class already
-            auto klassSymbol = ctx.state.lookupClassSymbol(owner, symbol.name(ctx));
-            if (klassSymbol.exists()) {
-                return klassSymbol;
+    core::ClassOrModuleRef getClassSymbol(core::MutableContext ctx, const State &state, const core::FoundClass &klass) {
+        core::ClassOrModuleRef symbol;
+        if (klass.name == core::Names::Constants::Root()) {
+            symbol = core::Symbols::root();
+        } else if (klass.name == core::Names::singleton()) {
+            symbol = ctx.owner.asClassOrModuleRef().data(ctx)->singletonClass(ctx);
+        } else {
+            auto owner = getOwnerSymbol(state, klass.owner);
+            auto member = owner.data(ctx)->findMember(ctx, klass.name);
+            if (member.exists()) {
+                // If member exists with this name, it must be a class or module, because we never mangle-rename them.
+                symbol = member.asClassOrModuleRef();
+            } else {
+                auto newClass = ctx.state.enterClassSymbol(ctx.locAt(klass.declLoc), owner, klass.name);
+                symbol = newClass;
             }
-
-            emitRedefinedConstantError(ctx, klass.loc, symbol.name(ctx), core::SymbolRef::Kind::ClassOrModule, symbol);
-
-            auto name = ctx.state.nextMangledName(owner, symbol.name(ctx));
-            klassSymbol = ctx.state.enterClassSymbol(declLoc, owner, name);
-            klassSymbol.data(ctx)->setIsModule(isModule);
-
-            auto oldSymCount = ctx.state.classAndModulesUsed();
-            auto newSingleton = klassSymbol.data(ctx)->singletonClass(ctx); // force singleton class into existence
-            ENFORCE(newSingleton.id() >= oldSymCount,
-                    "should be a fresh symbol. Otherwise we could be reusing an existing singletonClass");
-            return klassSymbol;
         }
+        ENFORCE(symbol.exists());
 
-        auto klassSymbol = symbol.asClassOrModuleRef();
-        if (klassSymbol.data(ctx)->isClassModuleSet() && isModule != klassSymbol.data(ctx)->isModule()) {
+        const bool isUnknown = klass.classKind == core::FoundClass::Kind::Unknown;
+        const bool isModule = klass.classKind == core::FoundClass::Kind::Module;
+        auto declLoc = ctx.locAt(klass.declLoc);
+
+        if (symbol.data(ctx)->isClassModuleSet() && !isUnknown && isModule != symbol.data(ctx)->isModule()) {
             if (auto e = ctx.state.beginError(declLoc, core::errors::Namer::ModuleKindRedefinition)) {
                 e.setHeader("`{}` was previously defined as a `{}`", symbol.show(ctx),
-                            klassSymbol.data(ctx)->isModule() ? "module" : "class");
+                            symbol.data(ctx)->isModule() ? "module" : "class");
 
-                for (auto loc : klassSymbol.data(ctx)->locs()) {
+                for (auto loc : symbol.data(ctx)->locs()) {
                     if (loc != declLoc) {
                         e.addErrorLine(loc, "Previous definition");
                     }
                 }
             }
-        } else {
-            klassSymbol.data(ctx)->setIsModule(isModule);
-            auto name = klassSymbol.data(ctx)->name;
-            if (isMangleRenameUniqueName(ctx, name)) {
-                // TODO(jez) is `symbol.name(ctx)` the correct name to look up with?
-                auto renamed = ctx.state.lookupSymbol(owner, symbol.name(ctx));
-                emitRedefinedConstantError(ctx, klass.loc, symbol, renamed);
-            }
+        } else if (!isUnknown) {
+            symbol.data(ctx)->setIsModule(isModule);
         }
-        return klassSymbol;
+        return symbol;
     }
 
-    core::ClassOrModuleRef insertClass(core::MutableContext ctx, const core::FoundClass &klass) {
-        auto symbol = getClassSymbol(ctx, klass);
+    core::ClassOrModuleRef insertClass(core::MutableContext ctx, const State &state, const core::FoundClass &klass) {
+        auto symbol = getClassSymbol(ctx, state, klass);
 
-        if (klass.classKind == ast::ClassDef::Kind::Class && !symbol.data(ctx)->superClass().exists() &&
+        if (klass.classKind == core::FoundClass::Kind::Class && !symbol.data(ctx)->superClass().exists() &&
             symbol != core::Symbols::BasicObject()) {
             symbol.data(ctx)->setSuperClass(core::Symbols::todo());
         }
@@ -1158,20 +1080,39 @@ private:
             symbol.data(ctx)->setSuperClass(core::Symbols::Net_Protocol());
         }
 
+        // Skip adding locs when kind is Unknown, becaue that means it was a only a FoundClass for a
+        // class or static field scope (not the class def itself), and we want to treat those as
+        // usage locs, not definition locs.
+        // TODO(jez) This causes known problems on the fast path, where these locs can fail to be
+        // updated and crash. We've chosen the current approach because (1) it matches old behavior
+        // (2) adding O(files) locs for something like Opus is far too slow.
+        const bool isUnknown = klass.classKind == core::FoundClass::Kind::Unknown;
         // Don't add locs for <root>; 1) they aren't useful and 2) they'll end up with O(files in
         // project) locs!
-        if (symbol != core::Symbols::root()) {
+        if (symbol != core::Symbols::root() && !isUnknown) {
             symbol.data(ctx)->addLoc(ctx, ctx.locAt(klass.declLoc));
         }
         auto singletonClass = symbol.data(ctx)->singletonClass(ctx); // force singleton class into existence
-        if (symbol != core::Symbols::root()) {
+        if (symbol != core::Symbols::root() && !isUnknown) {
             singletonClass.data(ctx)->addLoc(ctx, ctx.locAt(klass.declLoc));
         }
+
+        // Reset resultType to nullptr for idempotency on the fast path--it will always be
+        // re-entered in resolver.
+        symbol.data(ctx)->resultType = nullptr;
+        singletonClass.data(ctx)->resultType = nullptr;
+        // TODO(jez) This is a gross hack. We are basically re-implementing the logic in
+        // singletonClass to reset the <AttachedClass> type template to what it used to be.
+        // Is there a better way to accomplish this? (This is largely the same as the bad locs problem above;
+        // we can probably be more principled about what state calling `singletonClass` sets up/resets.)
+        auto todo = core::make_type<core::ClassType>(core::Symbols::todo());
+        auto tp = singletonClass.data(ctx)->members()[core::Names::Constants::AttachedClass()].asTypeMemberRef();
+        tp.data(ctx)->resultType = core::make_type<core::LambdaParam>(tp, todo, todo);
 
         // make sure we've added a static init symbol so we have it ready for the flatten pass later
         if (symbol == core::Symbols::root()) {
             ctx.state.staticInitForFile(ctx.locAt(klass.loc));
-        } else {
+        } else if (!isUnknown) {
             ctx.state.staticInitForClass(symbol, ctx.locAt(klass.loc));
         }
 
@@ -1257,11 +1198,11 @@ private:
         return sym;
     }
 
-    core::FieldRef insertStaticField(core::MutableContext ctx, const core::FoundStaticField &staticField) {
+    core::FieldRef insertStaticField(core::MutableContext ctx, const State &state,
+                                     const core::FoundStaticField &staticField) {
         ENFORCE(ctx.owner.isClassOrModule());
 
-        auto scope = ensureScopeIsClass(ctx, squashNames(ctx, staticField.scopeClass, contextClass(ctx, ctx.owner)),
-                                        staticField.name, staticField.asgnLoc);
+        auto scope = getOwnerSymbol(state, staticField.owner);
         auto name = staticField.name;
         auto sym = ctx.state.lookupStaticFieldSymbol(scope, name);
         auto currSym = ctx.state.lookupSymbol(scope, name);
@@ -1290,7 +1231,8 @@ private:
         return sym;
     }
 
-    core::SymbolRef insertTypeMember(core::MutableContext ctx, const core::FoundTypeMember &typeMember) {
+    core::SymbolRef insertTypeMember(core::MutableContext ctx, const State &state,
+                                     const core::FoundTypeMember &typeMember) {
         if (ctx.owner == core::Symbols::root()) {
             core::FoundStaticField staticField;
             staticField.owner = typeMember.owner;
@@ -1298,7 +1240,7 @@ private:
             staticField.asgnLoc = typeMember.asgnLoc;
             staticField.lhsLoc = typeMember.asgnLoc;
             staticField.isTypeAlias = true;
-            return insertStaticField(ctx, staticField);
+            return insertStaticField(ctx, state, staticField);
         }
 
         core::Variance variance = core::Variance::Invariant;
@@ -1446,6 +1388,8 @@ private:
                         ctx.state.deleteFieldSymbol(oldSymbol.asFieldRef());
                         break;
                     case core::SymbolRef::Kind::TypeMember:
+                        ctx.state.deleteTypeMemberSymbol(oldSymbol.asTypeMemberRef());
+                        break;
                     case core::SymbolRef::Kind::ClassOrModule:
                     case core::SymbolRef::Kind::TypeArgument:
                         ENFORCE(false);
@@ -1455,78 +1399,148 @@ private:
         }
     }
 
-    void deleteFieldViaFullNameHash(core::MutableContext ctx, const core::FoundFieldHash &oldDefHash) {
-        auto ownerRef = core::FoundDefinitionRef(core::FoundDefinitionRef::Kind::Class, oldDefHash.owner.idx);
+    void deleteStaticFieldViaFullNameHash(core::MutableContext ctx, const SymbolDefiner::State &state,
+                                          const core::FoundStaticFieldHash &oldDefHash) {
+        ENFORCE(oldDefHash.nameHash.isDefined(), "Can't delete rename if old hash is not defined");
+
+        auto owner = getOwnerSymbol(state, oldDefHash.owner());
+        deleteSymbolViaFullNameHash(ctx, owner, oldDefHash.nameHash);
+    }
+
+    void deleteTypeMemberViaFullNameHash(core::MutableContext ctx, const SymbolDefiner::State &state,
+                                         const core::FoundTypeMemberHash &oldDefHash) {
         ENFORCE(oldDefHash.nameHash.isDefined(), "Can't delete rename if old hash is not defined");
 
         // Changes to classes/modules take the slow path, so getOwnerSymbol is okay to call here
-        auto ownerSymbol = getOwnerSymbol(ownerRef);
-        auto owner = ownerSymbol.asClassOrModuleRef();
-        if (oldDefHash.owner.onSingletonClass) {
+        auto owner = getOwnerSymbol(state, oldDefHash.owner());
+        if (oldDefHash.isTypeTemplate) {
+            // Also have to delete the static-field-class-alias that forwards from a constant
+            // literal on the attached class to the type template on the singleton class
+            deleteSymbolViaFullNameHash(ctx, owner, oldDefHash.nameHash);
+
             owner = owner.data(ctx)->singletonClass(ctx);
         }
 
         deleteSymbolViaFullNameHash(ctx, owner, oldDefHash.nameHash);
     }
 
-    void deleteMethodViaFullNameHash(core::MutableContext ctx, const core::FoundMethodHash &oldDefHash) {
-        auto ownerRef = core::FoundDefinitionRef(core::FoundDefinitionRef::Kind::Class, oldDefHash.owner.idx);
-        ENFORCE(oldDefHash.nameHash.isDefined(), "Can't delete rename if old hash is not defined");
+    void deleteFieldViaFullNameHash(core::MutableContext ctx, const SymbolDefiner::State &state,
+                                    const core::FoundFieldHash &oldDefHash) {
+        ENFORCE(oldDefHash.nameHash.isDefined(), "Can't delete via hash if old hash is not defined");
 
         // Changes to classes/modules take the slow path, so getOwnerSymbol is okay to call here
-        auto ownerSymbol = getOwnerSymbol(ownerRef);
-        ENFORCE(ownerSymbol.isClassOrModule());
-        auto owner = methodOwner(ctx, ownerSymbol, oldDefHash.owner.useSingletonClass);
+        auto owner = getOwnerSymbol(state, oldDefHash.owner());
+        if (oldDefHash.onSingletonClass) {
+            owner = owner.data(ctx)->singletonClass(ctx);
+        }
 
         deleteSymbolViaFullNameHash(ctx, owner, oldDefHash.nameHash);
     }
 
-    void deleteOldDefinitionsInternal(core::MutableContext ctx) {
+    void deleteMethodViaFullNameHash(core::MutableContext ctx, const SymbolDefiner::State &state,
+                                     const core::FoundMethodHash &oldDefHash) {
+        ENFORCE(oldDefHash.nameHash.isDefined(), "Can't delete via hash if old hash is not defined");
+
+        // Changes to classes/modules take the slow path, so getOwnerSymbol is okay to call here
+        auto ownerSymbol = getOwnerSymbol(state, oldDefHash.owner());
+        auto owner = methodOwner(ctx, ownerSymbol, oldDefHash.useSingletonClass);
+
+        deleteSymbolViaFullNameHash(ctx, owner, oldDefHash.nameHash);
+    }
+
+public:
+    void deleteOldDefinitions(core::MutableContext ctx, const SymbolDefiner::State &state) {
+        Timer timeit(ctx.state.tracer(), "deleteOldDefinitions");
         if (oldFoundHashes.has_value()) {
             const auto &oldFoundHashesVal = oldFoundHashes.value();
 
-            for (const auto &oldFieldHash : oldFoundHashesVal.fieldHashes) {
-                if (oldFieldHash.owner.isInstanceVariable) {
-                    deleteFieldViaFullNameHash(ctx, oldFieldHash);
+            for (const auto &oldStaticFieldHash : oldFoundHashesVal.staticFieldHashes) {
+                deleteStaticFieldViaFullNameHash(ctx, state, oldStaticFieldHash);
+            }
+
+            for (const auto &oldTypeMemberHash : oldFoundHashesVal.typeMemberHashes) {
+                deleteTypeMemberViaFullNameHash(ctx, state, oldTypeMemberHash);
+            }
+
+            for (auto klass : state.definedClasses) {
+                // In the process of recovering from "parent type member must be re-declared in child" errors,
+                // GlobalPass will create type members even if there isn't a `type_member` in the child class' body.
+                // There won't be an entry in the old typeMemberHashes for these type members, so we have to
+                // delete them manually.
+                auto currentClass = klass;
+                vector<core::TypeMemberRef> toDelete;
+                do {
+                    const auto &typeMembers = currentClass.data(ctx)->typeMembers();
+                    toDelete.reserve(typeMembers.size());
+                    for (const auto &typeMember : typeMembers) {
+                        if (typeMember.data(ctx)->name == core::Names::Constants::AttachedClass()) {
+                            // <AttachedClass> type templates are created when the singleton class was created.
+                            // Since we don't delete and re-add classes on the fast path, we both can and must leave
+                            // these `<AttachedClass>` type templates alone
+                            continue;
+                        }
+                        toDelete.emplace_back(typeMember);
+                    }
+
+                    currentClass = currentClass.data(ctx)->lookupSingletonClass(ctx);
+                } while (currentClass.exists());
+
+                for (auto oldTypeMember : toDelete) {
+                    oldTypeMember.data(ctx)->removeLocsForFile(ctx.file);
+                    if (oldTypeMember.data(ctx)->locs().empty()) {
+                        ctx.state.deleteTypeMemberSymbol(oldTypeMember);
+                    }
                 }
+            }
+
+            for (const auto &oldFieldHash : oldFoundHashesVal.fieldHashes) {
+                deleteFieldViaFullNameHash(ctx, state, oldFieldHash);
             }
 
             for (const auto &oldMethodHash : oldFoundHashesVal.methodHashes) {
                 // Since we've already processed all the non-method symbols (which includes classes), we now
                 // guarantee that deleteViaFullNameHash can use getOwnerSymbol to lookup an old owner
                 // ref in the new definedClasses vector.
-                deleteMethodViaFullNameHash(ctx, oldMethodHash);
+                deleteMethodViaFullNameHash(ctx, state, oldMethodHash);
             }
         }
     }
 
-public:
-    SymbolDefiner(State state, const core::FoundDefinitions &foundDefs, optional<core::FoundDefHashes> oldFoundHashes)
-        : state(move(state)), foundDefs(foundDefs), oldFoundHashes(move(oldFoundHashes)) {}
+    SymbolDefiner(const core::FoundDefinitions &foundDefs, optional<core::FoundDefHashes> oldFoundHashes)
+        : foundDefs(foundDefs), oldFoundHashes(move(oldFoundHashes)) {}
 
-    void enterNonDeletableDefinitions(core::MutableContext ctx) {
+    SymbolDefiner::State enterClassDefinitions(core::MutableContext ctx) {
+        SymbolDefiner::State state;
         state.definedClasses.reserve(foundDefs.klasses().size());
-        state.definedMethods.reserve(foundDefs.methods().size());
 
         for (const auto &klass : foundDefs.klasses()) {
-            state.definedClasses.emplace_back(insertClass(ctx.withOwner(getOwnerSymbol(klass.owner)), klass));
+            state.definedClasses.emplace_back(
+                insertClass(ctx.withOwner(getOwnerSymbol(state, klass.owner)), state, klass));
         }
 
-        for (auto ref : foundDefs.nonDeletableDefinitions()) {
+        return state;
+    }
+
+    void enterNewDefinitions(core::MutableContext ctx, SymbolDefiner::State &&state) {
+        // We have to defer defining "deletable" symbols until this (second) phase of incremental
+        // namer so that we don't delete and immediately re-enter a symbol (possibly keeping it
+        // alive, if it had multiple locs at the time of deletion) before SymbolDefiner has had a
+        // chance to process _all_ files.
+
+        for (auto ref : foundDefs.deletableDefinitions()) {
             switch (ref.kind()) {
                 case core::FoundDefinitionRef::Kind::StaticField: {
                     const auto &staticField = ref.staticField(foundDefs);
-                    insertStaticField(ctx.withOwner(getOwnerSymbol(staticField.owner)), staticField);
+                    insertStaticField(ctx.withOwner(getOwnerSymbol(state, staticField.owner)), state, staticField);
                     break;
                 }
                 case core::FoundDefinitionRef::Kind::TypeMember: {
                     const auto &typeMember = ref.typeMember(foundDefs);
-                    insertTypeMember(ctx.withOwner(getOwnerSymbol(typeMember.owner)), typeMember);
+                    insertTypeMember(ctx.withOwner(getOwnerSymbol(state, typeMember.owner)), state, typeMember);
                     break;
                 }
                 case core::FoundDefinitionRef::Kind::Class:
                 case core::FoundDefinitionRef::Kind::Empty:
-                case core::FoundDefinitionRef::Kind::ClassRef:
                 case core::FoundDefinitionRef::Kind::Method:
                 case core::FoundDefinitionRef::Kind::Field:
                 case core::FoundDefinitionRef::Kind::Symbol:
@@ -1534,42 +1548,23 @@ public:
                     break;
             }
         }
-    }
 
-    SymbolDefiner::State deleteOldDefinitions(core::MutableContext ctx) {
-        deleteOldDefinitionsInternal(ctx);
-        return move(state);
-    }
-
-    void enterNewDefinitions(core::MutableContext ctx) {
-        // TODO(jez) After everything but classes is handled on the fast path, I think we can go
-        // back to having a single list of (non-class) definitions with a switch statement, like how
-        // namer used to work.
-
-        // We have to defer defining "deletable" symbols until this (second) phase of incremental
-        // namer so that we don't delete and immediately re-enter a symbol (possibly keeping it
-        // alive, if it had multiple locs at the time of deletion) before SymbolDefiner has had a
-        // chance to process _all_ files.
         for (auto &method : foundDefs.methods()) {
             if (method.arityHash.isAliasMethod()) {
                 // We need alias methods in the FoundDefinitions list not so that we can actually
                 // create method symbols for them yet, but just so we can know which alias methods
                 // to delete on the fast path. Alias methods will be defined later, in resolver.
-                //
-                // We still need to put something here so that other found definitions that
-                // reference methods will get the correct symbols.
-                state.definedMethods.emplace_back(core::MethodRef{});
                 continue;
             }
-            state.definedMethods.emplace_back(insertMethod(ctx.withOwner(getOwnerSymbol(method.owner)), method));
+            insertMethod(ctx.withOwner(getOwnerSymbol(state, method.owner)), method);
         }
 
         for (auto &field : foundDefs.fields()) {
-            insertField(ctx.withOwner(getOwnerSymbol(field.owner)), field);
+            insertField(ctx.withOwner(getOwnerSymbol(state, field.owner)), field);
         }
 
         for (const auto &modifier : foundDefs.modifiers()) {
-            const auto owner = getOwnerSymbol(modifier.owner);
+            const auto owner = getOwnerSymbol(state, modifier.owner);
             switch (modifier.kind) {
                 case core::FoundModifier::Kind::Method:
                     modifyMethod(ctx.withOwner(owner), modifier);
@@ -1582,15 +1577,6 @@ public:
                     break;
             }
         }
-    }
-
-    SymbolDefiner::State run(core::MutableContext ctx) {
-        enterNonDeletableDefinitions(ctx);
-        enterNewDefinitions(ctx);
-
-        state.definedClasses.clear();
-        state.definedMethods.clear();
-        return move(state);
     }
 };
 
@@ -1925,7 +1911,8 @@ public:
                     insertLoc, fmt::format(" do\n{0}  {{{1}}}\n{0}end", indent, kwArgsSource)});
             }
         } else {
-            edits.emplace_back(core::AutocorrectSuggestion::Edit{insertLoc, fmt::format(" {{{{{}}}}}", kwArgsSource)});
+            edits.emplace_back(
+                core::AutocorrectSuggestion::Edit{insertLoc, fmt::format(" {{ {{{}}} }}", kwArgsSource)});
         }
         e.addAutocorrect(core::AutocorrectSuggestion{
             fmt::format("Convert `{}` to block form", send->fun.show(ctx)),
@@ -2153,24 +2140,52 @@ vector<SymbolFinderResult> findSymbols(const core::GlobalState &gs, vector<ast::
 
 void populateFoundDefHashes(core::Context ctx, core::FoundDefinitions &foundDefs,
                             core::FoundDefHashes &foundHashesOut) {
+    ENFORCE(foundHashesOut.staticFieldHashes.empty());
+    foundHashesOut.staticFieldHashes.reserve(foundDefs.staticFields().size());
+    for (const auto &staticField : foundDefs.staticFields()) {
+        auto owner = staticField.owner;
+        ENFORCE(owner.kind() == core::FoundDefinitionRef::Kind::Class ||
+                    owner.kind() == core::FoundDefinitionRef::Kind::Symbol,
+                "kind={}", core::FoundDefinitionRef::kindToString(owner.kind()));
+        auto ownerIsSymbol = owner.kind() == core::FoundDefinitionRef::Kind::Symbol;
+        auto fullNameHash = core::FullNameHash(ctx, staticField.name);
+        foundHashesOut.staticFieldHashes.emplace_back(owner.idx(), ownerIsSymbol, fullNameHash);
+    }
+
+    ENFORCE(foundHashesOut.typeMemberHashes.empty());
+    foundHashesOut.typeMemberHashes.reserve(foundDefs.typeMembers().size());
+    for (const auto &typeMember : foundDefs.typeMembers()) {
+        auto owner = typeMember.owner;
+        ENFORCE(owner.kind() == core::FoundDefinitionRef::Kind::Class ||
+                    owner.kind() == core::FoundDefinitionRef::Kind::Symbol,
+                "kind={}", core::FoundDefinitionRef::kindToString(owner.kind()));
+        auto ownerIsSymbol = owner.kind() == core::FoundDefinitionRef::Kind::Symbol;
+        auto fullNameHash = core::FullNameHash(ctx, typeMember.name);
+        foundHashesOut.typeMemberHashes.emplace_back(owner.idx(), ownerIsSymbol, typeMember.isTypeTemplate,
+                                                     fullNameHash);
+    }
+
     ENFORCE(foundHashesOut.methodHashes.empty());
-    ENFORCE(foundHashesOut.fieldHashes.empty());
     foundHashesOut.methodHashes.reserve(foundDefs.methods().size());
-    foundHashesOut.fieldHashes.reserve(foundDefs.fields().size());
     for (const auto &method : foundDefs.methods()) {
         auto owner = method.owner;
         ENFORCE(owner.kind() == core::FoundDefinitionRef::Kind::Class, "kind={}",
                 core::FoundDefinitionRef::kindToString(owner.kind()));
+        auto ownerIsSymbol = owner.kind() == core::FoundDefinitionRef::Kind::Symbol;
         auto fullNameHash = core::FullNameHash(ctx, method.name);
-        foundHashesOut.methodHashes.emplace_back(owner.idx(), method.flags.isSelfMethod, fullNameHash,
+        foundHashesOut.methodHashes.emplace_back(owner.idx(), ownerIsSymbol, method.flags.isSelfMethod, fullNameHash,
                                                  method.arityHash);
     }
+
+    ENFORCE(foundHashesOut.fieldHashes.empty());
+    foundHashesOut.fieldHashes.reserve(foundDefs.fields().size());
     for (const auto &field : foundDefs.fields()) {
         auto owner = field.owner;
         ENFORCE(owner.kind() == core::FoundDefinitionRef::Kind::Class, "kind={}",
                 core::FoundDefinitionRef::kindToString(owner.kind()));
+        auto ownerIsSymbol = owner.kind() == core::FoundDefinitionRef::Kind::Symbol;
         auto fullNameHash = core::FullNameHash(ctx, field.name);
-        foundHashesOut.fieldHashes.emplace_back(owner.idx(), field.onSingletonClass,
+        foundHashesOut.fieldHashes.emplace_back(owner.idx(), ownerIsSymbol, field.onSingletonClass,
                                                 field.kind == core::FoundField::Kind::InstanceVariable,
                                                 field.fromWithinMethod, fullNameHash);
     }
@@ -2186,7 +2201,6 @@ ast::ParsedFilesOrCancelled defineSymbols(core::GlobalState &gs, vector<SymbolFi
     const auto &epochManager = *gs.epochManager;
     uint32_t count = 0;
     uint32_t foundMethods = 0;
-    SymbolDefiner::State state;
     UnorderedMap<core::FileRef, SymbolDefiner::State> incrementalDefinitions;
     for (auto &fileFoundDefinitions : allFoundDefinitions) {
         foundMethods += fileFoundDefinitions.names->methods().size();
@@ -2204,41 +2218,36 @@ ast::ParsedFilesOrCancelled defineSymbols(core::GlobalState &gs, vector<SymbolFi
         auto frefIt = oldFoundHashesForFiles.find(fref);
         auto oldFoundHashes =
             frefIt == oldFoundHashesForFiles.end() ? optional<core::FoundDefHashes>() : std::move(frefIt->second);
-        SymbolDefiner symbolDefiner(move(state), *fileFoundDefinitions.names, move(oldFoundHashes));
+        SymbolDefiner symbolDefiner(*fileFoundDefinitions.names, move(oldFoundHashes));
+        auto state = symbolDefiner.enterClassDefinitions(ctx);
         if (!oldFoundHashesForFiles.empty()) {
-            symbolDefiner.enterNonDeletableDefinitions(ctx);
-            state = symbolDefiner.deleteOldDefinitions(ctx);
-            incrementalDefinitions[fref] = move(state);
-        } else {
-            state = symbolDefiner.run(ctx);
+            symbolDefiner.deleteOldDefinitions(ctx, state);
         }
+        incrementalDefinitions[fref] = move(state);
         output.emplace_back(move(fileFoundDefinitions.tree));
         if (foundHashesOut != nullptr) {
             populateFoundDefHashes(ctx, *fileFoundDefinitions.names, *foundHashesOut);
         }
     }
+    ENFORCE(incrementalDefinitions.size() == allFoundDefinitions.size());
     prodCounterAdd("types.input.foundmethods.total", foundMethods);
-    if (!incrementalDefinitions.empty()) {
-        ENFORCE(incrementalDefinitions.size() == allFoundDefinitions.size());
-        count = 0;
-        for (auto &fileFoundDefinitions : allFoundDefinitions) {
-            count++;
-            if (count % 250 == 0 && epochManager.wasTypecheckingCanceled()) {
-                return ast::ParsedFilesOrCancelled::cancel(move(output), workers);
-            }
-
-            auto fref = fileFoundDefinitions.tree.file;
-            // The contents of this don't matter for incremental definition.  The
-            // old definitions should only matter when deleting old symbols (which
-            // happened in the previous phase of incremental namer), not here when
-            // entering symbols.
-            optional<core::FoundDefHashes> oldFoundHashes;
-            core::MutableContext ctx(gs, core::Symbols::root(), fref);
-
-            SymbolDefiner symbolDefiner(move(incrementalDefinitions[fref]), *fileFoundDefinitions.names,
-                                        oldFoundHashes);
-            symbolDefiner.enterNewDefinitions(ctx);
+    count = 0;
+    for (auto &fileFoundDefinitions : allFoundDefinitions) {
+        count++;
+        if (count % 250 == 0 && epochManager.wasTypecheckingCanceled()) {
+            return ast::ParsedFilesOrCancelled::cancel(move(output), workers);
         }
+
+        auto fref = fileFoundDefinitions.tree.file;
+        // The contents of this don't matter for incremental definition.  The
+        // old definitions should only matter when deleting old symbols (which
+        // happened in the previous phase of incremental namer), not here when
+        // entering symbols.
+        optional<core::FoundDefHashes> oldFoundHashes;
+        core::MutableContext ctx(gs, core::Symbols::root(), fref);
+
+        SymbolDefiner symbolDefiner(*fileFoundDefinitions.names, oldFoundHashes);
+        symbolDefiner.enterNewDefinitions(ctx, move(incrementalDefinitions[fref]));
     }
     return output;
 }

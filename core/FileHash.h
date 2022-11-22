@@ -5,6 +5,10 @@
 namespace sorbet::core {
 class NameRef;
 class GlobalState;
+class FoundDefinitionRef;
+namespace serialize {
+class SerializerImpl;
+}
 class WithoutUniqueNameHash {
 public:
     static void sortAndDedupe(std::vector<core::WithoutUniqueNameHash> &hashes);
@@ -86,15 +90,73 @@ struct SymbolHash {
     }
 };
 
+// 28 is the same as the size of an ID in FoundDefinitionRef::_storage
+//
+// `ownerIsSymbol` means that the ownerIdx stores a ClassOrModuleRef ID because the
+// FoundDefinition::kind was Kind::Symbol.
+// `!ownerIsSymbol` means that ownerIdx stores an index into the definedClasses list maintained by
+// Namer::defineSymbols.
+#define FOUND_HASH_OWNER_INFO()             \
+private:                                    \
+    friend class serialize::SerializerImpl; \
+    uint32_t ownerIdx : 28;                 \
+    bool ownerIsSymbol : 1;                 \
+                                            \
+public:                                     \
+    FoundDefinitionRef owner() const;
+
+struct FoundStaticFieldHash {
+    // The owner of this static field (index into namer's definedClasses vector)
+    FOUND_HASH_OWNER_INFO();
+    // Hash of this static field's name
+    const FullNameHash nameHash;
+
+    FoundStaticFieldHash(uint32_t ownerIdx, bool ownerIsSymbol, FullNameHash nameHash)
+        : ownerIdx(ownerIdx), ownerIsSymbol(ownerIsSymbol), nameHash(nameHash) {
+        sanityCheck();
+    }
+
+    void sanityCheck() const;
+
+    // Debug string
+    std::string toString() const;
+};
+CheckSize(FoundStaticFieldHash, 8, 4);
+
+using FoundStaticFieldHashes = std::vector<FoundStaticFieldHash>;
+
+struct FoundTypeMemberHash {
+    // The owner of this type member (index into namer's definedClasses vector)
+    FOUND_HASH_OWNER_INFO();
+
+    // If this is true, then the actual owner is the singleton class of the class pointed to by `idx`
+    bool isTypeTemplate : 1;
+
+    // Hash of this type member's name
+    const FullNameHash nameHash;
+
+    FoundTypeMemberHash(uint32_t ownerIdx, bool ownerIsSymbol, bool isTypeTemplate, FullNameHash nameHash)
+        : ownerIdx(ownerIdx), ownerIsSymbol(ownerIsSymbol), isTypeTemplate(isTypeTemplate), nameHash(nameHash) {
+        sanityCheck();
+    }
+
+    void sanityCheck() const;
+
+    // Debug string
+    std::string toString() const;
+};
+CheckSize(FoundTypeMemberHash, 8, 4);
+
+using FoundTypeMemberHashes = std::vector<FoundTypeMemberHash>;
+
 // A fingerprint of a FoundDefinition suitable for storing on a File.
 // Allows a current Namer run to reference information about a previous Namer run.
 struct FoundMethodHash {
-    struct {
-        // The owner of this method.
-        uint32_t idx : 31;
-        // Whether the method was defined as an instance method or a singleton class method
-        bool useSingletonClass : 1;
-    } owner;
+    // The owner of this method.
+    FOUND_HASH_OWNER_INFO();
+
+    // Whether the method was defined as an instance method or a singleton class method
+    bool useSingletonClass : 1;
 
     // Hash of this method's name
     const FullNameHash nameHash;
@@ -102,8 +164,10 @@ struct FoundMethodHash {
     // A hash of the method's arity
     ArityHash arityHash;
 
-    FoundMethodHash(uint32_t ownerIdx, bool useSingletonClass, FullNameHash nameHash, ArityHash arityHash)
-        : owner({ownerIdx, useSingletonClass}), nameHash(nameHash), arityHash(arityHash) {
+    FoundMethodHash(uint32_t ownerIdx, bool ownerIsSymbol, bool useSingletonClass, FullNameHash nameHash,
+                    ArityHash arityHash)
+        : ownerIdx(ownerIdx), ownerIsSymbol(ownerIsSymbol), useSingletonClass(useSingletonClass), nameHash(nameHash),
+          arityHash(arityHash) {
         sanityCheck();
     };
 
@@ -117,25 +181,24 @@ CheckSize(FoundMethodHash, 12, 4);
 using FoundMethodHashes = std::vector<FoundMethodHash>;
 
 struct FoundFieldHash {
-    struct {
-        // The owner of this field.
-        uint32_t idx : 29;
-        // Whether the field was defined on instances of the class or on the singleton class.
-        bool onSingletonClass : 1;
-        // Whether the field was a class or instance variable.
-        // TODO(froydnj) we should just subsume class variables into the more
-        // general static fields, since that's how we represent them internally.
-        bool isInstanceVariable : 1;
-        // Whether the definition of the field comes from inside a method.
-        bool fromWithinMethod : 1;
-    } owner;
+    // The owner of this field.
+    FOUND_HASH_OWNER_INFO();
+    // Whether the field was defined on instances of the class or on the singleton class.
+    bool onSingletonClass : 1;
+    // Whether the field was a class or instance variable.
+    // TODO(froydnj) we should just subsume class variables into the more
+    // general static fields, since that's how we represent them internally.
+    bool isInstanceVariable : 1;
+    // Whether the definition of the field comes from inside a method.
+    bool fromWithinMethod : 1;
 
     // Hash of this field's name.
     const FullNameHash nameHash;
 
-    FoundFieldHash(uint32_t ownerIdx, bool onSingletonClass, bool isInstanceVariable, bool fromWithinMethod,
-                   FullNameHash nameHash)
-        : owner({ownerIdx, onSingletonClass, isInstanceVariable, fromWithinMethod}), nameHash(nameHash) {
+    FoundFieldHash(uint32_t ownerIdx, bool ownerIsSymbol, bool onSingletonClass, bool isInstanceVariable,
+                   bool fromWithinMethod, FullNameHash nameHash)
+        : ownerIdx(ownerIdx), ownerIsSymbol(ownerIsSymbol), onSingletonClass(onSingletonClass),
+          isInstanceVariable(isInstanceVariable), fromWithinMethod(fromWithinMethod), nameHash(nameHash) {
         sanityCheck();
     }
 
@@ -149,6 +212,8 @@ CheckSize(FoundFieldHash, 8, 4);
 using FoundFieldHashes = std::vector<FoundFieldHash>;
 
 struct FoundDefHashes {
+    FoundStaticFieldHashes staticFieldHashes;
+    FoundTypeMemberHashes typeMemberHashes;
     FoundMethodHashes methodHashes;
     FoundFieldHashes fieldHashes;
 };
@@ -205,8 +270,9 @@ struct LocalSymbolTableHashes {
     //
     // The hierarchyHash stores only enough information to know whether to take the fast path or not.
     // These symbol hashes store enough to know whether _anything_ changed, which lets us use a set
-    // difference to know the name hashes of any deletable symbols that changed in any way.
-    std::vector<SymbolHash> deletableSymbolHashes;
+    // difference to know the name hashes of any symbols that changed in any way, so that files
+    // mentioning them can be retypechecked.
+    std::vector<SymbolHash> retypecheckableSymbolHashes;
 
     static uint32_t patchHash(uint32_t hash) {
         if (hash == LocalSymbolTableHashes::HASH_STATE_NOT_COMPUTED) {

@@ -247,8 +247,8 @@ void SerializerImpl::pickle(Pickler &p, shared_ptr<const FileHash> fh) {
     p.putU4(fh->localSymbolTableHashes.staticFieldHash);
     p.putU4(fh->localSymbolTableHashes.classAliasHash);
     p.putU4(fh->localSymbolTableHashes.methodHash);
-    p.putU4(fh->localSymbolTableHashes.deletableSymbolHashes.size());
-    for (const auto &[key, value] : fh->localSymbolTableHashes.deletableSymbolHashes) {
+    p.putU4(fh->localSymbolTableHashes.retypecheckableSymbolHashes.size());
+    for (const auto &[key, value] : fh->localSymbolTableHashes.retypecheckableSymbolHashes) {
         p.putU4(key._hashValue);
         p.putU4(value);
     }
@@ -256,19 +256,34 @@ void SerializerImpl::pickle(Pickler &p, shared_ptr<const FileHash> fh) {
     for (const auto &e : fh->usages.nameHashes) {
         p.putU4(e._hashValue);
     }
+    p.putU4(fh->foundHashes.staticFieldHashes.size());
+    for (const auto &ffh : fh->foundHashes.staticFieldHashes) {
+        p.putU4(ffh.ownerIdx);
+        p.putU1(ffh.ownerIsSymbol);
+        p.putU4(ffh.nameHash._hashValue);
+    }
+    p.putU4(fh->foundHashes.typeMemberHashes.size());
+    for (const auto &ffh : fh->foundHashes.typeMemberHashes) {
+        p.putU4(ffh.ownerIdx);
+        p.putU1(ffh.ownerIsSymbol);
+        p.putU1(ffh.isTypeTemplate);
+        p.putU4(ffh.nameHash._hashValue);
+    }
     p.putU4(fh->foundHashes.methodHashes.size());
     for (const auto &fdh : fh->foundHashes.methodHashes) {
-        p.putU4(fdh.owner.idx);
-        p.putU1(fdh.owner.useSingletonClass);
+        p.putU4(fdh.ownerIdx);
+        p.putU1(fdh.ownerIsSymbol);
+        p.putU1(fdh.useSingletonClass);
         p.putU4(fdh.nameHash._hashValue);
         p.putU4(fdh.arityHash._hashValue);
     }
     p.putU4(fh->foundHashes.fieldHashes.size());
     for (const auto &ffh : fh->foundHashes.fieldHashes) {
-        p.putU4(ffh.owner.idx);
-        p.putU1(ffh.owner.onSingletonClass);
-        p.putU1(ffh.owner.isInstanceVariable);
-        p.putU1(ffh.owner.fromWithinMethod);
+        p.putU4(ffh.ownerIdx);
+        p.putU1(ffh.ownerIsSymbol);
+        p.putU1(ffh.onSingletonClass);
+        p.putU1(ffh.isInstanceVariable);
+        p.putU1(ffh.fromWithinMethod);
         p.putU4(ffh.nameHash._hashValue);
     }
 }
@@ -288,12 +303,12 @@ unique_ptr<const FileHash> SerializerImpl::unpickleFileHash(UnPickler &p) {
     ret.localSymbolTableHashes.staticFieldHash = p.getU4();
     ret.localSymbolTableHashes.classAliasHash = p.getU4();
     ret.localSymbolTableHashes.methodHash = p.getU4();
-    auto deletableSymbolHashSize = p.getU4();
-    ret.localSymbolTableHashes.deletableSymbolHashes.reserve(deletableSymbolHashSize);
-    for (int it = 0; it < deletableSymbolHashSize; it++) {
+    auto retypecheckableSymbolHashSize = p.getU4();
+    ret.localSymbolTableHashes.retypecheckableSymbolHashes.reserve(retypecheckableSymbolHashSize);
+    for (int it = 0; it < retypecheckableSymbolHashSize; it++) {
         WithoutUniqueNameHash key;
         key._hashValue = p.getU4();
-        ret.localSymbolTableHashes.deletableSymbolHashes.emplace_back(key, p.getU4());
+        ret.localSymbolTableHashes.retypecheckableSymbolHashes.emplace_back(key, p.getU4());
     }
     auto constantsSize = p.getU4();
     ret.usages.nameHashes.reserve(constantsSize);
@@ -302,28 +317,49 @@ unique_ptr<const FileHash> SerializerImpl::unpickleFileHash(UnPickler &p) {
         key._hashValue = p.getU4();
         ret.usages.nameHashes.emplace_back(key);
     }
+    auto foundStaticFieldHashesSize = p.getU4();
+    ret.foundHashes.staticFieldHashes.reserve(foundStaticFieldHashesSize);
+    for (int it = 0; it < foundStaticFieldHashesSize; it++) {
+        auto ownerIdx = p.getU4();
+        auto ownerIsSymbol = p.getU1();
+        FullNameHash fullNameHash;
+        fullNameHash._hashValue = p.getU4();
+        ret.foundHashes.staticFieldHashes.emplace_back(ownerIdx, ownerIsSymbol, fullNameHash);
+    }
+    auto foundTypeMemberHashesSize = p.getU4();
+    ret.foundHashes.typeMemberHashes.reserve(foundTypeMemberHashesSize);
+    for (int it = 0; it < foundTypeMemberHashesSize; it++) {
+        auto ownerIdx = p.getU4();
+        auto ownerIsSymbol = p.getU1();
+        auto isTypeTemplate = p.getU1();
+        FullNameHash fullNameHash;
+        fullNameHash._hashValue = p.getU4();
+        ret.foundHashes.typeMemberHashes.emplace_back(ownerIdx, ownerIsSymbol, isTypeTemplate, fullNameHash);
+    }
     auto foundMethodHashesSize = p.getU4();
     ret.foundHashes.methodHashes.reserve(foundMethodHashesSize);
     for (int it = 0; it < foundMethodHashesSize; it++) {
         auto ownerIdx = p.getU4();
+        auto ownerIsSymbol = p.getU1();
         auto useSingletonClass = p.getU1();
         FullNameHash fullNameHash;
         fullNameHash._hashValue = p.getU4();
         ArityHash arityHash;
         arityHash._hashValue = p.getU4();
-        ret.foundHashes.methodHashes.emplace_back(ownerIdx, useSingletonClass, fullNameHash, arityHash);
+        ret.foundHashes.methodHashes.emplace_back(ownerIdx, ownerIsSymbol, useSingletonClass, fullNameHash, arityHash);
     }
     auto foundFieldHashesSize = p.getU4();
     ret.foundHashes.fieldHashes.reserve(foundFieldHashesSize);
     for (int it = 0; it < foundFieldHashesSize; it++) {
         auto ownerIdx = p.getU4();
+        auto ownerIsSymbol = p.getU1();
         auto onSingletonClass = p.getU1();
         auto isInstanceVariable = p.getU1();
         auto fromWithinMethod = p.getU1();
         FullNameHash fullNameHash;
         fullNameHash._hashValue = p.getU4();
-        ret.foundHashes.fieldHashes.emplace_back(ownerIdx, onSingletonClass, isInstanceVariable, fromWithinMethod,
-                                                 fullNameHash);
+        ret.foundHashes.fieldHashes.emplace_back(ownerIdx, ownerIsSymbol, onSingletonClass, isInstanceVariable,
+                                                 fromWithinMethod, fullNameHash);
     }
     return make_unique<const FileHash>(move(ret));
 }
@@ -402,7 +438,7 @@ void SerializerImpl::pickle(Pickler &p, const TypePtr &what) {
             switch (c.literalKind) {
                 case NamedLiteralType::LiteralTypeKind::Symbol:
                 case NamedLiteralType::LiteralTypeKind::String:
-                    p.putS8(c.unsafeAsName().rawId());
+                    p.putU4(c.unsafeAsName().rawId());
                     break;
             }
             break;
@@ -496,12 +532,12 @@ TypePtr SerializerImpl::unpickleType(UnPickler &p, const GlobalState *gs) {
             return OrType::make_shared(unpickleType(p, gs), unpickleType(p, gs));
         case TypePtr::Tag::NamedLiteralType: {
             auto kind = (core::NamedLiteralType::LiteralTypeKind)p.getU1();
-            auto value = p.getS8();
+            auto name = NameRef::fromRawUnchecked(p.getU4());
             switch (kind) {
                 case NamedLiteralType::LiteralTypeKind::String:
-                    return make_type<NamedLiteralType>(Symbols::String(), NameRef::fromRawUnchecked(value));
+                    return make_type<NamedLiteralType>(Symbols::String(), name);
                 case NamedLiteralType::LiteralTypeKind::Symbol:
-                    return make_type<NamedLiteralType>(Symbols::Symbol(), NameRef::fromRawUnchecked(value));
+                    return make_type<NamedLiteralType>(Symbols::Symbol(), name);
             }
             Exception::notImplemented();
         }

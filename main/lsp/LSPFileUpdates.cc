@@ -31,7 +31,7 @@ void LSPFileUpdates::mergeOlder(const LSPFileUpdates &older) {
         auto &ast = older.updatedFileIndexes[i];
         updatedFileIndexes.push_back(ast::ParsedFile{ast.tree.deepCopy(), ast.file});
     }
-    typecheckingPath = PathType::Slow;
+    typecheckingPath = TypecheckingPath::Slow;
 }
 
 LSPFileUpdates LSPFileUpdates::copy() const {
@@ -87,7 +87,7 @@ LSPFileUpdates::fastPathFilesToTypecheck(const core::GlobalState &gs, const LSPC
                                          const UnorderedMap<core::FileRef, shared_ptr<core::File>> &evictedFiles) {
     FastPathFilesToTypecheckResult result;
     Timer timeit(config.logger, "compute_fast_path_file_set");
-    vector<core::SymbolHash> changedDeletableSymbolHashes;
+    vector<core::SymbolHash> changedRetypecheckableSymbolHashes;
     auto idx = -1;
     for (const auto &updatedFile : updatedFiles) {
         idx++;
@@ -121,26 +121,26 @@ LSPFileUpdates::fastPathFilesToTypecheck(const core::GlobalState &gs, const LSPC
                                                     ? fref.data(gs).getFileHash()->localSymbolTableHashes
                                                     : evictedFiles.at(fref)->getFileHash()->localSymbolTableHashes;
         const auto &newLocalSymbolTableHashes = updatedFile->getFileHash()->localSymbolTableHashes;
-        const auto &oldDeletableSymbolHashes = oldLocalSymbolTableHashes.deletableSymbolHashes;
-        const auto &newDeletableSymbolHashes = newLocalSymbolTableHashes.deletableSymbolHashes;
+        const auto &oldRetypecheckableSymbolHashes = oldLocalSymbolTableHashes.retypecheckableSymbolHashes;
+        const auto &newRetypecheckableSymbolHashes = newLocalSymbolTableHashes.retypecheckableSymbolHashes;
 
         if (!config.opts.lspExperimentalFastPathEnabled) {
             // Both oldHash and newHash should have the same methods, since this is the fast path!
-            ENFORCE(validateIdenticalFingerprints(oldDeletableSymbolHashes, newDeletableSymbolHashes),
+            ENFORCE(validateIdenticalFingerprints(oldRetypecheckableSymbolHashes, newRetypecheckableSymbolHashes),
                     "definitionHash should have failed");
         }
 
-        // Find which hashes changed. Note: deletableSymbolHashes are pre-sorted, so set_difference should work.
-        // This will insert two entries into `deletableSymbolHashes` for each changed method, but they
+        // Find which hashes changed. Note: retypecheckableSymbolHashes are pre-sorted, so set_difference should work.
+        // This will insert two entries into `retypecheckableSymbolHashes` for each changed method, but they
         // will get deduped later.
-        absl::c_set_symmetric_difference(oldDeletableSymbolHashes, newDeletableSymbolHashes,
-                                         std::back_inserter(changedDeletableSymbolHashes));
+        absl::c_set_symmetric_difference(oldRetypecheckableSymbolHashes, newRetypecheckableSymbolHashes,
+                                         std::back_inserter(changedRetypecheckableSymbolHashes));
 
         result.changedFiles.emplace(fref, idx);
     }
 
-    result.changedSymbolNameHashes.reserve(changedDeletableSymbolHashes.size());
-    absl::c_transform(changedDeletableSymbolHashes, std::back_inserter(result.changedSymbolNameHashes),
+    result.changedSymbolNameHashes.reserve(changedRetypecheckableSymbolHashes.size());
+    absl::c_transform(changedRetypecheckableSymbolHashes, std::back_inserter(result.changedSymbolNameHashes),
                       [](const auto &symhash) { return symhash.nameHash; });
     core::WithoutUniqueNameHash::sortAndDedupe(result.changedSymbolNameHashes);
 
@@ -194,10 +194,10 @@ LSPFileUpdates::fastPathFilesToTypecheck(const core::GlobalState &gs, const LSPC
             // One of two things could be true:
             // - We're running on the indexer thread to decide typecheckingPath, which only cares about how
             //   many extra files there are, not what they are.
-            // - We're running on the typechecker thread (knowing that typecheckingPath was already PathType::Fast)
-            //   and simply need to compute the list of files to typecheck. But that would be a
-            //   contradiction--because otherwise the indexer would have marked the update as not being
-            //   able to take the fast path.
+            // - We're running on the typechecker thread (knowing that typecheckingPath was already
+            //   TypecheckingPath::Fast) and simply need to compute the list of files to typecheck.
+            //   But that would be a contradiction--because otherwise the indexer would have marked
+            //   the update as not being able to take the fast path.
             //
             // So it's actually only the first thing that's true.
 

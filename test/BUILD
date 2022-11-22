@@ -155,6 +155,14 @@ cc_binary(
     ],
 )
 
+sh_test(
+    name = "print_document_symbols_builds",
+    srcs = ["print_document_symbols_builds.sh"],
+    data = [
+        ":print_document_symbols",
+    ],
+)
+
 cc_test(
     name = "hello-test",
     size = "small",
@@ -314,6 +322,7 @@ pipeline_tests(
     glob(
         [
             "testdata/**/*.rb",
+            "testdata/**/*.rbi",
             "testdata/**/*.exp",
         ],
         exclude = [
