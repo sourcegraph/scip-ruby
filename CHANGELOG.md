@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## v0.3.2
+
+### Auto-indexing
+
+(Sourcegraph-use only)
+
+The auto-indexing script will run `bundle install`
+for non-Sorbet repos to fetch dependencies before invoking
+the indexer. (https://github.com/sourcegraph/scip-ruby/pull/165)
+
+### Sorbet sync
+
+- Updated with changes from upstream Sorbet as of Nov 21 2022. (b8461dbcd56ba56b2854d07f546c7216b31b58e6)
+
 ## v0.3.1
 
 No user-facing changes; this is a synthetic release
