@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## v0.3.3
+
+### Auto-indexing
+
+(Sourcegraph-use only)
+
+The auto-indexing image also bundles in `git`
+which can be used by `bundler`.
+
 ## v0.3.2
 
 ### Auto-indexing
