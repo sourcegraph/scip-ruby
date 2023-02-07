@@ -9,7 +9,7 @@ on:
 jobs:
   download-and-publish-gems:
     name: 'Download and publish gems'
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-20.04'
     env:
       TAG: ${{ inputs.tag }}
     steps:
