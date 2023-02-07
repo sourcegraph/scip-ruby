@@ -9,7 +9,7 @@ jobs:
     name: 'Build and upload artifacts'
     strategy:
       matrix:
-        platform: [ubuntu-latest, macos-latest]
+        platform: ['ubuntu-20.04', 'macos-12']
         config: ['debug', 'release']
     runs-on: ${{ matrix.platform }}
     env:
@@ -88,7 +88,7 @@ jobs:
   create-release:
     name: 'Create release'
     needs: build-and-upload-artifacts
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-20.04'
     steps:
       - uses: actions/checkout@v3
       - name: Create Release
