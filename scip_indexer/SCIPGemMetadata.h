@@ -33,14 +33,23 @@ extern GemMetadataError configNotFoundError, multipleGemspecWarning, failedToPar
     failedToParseGemspecWarning, failedToParseNameFromGemspecWarning, failedToParseVersionFromGemspecWarning,
     failedToParseGemfileLockWarning;
 
+class GemDependencies;
+class GemMapping;
+
 class GemMetadata final {
     std::string _name;
     std::string _version;
 
     GemMetadata(std::string name, std::string version) : _name(name), _version(version) {}
 
+    friend GemDependencies;
+    friend GemMapping;
+
 public:
     GemMetadata() = default;
+    GemMetadata(GemMetadata &&) = default;
+    GemMetadata &operator=(GemMetadata &&) = default;
+    GemMetadata(const GemMetadata &) = default;
     GemMetadata &operator=(const GemMetadata &) = default;
 
     // Don't call this method outside test code!
@@ -67,18 +76,35 @@ public:
     bool operator==(const GemMetadata &other) const {
         return this->name() == other.name() && this->version() == other.version();
     }
+};
 
-    // HACK: Do a best-effort parse of any config files to extract the name and version.
-    static std::pair<GemMetadata, std::vector<GemMetadataError>> readFromConfig(const FileSystem &fs);
+class GemDependencies {
+    // Mapping of gem name -> version for dependencies
+    UnorderedMap<std::string, std::string> versionMap;
+
+public:
+    GemMetadata currentGem;
+
+    GemDependencies() = default;
+
+    // Parse Gemfile.lock and .gemspec on a best-effort basis to extract dependency names and versions.
+    std::vector<GemMetadataError> populateFromConfig(const FileSystem &);
 
 private:
-    static std::pair<GemMetadata, std::vector<GemMetadataError>> readFromGemfileLock(const std::string &);
-    static std::pair<GemMetadata, std::vector<GemMetadataError>> readFromGemspec(const std::string &);
+    std::vector<GemMetadataError> populateFromGemfileLock(const std::string &fileContents);
+    std::vector<GemMetadataError> populateFromGemspec(const std::string &fileContents);
+
+    void addDependency(std::string &&name, std::string &&version) {
+        this->versionMap.insert({std::string(name), std::string(version)});
+    }
+
+    void modifyCurrentGem(std::optional<std::string> name, std::optional<std::string> version);
 };
 
 // Type carrying gem information for each file, which is used during
 // symbol emission to ensure correct symbol names for cross-repo.
 class GemMapping final {
+    GemDependencies gemDeps;
     std::optional<std::shared_ptr<GemMetadata>> currentGem;
     UnorderedMap<core::FileRef, std::shared_ptr<GemMetadata>> map;
     std::shared_ptr<GemMetadata> stdlibGem;
@@ -90,9 +116,22 @@ public:
 
     std::optional<std::shared_ptr<GemMetadata>> lookupGemForFile(const core::GlobalState &gs, core::FileRef file) const;
 
+    // Record gem metadata for the file based on the externally specified file.
     void populateFromNDJSON(const core::GlobalState &, const FileSystem &fs, const std::string &ndjsonPath);
 
-    void markCurrentGem(GemMetadata gem);
+    // Record gem metadata for the file based on the filepath
+    void populateCache(core::FileRef, std::shared_ptr<core::File> file);
+
+    void addGemDependencies(GemDependencies &&deps) {
+        if (!deps.currentGem.name().empty()) {
+            auto metadata = GemMetadata(deps.currentGem.name(), deps.currentGem.version());
+            this->currentGem = std::make_shared<GemMetadata>(std::move(metadata));
+        }
+        this->gemDeps = deps;
+    }
+
+private:
+    std::optional<std::shared_ptr<GemMetadata>> identifyGem(std::string_view filepath) const;
 };
 
 } // namespace sorbet::scip_indexer

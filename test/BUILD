@@ -77,6 +77,8 @@ cc_binary(
         "//test/scip:__pkg__",
         "//tools:__pkg__",
     ],
+    # sprintf has been deprecated in newer macOS SDKs
+    copts = ["-Wno-deprecated-declarations"],
     deps = [
         # TODO(varun): Revisit dependencies after rewriting test runner.
         "//ast/desugar",

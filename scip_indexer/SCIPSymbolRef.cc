@@ -11,6 +11,7 @@
 #include "spdlog/fmt/fmt.h"
 
 #include "common/FileSystem.h"
+#include "common/common.h"
 #include "common/sort.h"
 #include "core/Loc.h"
 #include "main/lsp/LSPLoop.h"
@@ -48,6 +49,10 @@ utils::Result UntypedGenericSymbolRef::symbolForExpr(const core::GlobalState &gs
         metadata = gemMap.globalPlaceholderGem;
     } else {
         auto owningFile = loc.has_value() ? loc->file() : this->selfOrOwner.loc(gs).file();
+        if (this->name.exists() && absl::StrContains(this->name.shortName(gs), "Loader")) {
+            fmt::print(stderr, "Loader path: {}, loc: {}", owningFile.data(gs).path(),
+                       loc.has_value() ? loc->showRawLineColumn(gs) : "<>");
+        }
         if (!owningFile.exists()) {
             // Synthetic symbols and built-in like constructs do not have a source location.
             return utils::Result::skipValue();

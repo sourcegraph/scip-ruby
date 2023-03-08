@@ -39,28 +39,38 @@ GemMetadataError failedToParseVersionFromGemspecWarning =
 GemMetadataError failedToParseGemfileLockWarning{GMEKind::Warning,
                                                  "Failed to extract name and version from Gemfile.lock"};
 
-pair<GemMetadata, vector<GemMetadataError>> GemMetadata::readFromGemfileLock(const string &contents) {
-    istringstream lines(contents);
-    bool sawPATH = false;
-    bool sawSpecs = false;
+void GemDependencies::modifyCurrentGem(optional<string> name, optional<string> version) {
+    if (this->currentGem.name().empty() && name.has_value()) {
+        this->currentGem._name = name.value();
+    }
+    if (this->currentGem.version().empty() && version.has_value()) {
+        this->currentGem._version = version.value();
+    }
+}
+
+vector<GemMetadataError> GemDependencies::populateFromGemfileLock(const string &contents) {
     optional<string> name;
     optional<string> version;
     vector<GemMetadataError> errors;
-    // PATH
-    //   remote: .
-    //   specs:
-    //     my_gem_name (M.N.P)
-    for (string line; getline(lines, line);) {
-        if (absl::StartsWith(line, "PATH")) {
-            sawPATH = true;
-            continue;
-        }
-        if (sawPATH && absl::StrContains(line, "specs:")) {
-            sawSpecs = true;
-            continue;
-        }
-        if (sawSpecs) {
-            std::regex specLineRegex(R"END(\s+([A-Za-z0-9_\-]+)\s*\((.+)\)\s*)END");
+    std::regex specLineRegex(R"END(    ([A-Za-z0-9_\-]+)\s*\(([.0-9a-zA-Z_\-]+)\)\s*))END");
+    //                             ^ Fixed 4 spaces to avoid picking indirect dep constraints in dep list.
+    {
+        istringstream lines(contents);
+        bool sawPATH = false;
+        bool sawSpecs = false;
+        // PATH
+        //   remote: .
+        //   specs:
+        //     my_gem_name (M.N.P)
+        for (string line; getline(lines, line);) {
+            if (!sawPATH) {
+                sawPATH = absl::StartsWith(line, "PATH");
+                continue;
+            }
+            if (!sawSpecs) {
+                sawSpecs = absl::StrContains(line, "specs:");
+                continue;
+            }
             std::smatch matches;
             if (std::regex_match(line, matches, specLineRegex)) {
                 name = matches[1].str();
@@ -68,14 +78,44 @@ pair<GemMetadata, vector<GemMetadataError>> GemMetadata::readFromGemfileLock(con
             }
             break;
         }
+        if (!name.has_value()) {
+            errors.push_back(failedToParseGemfileLockWarning);
+        }
     }
-    if (!name.has_value()) {
-        errors.push_back(failedToParseGemfileLockWarning);
+    {
+        istringstream lines(contents);
+        bool sawGEM = false;
+        bool sawSpecs = false;
+        // GEM
+        //   remote: https://rubygems.org/
+        //   specs:
+        //     dep1 (M.N.P)
+        //       indirect-dep1 (~> X.Y.Z)
+        //       indirect-dep2 (>= X.Y.Z)
+        //     dep2 (M.N.P)
+        for (string line; getline(lines, line);) {
+            if (!sawGEM) {
+                sawGEM = absl::StartsWith(line, "GEM");
+                continue;
+            }
+            if (!absl::StartsWith(line, "  ")) { // section end
+                break;
+            }
+            if (!sawSpecs) {
+                sawSpecs = absl::StrContains(line, "specs:");
+                continue;
+            }
+            std::smatch matches;
+            if (std::regex_match(line, matches, specLineRegex)) {
+                this->addDependency(matches[1].str(), matches[2].str());
+            }
+        }
     }
-    return {GemMetadata{name.value_or(""), version.value_or("")}, errors};
+    this->modifyCurrentGem(name, version);
+    return errors;
 }
 
-pair<GemMetadata, vector<GemMetadataError>> GemMetadata::readFromGemspec(const string &contents) {
+vector<GemMetadataError> GemDependencies::populateFromGemspec(const string &contents) {
     optional<string> name;
     optional<string> version;
     vector<GemMetadataError> errors;
@@ -117,10 +157,11 @@ pair<GemMetadata, vector<GemMetadataError>> GemMetadata::readFromGemspec(const s
     if (!name.has_value() || !version.has_value()) {
         errors.push_back(failedToParseGemspecWarning);
     }
-    return {GemMetadata{name.value_or(""), version.value_or("")}, errors};
+    this->modifyCurrentGem(name, version);
+    return errors;
 }
 
-pair<GemMetadata, vector<GemMetadataError>> GemMetadata::readFromConfig(const FileSystem &fs) {
+vector<GemMetadataError> GemDependencies::populateFromConfig(const FileSystem &fs) {
     UnorderedSet<string> extensions{".lock", ".gemspec"};
     auto paths = fs.listFilesInDir(".", extensions, /*recursive*/ false, {}, {});
     vector<GemMetadataError> errors;
@@ -135,24 +176,18 @@ pair<GemMetadata, vector<GemMetadataError>> GemMetadata::readFromConfig(const Fi
     };
     if (paths.empty()) {
         errors.push_back(configNotFoundError);
-        return {GemMetadata(currentDirName(), "latest"), errors};
+        this->currentGem = GemMetadata(currentDirName(), "latest");
+        return errors;
     }
-    optional<std::string> name{};
-    optional<std::string> version{};
-    auto copyState = [&](auto &m, auto &errs) {
-        name = m.name().empty() ? name : m.name();
-        version = m.version().empty() ? version : m.version();
-        absl::c_copy(errs, std::back_inserter(errors));
-    };
     for (auto &path : paths) {
         if (!absl::EndsWith(path, "Gemfile.lock")) {
             continue;
         }
-        auto [gemMetadata, parseErrors] = GemMetadata::readFromGemfileLock(fs.readFile(path));
-        if (!gemMetadata.name().empty() && !gemMetadata.version().empty()) {
-            return {gemMetadata, {}};
+        auto parseErrors = this->populateFromGemfileLock(fs.readFile(path));
+        if (!this->currentGem.name().empty() && !this->currentGem.version().empty()) {
+            return {};
         }
-        copyState(gemMetadata, parseErrors);
+        absl::c_copy(parseErrors, std::back_inserter(errors));
         break;
     }
     string gemspecPath{};
@@ -161,21 +196,23 @@ pair<GemMetadata, vector<GemMetadataError>> GemMetadata::readFromConfig(const Fi
             continue;
         }
         gemspecPath = filename;
-        auto [gemMetadata, parseErrors] = GemMetadata::readFromGemspec(fs.readFile(filename));
-        if (!gemMetadata.name().empty() && !gemMetadata.version().empty()) {
-            return {gemMetadata, {}};
+        auto parseErrors = this->populateFromGemspec(fs.readFile(filename));
+        if (!this->currentGem.name().empty() && !this->currentGem.version().empty()) {
+            return {};
         }
-        copyState(gemMetadata, parseErrors);
+        absl::c_copy(parseErrors, std::back_inserter(errors));
         break;
     }
-    if (name.has_value() && version.has_value()) {
+    if (!this->currentGem.name().empty() && !this->currentGem.version().empty()) {
         errors.clear();
     }
-    if (!name.has_value() && !gemspecPath.empty()) {
+    optional<string> name{};
+    if (this->currentGem.name().empty() && !gemspecPath.empty()) {
         vector<string_view> components = absl::StrSplit(gemspecPath, '/');
         name = string(absl::StripSuffix(components.back(), ".gemspec"));
     }
-    return {GemMetadata(name.value_or(currentDirName()), version.value_or("latest")), errors};
+    this->modifyCurrentGem(name.value_or(currentDirName()), "latest");
+    return errors;
 }
 
 // The 'ruby' namespace is reserved by RubyGems.org, so we won't run into any
@@ -217,28 +254,6 @@ optional<shared_ptr<GemMetadata>> GemMapping::lookupGemForFile(const core::Globa
     auto it = this->map.find(file);
     if (it != this->map.end()) {
         return it->second;
-    }
-    auto filepath = file.data(gs).path();
-    if (absl::StartsWith(filepath, core::File::URL_PREFIX)) {
-        return this->stdlibGem;
-    }
-    // See https://sorbet.org/docs/rbi#quickref for description of the standard layout.
-    // Based on some Sourcegraph searches, it looks like RBI files can be named either
-    // gem_name.rbi or gem_name@version.rbi.
-    if (absl::StrContains(filepath, "sorbet/rbi/")) {
-        if (absl::StrContains(filepath, "sorbet/rbi/gems/") || absl::StrContains(filepath, "sorbet/rbi/annotations/") ||
-            absl::StrContains(filepath, "sorbet/rbi/dsl/")) {
-            auto metadata = tryParseFilepath(filepath);
-            if (metadata.has_value()) {
-                return metadata;
-            }
-        }
-        // hidden-definitions and todo.rbi get treated as part of the current gem
-    }
-    if (this->currentGem.has_value()) {
-        // TODO Should we enforce here in debug builds?
-        // Fallback to this if set, to avoid collisions with other gems.
-        return this->currentGem.value();
     }
     return nullopt;
 }
@@ -303,8 +318,39 @@ void GemMapping::populateFromNDJSON(const core::GlobalState &gs, const FileSyste
     }
 }
 
-void GemMapping::markCurrentGem(GemMetadata gem) {
-    this->currentGem = make_shared<GemMetadata>(gem);
+void GemMapping::populateCache(core::FileRef fileRef, shared_ptr<core::File> file) {
+    auto it = this->map.find(fileRef);
+    if (it != this->map.end()) {
+        return;
+    }
+    auto metadata = this->identifyGem(file->path());
+    if (metadata.has_value()) {
+        this->map.insert({fileRef, metadata.value()});
+    }
+}
+
+optional<shared_ptr<GemMetadata>> GemMapping::identifyGem(string_view filepath) const {
+    if (absl::StartsWith(filepath, core::File::URL_PREFIX)) {
+        return this->stdlibGem;
+    }
+    // See https://sorbet.org/docs/rbi#quickref for description of the standard layout.
+    // Based on some Sourcegraph searches, it looks like RBI files can be named either
+    // gem_name.rbi or gem_name@version.rbi.
+    if (absl::StrContains(filepath, "sorbet/rbi/")) {
+        if (absl::StrContains(filepath, "sorbet/rbi/gems/") || absl::StrContains(filepath, "sorbet/rbi/annotations/") ||
+            absl::StrContains(filepath, "sorbet/rbi/dsl/")) {
+            auto metadata = tryParseFilepath(filepath);
+            if (metadata.has_value()) {
+                return metadata;
+            }
+        }
+        // hidden-definitions and todo.rbi get treated as part of the current gem
+    }
+    if (this->currentGem.has_value()) {
+        // Fallback to this if set, to avoid collisions with other gems.
+        return this->currentGem.value();
+    }
+    return nullopt;
 }
 
 } // namespace sorbet::scip_indexer
