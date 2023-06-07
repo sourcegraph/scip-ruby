@@ -603,13 +603,12 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
 
                     auto *argBlock = bodyBlock;
                     if (!blockArgFlags.empty()) {
-                        LocalRef argTemp = cctx.newTemporary(core::Names::blkArg());
-                        auto argOcc = LocalOccurrence::synthetic(argTemp);
-                        bodyBlock->exprs.emplace_back(argOcc, s.block()->loc, make_insn<LoadYieldParams>(link));
+                        auto argTemp = LocalOccurrence::synthetic(cctx.newTemporary(core::Names::blkArg()));
+                        bodyBlock->exprs.emplace_back(argTemp, s.block()->loc, make_insn<LoadYieldParams>(link));
 
                         for (int i = 0; i < blockArgFlags.size(); ++i) {
                             auto &arg = blockArgFlags[i];
-                            LocalRef argLoc = cctx.inWhat.enterLocal(arg.local);
+                            auto argLoc = LocalOccurrence{cctx.inWhat.enterLocal(arg.local), arg.loc};
 
                             if (arg.flags.isRepeated) {
                                 // Mixing positional and rest args in blocks is

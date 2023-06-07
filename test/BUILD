@@ -99,8 +99,8 @@ cc_binary(
         "//test/helpers",
         "@com_google_absl//absl/strings",
         "@cxxopts",
-        "@doctest",
-        "@doctest//:doctest_custom_main",
+        "@doctest//doctest",
+        "@doctest//doctest:custom_main",
     ],
 )
 
