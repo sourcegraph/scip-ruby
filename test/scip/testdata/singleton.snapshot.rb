@@ -4,7 +4,6 @@
 #      ^ definition [..] A#
    include Singleton
 #  ^^^^^^^ reference [..] Module#include().
-#  ^^^^^^^^^^^^^^^^^ definition [..] `<Class:A>`#instance().
 #          ^^^^^^^^^ reference [..] Singleton#
  end
  
@@ -17,7 +16,6 @@
 #      ^ definition [..] C#
    include Singleton
 #  ^^^^^^^ reference [..] Module#include().
-#  ^^^^^^^^^^^^^^^^^ definition [..] `<Class:C>`#instance().
 #          ^^^^^^^^^ reference [..] Singleton#
    extend T::Helpers
 #  ^^^^^^ reference [..] Kernel#extend().
@@ -28,9 +26,9 @@
 #    ^ definition [..] Object#f().
    return [A.instance, B.instance, C.instance]
 #          ^ reference [..] A#
-#            ^^^^^^^^ reference [..] `<Class:A>`#instance().
+#            ^^^^^^^^ reference [..] Singleton#SingletonClassMethods#instance().
 #                      ^ reference [..] B#
-#                        ^^^^^^^^ reference [..] `<Class:A>`#instance().
+#                        ^^^^^^^^ reference [..] Singleton#SingletonClassMethods#instance().
 #                                  ^ reference [..] C#
-#                                    ^^^^^^^^ reference [..] `<Class:C>`#instance().
+#                                    ^^^^^^^^ reference [..] Singleton#SingletonClassMethods#instance().
  end
