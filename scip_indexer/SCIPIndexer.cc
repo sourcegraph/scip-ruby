@@ -24,7 +24,7 @@
 #include "cfg/CFG.h"
 #include "common/EarlyReturnWithCode.h"
 #include "common/common.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
 #include "core/Error.h"
 #include "core/ErrorQueue.h"
 #include "core/Loc.h"

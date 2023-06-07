@@ -37,7 +37,7 @@
    localClass = Class.new
 #  ^^^^^^^^^^ definition local 1~#552113551
 #               ^^^^^ reference [..] Class#
-#                     ^^^ reference [..] Class#new().
+#                     ^^^ reference [..] `<Class:Class>`#new().
    # Technically, this is not supported by Sorbet (https://srb.help/3001),
    # but make sure we don't crash or do something weird.
    def localClass.myMethod()

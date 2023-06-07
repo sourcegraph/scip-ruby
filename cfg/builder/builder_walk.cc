@@ -753,7 +753,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, const ast::ExpressionPtr &what, Ba
 
                     auto *argBlock = bodyBlock;
                     if (!blockParamFlags.empty()) {
-                        LocalRef argTemp = cctx.newTemporary(core::Names::blkArg());
+                        auto argTemp = LocalOccurrence::synthetic(cctx.newTemporary(core::Names::blkArg()));
                         bodyBlock->exprs.emplace_back(argTemp, s.block()->loc, make_insn<LoadYieldParams>(link));
 
                         for (int i = 0; i < blockParamFlags.size(); ++i) {

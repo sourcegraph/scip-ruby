@@ -11,7 +11,7 @@
 #include "spdlog/fmt/fmt.h"
 
 #include "common/FileSystem.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
 #include "core/Loc.h"
 #include "main/lsp/LSPLoop.h"
 
