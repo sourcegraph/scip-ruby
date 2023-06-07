@@ -531,6 +531,17 @@ generated setter method will then be given an invalid name ending with `==`.
 `T.nilable(T.untyped)` is just `T.untyped`, because `nil` is a valid value of
 type `T.untyped` (along with all other values).
 
+## 3513
+
+This error code is from an old Sorbet version. It's equivalent to error 4023:
+
+[→ 4023](#4023)
+
+## 3514
+
+The `has_attached_class!` annotation cannot be given a contravariant `:in`
+annotation because `T.attached_class` is only allowed in output positions.
+
 ## 3702
 
 > This error is specific to Stripe's custom `--stripe-packages` mode. If you are
@@ -586,10 +597,10 @@ imports.
 
 > See [go/pbal](http://go/pbal) for more details.
 
-`autoloader_compatibility` declarations must take a single String argument,
-specifically either `legacy` or `strict`. These declarations annotate a package
-as compatible for path-based autoloading and are used by our Ruby code loading
-pipeline.
+`autoloader_compatibility` declarations must take a single String argument. The
+only allowed value is `legacy`, otherwise the declaration cannot be present.
+These declarations annotate a package as incompatible for path-based autoloading
+and are used by our Ruby code loading pipeline.
 
 ## 3707
 
@@ -790,6 +801,34 @@ class A::B < PackageSpec
 end
 ```
 
+Additional signatures of error 3721 include:
+
+- A package exporting a constant only defined in .rbi files. RBI files are shims
+  to enable typechecking in places where Ruby metaprogramming prevents Sorbet
+  from statically interpreting the behavior of a class or module. Generally,
+  these files declare additional methods on classes defined in Ruby source
+  files, and should not define any new constants. However, there are some rare
+  exceptions where these files can define net-new constants. For these cases, we
+  enforce that these constants cannot be exported.
+- A package exporting an enum value:
+
+```ruby
+module MyPackage
+  class A < T::Enum
+    enums do
+      Val1 = new
+      Val2 = new
+    end
+  end
+end
+
+# -- my_package/__package.rb --
+
+class MyPackage < PackageSpec
+  export A::Val1 # not allowed, instead the full enum should be exported with `export A`
+end
+```
+
 ## 3722
 
 > This error is specific to Stripe's custom `--stripe-packages` mode. If you are
@@ -816,6 +855,23 @@ class A::B < PackageSpec
 end
 ```
 
+## 3723
+
+> This error is specific to Stripe's custom `--stripe-packages` mode. If you are
+> at Stripe, please see [go/modularity](http://go/modularity) for more.
+
+The `--stripe-packages` mode allows packages to explicitly enumerate which other
+packages are allowed to import them by using the `visible_to` directive. If a
+package uses one or more `visible_to` lines, and is imported by a package _not_
+referenced by a `visible_to` line, then Sorbet will report an error pointing to
+that import.
+
+Often, if you're running across this error, it means that you're trying to rely
+on an implementation detail that was deliberately made private. However, if
+you're sure that it should be okay to import this package, then you can add an
+additional `visible_to` directive in order to allow the import you're trying to
+add.
+
 ## 4001
 
 Sorbet parses the syntax of `include` and `extend` declarations, even in
@@ -827,8 +883,14 @@ are reported when encountered.
 
 ## 4002
 
-Sorbet requires that every `include` references a constant literal. For example,
-this is an error, even in `# typed: false` files:
+Sorbet requires seeing the complete inheritance hierarchy in a codebase. To do
+this, it must be able to statically resolve a class's superclass and any mixins,
+declared with `include` or `extend`.
+
+To make this possible, Sorbet requires that every superclass, `include`, and
+`extend` references a constant literal. It's not possible to use an arbitrary
+expression (like a method call that produces a class or module) as an ancestor.
+This restriction holds even in `# typed: false` files.
 
 ```ruby
 module A; end
@@ -843,14 +905,17 @@ class C
 end
 ```
 
-Non-constant literals make it hard to impossible to determine the complete
-inheritance hierarchy in a codebase. Sorbet must know the complete inheritance
-hierarchy of a codebase in order to check that a variable is a valid instance of
-a type.
+(For some intuition why this restriction is in place: Sorbet requires resolving
+the inheritance hierarchy before it can run inference. Inference is when it
+assigns types to every expression in the codebase. Therefore inheritance
+resolution cannot depend on inference, as otherwise there would be a logical
+cycle in the order Sorbet has to type check a codebase. Similar restrictions
+appear throughout Sorbet: see [Why type annotations?](why-type-annotations.md)
+for more examples.)
 
-It is possible to silence this error with `T.unsafe`, but it should be done with
-**utmost caution**, as Sorbet will not consider the include and provide a less
-accurate analysis:
+For module mixins, it is possible to silence this error with `T.unsafe`, but it
+should be done with **utmost caution**, as Sorbet will not consider the include
+and provide a less accurate analysis:
 
 ```ruby
 module A; end
@@ -876,6 +941,8 @@ c.b # error: Method `b` does not exist on `C`
 T.let(C, A) # error: Argument does not have asserted type `A`
 T.let(C, B) # error: Argument does not have asserted type `B`
 ```
+
+There is no such workaround for superclasses.
 
 ## 4003
 
@@ -1207,6 +1274,11 @@ assignment and a class definition for a given constant, you can either:
     itself, and mark that file `# typed: ignore` (possibly also using an `RBI`
     file to declare anything that can't be factored out of the ignored file but
     should still be visible to Sorbet).
+
+## 4023
+
+The `has_attached_class!` annotation is only allowed in a Ruby `module`, not a
+Ruby `class`. For more, see the docs: [`T.attached_class`](attached-class.md).
 
 ## 5001
 
@@ -1543,6 +1615,10 @@ requires that the variance on parent and child classes matches.
 
 ## 5016
 
+> Note: more recent versions of Sorbet have eliminated this error--it is now
+> possible to define generic classes with covariant and contravariant type
+> members.
+
 Sorbet does not allow classes to be covariant nor contravariant.
 
 **Why?** The design of generic classes and interfaces in Sorbet was heavily
@@ -1677,7 +1753,7 @@ Some modules require specific functionality in the receiving class to work. For
 example `Enumerable` needs a `each` method in the target class.
 
 Failing example in
-[sorbet.run](https://sorbet.run/#class%20Example%0A%20%20include%20Enumerable%0Aend):
+[sorbet.run](https://sorbet.run/#%23%20typed%3A%20true%0A%0Aclass%20Example%0A%20%20include%20Enumerable%0Aend):
 
 ```
 class Example
@@ -1689,7 +1765,7 @@ To fix this, implement the required abstract methods in your class to provide
 the required functionality.
 
 Passing example in
-[sorbet.run](<https://sorbet.run/#class%20Example%0A%20%20include%20Enumerable%0A%0A%20%20def%20each(%26blk)%0A%0A%20%20end%0Aend>):
+[sorbet.run](https://sorbet.run/#%23%20typed%3A%20true%0A%0Aclass%20Example%0A%20%20include%20Enumerable%0A%0A%20%20def%20each%28%26blk%29%0A%0A%20%20end%0Aend):
 
 ```
 class Example
@@ -1757,6 +1833,71 @@ def foo; [0]; end
 
 For more information, see
 [Arrays, Hashes, and Generics in the Standard Library](stdlib-generics.md).
+
+## 5027
+
+> This error is opt-in, behind the `--check-out-of-order-constant-references`
+> flag.
+>
+> Sorbet does not check this by default because certain codebases make clever
+> usage of Ruby's `autoload` mechanism to allow all constants to be referenced
+> before their definitions.
+
+This error fires when a constant is referenced before it is defined.
+
+```ruby
+puts X # error: `X` referenced before it is defined
+X = 1
+```
+
+```ruby
+module Foo
+  A = X
+    # ^ error: `Foo::X` referenced before it is defined
+  class X; end
+end
+```
+
+Generally, Sorbet is not opinionated about definition-reference ordering. It
+assumes files are required in the correct order or at the correct times to
+ensure that definitions are available before they're referenced.
+
+However, if a constant is defined in a single file, Sorbet can detect when it's
+been referenced in that file ahead of its definition (because in the single-file
+case, it doesn't matter whether or in what order any require statements happen).
+There are some limitations:
+
+### Load-time scope must be established definitively
+
+Sorbet has to prove definitively that a given constant is accessed out-of-order
+at load time. It cannot track accesses across function calls or blocks, meaning
+that the following code, while technically unloadable, will not throw a Sorbet
+error.
+
+```ruby
+module Foo
+  def bar(&blk)
+    yield
+  end
+
+  bar do
+    A = X # this will not report an error
+  end
+
+  class X; end
+```
+
+### Symbols have to be guaranteed to exist only in one file
+
+In the above example, if `Foo::X` is also declared in another file, the error
+will not fire. In such cases, the other file that defines `X` may get required
+first, so Sorbet cannot prove that there will be a problem referencing `X` in
+this file.
+
+Ways to fix the error include:
+
+- Re-ordering the constant access below the declaration.
+- In the case of classes, adding an empty pre-declaration before the access.
 
 ## 5028
 
@@ -2150,9 +2291,16 @@ the restriction of only being able to use `Elem` in **out positions**. See
 [Input and output positions](generics.md#input-and-output-positions) for more
 information.
 
-Recall that only modules (not classes) may have covariant and contravariant type
-members—classes are limited to only invariant type members. For more, see the
-docs for error code [5016](#5016).
+The ways to fix this error include:
+
+- Make the type invariant by removing the `:in` or `:out` annotation on the
+  type. (This comes with the normal restrictions on invariant type members.)
+- Mark the method in question `private`. (This comes with the normal
+  restrictions on `private` methods.)
+
+If neither of these works, you'll have to reconsider whether it's possible to
+statically type the code in question, and how best to rewrite the code so that
+it can be typed statically.
 
 > **Note** that `T.attached_class` is actually modeled as a covariant (`:out`)
 > `type_template` defined automatically on all singleton classes, which means
@@ -2532,9 +2680,9 @@ module A
 end
 ```
 
-The definition B::C is ambiguous. In Ruby's runtime, it resolves to B::C (and
-not A::B::C). However, things are different in the presence of a pre-declared
-filler namespace like below:
+The definition `B::C` is ambiguous. In Ruby's runtime, it resolves to `B::C`
+(and not `A::B::C`). However, things are different in the presence of a
+pre-declared filler namespace like below:
 
 ```ruby
 # typed: true
@@ -2551,12 +2699,12 @@ module A
 end
 ```
 
-In this case, the definition resolves to A::B::C in Ruby's runtime.
+In this case, the definition resolves to `A::B::C` in Ruby's runtime.
 
 By default, Sorbet assumes the presence of filler namespaces while typechecking,
 regardless of whether they are explicitly predeclared like in the second
-example. This means that in Sorbet's view, the definition resolves to A::B::C in
-either case.
+example. This means that in Sorbet's view, the definition resolves to `A::B::C`
+in either case.
 
 In Stripe's codebase, this is generally not a problem at runtime, as we use
 Sorbet's own autoloader generation to pre-declare filler namespaces, keeping the
@@ -2700,6 +2848,43 @@ class MyClass < AbstractSerializable
   # ...
 end
 ```
+
+## 5073
+
+Abstract classes cannot be instantiated by definition. See
+[Abstract Classes and Interfaces](abstract.md) for more information.
+
+```ruby
+class Abstract
+  extend T::Sig
+  extend T::Helpers
+  abstract!
+
+  sig {abstract.void}
+  def foo; end
+end
+
+Abstract.new # error: Attempt to instantiate abstract class `Abstract`
+```
+
+To fix this error, there are some options:
+
+- If the class which is marked `abstract!` does not actually have any `abstract`
+  methods, simply remove `abstract!` from the class definition to fix the error.
+- If the class _does_ have `abstract` methods, find some concrete subclass to
+  call `new` on instead. If the call to `new` is in a test file, you may wish to
+  make a new, test-only subclass of the abstract class. (Depending on the
+  specifics of the test, it may even be possible to simply define all the
+  abstract methods to simply `raise`, so that other aspects of the parent class
+  can be tested.)
+
+## 5074
+
+A module marked `has_attached_class!` can only be mixed into a class with
+`extend`, or a module with `include`. When mixing a `has_attached_class!` module
+into another module, both modules must declare `has_attached_class!`.
+
+For more information, see the docs for [`T.attached_class`](attached-class.md).
 
 ## 6001
 
@@ -3298,14 +3483,21 @@ See also: [5028](#5028), [6002](#6002), [7028](#7028), [7043](#7043).
 
 ## 7018
 
-At `typed: strong`, Sorbet no longer allows `T.untyped` as the intermediate
-result of any method call. This effectively means that Sorbet knew the type
-statically for 100% of calls within a file. This sigil is rarely used—usually
-the only files that are `# typed: strong` are RBI files and files with empty
-class definitions. Most Ruby files that actually do interesting things will have
-errors in `# typed: strong`. Support for `typed: strong` files is minimal, as
-Sorbet changes regularly and new features often bring new `T.untyped`
-intermediate values.
+At `# typed: strong`, Sorbet no longer allows using `T.untyped` values. To fix
+errors of this class, add type annotations to the code until Sorbet has enough
+context to know the static type of a value. Usually this means adding
+[method signatures](sigs.md) or [type assertions](type-assertions.md) to declare
+types to Sorbet that it couldn't infer.
+
+**Note**: this strictness level should be considered a beta feature: the errors
+at this level are still being developed. Most Ruby files that actually do
+interesting things will have errors in `# typed: strong`. As such, an
+alternative solution to fixing these errors is simply to downgrade the file to
+`# typed: strict` or below, which will silence all these `T.untyped` errors.
+
+For more information on `# typed: strong`, strategies for dealing with errors
+that arise from using `T.untyped`, and current known limitations, see the docs
+for [`# typed: strong`](strong.md).
 
 ## 7019
 
@@ -3471,9 +3663,10 @@ def get_value(input)
 end
 ```
 
-Since generic types are erased at runtime, this construct would never work when
-the program executed. Replace the generic type `T::Array[Integer]` by the erased
-type `Array` so the runtime behavior is correct:
+Since [generic types are erased](generics.md#generics-and-runtime-checks) at
+runtime, this construct would never work when the program executed. Replace the
+generic type `T::Array[Integer]` by the erased type `Array` so the runtime
+behavior is correct:
 
 ```ruby
 def get_value(input)
@@ -3896,6 +4089,55 @@ Sorbet:
 arr = T::Array[NilClass].new
 T.unsafe(arr).dig(0, 0)
 ```
+
+## 7045
+
+Sorbet sometimes assumes an expression has a certain type—even when it has no
+guarantee whether that's the case—because the assumption will be correct almost
+all the time and assuming the type means not having to given an explicit type
+annotation.
+
+This error is reported when those assumptions are wrong. Rather than go back and
+attempt to invalidate the assumption by redoing work it already did (but this
+time under the correct assumptions), it reports an error asking the user to
+provide an explicit type annotation so that no assumption is necessary in the
+first place. This enables Sorbet to finish type checking quickly on large
+codebases.
+
+To fix this error, provide an explicit annotation (or simply accept the
+[autocorrect suggestion](cli.md#accepting-autocorrect-suggestions)).
+
+For more information, read
+[Why does Sorbet sometimes need type annotations?](why-type-annotations.md).
+
+## 7046
+
+For a limited number of types, Sorbet checks whether it looks like a call to
+`==` is out of place. Currently, Sorbet only does these checks when the left
+operand of `==` is:
+
+- `Symbol`
+- `String`
+
+Sorbet is unable to apply these checks for all types, because `==` can be
+overridden in arbitrary ways, including to allow for implicit conversion between
+unrelated types. This means that Sorbet will sometimes miss reporting this error
+in places where we would like it to, and can't be changed to report an error
+without breaking valid code.
+
+To fix this error, ensure that the left and right operands' types match before
+doing the comparison. For example, try converting `String`s to `Symbol`s with
+`to_sym` (or vice versa with `to_s`).
+
+## 7047
+
+This error code is an implementation detail of Sorbet's "highlight untyped in
+editor" mode. It indicates that the given piece of code has type
+[`T.untyped`](untyped.md). Untyped code can be dangerous, because it circumvents
+the guarantees of the type system.
+
+This feature is opt-in. See [VS Code](vscode.md) for instructions on how to turn
+it on.
 
 <!-- -->
 

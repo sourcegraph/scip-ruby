@@ -306,6 +306,18 @@ NodeDef nodes[] = {
         "forwarded_args",
         vector<FieldDef>(),
     },
+    // "*" argument forwarding in call site
+    {
+        "ForwardedRestArg",
+        "forwarded_restarg",
+        vector<FieldDef>(),
+    },
+    // "**" argument forwarding in call site
+    {
+        "ForwardedKwrestArg",
+        "forwarded_kwrestarg",
+        vector<FieldDef>(),
+    },
     // float literal like "1.2"
     {
         "Float",

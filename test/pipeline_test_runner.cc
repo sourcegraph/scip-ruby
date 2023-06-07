@@ -1,4 +1,4 @@
-#include "doctest.h"
+#include "doctest/doctest.h"
 #include <cxxopts.hpp>
 // has to go first as it violates our requirements
 
@@ -15,14 +15,15 @@
 #include "class_flatten/class_flatten.h"
 #include "common/FileOps.h"
 #include "common/common.h"
-#include "common/formatting.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
+#include "common/strings/formatting.h"
 #include "common/web_tracer_framework/tracing.h"
 #include "core/Error.h"
 #include "core/ErrorCollector.h"
 #include "core/ErrorQueue.h"
 #include "core/Unfreeze.h"
 #include "core/errors/namer.h"
+#include "core/errors/resolver.h"
 #include "core/serialize/serialize.h"
 #include "definition_validator/validator.h"
 #include "infer/infer.h"
@@ -201,7 +202,6 @@ TEST_CASE("PerPhaseTest") { // NOLINT
     }
 
     gs->censorForSnapshotTests = true;
-    gs->lspExperimentalFastPathEnabled = true;
     auto workers = WorkerPool::create(0, gs->tracer());
 
     auto assertions = RangeAssertion::parseAssertions(test.sourceFileContents);
@@ -213,6 +213,10 @@ TEST_CASE("PerPhaseTest") { // NOLINT
 
     if (!BooleanPropertyAssertion::getValue("stripe-mode", assertions).value_or(false)) {
         gs->suppressErrorClass(core::errors::Namer::MultipleBehaviorDefs.code);
+    }
+
+    if (!BooleanPropertyAssertion::getValue("check-out-of-order-constant-references", assertions).value_or(false)) {
+        gs->suppressErrorClass(core::errors::Resolver::OutOfOrderConstantAccess.code);
     }
 
     if (BooleanPropertyAssertion::getValue("no-stdlib", assertions).value_or(false)) {
@@ -295,32 +299,28 @@ TEST_CASE("PerPhaseTest") { // NOLINT
 
         ast::ParsedFile localNamed;
 
-        if (!test.expectations.contains("autogen")) {
-            // Rewriter
-            ast::ParsedFile rewriten;
-            {
-                core::UnfreezeNameTable nameTableAccess(*gs); // enters original strings
-
-                core::MutableContext ctx(*gs, core::Symbols::root(), desugared.file);
-                rewriten = testSerialize(
-                    *gs, ast::ParsedFile{rewriter::Rewriter::run(ctx, move(desugared.tree)), desugared.file});
-            }
-
-            handler.addObserved(*gs, "rewrite-tree", [&]() { return rewriten.tree.toString(*gs); });
-            handler.addObserved(*gs, "rewrite-tree-raw", [&]() { return rewriten.tree.showRaw(*gs); });
+        // Rewriter
+        ast::ParsedFile rewriten;
+        {
+            core::UnfreezeNameTable nameTableAccess(*gs); // enters original strings
 
             core::MutableContext ctx(*gs, core::Symbols::root(), desugared.file);
-            localNamed = testSerialize(*gs, local_vars::LocalVars::run(ctx, move(rewriten)));
-
-            handler.addObserved(*gs, "index-tree", [&]() { return localNamed.tree.toString(*gs); });
-            handler.addObserved(*gs, "index-tree-raw", [&]() { return localNamed.tree.showRaw(*gs); });
-        } else {
-            core::MutableContext ctx(*gs, core::Symbols::root(), desugared.file);
-            localNamed = testSerialize(*gs, local_vars::LocalVars::run(ctx, move(desugared)));
-            if (test.expectations.contains("rewrite-tree-raw") || test.expectations.contains("rewrite-tree")) {
-                FAIL_CHECK("Running Rewriter passes with autogen isn't supported");
-            }
+            bool previous = gs->runningUnderAutogen;
+            gs->runningUnderAutogen = test.expectations.contains("autogen");
+            rewriten =
+                testSerialize(*gs, ast::ParsedFile{rewriter::Rewriter::run(ctx, move(desugared.tree)), desugared.file});
+            gs->runningUnderAutogen = previous;
         }
+
+        handler.addObserved(*gs, "rewrite-tree", [&]() { return rewriten.tree.toString(*gs); });
+        handler.addObserved(*gs, "rewrite-tree-raw", [&]() { return rewriten.tree.showRaw(*gs); });
+
+        core::MutableContext ctx(*gs, core::Symbols::root(), desugared.file);
+        localNamed = testSerialize(*gs, local_vars::LocalVars::run(ctx, move(rewriten)));
+
+        handler.addObserved(*gs, "index-tree", [&]() { return localNamed.tree.toString(*gs); });
+        handler.addObserved(*gs, "index-tree-raw", [&]() { return localNamed.tree.showRaw(*gs); });
+
         trees.emplace_back(move(localNamed));
     }
 
@@ -331,6 +331,7 @@ TEST_CASE("PerPhaseTest") { // NOLINT
         vector<std::string> extraPackageFilesDirectorySlashPrefixes;
         vector<std::string> secondaryTestPackageNamespaces = {"Critic"};
         vector<std::string> skipRBIExportEnforcementDirs;
+        vector<std::string> skipImportVisibilityCheckFor;
 
         auto extraDirUnderscore =
             StringPropertyAssertion::getValue("extra-package-files-directory-prefix-underscore", assertions);
@@ -344,11 +345,18 @@ TEST_CASE("PerPhaseTest") { // NOLINT
             extraPackageFilesDirectorySlashPrefixes.emplace_back(extraDirSlash.value());
         }
 
+        auto skipImportVisibility =
+            StringPropertyAssertion::getValue("skip-package-import-visibility-check-for", assertions);
+        if (skipImportVisibility.has_value()) {
+            skipImportVisibilityCheckFor.emplace_back(skipImportVisibility.value());
+        }
+
         {
             core::UnfreezeNameTable packageNS(*gs);
             core::packages::UnfreezePackages unfreezeToEnterPackagerOptionsPackageDB = gs->unfreezePackages();
             gs->setPackagerOptions(secondaryTestPackageNamespaces, extraPackageFilesDirectoryUnderscorePrefixes,
-                                   extraPackageFilesDirectorySlashPrefixes, {}, "PACKAGE_ERROR_HINT");
+                                   extraPackageFilesDirectorySlashPrefixes, {}, skipImportVisibilityCheckFor,
+                                   "PACKAGE_ERROR_HINT");
         }
 
         // Packager runs over all trees.
@@ -752,6 +760,7 @@ TEST_CASE("PerPhaseTest") { // NOLINT
         }
     }
 
+    bool ranIncremantalNamer = false;
     {
         // namer
         for (auto &tree : trees) {
@@ -765,6 +774,7 @@ TEST_CASE("PerPhaseTest") { // NOLINT
             // Here, to complement those tests, we just run Namer::run (not Namer::runIncremental)
             // to stress the codepath where Namer is not tasked with deleting anything when run for
             // the fast path.
+            ENFORCE(!ranIncremantalNamer);
             vTmp = move(namer::Namer::run(*gs, move(vTmp), *workers, &foundHashes).result());
             tree = testSerialize(*gs, move(vTmp[0]));
 
@@ -774,7 +784,7 @@ TEST_CASE("PerPhaseTest") { // NOLINT
     }
 
     // resolver
-    trees = move(resolver::Resolver::runIncremental(*gs, move(trees)).result());
+    trees = move(resolver::Resolver::runIncremental(*gs, move(trees), ranIncremantalNamer).result());
 
     if (enablePackager) {
         trees = packager::VisibilityChecker::run(*gs, *workers, move(trees));

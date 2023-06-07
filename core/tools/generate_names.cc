@@ -135,6 +135,7 @@ NameDef names[] = {
     {"proc"},
     {"untyped"},
     {"noreturn"},
+    {"anything"},
     {"singletonClass", "singleton_class"},
     {"class_", "class"},
     {"classOf", "class_of"},
@@ -148,6 +149,7 @@ NameDef names[] = {
     {"let"},
     {"uncheckedLet", "<unchecked_let>"},
     {"syntheticBind", "<synthetic bind>"},
+    {"assumeType", "<assume type>"},
     {"unsafe"},
     {"must"},
     {"mustBecause", "must_because"},
@@ -195,6 +197,7 @@ NameDef names[] = {
     {"fixed"},
     {"lower"},
     {"upper"},
+    {"declareHasAttachedClass", "has_attached_class!"},
 
     {"prop"},
     {"tokenProp", "token_prop"},
@@ -231,15 +234,10 @@ NameDef names[] = {
     {"factory"},
     {"InexactStruct", "InexactStruct", true},
     {"ImmutableStruct", "ImmutableStruct", true},
-    {"Chalk", "Chalk", true},
-    {"ODM", "ODM", true},
-    {"Document", "Document", true},
-    {"DeprecatedNumeric", "DeprecatedNumeric", true},
     {"Private", "Private", true},
     {"Types", "Types", true},
     {"Methods", "Methods", true},
     {"DeclBuilder", "DeclBuilder", true},
-    {"Chalk_ODM_Document", "::Chalk::ODM::Document"},
 
     {"prefix"},
     {"to"},
@@ -250,6 +248,8 @@ NameDef names[] = {
     {"cattrAccessor", "cattr_accessor"},
     {"cattrReader", "cattr_reader"},
     {"cattrWriter", "cattr_writer"},
+    {"threadMattrAccessor", "thread_mattr_accessor"},
+    {"threadCattrAccessor", "thread_cattr_accessor"},
     {"instanceReader", "instance_reader"},
     {"instanceWriter", "instance_writer"},
     {"instanceAccessor", "instance_accessor"},
@@ -299,6 +299,7 @@ NameDef names[] = {
     {"genericPropGetter"},
 
     {"raise"},
+    {"fail"},
     {"rewriterRaiseUnimplemented", "Sorbet rewriter pass partially unimplemented"},
 
     {"test"},
@@ -345,6 +346,9 @@ NameDef names[] = {
     {"blkArg", "<blk>"},
     {"blockGiven_p", "block_given?"},
     {"anonymousBlock", "<anonymous-block>"},
+
+    // Method names known to Data
+    {"define"},
 
     // Used to generate temporary names for destructuring arguments ala proc do
     //  |(x,y)|; end
@@ -437,7 +441,6 @@ NameDef names[] = {
     {"callWithSplatAndBlock", "<call-with-splat-and-block>"},
     {"enumerableToH", "enumerable_to_h"},
     {"blockBreak", "<block-break>"},
-    {"selfNew", "<self-new>"},
     {"stringInterpolate", "<string-interpolate>"},
 
     // Packager
@@ -448,6 +451,8 @@ NameDef names[] = {
     {"autoloader_compatibility"},
     {"legacy"},
     {"strict"},
+    {"visible_to"},
+    {"exportAll", "export_all!"},
     {"PackageSpec", "PackageSpec", true},
     {"PackageSpecRegistry", "<PackageSpecRegistry>", true},
 
@@ -456,7 +461,7 @@ NameDef names[] = {
     {"compilerVersion", "compiler_version"},
 
     // GlobalState initEmpty()
-    {"Top", "<top>", true},
+    {"Top", "T.anything", true},
     {"Bottom", "T.noreturn", true},
     {"Untyped", "T.untyped", true},
     {"Root", "<root>", true},
@@ -464,6 +469,7 @@ NameDef names[] = {
     {"String", "String", true},
     {"Integer", "Integer", true},
     {"Float", "Float", true},
+    {"Numeric", "Numeric", true},
     {"Symbol", "Symbol", true},
     {"Array", "Array", true},
     {"Hash", "Hash", true},
@@ -489,6 +495,7 @@ NameDef names[] = {
     {"Kernel", "Kernel", true},
     {"Range", "Range", true},
     {"Regexp", "Regexp", true},
+    {"Exception", "Exception", true},
     {"StandardError", "StandardError", true},
     {"Complex", "Complex", true},
     {"Rational", "Rational", true},
@@ -504,8 +511,10 @@ NameDef names[] = {
     {"Enumerable", "Enumerable", true},
     {"Enumerator", "Enumerator", true},
     {"Lazy", "Lazy", true},
+    {"Chain", "Chain", true},
     {"Set", "Set", true},
     {"Struct", "Struct", true},
+    {"Data", "Data", true},
     {"File", "File", true},
     {"Encoding", "Encoding", true},
     {"getEncoding", "<get-encoding>"},

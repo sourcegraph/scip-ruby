@@ -8,11 +8,12 @@
 #include "common/FileOps.h"
 #include "common/concurrency/ConcurrentQueue.h"
 #include "common/concurrency/WorkerPool.h"
-#include "common/formatting.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
+#include "common/strings/formatting.h"
 #include "core/AutocorrectSuggestion.h"
 #include "core/Unfreeze.h"
 #include "core/errors/packager.h"
+#include "core/packages/MangledName.h"
 #include "core/packages/PackageInfo.h"
 #include <algorithm>
 #include <cctype>
@@ -67,17 +68,6 @@ struct FullyQualifiedName {
     }
 };
 
-class NameFormatter final {
-    const core::GlobalState &gs;
-
-public:
-    NameFormatter(const core::GlobalState &gs) : gs(gs) {}
-
-    void operator()(std::string *out, core::NameRef name) const {
-        out->append(name.shortName(gs));
-    }
-};
-
 struct PackageName {
     core::LocOffsets loc;
     core::NameRef mangledName = core::NameRef::noName();
@@ -86,7 +76,7 @@ struct PackageName {
 
     // Pretty print the package's (user-observable) name (e.g. Foo::Bar)
     string toString(const core::GlobalState &gs) const {
-        return absl::StrJoin(fullName.parts, "::", NameFormatter(gs));
+        return absl::StrJoin(fullName.parts, "::", core::packages::NameFormatter(gs));
     }
 
     bool operator==(const PackageName &rhs) const {
@@ -184,8 +174,12 @@ public:
         return declLoc_;
     }
 
-    bool strictAutoloaderCompatibility() const {
-        return strictAutoloaderCompatibility_;
+    bool legacyAutoloaderCompatibility() const {
+        return legacyAutoloaderCompatibility_;
+    }
+
+    bool exportAll() const {
+        return exportAll_;
     }
 
     // The possible path prefixes associated with files in the package, including path separator at end.
@@ -202,8 +196,16 @@ public:
     // These are copied into every package that imports this package.
     vector<Export> exports_;
 
-    // Whether the code in this package is compatible for path-based autoloading.
-    bool strictAutoloaderCompatibility_;
+    // Code in this package is _completely incompatible_ for path-based autoloading, and only works with the 'legacy'
+    // Sorbet-generated autoloader.
+    bool legacyAutoloaderCompatibility_;
+
+    // Whether this package should just export everything
+    bool exportAll_;
+
+    // The other packages to which this package is visible. If this vector is empty, then it means
+    // the package is fully public and can be imported by anything.
+    vector<PackageName> visibleTo_;
 
     // PackageInfoImpl is the only implementation of PackageInfoImpl
     const static PackageInfoImpl &from(const core::packages::PackageInfo &pkg) {
@@ -351,6 +353,13 @@ public:
         }
         return rv;
     }
+    vector<vector<core::NameRef>> visibleTo() const {
+        vector<vector<core::NameRef>> rv;
+        for (auto &v : visibleTo_) {
+            rv.emplace_back(v.fullName.parts);
+        }
+        return rv;
+    }
 
     std::optional<core::packages::ImportType> importsPackage(core::NameRef mangledName) const {
         if (!mangledName.exists()) {
@@ -418,11 +427,7 @@ PackageName getPackageName(core::MutableContext ctx, ast::UnresolvedConstantLit 
     pName.fullTestPkgName = pName.fullName.withPrefix(TEST_NAME);
 
     // Foo::Bar => Foo_Bar_Package
-    auto mangledName = absl::StrCat(absl::StrJoin(pName.fullName.parts, "_", NameFormatter(ctx)), core::PACKAGE_SUFFIX);
-
-    auto utf8Name = ctx.state.enterNameUTF8(mangledName);
-    auto packagerName = ctx.state.freshNameUnique(core::UniqueNameKind::Packager, utf8Name, 1);
-    pName.mangledName = ctx.state.enterNameConstant(packagerName);
+    pName.mangledName = core::packages::MangledName::mangledNameFromParts(ctx.state, pName.fullName.parts);
 
     return pName;
 }
@@ -504,8 +509,10 @@ class PackageNamespaces final {
 
     vector<Bound> bounds;
     vector<core::NameRef> nameParts;
+    vector<core::LocOffsets> namePartsLocs;
     vector<pair<core::NameRef, uint16_t>> curPkg;
     core::NameRef foundTestNS = core::NameRef::noName();
+    core::LocOffsets foundTestNSLoc;
 
     static constexpr uint16_t SKIP_BOUND_VAL = 0;
 
@@ -517,18 +524,20 @@ public:
     }
 
     int depth() const {
+        ENFORCE(nameParts.size() == namePartsLocs.size());
         return nameParts.size();
     }
 
-    const vector<core::NameRef> currentConstantName() const {
-        if (!foundTestNS.exists()) {
-            return nameParts;
+    const vector<pair<core::NameRef, core::LocOffsets>> currentConstantName() const {
+        vector<pair<core::NameRef, core::LocOffsets>> res;
+
+        if (foundTestNS.exists()) {
+            res.emplace_back(foundTestNS, foundTestNSLoc);
         }
 
-        auto res = vector<core::NameRef>{};
-        res.emplace_back(foundTestNS);
-        for (const auto nm : nameParts) {
-            res.emplace_back(nm);
+        ENFORCE(nameParts.size() == namePartsLocs.size());
+        for (size_t i = 0; i < nameParts.size(); ++i) {
+            res.emplace_back(nameParts[i], namePartsLocs[i]);
         }
         return res;
     }
@@ -550,7 +559,7 @@ public:
         return false;
     }
 
-    void pushName(core::Context ctx, core::NameRef name) {
+    void pushName(core::Context ctx, core::NameRef name, core::LocOffsets loc) {
         if (skips > 0) {
             skips++;
             return;
@@ -560,12 +569,14 @@ public:
         if (isTestFile && boundsEmpty && !foundTestNS.exists()) {
             if (isPrimaryTestNamespace(name)) {
                 foundTestNS = name;
+                foundTestNSLoc = loc;
                 return;
             } else if (!isTestNamespace(ctx, name)) {
                 // Inside a test file, but not inside a test namespace. Set bounds such that
                 // begin == end, stopping any subsequent search.
                 bounds.emplace_back(begin, end);
                 nameParts.emplace_back(name);
+                namePartsLocs.emplace_back(loc);
                 begin = end = 0;
                 return;
             }
@@ -582,6 +593,7 @@ public:
 
         bounds.emplace_back(begin, end);
         nameParts.emplace_back(name);
+        namePartsLocs.emplace_back(loc);
 
         auto lb = std::lower_bound(packages.begin() + begin, packages.begin() + end, nameParts,
                                    [ctx](auto pkgNr, auto &nameParts) -> bool {
@@ -617,6 +629,7 @@ public:
         if (isTestFile && bounds.size() == 0 && foundTestNS.exists()) {
             ENFORCE(nameParts.empty());
             foundTestNS = core::NameRef::noName();
+            foundTestNSLoc = core::LocOffsets::none();
             return;
         }
 
@@ -638,12 +651,14 @@ public:
         end = bounds.back().second;
         bounds.pop_back();
         nameParts.pop_back();
+        namePartsLocs.pop_back();
     }
 
     ~PackageNamespaces() {
         // Book-keeping sanity checks
         ENFORCE(bounds.empty());
         ENFORCE(nameParts.empty());
+        ENFORCE(namePartsLocs.empty());
         ENFORCE(begin == 0);
         ENFORCE(end = packages.size());
         ENFORCE(curPkg.empty());
@@ -665,7 +680,7 @@ class EnforcePackagePrefix final {
     int errorDepth = 0;
     int rootConsts = 0;
     bool useTestNamespace = false;
-    vector<core::NameRef> tmpNameParts;
+    vector<std::pair<core::NameRef, core::LocOffsets>> tmpNameParts;
 
 public:
     EnforcePackagePrefix(core::Context ctx, const PackageInfoImpl &pkg, bool isTestFile)
@@ -800,13 +815,17 @@ public:
             ENFORCE(errorDepth == 0);
             errorDepth++;
             if (auto e = ctx.beginError(loc, core::errors::Packager::DefinitionPackageMismatch)) {
-                e.setHeader(
-                    "Class or method behavior may not be defined outside of the enclosing package namespace `{}`",
-                    fmt::map_join(pkgName, "::", [&](const auto &nr) { return nr.show(ctx); }));
+                e.setHeader("This file must only define behavior in enclosing package `{}`",
+                            fmt::map_join(pkgName, "::", [&](const auto &nr) { return nr.show(ctx); }));
+                const auto &constantName = namespaces.currentConstantName();
+                e.addErrorLine(ctx.locAt(constantName.back().second), "Defining behavior in `{}` instead:",
+                               fmt::map_join(constantName, "::", [&](const auto &nr) { return nr.first.show(ctx); }));
+                e.addErrorLine(pkg.declLoc(), "Enclosing package `{}` declared here",
+                               fmt::map_join(pkgName, "::", [&](const auto &nr) { return nr.show(ctx); }));
                 if (packageForNamespace.exists()) {
-                    auto &namespaceParts = ctx.state.packageDB().getPackageInfo(packageForNamespace).fullName();
-                    e.addErrorNote("Attempting to define class or method behavior in package namespace `{}`",
-                                   fmt::map_join(namespaceParts, "::", [&](const auto &nr) { return nr.show(ctx); }));
+                    auto &packageInfo = ctx.state.packageDB().getPackageInfo(packageForNamespace);
+                    e.addErrorLine(packageInfo.declLoc(), "Package `{}` declared here",
+                                   constantName.back().first.show(ctx));
                 }
             }
         }
@@ -817,7 +836,7 @@ private:
         ENFORCE(tmpNameParts.empty());
         auto prevDepth = namespaces.depth();
         while (lit != nullptr) {
-            tmpNameParts.emplace_back(lit->cnst);
+            tmpNameParts.emplace_back(lit->cnst, lit->loc);
             auto *scope = ast::cast_tree<ast::ConstantLit>(lit->scope);
             lit = ast::cast_tree<ast::UnresolvedConstantLit>(lit->scope);
             if (scope != nullptr) {
@@ -828,12 +847,12 @@ private:
         }
         if (rootConsts == 0) {
             for (auto it = tmpNameParts.rbegin(); it != tmpNameParts.rend(); ++it) {
-                namespaces.pushName(ctx, *it);
+                namespaces.pushName(ctx, it->first, it->second);
             }
         }
 
         if (prevDepth == 0 && isTestFile && namespaces.depth() > 0) {
-            useTestNamespace = isPrimaryTestNamespace(tmpNameParts.back()) ||
+            useTestNamespace = isPrimaryTestNamespace(tmpNameParts.back().first) ||
                                !isSecondaryTestNamespace(ctx, pkg.name.fullName.parts[0]);
         }
 
@@ -883,7 +902,8 @@ private:
         auto reqMangledName = namespaces.packageForNamespace();
         if (reqMangledName.exists()) {
             auto &reqPkg = gs.packageDB().getPackageInfo(reqMangledName);
-            auto givenNamespace = absl::StrJoin(namespaces.currentConstantName(), "::", NameFormatter(gs));
+            auto givenNamespace =
+                absl::StrJoin(namespaces.currentConstantName(), "::", core::packages::NameFormatter(gs));
             e.addErrorLine(reqPkg.declLoc(), "Must belong to this package, given constant name `{}`", givenNamespace);
         }
     }
@@ -975,6 +995,10 @@ struct PackageInfoFinder {
             send.addPosArg(prependName(move(importArg), core::Names::Constants::PackageSpecRegistry()));
         }
 
+        if (send.fun == core::Names::exportAll() && send.numPosArgs() == 0) {
+            info->exportAll_ = true;
+        }
+
         if (send.fun == core::Names::autoloader_compatibility() && send.numPosArgs() == 1) {
             // Parse autoloader_compatibility DSL and set strict bit on PackageInfoImpl if configured
             auto *compatibilityAnnotationLit = ast::cast_tree<ast::Literal>(send.getPosArg(0));
@@ -995,16 +1019,45 @@ struct PackageInfoFinder {
             }
 
             auto compatibilityAnnotation = compatibilityAnnotationLit->asString();
-            if (compatibilityAnnotation != core::Names::strict() && compatibilityAnnotation != core::Names::legacy()) {
+            if (compatibilityAnnotation != core::Names::legacy()) {
                 if (auto e = ctx.beginError(send.loc, core::errors::Packager::InvalidConfiguration)) {
-                    e.setHeader("Argument to `{}` must be either 'strict' or 'legacy'", send.fun.show(ctx));
+                    if (compatibilityAnnotation == core::Names::strict()) {
+                        e.setHeader("The 'strict' argument has been deprecated as an argument to `{}`",
+                                    send.fun.show(ctx));
+                        e.addErrorNote("If you wish to mark your "
+                                       "package as strictly path-based-autoloading compatible, do not provide an "
+                                       "autoloader_compatibility annotation");
+                    } else {
+                        e.setHeader("Argument to `{}` can only be 'legacy'", send.fun.show(ctx));
+                    }
                 }
 
                 return;
             }
 
-            if (compatibilityAnnotation == core::Names::strict()) {
-                info->strictAutoloaderCompatibility_ = true;
+            if (compatibilityAnnotation == core::Names::legacy()) {
+                info->legacyAutoloaderCompatibility_ = true;
+            }
+        }
+
+        if (send.fun == core::Names::visible_to() && send.numPosArgs() == 1) {
+            if (auto target = verifyConstant(ctx, send.fun, send.getPosArg(0))) {
+                auto name = getPackageName(ctx, target);
+                ENFORCE(name.mangledName.exists());
+
+                if (name.mangledName == info->name.mangledName) {
+                    if (auto e = ctx.beginError(target->loc, core::errors::Packager::NoSelfImport)) {
+                        e.setHeader("Useless `{}`, because {} cannot import itself", "visible_to",
+                                    info->name.toString(ctx));
+                    }
+                }
+
+                auto importArg = move(send.getPosArg(0));
+                send.removePosArg(0);
+                ENFORCE(send.numPosArgs() == 0);
+                send.addPosArg(prependName(move(importArg), core::Names::Constants::PackageSpecRegistry()));
+
+                info->visibleTo_.emplace_back(move(name));
             }
         }
     }
@@ -1072,6 +1125,18 @@ struct PackageInfoFinder {
             return;
         }
 
+        if (info->exportAll()) {
+            // we're only here because exports exist, which means if
+            // `exportAll` is set then we've got conflicting
+            // information about export; flag the exports as wrong
+            for (auto it = exported.begin(); it != exported.end(); ++it) {
+                if (auto e = ctx.beginError(it->fqn.loc.offsets(), core::errors::Packager::ExportConflict)) {
+                    e.setHeader("Package `{}` declares `{}` and therefore should not use explicit exports",
+                                info->name.toString(ctx), "export_all!");
+                }
+            }
+        }
+
         fast_sort(exported, Export::lexCmp);
         vector<size_t> dupInds;
         for (auto it = exported.begin(); it != exported.end(); ++it) {
@@ -1113,6 +1178,8 @@ struct PackageInfoFinder {
             case core::Names::export_().rawId():
             case core::Names::restrict_to_service().rawId():
             case core::Names::autoloader_compatibility().rawId():
+            case core::Names::visible_to().rawId():
+            case core::Names::exportAll().rawId():
                 return true;
             default:
                 return false;
@@ -1266,6 +1333,38 @@ ast::ParsedFile validatePackage(core::Context ctx, ast::ParsedFile file) {
         // We already produced an error on this package when producing its package info.
         // The correct course of action is to abort the transform.
         return file;
+    }
+
+    auto &pkgInfo = PackageInfoImpl::from(absPkg);
+    bool skipImportVisibilityCheck = packageDB.skipImportVisibilityCheckFor(pkgInfo.mangledName());
+
+    if (!skipImportVisibilityCheck) {
+        for (auto &i : pkgInfo.importedPackageNames) {
+            auto &otherPkg = packageDB.getPackageInfo(i.name.mangledName);
+
+            // this might mean the other package doesn't exist, but that
+            // should have been caught already
+            if (!otherPkg.exists()) {
+                continue;
+            }
+
+            const auto &visibleTo = otherPkg.visibleTo();
+            if (visibleTo.empty()) {
+                continue;
+            }
+
+            bool allowed = absl::c_any_of(otherPkg.visibleTo(),
+                                          [&absPkg](const auto &other) { return other == absPkg.fullName(); });
+
+            if (!allowed) {
+                if (auto e = ctx.beginError(i.name.loc, core::errors::Packager::ImportNotVisible)) {
+                    e.setHeader("Package `{}` includes explicit visibility modifiers and cannot be imported from `{}`",
+                                otherPkg.show(ctx), absPkg.show(ctx));
+                    e.addErrorNote("Please consult with the owning team before adding a `{}` line to the package `{}`",
+                                   "visible_to", otherPkg.show(ctx));
+                }
+            }
+        }
     }
 
     // Sanity check: __package.rb files _must_ be typed: strict
@@ -1445,17 +1544,12 @@ void Packager::setPackageNameOnFiles(core::GlobalState &gs, const vector<core::F
 }
 
 vector<ast::ParsedFile> Packager::run(core::GlobalState &gs, WorkerPool &workers, vector<ast::ParsedFile> files) {
+    ENFORCE(!gs.runningUnderAutogen, "Packager pass does not run in autogen");
+
     Timer timeit(gs.tracer(), "packager");
 
     files = findPackages(gs, workers, std::move(files));
     setPackageNameOnFiles(gs, files);
-    if (gs.runningUnderAutogen) {
-        // Autogen only requires package metadata. Remove the package files.
-        auto it = std::remove_if(files.begin(), files.end(),
-                                 [&gs](auto &file) -> bool { return file.file.data(gs).isPackage(); });
-        files.erase(it, files.end());
-        return files;
-    }
 
     // Step 2:
     // * Find package files and rewrite them into virtual AST mappings.
@@ -1517,7 +1611,7 @@ public:
     ImportFormatter(const core::GlobalState &gs) : gs(gs) {}
 
     void operator()(std::string *out, const vector<core::NameRef> &name) const {
-        fmt::format_to(back_inserter(*out), "\"{}\"", absl::StrJoin(name, "::", NameFormatter(gs)));
+        fmt::format_to(back_inserter(*out), "\"{}\"", absl::StrJoin(name, "::", core::packages::NameFormatter(gs)));
     }
 };
 
@@ -1551,7 +1645,8 @@ public:
         const auto &pkg = gs.packageDB().getPackageInfo(mangledName);
         out->append("{{");
         out->append("\"name\":");
-        fmt::format_to(back_inserter(*out), "\"{}\",", absl::StrJoin(pkg.fullName(), "::", NameFormatter(gs)));
+        fmt::format_to(back_inserter(*out), "\"{}\",",
+                       absl::StrJoin(pkg.fullName(), "::", core::packages::NameFormatter(gs)));
         out->append("\"imports\":[");
         fmt::format_to(back_inserter(*out), absl::StrJoin(pkg.imports(), ",", ImportFormatter(gs)));
         out->append("],\"testImports\":[");

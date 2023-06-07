@@ -69,6 +69,13 @@
 # obj--->OtherClass---------->(OtherClass)-----------...
 # ```
 class Class < Module
+  # Intentionally does not write extend T::Generic so we don't pollute the
+  # stdlib with an ancestor that doesn't exist at runtime. It doesn't matter,
+  # because RBI files are not typechecked anyways.
+  has_attached_class!(:out)
+
+  ### TODO(jez) After T::Class change: Use `T.attached_class` in `allocate`
+
   # Allocates space for a new object of *class*'s class and does not call
   # initialize on the new instance. The returned object must be an instance of
   # *class*.
@@ -89,6 +96,23 @@ class Class < Module
   sig {returns(T.untyped)}
   def allocate(); end
 
+
+  # Returns the object for which the receiver is the singleton class.
+  #
+  # Raises a `TypeError` if the class is not a singleton class.
+  #
+  # ```ruby
+  # class Foo; end
+  #
+  # Foo.singleton_class.attached_object        #=> Foo
+  # Foo.attached_object                        #=> TypeError: `Foo' is not a singleton class
+  # Foo.new.singleton_class.attached_object    #=> #<Foo:0x000000010491a370>
+  # TrueClass.attached_object                  #=> TypeError: `TrueClass' is not a singleton class
+  # NilClass.attached_object                   #=> TypeError: `NilClass' is not a singleton class
+  # ```
+  sig { returns(BasicObject) }
+  def attached_object; end
+
   ### Sorbet hijacks Class#new to re-use the sig from MyClass#initialize when creating new instances of a class.
   ### This method must be here so that all calls to MyClass.new aren't forced to take 0 arguments.
 
@@ -97,8 +121,25 @@ class Class < Module
   # to create a new object of *class*'s class, then invokes that object's
   # initialize method, passing it *args*. This is the method that ends up
   # getting called whenever an object is constructed using `.new`.
-  sig {params(args: T.untyped, blk: T.untyped).returns(T.untyped)}
+  sig {params(args: T.untyped, blk: T.untyped).returns(T.attached_class)}
   def new(*args, &blk); end
+
+  # Creates a new anonymous (unnamed) class with the given superclass (or
+  # Object if no parameter is given). You can give a class a name by assigning
+  # the class object to a constant.
+  #
+  # If a block is given, it is passed the class object, and the block is
+  # evaluated in the context of this class like class_eval.
+  sig { params(blk: T.untyped).returns(T::Class[Object]) }
+  sig do
+    type_parameters(:Parent)
+      .params(
+        super_class: T.all(T::Class[T.anything], T.type_parameter(:Parent)),
+        blk: T.untyped
+      )
+      .returns(T.all(T::Class[T.anything], T.type_parameter(:Parent)))
+  end
+  def self.new(super_class = Object, &blk); end
 
   # Callback invoked whenever a subclass of the current class is created.
   #
@@ -126,7 +167,7 @@ class Class < Module
   # ```
   sig do
     params(
-        arg0: Class,
+        arg0: T::Class[T.anything],
     )
     .returns(T.untyped)
   end
@@ -157,7 +198,7 @@ class Class < Module
   # B.subclasses        #=> [C]
   # C.subclasses        #=> []
   # ```
-  sig { returns(T::Array[Class]) }
+  sig { returns(T::Array[T::Class[T.anything]]) }
   def subclasses(); end
 
   # Returns the superclass of *class*, or `nil`.
@@ -176,26 +217,26 @@ class Class < Module
   # ```ruby
   # BasicObject.superclass   #=> nil
   # ```
-  sig {returns(T.nilable(Class))}
+  sig {returns(T.nilable(T::Class[T.anything]))}
   def superclass(); end
 
   sig {void}
   sig do
     params(
-        superclass: Class,
+        superclass: T::Class[T.anything],
     )
     .void
   end
   sig do
     params(
-        blk: T.proc.params(arg0: Class).returns(BasicObject),
+        blk: T.proc.params(arg0: T::Class[T.anything]).returns(BasicObject),
     )
     .void
   end
   sig do
     params(
-        superclass: Class,
-        blk: T.proc.params(arg0: Class).returns(BasicObject),
+        superclass: T::Class[T.anything],
+        blk: T.proc.params(arg0: T::Class[T.anything]).returns(BasicObject),
     )
     .void
   end

@@ -1,7 +1,7 @@
 #include "environment.h"
 #include "absl/strings/match.h"
-#include "common/formatting.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
+#include "common/strings/formatting.h"
 #include "common/typecase.h"
 #include "core/GlobalState.h"
 #include "core/TypeConstraint.h"
@@ -530,7 +530,10 @@ void Environment::updateKnowledge(core::Context ctx, cfg::LocalRef local, core::
         whoKnows.falsy().addNoTypeTest(local, typeTestsWithVar, send->recv.variable, core::Types::falsyTypes());
 
         whoKnows.sanityCheck();
-    } else if (send->fun == core::Names::nil_p()) {
+        return;
+    }
+
+    if (send->fun == core::Names::nil_p()) {
         if (!knowledgeFilter.isNeeded(local)) {
             return;
         }
@@ -538,7 +541,10 @@ void Environment::updateKnowledge(core::Context ctx, cfg::LocalRef local, core::
         whoKnows.truthy().addYesTypeTest(local, typeTestsWithVar, send->recv.variable, core::Types::nilClass());
         whoKnows.falsy().addNoTypeTest(local, typeTestsWithVar, send->recv.variable, core::Types::nilClass());
         whoKnows.sanityCheck();
-    } else if (send->fun == core::Names::blank_p()) {
+        return;
+    }
+
+    if (send->fun == core::Names::blank_p()) {
         if (!knowledgeFilter.isNeeded(local)) {
             return;
         }
@@ -552,7 +558,10 @@ void Environment::updateKnowledge(core::Context ctx, cfg::LocalRef local, core::
             whoKnows.falsy().addYesTypeTest(local, typeTestsWithVar, send->recv.variable, knowledgeTypeWithoutFalsy);
             whoKnows.sanityCheck();
         }
-    } else if (send->fun == core::Names::present_p()) {
+        return;
+    }
+
+    if (send->fun == core::Names::present_p()) {
         if (!knowledgeFilter.isNeeded(local)) {
             return;
         }
@@ -566,11 +575,13 @@ void Environment::updateKnowledge(core::Context ctx, cfg::LocalRef local, core::
             whoKnows.truthy().addYesTypeTest(local, typeTestsWithVar, send->recv.variable, knowledgeTypeWithoutFalsy);
             whoKnows.sanityCheck();
         }
+        return;
     }
 
     if (send->args.empty()) {
         return;
     }
+
     // TODO(jez) We should probably update this to be aware of T::NonForcingConstants.non_forcing_is_a?
     if (send->fun == core::Names::kindOf_p() || send->fun == core::Names::isA_p()) {
         if (!knowledgeFilter.isNeeded(local)) {
@@ -587,8 +598,10 @@ void Environment::updateKnowledge(core::Context ctx, cfg::LocalRef local, core::
             }
             whoKnows.sanityCheck();
         }
-    } else if (send->fun == core::Names::eqeq() || send->fun == core::Names::equal_p() ||
-               send->fun == core::Names::neq()) {
+        return;
+    }
+
+    if (send->fun == core::Names::eqeq() || send->fun == core::Names::equal_p() || send->fun == core::Names::neq()) {
         if (!knowledgeFilter.isNeeded(local)) {
             return;
         }
@@ -635,7 +648,10 @@ void Environment::updateKnowledge(core::Context ctx, cfg::LocalRef local, core::
         }
 
         whoKnows.sanityCheck();
-    } else if (send->fun == core::Names::tripleEq()) {
+        return;
+    }
+
+    if (send->fun == core::Names::tripleEq()) {
         if (!knowledgeFilter.isNeeded(local)) {
             return;
         }
@@ -663,8 +679,10 @@ void Environment::updateKnowledge(core::Context ctx, cfg::LocalRef local, core::
             }
         }
         whoKnows.sanityCheck();
+        return;
+    }
 
-    } else if (send->fun == core::Names::lessThan() || send->fun == core::Names::leq()) {
+    if (send->fun == core::Names::lessThan() || send->fun == core::Names::leq()) {
         const auto &recvKlass = send->recv.type;
         const auto &argType = send->args[0].type;
 
@@ -691,6 +709,7 @@ void Environment::updateKnowledge(core::Context ctx, cfg::LocalRef local, core::
             whoKnows.falsy().addNoTypeTest(local, typeTestsWithVar, send->recv.variable, argType);
         }
         whoKnows.sanityCheck();
+        return;
     }
 }
 
@@ -918,7 +937,10 @@ core::TypePtr flatmapHack(core::Context ctx, const core::TypePtr &receiver, cons
         return returnType;
     }
 
-    if (!receiver.isUntyped() && receiver.derivesFrom(ctx, core::Symbols::Enumerator_Lazy())) {
+    if (!receiver.isUntyped() && (receiver.derivesFrom(ctx, core::Symbols::Enumerator_Lazy()) ||
+                                  receiver.derivesFrom(ctx, core::Symbols::Enumerator_Chain()))
+
+    ) {
         return returnType;
     }
 
@@ -994,7 +1016,6 @@ Environment::processBinding(core::Context ctx, const cfg::CFG &inWhat, cfg::Bind
                 auto dispatched = recvType.type.dispatchCall(ctx, dispatchArgs);
 
                 auto it = &dispatched;
-                auto multipleComponents = it->secondary != nullptr;
                 while (it != nullptr) {
                     for (auto &err : it->main.errors) {
                         if (err->what != core::errors::Infer::UnknownMethod ||
@@ -1060,31 +1081,6 @@ Environment::processBinding(core::Context ctx, const cfg::CFG &inWhat, cfg::Bind
                         }
                     }
 
-                    // Sometimes we hit a method here where the method symbol is Symbols::noSymbol().
-                    //
-                    // The primary cases for that is:
-                    //  - When the receiver is untyped
-                    //  - When the receiver is a void type
-                    //  - Calling super
-                    //  - Calling initialize on an object that doesn't define initialize
-                    //  - When a method doesn't exist.
-                    //
-                    // In all of these cases, we bail out and skip the non-private checking.
-                    if (it->main.method.exists() && it->main.method.data(ctx)->flags.isPrivate && !send.isPrivateOk) {
-                        if (auto e = ctx.beginError(bind.loc, core::errors::Infer::PrivateMethod)) {
-                            if (multipleComponents) {
-                                e.setHeader("Non-private call to private method `{}` on `{}` component of `{}`",
-                                            it->main.method.data(ctx)->name.show(ctx), it->main.receiver.show(ctx),
-                                            recvType.type.show(ctx));
-                            } else {
-                                e.setHeader("Non-private call to private method `{}` on `{}`",
-                                            it->main.method.data(ctx)->name.show(ctx), it->main.receiver.show(ctx));
-                            }
-                            e.addErrorLine(it->main.method.data(ctx)->loc(), "Defined in `{}` here",
-                                           it->main.method.data(ctx)->owner.show(ctx));
-                        }
-                    }
-
                     if (it->main.method.exists() && it->main.method.data(ctx)->flags.isPackagePrivate) {
                         core::ClassOrModuleRef klass = it->main.method.data(ctx)->owner;
                         if (klass.exists()) {
@@ -1117,28 +1113,6 @@ Environment::processBinding(core::Context ctx, const cfg::CFG &inWhat, cfg::Bind
                 if (send.link || lspQueryMatch) {
                     retainedResult = make_shared<core::DispatchResult>(std::move(dispatched));
                 }
-                // For `case x; when X ...`, desugar produces `X.===(x)`, but with
-                // a zero-length funLoc.  We tried producing a zero-length loc for
-                // the entire send so there would never be a match here, but that
-                // interacted poorly with a number of testcases (see discussion in
-                // https://github.com/sorbet/sorbet/pull/5015).  The next-best thing
-                // seemed to be detecting `===` calls that appear to have been produced
-                // by desugar and redacting the `SendResponse` so LSP features work
-                // more like developers expect.
-                const bool isDesugarTripleEqSend = send.fun == core::Names::tripleEq() && send.funLoc.empty();
-                if (lspQueryMatch && !isDesugarTripleEqSend) {
-                    auto fun = send.fun;
-                    if (fun == core::Names::checkAndAnd() && core::isa_type<core::NamedLiteralType>(args[1]->type)) {
-                        auto lit = core::cast_type_nonnull<core::NamedLiteralType>(args[2]->type);
-                        if (lit.derivesFrom(ctx, core::Symbols::Symbol())) {
-                            fun = lit.asName();
-                        }
-                    }
-                    core::lsp::QueryResponse::pushQueryResponse(
-                        ctx, core::lsp::SendResponse(ctx.locAt(bind.loc), retainedResult, fun, send.isPrivateOk,
-                                                     ctx.owner.asMethodRef(), ctx.locAt(send.receiverLoc),
-                                                     ctx.locAt(send.funLoc), send.args.size()));
-                }
                 if (send.link) {
                     // This should eventually become ENFORCEs but currently they are wrong
                     if (!retainedResult->main.blockReturnType) {
@@ -1148,7 +1122,36 @@ Environment::processBinding(core::Context ctx, const cfg::CFG &inWhat, cfg::Bind
                         retainedResult->main.blockPreType = core::Types::untyped(ctx, retainedResult->main.method);
                     }
                     ENFORCE(retainedResult->main.sendTp);
+                }
 
+                // For `case x; when X ...`, desugar produces `X.===(x)`, but with
+                // a zero-length funLoc.  We tried producing a zero-length loc for
+                // the entire send so there would never be a match here, but that
+                // interacted poorly with a number of testcases (see discussion in
+                // https://github.com/sorbet/sorbet/pull/5015).  The next-best thing
+                // seemed to be detecting `===` calls that appear to have been produced
+                // by desugar and redacting the `SendResponse` so LSP features work
+                // more like developers expect.
+                const bool isDesugarTripleEqSend = send.fun == core::Names::tripleEq() && send.funLoc.empty();
+                // Something like `X = Foo` will be rewritten to `X = Magic.<suggest-constant-type>(Foo)` if `Foo` fails
+                // to resolve. We don't want to report a send response for the <suggest-constant-type> call here.
+                const bool isSuggestConstantType = send.fun == core::Names::suggestConstantType();
+
+                const bool ignoreSendForLSPQuery = isDesugarTripleEqSend || isSuggestConstantType;
+                if (lspQueryMatch && !ignoreSendForLSPQuery) {
+                    auto fun = send.fun;
+                    if (fun == core::Names::checkAndAnd() && core::isa_type<core::NamedLiteralType>(args[1]->type)) {
+                        auto lit = core::cast_type_nonnull<core::NamedLiteralType>(args[2]->type);
+                        if (lit.derivesFrom(ctx, core::Symbols::Symbol())) {
+                            fun = lit.asName();
+                        }
+                    }
+                    core::lsp::QueryResponse::pushQueryResponse(
+                        ctx,
+                        core::lsp::SendResponse(retainedResult, send.argLocs, fun, ctx.owner.asMethodRef(),
+                                                send.isPrivateOk, ctx.file, bind.loc, send.receiverLoc, send.funLoc));
+                }
+                if (send.link) {
                     send.link->result = move(retainedResult);
                 }
                 if (send.fun == core::Names::toHashDup()) {
@@ -1163,9 +1166,9 @@ Environment::processBinding(core::Context ctx, const cfg::CFG &inWhat, cfg::Bind
                 tp.origins = typeAndOrigin.origins;
 
                 if (lspQueryMatch && !bind.value.isSynthetic()) {
-                    core::lsp::QueryResponse::pushQueryResponse(ctx, core::lsp::IdentResponse(ctx.locAt(bind.loc),
-                                                                                              i.what.data(inWhat), tp,
-                                                                                              ctx.owner.asMethodRef()));
+                    core::lsp::QueryResponse::pushQueryResponse(
+                        ctx, core::lsp::IdentResponse(ctx.locAt(bind.loc), i.what.data(inWhat), tp,
+                                                      ctx.owner.asMethodRef(), ctx.locAt(inWhat.loc)));
                 }
 
                 ENFORCE(ctx.file.data(ctx).hasParseErrors() || !tp.origins.empty(),
@@ -1272,9 +1275,16 @@ Environment::processBinding(core::Context ctx, const cfg::CFG &inWhat, cfg::Bind
                  */
                 ENFORCE(ctx.owner == i.method);
 
-                auto argType = i.argument(ctx).argumentTypeAsSeenByImplementation(ctx, constr);
+                const auto &argInfo = i.argument(ctx);
+                auto argType = argInfo.argumentTypeAsSeenByImplementation(ctx, constr);
                 tp.type = std::move(argType);
                 tp.origins.emplace_back(ctx.locAt(bind.loc));
+
+                if (lspQuery.matchesLoc(argInfo.loc)) {
+                    core::lsp::QueryResponse::pushQueryResponse(
+                        ctx, core::lsp::IdentResponse(argInfo.loc, bind.bind.variable.data(inWhat), tp,
+                                                      ctx.owner.asMethodRef(), ctx.locAt(inWhat.loc)));
+                }
             },
             [&](cfg::ArgPresent &i) {
                 // Return an unanalyzable boolean value that indicates whether or not arg was provided
@@ -1359,40 +1369,51 @@ Environment::processBinding(core::Context ctx, const cfg::CFG &inWhat, cfg::Bind
                 // Fetch the type for the argument out of the parameters for the block
                 // by simulating a blockParam[i] call.
                 const core::TypeAndOrigins &recvType = getAndFillTypeAndOrigin(ctx, i.yieldParam);
-                core::TypePtr argType = core::make_type<core::IntegerLiteralType>((int64_t)i.argId);
 
-                core::TypeAndOrigins arg{argType, recvType.origins};
-                InlinedVector<const core::TypeAndOrigins *, 2> args;
-                args.emplace_back(&arg);
+                if (recvType.type.isUntyped()) {
+                    // This avoids reporting an untyped usage for ->(x) { 0 }. Sorbet would
+                    // initialize the type of the local `x` by calling <blk>.[](0), which makes it
+                    // look like we're "using" an untyped value, but that's purely internal to
+                    // Sorbet. By early returning here, we'll only report an untyped usage if that
+                    // real argument ends up then getting used.
+                    tp.type = recvType.type;
+                } else {
+                    core::TypePtr argType = core::make_type<core::IntegerLiteralType>((int64_t)i.argId);
 
-                InlinedVector<core::LocOffsets, 2> argLocs;
-                argLocs.emplace_back(bind.loc);
-                core::CallLocs locs{
-                    ctx.file, bind.loc, bind.loc, bind.loc, argLocs,
-                };
+                    core::TypeAndOrigins arg{argType, recvType.origins};
+                    InlinedVector<const core::TypeAndOrigins *, 2> args;
+                    args.emplace_back(&arg);
 
-                const auto numPosArgs = 1;
-                const auto suppressErrors = true;
-                const auto isPrivateOk = true;
-                const std::shared_ptr<const core::SendAndBlockLink> block = nullptr;
-                core::DispatchArgs dispatchArgs{core::Names::squareBrackets(),
-                                                locs,
-                                                numPosArgs,
-                                                args,
-                                                recvType.type,
-                                                recvType,
-                                                recvType.type,
-                                                block,
-                                                ctx.locAt(bind.loc),
-                                                isPrivateOk,
-                                                suppressErrors};
-                auto dispatched = recvType.type.dispatchCall(ctx, dispatchArgs);
-                tp.type = dispatched.returnType;
+                    InlinedVector<core::LocOffsets, 2> argLocs;
+                    argLocs.emplace_back(bind.loc);
+                    core::CallLocs locs{
+                        ctx.file, bind.loc, bind.loc, bind.loc, argLocs,
+                    };
+
+                    const auto numPosArgs = 1;
+                    const auto suppressErrors = true;
+                    const auto isPrivateOk = true;
+                    const std::shared_ptr<const core::SendAndBlockLink> block = nullptr;
+                    core::DispatchArgs dispatchArgs{core::Names::squareBrackets(),
+                                                    locs,
+                                                    numPosArgs,
+                                                    args,
+                                                    recvType.type,
+                                                    recvType,
+                                                    recvType.type,
+                                                    block,
+                                                    ctx.locAt(bind.loc),
+                                                    isPrivateOk,
+                                                    suppressErrors};
+                    auto dispatched = recvType.type.dispatchCall(ctx, dispatchArgs);
+                    tp.type = dispatched.returnType;
+                }
                 tp.origins.emplace_back(ctx.locAt(bind.loc));
+
                 if (lspQueryMatch) {
                     core::lsp::QueryResponse::pushQueryResponse(
                         ctx, core::lsp::IdentResponse(ctx.locAt(bind.loc), bind.bind.variable.data(inWhat), tp,
-                                                      ctx.owner.asMethodRef()));
+                                                      ctx.owner.asMethodRef(), ctx.locAt(inWhat.loc)));
                 }
             },
             [&](cfg::Return &i) {
@@ -1401,7 +1422,7 @@ Environment::processBinding(core::Context ctx, const cfg::CFG &inWhat, cfg::Bind
 
                 const core::TypeAndOrigins &typeAndOrigin = getAndFillTypeAndOrigin(ctx, i.what);
                 if (core::Types::isSubType(ctx, core::Types::void_(), methodReturnType)) {
-                    methodReturnType = core::Types::untypedUntracked();
+                    methodReturnType = core::Types::top();
                 }
                 if (!core::Types::isSubTypeUnderConstraint(ctx, constr, typeAndOrigin.type, methodReturnType,
                                                            core::UntypedMode::AlwaysCompatible)) {
@@ -1420,6 +1441,13 @@ Environment::processBinding(core::Context ctx, const cfg::CFG &inWhat, cfg::Bind
                                                                          typeAndOrigin.type);
                         }
                     }
+                } else if (!methodReturnType.isUntyped() && !methodReturnType.isTop() &&
+                           typeAndOrigin.type.isUntyped()) {
+                    auto what = core::errors::Infer::errorClassForUntyped(ctx, ctx.file, typeAndOrigin.type);
+                    if (auto e = ctx.beginError(bind.loc, what)) {
+                        e.setHeader("Value returned from method is `{}`", "T.untyped");
+                        core::TypeErrorDiagnostics::explainUntyped(ctx, e, what, typeAndOrigin, ownerLoc);
+                    }
                 }
             },
             [&](cfg::BlockReturn &i) {
@@ -1429,7 +1457,7 @@ Environment::processBinding(core::Context ctx, const cfg::CFG &inWhat, cfg::Bind
                 const core::TypeAndOrigins &typeAndOrigin = getAndFillTypeAndOrigin(ctx, i.what);
                 auto expectedType = i.link->result->main.blockReturnType;
                 if (core::Types::isSubType(ctx, core::Types::void_(), expectedType)) {
-                    expectedType = core::Types::untypedUntracked();
+                    expectedType = core::Types::top();
                 }
                 bool isSubtype;
                 if (i.link->result->main.constr) {
@@ -1451,6 +1479,12 @@ Environment::processBinding(core::Context ctx, const cfg::CFG &inWhat, cfg::Bind
 
                         e.addErrorSection(typeAndOrigin.explainGot(ctx, ownerLoc));
                         core::TypeErrorDiagnostics::explainTypeMismatch(ctx, e, expectedType, typeAndOrigin.type);
+                    }
+                } else if (!expectedType.isUntyped() && !expectedType.isTop() && typeAndOrigin.type.isUntyped()) {
+                    auto what = core::errors::Infer::errorClassForUntyped(ctx, ctx.file, typeAndOrigin.type);
+                    if (auto e = ctx.beginError(bind.loc, what)) {
+                        e.setHeader("Value returned from block is `{}`", "T.untyped");
+                        core::TypeErrorDiagnostics::explainUntyped(ctx, e, what, typeAndOrigin, ownerLoc);
                     }
                 }
 
@@ -1535,6 +1569,7 @@ Environment::processBinding(core::Context ctx, const cfg::CFG &inWhat, cfg::Bind
                 ENFORCE(c.cast != core::Names::uncheckedLet() && c.cast != core::Names::bind() &&
                         c.cast != core::Names::syntheticBind());
 
+                // TODO(jez) Should we allow `T.let` / `T.cast` opt out of the untyped code error?
                 if (c.cast != core::Names::cast()) {
                     if (c.cast == core::Names::assertType() && ty.type.isUntyped()) {
                         if (auto e = ctx.beginError(bind.loc, core::errors::Infer::CastTypeMismatch)) {
@@ -1543,9 +1578,24 @@ Environment::processBinding(core::Context ctx, const cfg::CFG &inWhat, cfg::Bind
                             e.addErrorNote("You may need to add additional `{}` annotations", "sig");
                         }
                     } else if (!core::Types::isSubType(ctx, ty.type, castType)) {
-                        if (auto e = ctx.beginError(bind.loc, core::errors::Infer::CastTypeMismatch)) {
-                            e.setHeader("Argument does not have asserted type `{}`", castType.show(ctx));
-                            e.addErrorSection(ty.explainGot(ctx, ownerLoc));
+                        if (c.cast == core::Names::assumeType()) {
+                            if (auto e = ctx.beginError(bind.loc, core::errors::Infer::IncorrectlyAssumedType)) {
+                                e.setHeader("Assumed expression had type `{}` but found `{}`", castType.show(ctx),
+                                            ty.type.show(ctx));
+                                e.addErrorSection(ty.explainGot(ctx, ownerLoc));
+                                e.addErrorNote("Please add an explicit type annotation to correct this assumption");
+                                if (bind.loc.exists() && c.valueLoc.exists()) {
+                                    e.replaceWith("Add explicit annotation", ctx.locAt(bind.loc), "T.let({}, {})",
+                                                  ctx.locAt(c.valueLoc).source(ctx).value(), ty.type.show(ctx));
+                                }
+                            }
+                        } else {
+                            if (auto e = ctx.beginError(bind.loc, core::errors::Infer::CastTypeMismatch)) {
+                                e.setHeader("Argument does not have asserted type `{}`", castType.show(ctx));
+                                e.addErrorSection(ty.explainGot(ctx, ownerLoc));
+                                core::TypeErrorDiagnostics::maybeAutocorrect(ctx, e, ctx.locAt(c.valueLoc), constr,
+                                                                             castType, ty.type);
+                            }
                         }
                     }
                 } else if (!bind.value.isSynthetic()) {
@@ -1603,6 +1653,7 @@ Environment::processBinding(core::Context ctx, const cfg::CFG &inWhat, cfg::Bind
             const core::TypeAndOrigins &cur =
                 (pin != pinnedTypes.end()) ? pin->second : getTypeAndOrigin(ctx, bind.bind.variable);
 
+            // TODO(jez) What should we do about untyped code and pinning?
             bool asGoodAs = core::Types::isSubType(ctx, core::Types::dropLiteral(ctx, tp.type),
                                                    core::Types::dropLiteral(ctx, cur.type));
 
@@ -1730,7 +1781,7 @@ core::TypeAndOrigins Environment::getTypeFromRebind(core::Context ctx, const cor
 
             result.type = lambdaParam->upperBound;
         } else {
-            result.type = rebind.data(ctx)->externalType();
+            result.type = rebind.data(ctx)->selfType(ctx);
         }
 
         result.origins.emplace_back(main.blockSpec.loc);

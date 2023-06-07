@@ -10,6 +10,7 @@ case "${unameOut}" in
 esac
 
 if [[ "linux" == "$platform" ]]; then
+    curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
     apt-get update
     apt-get install -yy libncurses5-dev libncursesw5-dev xxd
 elif [[ "mac" == "$platform" ]]; then
@@ -38,6 +39,10 @@ mkdir -p _out_
 test_args=(
   "//test:compiler"
   "//test/cli/compiler"
+  # These are two tests that depend on sorbet_ruby, and it's annoying to have
+  # to build sorbet_ruby on the static sanitized job (delays test start time)
+  "//test:end_to_end_rbi_test"
+  "//test:single_package_runner"
   "-c"
   "opt"
   "--config=forcedebug"

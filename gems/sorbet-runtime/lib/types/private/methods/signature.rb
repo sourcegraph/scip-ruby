@@ -8,17 +8,20 @@ class T::Private::Methods::Signature
               :check_level, :parameters, :on_failure, :override_allow_incompatible,
               :defined_raw
 
+  UNNAMED_REQUIRED_PARAMETERS = [[:req]].freeze
+
   def self.new_untyped(method:, mode: T::Private::Methods::Modes.untyped, parameters: method.parameters)
-    # Using `Untyped` ensures we'll get an error if we ever try validation on these.
-    not_typed = T::Private::Types::NotTyped.new
+    # Using `NotTyped` ensures we'll get an error if we ever try validation on these.
+    not_typed = T::Private::Types::NotTyped::INSTANCE
     raw_return_type = not_typed
     # Map missing parameter names to "argN" positionally
     parameters = parameters.each_with_index.map do |(param_kind, param_name), index|
       [param_kind, param_name || "arg#{index}"]
     end
-    raw_arg_types = parameters.map do |_param_kind, param_name|
-      [param_name, not_typed]
-    end.to_h
+    raw_arg_types = {}
+    parameters.each do |_, param_name|
+      raw_arg_types[param_name] = not_typed
+    end
 
     self.new(
       method: method,
@@ -57,28 +60,34 @@ class T::Private::Methods::Signature
     @override_allow_incompatible = override_allow_incompatible
     @defined_raw = defined_raw
 
-    declared_param_names = raw_arg_types.keys
     # If sig params are declared but there is a single parameter with a missing name
     # **and** the method ends with a "=", assume it is a writer method generated
     # by attr_writer or attr_accessor
-    writer_method = declared_param_names != [nil] && parameters == [[:req]] && method_name[-1] == "="
+    writer_method = !(raw_arg_types.size == 1 && raw_arg_types.key?(nil)) && parameters == UNNAMED_REQUIRED_PARAMETERS && method_name[-1] == "="
     # For writer methods, map the single parameter to the method name without the "=" at the end
     parameters = [[:req, method_name[0...-1].to_sym]] if writer_method
-    param_names = parameters.map {|_, name| name}
-    missing_names = param_names - declared_param_names
-    extra_names = declared_param_names - param_names
-    if !missing_names.empty?
+    is_name_missing = parameters.any? {|_, name| !raw_arg_types.key?(name)}
+    if is_name_missing
+      param_names = parameters.map {|_, name| name}
+      missing_names = param_names - raw_arg_types.keys
       raise "The declaration for `#{method.name}` is missing parameter(s): #{missing_names.join(', ')}"
-    end
-    if !extra_names.empty?
-      raise "The declaration for `#{method.name}` has extra parameter(s): #{extra_names.join(', ')}"
+    elsif parameters.length == raw_arg_types.size
+    else
+      param_names = parameters.map {|_, name| name}
+      has_extra_names = parameters.count {|_, name| raw_arg_types.key?(name)} < raw_arg_types.size
+      if has_extra_names
+        extra_names = raw_arg_types.keys - param_names
+        raise "The declaration for `#{method.name}` has extra parameter(s): #{extra_names.join(', ')}"
+      end
     end
 
     if parameters.size != raw_arg_types.size
       raise "The declaration for `#{method.name}` has arguments with duplicate names"
     end
+    i = 0
+    raw_arg_types.each do |type_name, raw_type|
+      param_kind, param_name = parameters[i]
 
-    parameters.zip(raw_arg_types) do |(param_kind, param_name), (type_name, raw_type)|
       if type_name != param_name
         hint = ""
         # Ruby reorders params so that required keyword arguments
@@ -92,8 +101,8 @@ class T::Private::Methods::Signature
         end
 
         raise "Parameter `#{type_name}` is declared out of order (declared as arg number " \
-              "#{declared_param_names.index(type_name) + 1}, defined in the method as arg number " \
-              "#{param_names.index(type_name) + 1}).#{hint}\nMethod: #{method_desc}"
+              "#{i + 1}, defined in the method as arg number " \
+              "#{parameters.index {|_, name| name == type_name} + 1}).#{hint}\nMethod: #{method_desc}"
       end
 
       type = T::Utils.coerce(raw_type)
@@ -134,6 +143,8 @@ class T::Private::Methods::Signature
       else
         raise "Unexpected param_kind: `#{param_kind}`. Method: #{method_desc}"
       end
+
+      i += 1
     end
   end
 
@@ -179,15 +190,7 @@ class T::Private::Methods::Signature
       kwargs = EMPTY_HASH
     end
 
-    arg_types = @arg_types
-
-    if @has_rest
-      rest_count = args_length - @arg_types.length
-      rest_count = 0 if rest_count.negative?
-
-      arg_types += [[@rest_name, @rest_type]] * rest_count
-
-    elsif (args_length < @req_arg_count) || (args_length > @arg_types.length)
+    if !@has_rest && ((args_length < @req_arg_count) || (args_length > @arg_types.length))
       expected_str = @req_arg_count.to_s
       if @arg_types.length != @req_arg_count
         expected_str += "..#{@arg_types.length}"
@@ -197,9 +200,22 @@ class T::Private::Methods::Signature
 
     begin
       it = 0
-      while it < args_length
-        yield arg_types[it][0], args[it], arg_types[it][1]
+
+      # Process given pre-rest args. When there are no rest args,
+      # this is just the given number of args.
+      while it < args_length && it < @arg_types.length
+        yield @arg_types[it][0], args[it], @arg_types[it][1]
         it += 1
+      end
+
+      if @has_rest
+        rest_count = args_length - @arg_types.length
+        rest_count = 0 if rest_count.negative?
+
+        rest_count.times do
+          yield @rest_name, args[it], @rest_type
+          it += 1
+        end
       end
     end
 
@@ -208,6 +224,7 @@ class T::Private::Methods::Signature
       if !type && @has_keyrest
         type = @keyrest_type
       end
+
       yield name, val, type if type
     end
   end

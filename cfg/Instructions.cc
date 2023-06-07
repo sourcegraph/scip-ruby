@@ -1,6 +1,6 @@
 #include "Instructions.h"
 
-#include "common/formatting.h"
+#include "common/strings/formatting.h"
 #include "common/typecase.h"
 #include "core/Names.h"
 #include "core/TypeConstraint.h"
@@ -123,7 +123,7 @@ string LoadSelf::showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs) 
 
 // NOTE(varun): loc copying
 Send::Send(LocalRef recv, core::LocOffsets receiverLoc, core::NameRef fun, core::LocOffsets funLoc, uint16_t numPosArgs,
-           const InlinedVector<LocalRef, 2> &args, InlinedVector<core::LocOffsets, 2> argLocs, bool isPrivateOk,
+           const InlinedVector<LocalRef, 2> &args, InlinedVector<core::LocOffsets, 2> &&argLocs, bool isPrivateOk,
            const shared_ptr<core::SendAndBlockLink> &link)
     : isPrivateOk(isPrivateOk), numPosArgs(numPosArgs), fun(fun), recv(recv, receiverLoc), funLoc(funLoc),
       receiverLoc(receiverLoc), argLocs(std::move(argLocs)), link(move(link)) {
@@ -154,7 +154,9 @@ core::LocOffsets Send::locWithoutBlock(core::LocOffsets bindLoc) {
     }
 
     if (!this->argLocs.empty()) {
-        return this->receiverLoc.join(this->argLocs.back());
+        // For sig, the arg will often be a reference to an implicit self,
+        // so the back of argLocs is a zero width loc.
+        return this->receiverLoc.join(this->funLoc).join(this->argLocs.back());
     }
 
     return this->receiverLoc.join(this->funLoc);

@@ -9,7 +9,7 @@ cc_library(
         "watchman/*.cc",
     ]) + [
         ":lsp_messages",
-        "AbstractRenamer.h",
+        "AbstractRewriter.h",
         "DefLocSaver.h",
         "ErrorFlusherLSP.h",
         "ErrorReporter.h",
@@ -30,6 +30,7 @@ cc_library(
         "watchman/WatchmanProcess.h",
     ],
     hdrs = [
+        "ConvertToSingletonClassMethod.h",
         "LSPConfiguration.h",
         "LSPInput.h",
         "LSPLoop.h",
@@ -143,8 +144,8 @@ cc_test(
         "lsp",
         "//payload",
         "//test/helpers",
-        "@doctest",
-        "@doctest//:doctest_main",
+        "@doctest//doctest",
+        "@doctest//doctest:main",
     ],
 )
 
@@ -161,8 +162,8 @@ cc_test(
         "lsp",
         "//payload",
         "//test/helpers",
-        "@doctest",
-        "@doctest//:doctest_main",
+        "@doctest//doctest",
+        "@doctest//doctest:main",
     ],
 )
 
@@ -179,8 +180,8 @@ cc_test(
         "lsp",
         "//payload",
         "//test/helpers",
-        "@doctest",
-        "@doctest//:doctest_main",
+        "@doctest//doctest",
+        "@doctest//doctest:main",
     ],
 )
 
@@ -197,8 +198,8 @@ cc_test(
         "lsp",
         "//payload",
         "//test/helpers",
-        "@doctest",
-        "@doctest//:doctest_main",
+        "@doctest//doctest",
+        "@doctest//doctest:main",
     ],
 )
 
@@ -215,7 +216,7 @@ cc_test(
         "lsp",
         "//payload",
         "//test/helpers",
-        "@doctest",
-        "@doctest//:doctest_main",
+        "@doctest//doctest",
+        "@doctest//doctest:main",
     ],
 )

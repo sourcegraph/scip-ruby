@@ -1,6 +1,7 @@
 #ifndef SORBET_CORE_ERRORS_INFER_H
 #define SORBET_CORE_ERRORS_INFER_H
 #include "core/Error.h"
+#include "core/TypePtr.h"
 
 namespace sorbet::core::errors::Infer {
 // N.B infer does not run for untyped call at all. StrictLevel::False here would be meaningless
@@ -47,6 +48,12 @@ constexpr ErrorClass CallOnUnboundedTypeMember{7039, StrictLevel::True};
 constexpr ErrorClass AttachedClassOnInstance{7040, StrictLevel::True};
 constexpr ErrorClass UntypedFieldSuggestion{7043, StrictLevel::Strict};
 constexpr ErrorClass DigExtraArgs{7044, StrictLevel::True};
+constexpr ErrorClass IncorrectlyAssumedType{7045, StrictLevel::True};
+constexpr ErrorClass NonOverlappingEqual{7046, StrictLevel::True};
+constexpr ErrorClass UntypedValueInformation{7047, StrictLevel::True};
 // N.B infer does not run for untyped call at all. StrictLevel::False here would be meaningless
+
+ErrorClass errorClassForUntyped(const GlobalState &gs, FileRef file, const TypePtr &ptr);
+
 } // namespace sorbet::core::errors::Infer
 #endif

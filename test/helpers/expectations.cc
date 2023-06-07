@@ -1,11 +1,11 @@
-#include "doctest.h"
+#include "doctest/doctest.h"
 // Include first as it uses poisoned things
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_split.h"
 #include "common/FileOps.h"
 #include "common/concurrency/WorkerPool.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
 #include "dtl/dtl.hpp"
 #include "test/helpers/expectations.h"
 #include <sstream>

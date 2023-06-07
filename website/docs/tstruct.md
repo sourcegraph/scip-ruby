@@ -99,7 +99,7 @@ Before we get ahead of ourselves, consider this code:
 ```ruby
 class Example < T::Struct
   # The `[]` default is cloned on initialization,
-  # so it is not shared by by multiple instances.
+  # so it is not shared by multiple instances.
   prop :vals, T::Array[Integer], default: []
 end
 
@@ -197,10 +197,11 @@ child class:
 ```ruby
 module Common
   extend T::Helpers
+  extend T::Sig
   interface!
-  sig {returns(Integer)}
+  sig {abstract.returns(Integer)}
   def foo; end
-  sig {params(Integer).returns(Integer)}
+  sig {abstract.params(foo: Integer).returns(Integer)}
   def foo=(foo); end
 end
 

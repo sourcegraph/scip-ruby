@@ -54,32 +54,17 @@ bool isTImmutableStruct(const ast::ExpressionPtr &expr) {
     return struct_ != nullptr && struct_->cnst == core::Names::Constants::ImmutableStruct() && isT(struct_->scope);
 }
 
-bool isChalkODMDocument(const ast::ExpressionPtr &expr) {
-    auto *document = ast::cast_tree<ast::UnresolvedConstantLit>(expr);
-    if (document == nullptr || document->cnst != core::Names::Constants::Document()) {
-        return false;
-    }
-    auto *odm = ast::cast_tree<ast::UnresolvedConstantLit>(document->scope);
-    if (odm == nullptr || odm->cnst != core::Names::Constants::ODM()) {
-        return false;
-    }
-    auto *chalk = ast::cast_tree<ast::UnresolvedConstantLit>(odm->scope);
-    return chalk != nullptr && chalk->cnst == core::Names::Constants::Chalk() && ast::MK::isRootScope(chalk->scope);
-}
-
 enum class SyntacticSuperClass {
     Unknown,
     TStruct,
     TInexactStruct,
-    ChalkODMDocument,
     TImmutableStruct,
 };
 
-bool knownNonModel(SyntacticSuperClass syntacticSuperClass) {
+bool wantSimpleIVarGet(SyntacticSuperClass syntacticSuperClass) {
     switch (syntacticSuperClass) {
         case SyntacticSuperClass::TStruct:
         case SyntacticSuperClass::TInexactStruct:
-        case SyntacticSuperClass::ChalkODMDocument:
         case SyntacticSuperClass::TImmutableStruct:
             return true;
         case SyntacticSuperClass::Unknown:
@@ -93,7 +78,6 @@ bool knownNonDocument(SyntacticSuperClass syntacticSuperClass) {
         case SyntacticSuperClass::TInexactStruct:
         case SyntacticSuperClass::TImmutableStruct:
             return true;
-        case SyntacticSuperClass::ChalkODMDocument:
         case SyntacticSuperClass::Unknown:
             return false;
     }
@@ -105,7 +89,6 @@ bool wantTypedInitialize(SyntacticSuperClass syntacticSuperClass) {
         case SyntacticSuperClass::TImmutableStruct:
             return true;
         case SyntacticSuperClass::TInexactStruct:
-        case SyntacticSuperClass::ChalkODMDocument:
         case SyntacticSuperClass::Unknown:
             return false;
     }
@@ -167,11 +150,8 @@ optional<PropInfo> parseProp(core::MutableContext ctx, const ast::Send *send) {
             ret.name = send->fun == core::Names::createdProp() ? core::Names::created() : core::Names::updated();
             // 5 is the length of the _prop suffix
             ret.nameLoc = core::LocOffsets{send->loc.beginPos(), send->loc.endPos() - 5};
-            auto chalk = ast::MK::UnresolvedConstant(send->loc, ast::MK::EmptyTree(), core::Names::Constants::Chalk());
-            auto chalk_odm = ast::MK::UnresolvedConstant(send->loc, std::move(chalk), core::Names::Constants::ODM());
-            ret.type =
-                ASTUtil::mkNilable(send->loc, ast::MK::UnresolvedConstant(send->loc, std::move(chalk_odm),
-                                                                          core::Names::Constants::DeprecatedNumeric()));
+            ret.type = ASTUtil::mkNilable(send->loc, ast::MK::UnresolvedConstant(send->loc, ast::MK::EmptyTree(),
+                                                                                 core::Names::Constants::Numeric()));
             break;
         }
         case core::Names::merchantProp().rawId():
@@ -233,6 +213,11 @@ optional<PropInfo> parseProp(core::MutableContext ctx, const ast::Send *send) {
         ENFORCE(ctx.locAt(sym->loc).exists());
         ENFORCE(!ctx.locAt(sym->loc).source(ctx).value().empty() && ctx.locAt(sym->loc).source(ctx).value()[0] == ':');
         ret.nameLoc = core::LocOffsets{sym->loc.beginPos() + 1, sym->loc.endPos()};
+        const auto nameValue = ctx.locAt(ret.nameLoc).source(ctx).value();
+        if ((nameValue.front() == '\'' && nameValue.back() == '\'') ||
+            (nameValue.front() == '\"' && nameValue.back() == '\"')) {
+            ret.nameLoc = core::LocOffsets{ret.nameLoc.beginPos() + 1, ret.nameLoc.endPos() - 1};
+        }
     }
 
     // ----- What's the prop's type? -----
@@ -294,7 +279,7 @@ optional<PropInfo> parseProp(core::MutableContext ctx, const ast::Send *send) {
         }
 
         if (ASTUtil::hasTruthyHashValue(ctx, *rules, core::Names::factory())) {
-            ret.default_ = ast::MK::RaiseUnimplemented(ret.loc);
+            ret.default_ = ast::MK::RaiseTypedUnimplemented(ret.loc);
         } else if (ASTUtil::hasHashValue(ctx, *rules, core::Names::default_())) {
             auto [key, val] = ASTUtil::extractHashValue(ctx, *rules, core::Names::default_());
             ret.default_ = std::move(val);
@@ -380,13 +365,13 @@ vector<ast::ExpressionPtr> processProp(core::MutableContext ctx, PropInfo &ret, 
                            computedByMethodNameLocZero, std::move(raiseUnimplemented));
         auto assertTypeMatches =
             ast::MK::AssertType(computedByMethodNameLoc, std::move(sendComputedMethod), ASTUtil::dupType(getType));
-        auto insSeq = ast::MK::InsSeq1(loc, std::move(assertTypeMatches), ast::MK::RaiseUnimplemented(loc));
+        auto insSeq = ast::MK::InsSeq1(loc, std::move(assertTypeMatches), ast::MK::RaiseTypedUnimplemented(loc));
         nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, nameLoc, std::move(insSeq)));
     } else if (propContext.needsRealPropBodies && propContext.classDefKind == ast::ClassDef::Kind::Module) {
         // Not all modules include Kernel, can't make an initialize, etc. so we're punting on props in modules rn.
-        nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, nameLoc, ast::MK::RaiseUnimplemented(loc)));
+        nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, nameLoc, ast::MK::RaiseTypedUnimplemented(loc)));
     } else if (ret.ifunset == nullptr) {
-        if (knownNonModel(propContext.syntacticSuperClass)) {
+        if (wantSimpleIVarGet(propContext.syntacticSuperClass)) {
             ast::MethodDef::Flags flags;
             flags.isAttrReader = true;
             if (wantTypedInitialize(propContext.syntacticSuperClass)) {
@@ -403,8 +388,8 @@ vector<ast::ExpressionPtr> processProp(core::MutableContext ctx, PropInfo &ret, 
             flags.genericPropGetter = true;
 
             // Models have a custom decorator, which means we have to forward the prop get to it.
-            // If this is actually a T::InexactStruct or Chalk::ODM::Document sub-sub-class, this implementation is
-            // correct but does extra work.
+            // If this is actually a T::InexactStruct or Chalk::ODM::Base::Document sub-sub-class,
+            // this implementation is correct but does extra work.
 
             auto arg2 = ast::MK::Local(loc, core::Names::arg2());
 
@@ -420,10 +405,10 @@ vector<ast::ExpressionPtr> processProp(core::MutableContext ctx, PropInfo &ret, 
             auto insSeq = ast::MK::InsSeq1(loc, std::move(assign), std::move(propGetLogic));
             nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, nameLoc, std::move(insSeq), flags));
         } else {
-            nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, nameLoc, ast::MK::RaiseUnimplemented(loc)));
+            nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, nameLoc, ast::MK::RaiseTypedUnimplemented(loc)));
         }
     } else {
-        nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, nameLoc, ast::MK::RaiseUnimplemented(loc)));
+        nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, nameLoc, ast::MK::RaiseTypedUnimplemented(loc)));
     }
 
     core::NameRef setName = name.addEq(ctx);
@@ -438,7 +423,7 @@ vector<ast::ExpressionPtr> processProp(core::MutableContext ctx, PropInfo &ret, 
 
         if (propContext.needsRealPropBodies && propContext.classDefKind == ast::ClassDef::Kind::Module) {
             // Not all modules include Kernel, can't make an initialize, etc. so we're punting on props in modules rn.
-            nodes.emplace_back(ASTUtil::mkSet(ctx, loc, setName, nameLoc, ast::MK::RaiseUnimplemented(loc)));
+            nodes.emplace_back(ASTUtil::mkSet(ctx, loc, setName, nameLoc, ast::MK::RaiseTypedUnimplemented(loc)));
         } else if (ret.enum_ == nullptr) {
             if (knownNonDocument(propContext.syntacticSuperClass)) {
                 if (wantTypedInitialize(propContext.syntacticSuperClass)) {
@@ -465,10 +450,10 @@ vector<ast::ExpressionPtr> processProp(core::MutableContext ctx, PropInfo &ret, 
                 auto insSeq = ast::MK::InsSeq1(loc, std::move(propFreezeLogic), std::move(ivarSet));
                 nodes.emplace_back(ASTUtil::mkSet(ctx, loc, setName, nameLoc, std::move(insSeq)));
             } else {
-                nodes.emplace_back(ASTUtil::mkSet(ctx, loc, setName, nameLoc, ast::MK::RaiseUnimplemented(loc)));
+                nodes.emplace_back(ASTUtil::mkSet(ctx, loc, setName, nameLoc, ast::MK::RaiseTypedUnimplemented(loc)));
             }
         } else {
-            nodes.emplace_back(ASTUtil::mkSet(ctx, loc, setName, nameLoc, ast::MK::RaiseUnimplemented(loc)));
+            nodes.emplace_back(ASTUtil::mkSet(ctx, loc, setName, nameLoc, ast::MK::RaiseTypedUnimplemented(loc)));
         }
     }
 
@@ -499,7 +484,7 @@ vector<ast::ExpressionPtr> processProp(core::MutableContext ctx, PropInfo &ret, 
         ast::MethodDef::Flags fkFlags;
         fkFlags.discardDef = true;
         auto fkMethodDef = ast::MK::SyntheticMethod1(loc, loc, nameLoc, fkMethod, std::move(arg),
-                                                     ast::MK::RaiseUnimplemented(loc), fkFlags);
+                                                     ast::MK::RaiseTypedUnimplemented(loc), fkFlags);
         nodes.emplace_back(std::move(fkMethodDef));
 
         // sig {params(opts: T.untyped).returns($foreign)}
@@ -515,7 +500,7 @@ vector<ast::ExpressionPtr> processProp(core::MutableContext ctx, PropInfo &ret, 
         ast::MethodDef::Flags fkBangFlags;
         fkBangFlags.discardDef = true;
         auto fkMethodDefBang = ast::MK::SyntheticMethod1(loc, loc, nameLoc, fkMethodBang, std::move(arg2),
-                                                         ast::MK::RaiseUnimplemented(loc), fkBangFlags);
+                                                         ast::MK::RaiseTypedUnimplemented(loc), fkBangFlags);
         nodes.emplace_back(std::move(fkMethodDefBang));
     }
 
@@ -618,8 +603,6 @@ void Prop::run(core::MutableContext ctx, ast::ClassDef *klass) {
             syntacticSuperClass = SyntacticSuperClass::TInexactStruct;
         } else if (isTImmutableStruct(superClass)) {
             syntacticSuperClass = SyntacticSuperClass::TImmutableStruct;
-        } else if (isChalkODMDocument(superClass)) {
-            syntacticSuperClass = SyntacticSuperClass::ChalkODMDocument;
         }
     }
     // The compiler is going to turn the bodies of rewritten prop methods into actual

@@ -1,7 +1,7 @@
 #include "core/packages/PackageDB.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
 #include "core/AutocorrectSuggestion.h"
 #include "core/GlobalState.h"
 #include "core/Loc.h"
@@ -58,7 +58,12 @@ public:
         return false;
     }
 
-    bool strictAutoloaderCompatibility() const {
+    bool legacyAutoloaderCompatibility() const {
+        notImplemented();
+        return true;
+    }
+
+    bool exportAll() const {
         notImplemented();
         return false;
     }
@@ -70,6 +75,9 @@ public:
         return vector<vector<core::NameRef>>();
     }
     std::vector<std::vector<core::NameRef>> testImports() const {
+        return vector<vector<core::NameRef>>();
+    }
+    std::vector<std::vector<core::NameRef>> visibleTo() const {
         return vector<vector<core::NameRef>>();
     }
 
@@ -235,6 +243,10 @@ const std::vector<std::string> &PackageDB::extraPackageFilesDirectorySlashPrefix
 
 const std::string_view PackageDB::errorHint() const {
     return errorHint_;
+}
+
+bool PackageDB::skipImportVisibilityCheckFor(core::NameRef mangledName) const {
+    return absl::c_find(skipImportVisibilityCheckFor_, mangledName) != skipImportVisibilityCheckFor_.end();
 }
 
 PackageDB PackageDB::deepCopy() const {

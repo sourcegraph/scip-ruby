@@ -2,7 +2,7 @@
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 #include "common/common.h"
-#include "common/formatting.h"
+#include "common/strings/formatting.h"
 #include "core/Context.h"
 #include "core/Names.h"
 #include "core/Symbols.h"
@@ -54,16 +54,7 @@ string argTypeForUnresolvedAppliedType(const GlobalState &gs, const TypePtr &t, 
 
 string UnresolvedAppliedType::show(const GlobalState &gs, ShowOptions options) const {
     string resolvedString = options.showForRBI ? "" : " (unresolved)";
-    ClassOrModuleRef symForPrinting;
-
-    if (options.showForRBI) {
-        auto attachedClass = this->klass.data(gs)->attachedClass(gs);
-        symForPrinting = attachedClass;
-    } else {
-        symForPrinting = this->klass;
-    }
-
-    return fmt::format("{}[{}]{}", symForPrinting.show(gs, options),
+    return fmt::format("{}[{}]{}", this->klass.show(gs, options),
                        fmt::map_join(targs, ", ",
                                      [&](auto targ) {
                                          return options.showForRBI ? argTypeForUnresolvedAppliedType(gs, targ, options)
@@ -444,10 +435,14 @@ string AppliedType::show(const GlobalState &gs, ShowOptions options) const {
         fmt::format_to(std::back_inserter(buf), "T::Enumerator");
     } else if (this->klass == Symbols::Enumerator_Lazy()) {
         fmt::format_to(std::back_inserter(buf), "T::Enumerator::Lazy");
+    } else if (this->klass == Symbols::Enumerator_Chain()) {
+        fmt::format_to(std::back_inserter(buf), "T::Enumerator::Chain");
     } else if (this->klass == Symbols::Range()) {
         fmt::format_to(std::back_inserter(buf), "T::Range");
     } else if (this->klass == Symbols::Set()) {
         fmt::format_to(std::back_inserter(buf), "T::Set");
+    } else if (this->klass == Symbols::Class()) {
+        fmt::format_to(std::back_inserter(buf), "T::Class");
     } else {
         if (std::optional<int> procArity = Types::getProcArity(*this)) {
             fmt::format_to(std::back_inserter(buf), "T.proc");
@@ -498,7 +493,17 @@ string AppliedType::show(const GlobalState &gs, ShowOptions options) const {
         auto tm = typeMember;
         if (tm.data(gs)->flags.isFixed) {
             it = targs.erase(it);
-        } else if (typeMember.data(gs)->name == core::Names::Constants::AttachedClass()) {
+        } else if (this->klass.data(gs)->isSingletonClass(gs) &&
+                   typeMember.data(gs)->name == core::Names::Constants::AttachedClass() &&
+                   // We only want to hide the <AttachedClass> arg if it's the same as the default.
+                   // (Things like `T.all` can make this upper bound more narrow than the default.)
+                   // Relies on the fact that the common case is for the upperBound to be a
+                   // ClassType (most classes are not generic), and ClassTypes can be compared with
+                   // `==` because they are inlined (instead of being behind pointers).
+                   (cast_type<LambdaParam>(typeMember.data(gs)->resultType)->upperBound == *it ||
+                    // This side handles the selfType case, which is how we compute the initial type
+                    // of <self> in builder_entry.
+                    (isa_type<SelfTypeParam>(*it) && cast_type_nonnull<SelfTypeParam>(*it).definition == typeMember))) {
             it = targs.erase(it);
         } else if (this->klass == Symbols::Hash() && typeMember == typeMembers.back()) {
             it = targs.erase(it);

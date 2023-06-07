@@ -444,16 +444,10 @@ class Array < Object
   # See also
   # [`Array#concat`](https://docs.ruby-lang.org/en/2.7.0/Array.html#method-i-concat).
   sig do
-    params(
-        arg0: T::Enumerable[Elem],
+    type_parameters(:T).params(
+        arg0: T::Enumerable[T.type_parameter(:T)],
     )
-    .returns(T::Array[Elem])
-  end
-  sig do
-    params(
-        arg0: T::Array[Elem],
-    )
-    .returns(T::Array[Elem])
+    .returns(T::Array[T.any(Elem, T.type_parameter(:T))])
   end
   def +(arg0); end
 
@@ -1279,18 +1273,20 @@ class Array < Object
     .returns(Elem)
   end
   sig do
-    params(
+    type_parameters(:Fallback)
+    .params(
         arg0: Integer,
-        arg1: Elem,
+        arg1: T.type_parameter(:Fallback),
     )
-    .returns(Elem)
+    .returns(T.any(Elem, T.type_parameter(:Fallback)))
   end
   sig do
-    params(
+    type_parameters(:Fallback)
+    .params(
         arg0: Integer,
-        blk: T.proc.params(arg0: Integer).returns(Elem),
+        blk: T.proc.params(arg0: Integer).returns(T.type_parameter(:Fallback)),
     )
-    .returns(Elem)
+    .returns(T.any(Elem, T.type_parameter(:Fallback)))
   end
   def fetch(arg0, arg1=T.unsafe(nil), &blk); end
 
@@ -1565,6 +1561,20 @@ class Array < Object
     .returns(T::Array[Elem])
   end
   def intersection(*arrays); end
+
+
+  # Returns `true` if the array and `other_ary` have at least one element in
+  # common, otherwise returns `false`:
+  #
+  # ```ruby
+  # a = [ 1, 2, 3 ]
+  # b = [ 3, 4, 5 ]
+  # c = [ 5, 6, 7 ]
+  # a.intersect?(b)   #=> true
+  # a.intersect?(c)   #=> false
+  # ```
+  sig { params(other_ary: T.untyped).returns(T::Boolean) }
+  def intersect?(other_ary); end
 
   # Returns a string created by converting each element of the array to a
   # string, separated by the given `separator`. If the `separator` is `nil`, it

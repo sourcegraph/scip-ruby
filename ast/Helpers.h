@@ -375,6 +375,11 @@ public:
                                                std::move(type));
     }
 
+    static ExpressionPtr AssumeType(core::LocOffsets loc, ExpressionPtr value, ExpressionPtr type) {
+        return ast::make_expression<ast::Cast>(loc, core::Types::todo(), std::move(value), core::Names::assumeType(),
+                                               std::move(type));
+    }
+
     static ExpressionPtr ClassOf(core::LocOffsets loc, ExpressionPtr value) {
         return Send1(loc, T(loc), core::Names::classOf(), loc, std::move(value));
     }
@@ -426,11 +431,6 @@ public:
         return Constant(loc, core::Symbols::Magic());
     }
 
-    static ExpressionPtr SelfNew(core::LocOffsets loc, core::LocOffsets funLoc, int numPosArgs,
-                                 ast::Send::ARGS_store args, Send::Flags flags = {}) {
-        return Send(loc, Magic(loc), core::Names::selfNew(), funLoc, numPosArgs, std::move(args), flags);
-    }
-
     static ExpressionPtr DefineTopClassOrModule(core::LocOffsets loc, core::ClassOrModuleRef klass) {
         Send::Flags flags;
         flags.isRewriterSynthesized = true;
@@ -452,6 +452,14 @@ public:
         return ret;
     }
 
+    static ExpressionPtr RaiseTypedUnimplemented(core::LocOffsets loc) {
+        auto kernel = Constant(loc, core::Symbols::Kernel());
+        auto msg = String(loc, core::Names::rewriterRaiseUnimplemented());
+        auto ret = Send1(loc, std::move(kernel), core::Names::raise(), loc, std::move(msg));
+        cast_tree<ast::Send>(ret)->flags.isRewriterSynthesized = true;
+        return ret;
+    }
+
     static bool isRootScope(const ast::ExpressionPtr &scope) {
         if (ast::isa_tree<ast::EmptyTree>(scope)) {
             return true;
@@ -469,11 +477,7 @@ public:
     }
 
     static bool isSelfNew(ast::Send *send) {
-        if (send->fun != core::Names::selfNew()) {
-            return false;
-        }
-
-        return isMagicClass(send->recv);
+        return send->fun == core::Names::new_() && send->recv.isSelfReference();
     }
 
     static core::NameRef arg2Name(const ExpressionPtr &arg) {

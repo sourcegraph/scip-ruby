@@ -50,6 +50,7 @@ Otherwise, add this line to your `Gemfile`:
 ```ruby
 gem 'scip-ruby', require: false, :group => :development
 ```
+
 After either of those steps, run `bundle install`
 to download and install fetch `scip-ruby`.
 

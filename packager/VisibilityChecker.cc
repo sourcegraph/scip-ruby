@@ -4,8 +4,8 @@
 #include "absl/synchronization/blocking_counter.h"
 #include "ast/treemap/treemap.h"
 #include "common/concurrency/ConcurrentQueue.h"
-#include "common/formatting.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
+#include "common/strings/formatting.h"
 #include "core/Context.h"
 #include "core/errors/packager.h"
 #include "core/errors/resolver.h"
@@ -18,6 +18,18 @@ namespace sorbet::packager {
 
 namespace {
 
+static core::SymbolRef getEnumClassForEnumValue(const core::GlobalState &gs, core::SymbolRef sym) {
+    if (sym.isStaticField(gs) && sym.owner(gs).isClassOrModule()) {
+        auto owner = sym.owner(gs);
+        // There's a hidden class like `MyEnum::X$1` between `MyEnum::X` and `T::Enum` in the ancestor chain.
+        if (owner.asClassOrModuleRef().data(gs)->superClass() == core::Symbols::T_Enum()) {
+            return owner;
+        }
+    }
+
+    return core::Symbols::noSymbol();
+}
+
 // For each __package.rb file, traverse the resolved tree and apply the visibility annotations to the symbols.
 class PropagateVisibility final {
     const core::packages::PackageInfo &package;
@@ -28,8 +40,14 @@ class PropagateVisibility final {
     }
 
     void recursiveExportSymbol(core::GlobalState &gs, bool firstSymbol, core::ClassOrModuleRef klass) {
-        // We only mark symbols from this package.
-        if (!this->definedByThisPackage(gs, klass)) {
+        // We only mark symbols from this package. However, there's a
+        // tough case where non-behavior-defining "namespace-like"
+        // constants might get attributed to other packages (since we
+        // don't have a canonical location, so we use the first place
+        // we see them... which might be in a subpackage) and
+        // therefore this might stop too soon. That's why we only stop
+        // recursing if the thing is actually behavior-defining.
+        if (!this->definedByThisPackage(gs, klass) && klass.data(gs)->flags.isBehaviorDefining) {
             return;
         }
 
@@ -49,7 +67,11 @@ class PropagateVisibility final {
     }
 
     void exportParentNamespace(core::GlobalState &gs, core::ClassOrModuleRef owner) {
-        while (owner.exists() && !owner.data(gs)->flags.isExported && this->definedByThisPackage(gs, owner)) {
+        // Implicitly export parent namespace (symbol owner) until we hit the root of the package.
+        // NOTE that we make an exception for namespaces that define behavior: these CANNOT get exported implicitly,
+        // as that violates the private-by-default paradigm.
+        while (owner.exists() && !owner.data(gs)->flags.isExported && !owner.data(gs)->flags.isBehaviorDefining &&
+               this->definedByThisPackage(gs, owner)) {
             owner.data(gs)->flags.isExported = true;
             owner = owner.data(gs)->owner;
         }
@@ -192,6 +214,22 @@ class PropagateVisibility final {
                 e.addErrorLine(sym.loc(ctx), "Defined here");
             }
         }
+
+        // If sym is an enum value, it can't be exported directly. Instead, its wrapping enum class must be exported.
+        auto enumClass = getEnumClassForEnumValue(ctx.state, sym);
+        if (enumClass.exists()) {
+            if (auto e = ctx.beginError(loc, core::errors::Packager::InvalidExport)) {
+                std::string enumClassName = enumClass.show(ctx);
+                e.setHeader("Cannot export enum value `{}`. Instead, export the entire enum `{}`", sym.show(ctx),
+                            enumClassName);
+                e.addErrorLine(sym.loc(ctx), "Defined here");
+
+                e.addAutocorrect(core::AutocorrectSuggestion{
+                    fmt::format("Export `{}`", enumClassName),
+                    {core::AutocorrectSuggestion::Edit{core::Loc{package.fullLoc().file(), loc},
+                                                       fmt::format("export {}", enumClassName)}}});
+            }
+        }
     }
 
     PropagateVisibility(const core::packages::PackageInfo &package) : package{package} {}
@@ -294,6 +332,24 @@ public:
         core::MutableContext ctx{gs, core::Symbols::root(), f.file};
         ast::TreeWalk::apply(ctx, pass, f.tree);
 
+        // if we used `export_all`, then there were no `export`
+        // directives in the previous pass; we should instead export
+        // the package root
+        if (package.exportAll()) {
+            // we check if these exist because if no constants were
+            // defined in the package then we might not have actually
+            // ever created the relevant namespaces
+            auto pkgRoot = package.getPackageScope(gs);
+            if (pkgRoot.exists()) {
+                pass.recursiveExportSymbol(gs, true, pkgRoot);
+            }
+
+            auto pkgTestRoot = package.getPackageTestScope(gs);
+            if (pkgTestRoot.exists()) {
+                pass.recursiveExportSymbol(gs, true, pkgTestRoot);
+            }
+        }
+
         return f;
     }
 };
@@ -377,7 +433,13 @@ public:
                 } else {
                     e.addErrorLine(definedHereLoc, "Defined here");
                 }
-                if (auto exp = pkg.addExport(ctx, lit.symbol)) {
+
+                auto symToExport = lit.symbol;
+                auto enumClass = getEnumClassForEnumValue(ctx.state, symToExport);
+                if (enumClass.exists()) {
+                    symToExport = enumClass;
+                }
+                if (auto exp = pkg.addExport(ctx, symToExport)) {
                     e.addAutocorrect(std::move(exp.value()));
                 }
                 if (!db.errorHint().empty()) {

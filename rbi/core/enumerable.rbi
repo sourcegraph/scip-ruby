@@ -91,7 +91,9 @@ module Enumerable
   # ```
   sig do
     type_parameters(:U).params(enums: T::Enumerable[T.type_parameter(:U)])
-    .returns(T::Enumerator[T.any(Elem, T.type_parameter(:U))])
+    .returns(
+      T::Enumerator::Chain[T.any(Elem, T.type_parameter(:U))]
+    )
   end
   def chain(*enums); end
 
@@ -1742,8 +1744,12 @@ module Enumerable
   # ```ruby
   # ["a", "b", "c", "b"].tally  #=> {"a"=>1, "b"=>2, "c"=>1}
   # ```
-  sig {returns(T::Hash[Elem, Integer])}
-  def tally(); end
+  #
+  # If a hash is given, the number of occurrences is added to each value
+  # in the hash, and the hash is returned. The value corresponding to
+  # each element must be an integer.
+  sig {params(hash: T::Hash[Elem, Integer]).returns(T::Hash[Elem, Integer])}
+  def tally(hash = {}); end
 
   ### Implemented in C++
 
@@ -1818,17 +1824,28 @@ module Enumerable
   # (1..100).find          { |i| i % 5 == 0 && i % 7 == 0 }   #=> 35
   # ```
   sig do
-    params(
-        ifnone: Proc,
+    type_parameters(:U)
+      .params(
+        ifnone: T.proc.returns(T.type_parameter(:U)),
         blk: T.proc.params(arg0: Elem).returns(BasicObject),
+      )
+      .returns(T.any(T.type_parameter(:U), Elem))
+  end
+  sig do
+    type_parameters(:U)
+      .params(
+        ifnone: T.proc.returns(T.type_parameter(:U)),
+      )
+      .returns(T::Enumerator[T.any(T.type_parameter(:U), Elem)])
+  end
+  sig do
+    params(
+      blk: T.proc.params(arg0: Elem).returns(BasicObject),
     )
     .returns(T.nilable(Elem))
   end
   sig do
-    params(
-        ifnone: Proc,
-    )
-    .returns(T::Enumerator[Elem])
+    returns(T::Enumerator[Elem])
   end
   def find(ifnone=T.unsafe(nil), &blk); end
 

@@ -1,5 +1,4 @@
 import * as assert from "assert";
-import { isEqual } from "lodash";
 import * as sinon from "sinon";
 import {
   EventEmitter,
@@ -21,12 +20,17 @@ import {
 
 /** Imitate the WorkspaceConfiguration. */
 class FakeWorkspaceConfiguration implements ISorbetWorkspaceContext {
-  public _emitter = new EventEmitter<ConfigurationChangeEvent>();
-  public backingStore: Map<String, any>;
-  public defaults: Map<String, any>;
-  constructor(public properties: Iterable<[String, any]> = []) {
-    this.backingStore = new Map<String, any>(properties);
+  public readonly backingStore: Map<String, any>;
+  public readonly defaults: Map<String, any>;
+  private readonly configurationChangeEmitter: EventEmitter<
+    ConfigurationChangeEvent
+  >;
 
+  constructor(properties: Iterable<[String, any]> = []) {
+    this.backingStore = new Map<String, any>(properties);
+    this.configurationChangeEmitter = new EventEmitter<
+      ConfigurationChangeEvent
+    >();
     const defaultProperties = extensions.getExtension(
       "sorbet.sorbet-vscode-extension",
     )!.packageJSON.contributes.configuration.properties;
@@ -69,7 +73,7 @@ class FakeWorkspaceConfiguration implements ISorbetWorkspaceContext {
     }
     this.backingStore.set(section, value);
     return Promise.resolve(
-      this._emitter.fire({
+      this.configurationChangeEmitter.fire({
         affectsConfiguration: (s: string, _?: Uri) => {
           return section.startsWith(`${s}.`);
         },
@@ -78,7 +82,7 @@ class FakeWorkspaceConfiguration implements ISorbetWorkspaceContext {
   }
 
   get onDidChangeConfiguration() {
-    return this._emitter.event;
+    return this.configurationChangeEmitter.event;
   }
 
   workspaceFolders() {
@@ -224,16 +228,6 @@ suite("SorbetLspConfig", () => {
           !SorbetLspConfig.areEqual(config1, c),
           `Should not equal: ${c}`,
         );
-      });
-    });
-    test("using lodash.isEqual()", () => {
-      assert.notEqual(config1, config2, "Should not be identical");
-      assert.ok(
-        isEqual(config1, config2),
-        `Should be deeply equal to ${config2}`,
-      );
-      differentConfigs.forEach((c) => {
-        assert.ok(!isEqual(c, config1), `Should not be deeply equal to ${c}`);
       });
     });
   });

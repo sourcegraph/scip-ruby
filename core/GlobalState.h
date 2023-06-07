@@ -164,7 +164,8 @@ public:
     void setPackagerOptions(const std::vector<std::string> &secondaryTestPackageNamespaces,
                             const std::vector<std::string> &extraPackageFilesDirectoryUnderscorePrefixes,
                             const std::vector<std::string> &extraPackageFilesDirectorySlashPrefixes,
-                            const std::vector<std::string> &packageSkipRBIExportEnforcementDirs, std::string errorHint);
+                            const std::vector<std::string> &packageSkipRBIExportEnforcementDirs,
+                            const std::vector<std::string> &skipImportVisibilityCheckFor, std::string errorHint);
     packages::UnfreezePackages unfreezePackages();
 
     NameRef nextMangledName(ClassOrModuleRef owner, NameRef origName);
@@ -232,6 +233,8 @@ public:
     bool unsilenceErrors = false;
     bool logRecordedFilepaths = false;
     bool autocorrect = false;
+    bool trackUntyped = false;
+    bool printingFileTable = false;
 
     // We have a lot of internal names of form `<something>` that's chosen with `<` and `>` as you can't make
     // this into a valid ruby identifier without suffering.
@@ -295,9 +298,6 @@ public:
 
     // If 'true', enforce use of Ruby 3.0-style keyword args.
     bool ruby3KeywordArgs = false;
-
-    // If 'true', enable the experimental, symbol-deletion-based fast path mode
-    bool lspExperimentalFastPathEnabled = false;
 
     // If 'true', we're running in scip-ruby mode.
     bool isSCIPRuby = true;

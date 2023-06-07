@@ -271,6 +271,10 @@ default checked level can also be configured. For example:
 T::Configuration.default_checked_level = :tests
 ```
 
+This can also be set via the `SORBET_RUNTIME_DEFAULT_CHECKED_LEVEL` environment
+variable, see [Environment Variables](tconfiguration.md#environment-variables)
+for more.
+
 Writing this will make it so that any sig which does not have a `.checked(...)`
 call in it will behave as if the user had written `.checked(:tests)`. To prevent
 accidental misuse, `sorbet-runtime` will require that this setting is changed
@@ -283,6 +287,10 @@ point is a test, run:
 ```ruby
 T::Configuration.enable_checking_for_sigs_marked_checked_tests
 ```
+
+This can also be set via the `SORBET_RUNTIME_ENABLE_CHECKING_IN_TESTS`
+environment variable, see
+[Environment Variables](tconfiguration.md#environment-variables) for more.
 
 For example, this should probably be placed as the first line of any `rake test`
 target, as well as any other entry point to a project's tests. If this line is
@@ -320,6 +328,17 @@ class Foo
   def bar(x); end
 end
 ```
+
+## T.let, T.cast, T.must, T.bind
+
+Type assertions like `T.let`, `T.cast`, `T.must`, and `T.bind` are normally
+checked at runtime, just like `sig` annotations on methods, unless runtime
+checks have been disabled.
+
+Unlike method signatures, type assertions _always_ have a performance cost,
+whether or not they are checked at runtime. See
+[Type Assertions](type-assertions.md) for tips on patterns that reduce or avoid
+this cost.
 
 ## What's next?
 

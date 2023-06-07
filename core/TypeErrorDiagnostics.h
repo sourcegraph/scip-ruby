@@ -1,6 +1,7 @@
 #ifndef SORBET_TYPE_ERROR_DIAGNOSTICS_H
 #define SORBET_TYPE_ERROR_DIAGNOSTICS_H
 
+#include "core/Context.h"
 #include "core/Error.h"
 #include "core/GlobalState.h"
 #include "core/TypeConstraint.h"
@@ -16,14 +17,27 @@ public:
     // (It should usually be a cfg::Send::argLocs element or cfg::Return::whatLoc)
     //
     // Statefully accumulates the autocorrect directly onto the provided `ErrorBuilder`.
-    static void maybeAutocorrect(const GlobalState &gs, ErrorBuilder &e, Loc loc, TypeConstraint &constr,
+    static void maybeAutocorrect(const GlobalState &gs, ErrorBuilder &e, Loc loc, const TypeConstraint &constr,
                                  const TypePtr &expectedType, const TypePtr &actualType);
 
     static void explainTypeMismatch(const GlobalState &gs, ErrorBuilder &e, const TypePtr &expected,
                                     const TypePtr &got);
 
-    static void insertUntypedTypeArguments(const GlobalState &gs, ErrorBuilder &e, ClassOrModuleRef klass,
-                                           core::Loc replaceLoc);
+    static void insertTypeArguments(const GlobalState &gs, ErrorBuilder &e, ClassOrModuleRef klass,
+                                    core::Loc replaceLoc);
+
+    static void explainUntyped(const GlobalState &gs, ErrorBuilder &e, ErrorClass what, const TypeAndOrigins &untyped,
+                               Loc originForUninitialized);
+
+    static void explainUntyped(const GlobalState &gs, ErrorBuilder &e, ErrorClass what, TypePtr untyped, Loc origin,
+                               Loc originForUninitialized);
+
+    static std::optional<core::AutocorrectSuggestion::Edit>
+    editForDSLMethod(const GlobalState &gs, FileRef fileToEdit, Loc defaultInsertLoc, ClassOrModuleRef inWhat,
+                     ClassOrModuleRef dslOwner, std::string_view dsl);
+
+    static void maybeInsertDSLMethod(const GlobalState &gs, ErrorBuilder &e, FileRef fileToEdit, Loc defaultInsertLoc,
+                                     ClassOrModuleRef inWhat, ClassOrModuleRef dslOwner, std::string_view dsl);
 };
 
 } // namespace sorbet::core

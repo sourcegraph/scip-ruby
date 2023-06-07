@@ -1,6 +1,6 @@
 #include "common/statsd/statsd.h"
-#include "common/Counters_impl.h"
-#include "common/formatting.h"
+#include "common/counters/Counters_impl.h"
+#include "common/strings/formatting.h"
 #include "sorbet_version/sorbet_version.h"
 
 extern "C" {
@@ -108,6 +108,9 @@ bool StatsD::submitCounters(const CounterState &counters, string_view host, int 
     }
 
     for (auto &hist : counters.counters->histograms) {
+        if (std::find(ignoredHistograms.begin(), ignoredHistograms.end(), hist.first) != ignoredHistograms.end()) {
+            continue;
+        }
         CounterImpl::CounterType sum = 0;
         for (auto &e : hist.second) {
             sum += e.second;

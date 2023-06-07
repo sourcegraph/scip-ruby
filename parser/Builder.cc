@@ -377,6 +377,10 @@ public:
             return true;
         }
 
+        if (parser::isa_node<ForwardedKwrestArg>(nd)) {
+            return true;
+        }
+
         if (auto *pair = parser::cast_node<Pair>(nd)) {
             return parser::isa_node<Symbol>(pair->key.get());
         }
@@ -992,6 +996,14 @@ public:
         return make_unique<ForwardedArgs>(tokLoc(dots));
     }
 
+    unique_ptr<Node> forwarded_restarg(const token *star) {
+        return make_unique<ForwardedRestArg>(tokLoc(star));
+    }
+
+    unique_ptr<Node> forwarded_kwrestarg(const token *dstar) {
+        return make_unique<ForwardedKwrestArg>(tokLoc(dstar));
+    }
+
     unique_ptr<Node> gvar(const token *tok) {
         return make_unique<GVar>(tokLoc(tok), gs_.enterNameUTF8(tok->view()));
     }
@@ -1548,7 +1560,7 @@ public:
             // only 1 child: String
             auto firstPart = parts.front().get();
             if (auto *s = parser::cast_node<String>(firstPart)) {
-                return make_unique<Symbol>(s->loc, s->val);
+                return make_unique<Symbol>(tokLoc(begin, end), s->val);
             } else {
                 return nullptr;
             }
@@ -2206,6 +2218,16 @@ ForeignPtr forwarded_args(SelfPtr builder, const token *dots) {
     return build->toForeign(build->forwarded_args(dots));
 }
 
+ForeignPtr forwarded_restarg(SelfPtr builder, const token *star) {
+    auto build = cast_builder(builder);
+    return build->toForeign(build->forwarded_restarg(star));
+}
+
+ForeignPtr forwarded_kwrestarg(SelfPtr builder, const token *dstar) {
+    auto build = cast_builder(builder);
+    return build->toForeign(build->forwarded_kwrestarg(dstar));
+}
+
 ForeignPtr gvar(SelfPtr builder, const token *tok) {
     auto build = cast_builder(builder);
     return build->toForeign(build->gvar(tok));
@@ -2740,6 +2762,8 @@ struct ruby_parser::builder Builder::interface = {
     for_,
     forward_arg,
     forwarded_args,
+    forwarded_restarg,
+    forwarded_kwrestarg,
     gvar,
     hash_pattern,
     ident,

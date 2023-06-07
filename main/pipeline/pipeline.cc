@@ -23,11 +23,11 @@
 #include "cfg/builder/builder.h"
 #include "class_flatten/class_flatten.h"
 #include "common/FileOps.h"
-#include "common/Timer.h"
 #include "common/concurrency/ConcurrentQueue.h"
 #include "common/crypto_hashing/crypto_hashing.h"
-#include "common/formatting.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
+#include "common/strings/formatting.h"
+#include "common/timers/Timer.h"
 #include "core/ErrorQueue.h"
 #include "core/NameSubstitution.h"
 #include "core/Unfreeze.h"
@@ -237,13 +237,14 @@ incrementalResolve(core::GlobalState &gs, vector<ast::ParsedFile> what,
             what = packager::Packager::runIncremental(gs, move(what));
         }
 #endif
+        auto runIncrementalNamer = foundHashesForFiles.has_value() && !foundHashesForFiles->empty();
         {
             Timer timeit(gs.tracer(), "incremental_naming");
             core::UnfreezeSymbolTable symbolTable(gs);
             core::UnfreezeNameTable nameTable(gs);
             auto emptyWorkers = WorkerPool::create(0, gs.tracer());
 
-            auto result = foundHashesForFiles.has_value()
+            auto result = runIncrementalNamer
                               ? sorbet::namer::Namer::runIncremental(
                                     gs, move(what), std::move(foundHashesForFiles.value()), *emptyWorkers)
                               : sorbet::namer::Namer::run(gs, move(what), *emptyWorkers, nullptr);
@@ -264,7 +265,7 @@ incrementalResolve(core::GlobalState &gs, vector<ast::ParsedFile> what,
             core::UnfreezeSymbolTable symbolTable(gs);
             core::UnfreezeNameTable nameTable(gs);
 
-            auto result = sorbet::resolver::Resolver::runIncremental(gs, move(what));
+            auto result = sorbet::resolver::Resolver::runIncremental(gs, move(what), runIncrementalNamer);
             // incrementalResolve is not cancelable.
             ENFORCE(result.hasResult());
             what = move(result.result());
@@ -405,6 +406,10 @@ ast::ExpressionPtr readFileWithStrictnessOverrides(core::GlobalState &gs, core::
     }
     prodCounterAdd("types.input.bytes", src.size());
     prodCounterInc("types.input.files");
+    if (core::File::isRBIPath(fileName)) {
+        counterAdd("types.input.rbi.bytes", src.size());
+        counterInc("types.input.rbi.files");
+    }
 
     {
         core::UnfreezeFileTable unfreezeFiles(gs);
@@ -472,7 +477,6 @@ vector<ast::ParsedFile> mergeIndexResults(core::GlobalState &cgs, const options:
                                           shared_ptr<BlockingBoundedQueue<IndexThreadResultPack>> input,
                                           WorkerPool &workers, const unique_ptr<const OwnedKeyValueStore> &kvstore) {
     ProgressIndicator progress(opts.showProgress, "Indexing", input->bound);
-    Timer timeit(cgs.tracer(), "mergeIndexResults");
 
     auto batchq = make_shared<ConcurrentBoundedQueue<IndexSubstitutionJob>>(input->bound);
     vector<ast::ParsedFile> ret;
@@ -533,7 +537,6 @@ vector<ast::ParsedFile> mergeIndexResults(core::GlobalState &cgs, const options:
 vector<ast::ParsedFile> indexSuppliedFiles(core::GlobalState &baseGs, vector<core::FileRef> &files,
                                            const options::Options &opts, WorkerPool &workers,
                                            const unique_ptr<const OwnedKeyValueStore> &kvstore) {
-    Timer timeit(baseGs.tracer(), "indexSuppliedFiles");
     auto resultq = make_shared<BlockingBoundedQueue<IndexThreadResultPack>>(files.size());
     auto fileq = make_shared<ConcurrentBoundedQueue<core::FileRef>>(files.size());
     for (auto &file : files) {
@@ -680,14 +683,13 @@ vector<ast::ParsedFile> package(core::GlobalState &gs, vector<ast::ParsedFile> w
                                 WorkerPool &workers) {
 #ifndef SORBET_REALMAIN_MIN
     if (opts.stripePackages) {
-        Timer timeit(gs.tracer(), "package");
         {
             core::UnfreezeNameTable unfreezeToEnterPackagerOptionsGS(gs);
             core::packages::UnfreezePackages unfreezeToEnterPackagerOptionsPackageDB = gs.unfreezePackages();
-            gs.setPackagerOptions(opts.secondaryTestPackageNamespaces,
-                                  opts.extraPackageFilesDirectoryUnderscorePrefixes,
-                                  opts.extraPackageFilesDirectorySlashPrefixes,
-                                  opts.packageSkipRBIExportEnforcementDirs, opts.stripePackagesHint);
+            gs.setPackagerOptions(
+                opts.secondaryTestPackageNamespaces, opts.extraPackageFilesDirectoryUnderscorePrefixes,
+                opts.extraPackageFilesDirectorySlashPrefixes, opts.packageSkipRBIExportEnforcementDirs,
+                opts.skipPackageImportVisibilityCheckFor, opts.stripePackagesHint);
         }
         what = packager::Packager::run(gs, workers, move(what));
         if (opts.print.Packager.enabled) {
@@ -963,56 +965,6 @@ ast::ParsedFilesOrCancelled resolve(unique_ptr<core::GlobalState> &gs, vector<as
         opts.print.SymbolTableFullRaw.fmt("{}\n", gs->showRawFull());
     }
 
-#ifndef SORBET_REALMAIN_MIN
-    if (opts.print.FileTableProto.enabled || opts.print.FileTableFullProto.enabled) {
-        if (opts.print.FileTableProto.enabled && opts.print.FileTableFullProto.enabled) {
-            Exception::raise("file-table-proto and file-table-full-proto are mutually exclusive print options");
-        }
-        auto files = core::Proto::filesToProto(*gs, opts.print.FileTableFullProto.enabled);
-        if (opts.print.FileTableProto.outputPath.empty()) {
-            files.SerializeToOstream(&cout);
-        } else {
-            string buf;
-            files.SerializeToString(&buf);
-            opts.print.FileTableProto.print(buf);
-        }
-    }
-    if (opts.print.FileTableJson.enabled || opts.print.FileTableFullJson.enabled) {
-        if (opts.print.FileTableJson.enabled && opts.print.FileTableFullJson.enabled) {
-            Exception::raise("file-table-json and file-table-full-json are mutually exclusive print options");
-        }
-        auto files = core::Proto::filesToProto(*gs, opts.print.FileTableFullJson.enabled);
-        if (opts.print.FileTableJson.outputPath.empty()) {
-            core::Proto::toJSON(files, cout);
-        } else {
-            stringstream buf;
-            core::Proto::toJSON(files, buf);
-            opts.print.FileTableJson.print(buf.str());
-        }
-    }
-    if (opts.print.FileTableMessagePack.enabled || opts.print.FileTableFullMessagePack.enabled) {
-        if (opts.print.FileTableMessagePack.enabled && opts.print.FileTableFullMessagePack.enabled) {
-            Exception::raise("file-table-msgpack and file-table-full-msgpack are mutually exclusive print options");
-        }
-        auto files = core::Proto::filesToProto(*gs, opts.print.FileTableFullMessagePack.enabled);
-        stringstream buf;
-        core::Proto::toJSON(files, buf);
-        auto str = buf.str();
-        rapidjson::Document document;
-        document.Parse(str);
-        mpack_writer_t writer;
-        if (opts.print.FileTableMessagePack.outputPath.empty()) {
-            mpack_writer_init_stdfile(&writer, stdout, /* close when done */ false);
-        } else {
-            mpack_writer_init_filename(&writer, opts.print.FileTableMessagePack.outputPath.c_str());
-        }
-        json2msgpack::json2msgpack(document, &writer);
-        if (mpack_writer_destroy(&writer)) {
-            Exception::raise("failed to write msgpack");
-        }
-    }
-#endif
-
     if (opts.print.MissingConstants.enabled) {
         what = printMissingConstants(*gs, opts, move(what));
     }
@@ -1159,7 +1111,60 @@ void typecheck(const core::GlobalState &gs, vector<ast::ParsedFile> what, const 
     }
 }
 
-bool cacheTreesAndFiles(const core::GlobalState &gs, WorkerPool &workers, vector<ast::ParsedFile> &parsedFiles,
+void printFileTable(unique_ptr<core::GlobalState> &gs, const options::Options &opts,
+                    const UnorderedMap<long, long> &untypedUsages) {
+#ifndef SORBET_REALMAIN_MIN
+    if (opts.print.FileTableProto.enabled || opts.print.FileTableFullProto.enabled) {
+        if (opts.print.FileTableProto.enabled && opts.print.FileTableFullProto.enabled) {
+            Exception::raise("file-table-proto and file-table-full-proto are mutually exclusive print options");
+        }
+        auto files = core::Proto::filesToProto(*gs, untypedUsages, opts.print.FileTableFullProto.enabled);
+        if (opts.print.FileTableProto.outputPath.empty()) {
+            files.SerializeToOstream(&cout);
+        } else {
+            string buf;
+            files.SerializeToString(&buf);
+            opts.print.FileTableProto.print(buf);
+        }
+    }
+    if (opts.print.FileTableJson.enabled || opts.print.FileTableFullJson.enabled) {
+        if (opts.print.FileTableJson.enabled && opts.print.FileTableFullJson.enabled) {
+            Exception::raise("file-table-json and file-table-full-json are mutually exclusive print options");
+        }
+        auto files = core::Proto::filesToProto(*gs, untypedUsages, opts.print.FileTableFullJson.enabled);
+        if (opts.print.FileTableJson.outputPath.empty()) {
+            core::Proto::toJSON(files, cout);
+        } else {
+            stringstream buf;
+            core::Proto::toJSON(files, buf);
+            opts.print.FileTableJson.print(buf.str());
+        }
+    }
+    if (opts.print.FileTableMessagePack.enabled || opts.print.FileTableFullMessagePack.enabled) {
+        if (opts.print.FileTableMessagePack.enabled && opts.print.FileTableFullMessagePack.enabled) {
+            Exception::raise("file-table-msgpack and file-table-full-msgpack are mutually exclusive print options");
+        }
+        auto files = core::Proto::filesToProto(*gs, untypedUsages, opts.print.FileTableFullMessagePack.enabled);
+        stringstream buf;
+        core::Proto::toJSON(files, buf);
+        auto str = buf.str();
+        rapidjson::Document document;
+        document.Parse(str);
+        mpack_writer_t writer;
+        if (opts.print.FileTableMessagePack.outputPath.empty()) {
+            mpack_writer_init_stdfile(&writer, stdout, /* close when done */ false);
+        } else {
+            mpack_writer_init_filename(&writer, opts.print.FileTableMessagePack.outputPath.c_str());
+        }
+        json2msgpack::json2msgpack(document, &writer);
+        if (mpack_writer_destroy(&writer)) {
+            Exception::raise("failed to write msgpack");
+        }
+    }
+#endif
+}
+
+bool cacheTreesAndFiles(const core::GlobalState &gs, WorkerPool &workers, const vector<ast::ParsedFile> &parsedFiles,
                         const unique_ptr<OwnedKeyValueStore> &kvstore) {
     if (kvstore == nullptr) {
         return false;
@@ -1168,7 +1173,7 @@ bool cacheTreesAndFiles(const core::GlobalState &gs, WorkerPool &workers, vector
     Timer timeit(gs.tracer(), "pipeline::cacheTreesAndFiles");
 
     // Compress files in parallel.
-    auto fileq = make_shared<ConcurrentBoundedQueue<ast::ParsedFile *>>(parsedFiles.size());
+    auto fileq = make_shared<ConcurrentBoundedQueue<const ast::ParsedFile *>>(parsedFiles.size());
     for (auto &parsedFile : parsedFiles) {
         fileq->push(&parsedFile, 1);
     }
@@ -1177,7 +1182,7 @@ bool cacheTreesAndFiles(const core::GlobalState &gs, WorkerPool &workers, vector
     workers.multiplexJob("compressTreesAndFiles", [fileq, resultq, &gs]() {
         vector<pair<string, vector<uint8_t>>> threadResult;
         int processedByThread = 0;
-        ast::ParsedFile *job = nullptr;
+        const ast::ParsedFile *job = nullptr;
         unique_ptr<Timer> timeit;
         {
             for (auto result = fileq->try_pop(job); !result.done(); result = fileq->try_pop(job)) {
@@ -1264,6 +1269,65 @@ vector<ast::ParsedFile> autogenWriteCacheFile(const core::GlobalState &gs, const
     return results;
 #else
     return what;
+#endif
+}
+
+void printUntypedBlames(const core::GlobalState &gs, const UnorderedMap<long, long> &untypedBlames,
+                        const options::Options &opts) {
+#ifndef SORBET_REALMAIN_MIN
+
+    if (!opts.print.UntypedBlame.enabled) {
+        return;
+    }
+
+    rapidjson::StringBuffer result;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(result);
+
+    writer.StartArray();
+
+    for (auto &[symId, count] : untypedBlames) {
+        auto sym = core::SymbolRef::fromRaw(symId);
+
+        writer.StartObject();
+
+        writer.String("path");
+        if (sym.exists() && sym.loc(gs).exists()) {
+            writer.String(std::string(sym.loc(gs).file().data(gs).path()));
+
+        } else {
+            writer.String("<none>");
+        }
+
+        writer.String("package");
+        if (sym.exists() && sym.loc(gs).exists()) {
+            const auto file = sym.loc(gs).file();
+            const auto pkg = gs.packageDB().getPackageNameForFile(file);
+            if (pkg == core::NameRef::noName()) {
+                writer.String("<none>");
+            } else {
+                writer.String(pkg.show(gs));
+            }
+
+        } else {
+            writer.String("<none>");
+        }
+
+        writer.String("owner");
+        auto owner = sym.owner(gs).show(gs);
+        writer.String(owner);
+
+        writer.String("name");
+        writer.String(sym.name(gs).show(gs));
+
+        writer.String("count");
+        writer.Int64(count);
+
+        writer.EndObject();
+    }
+
+    writer.EndArray();
+
+    opts.print.UntypedBlame.print(result.GetString());
 #endif
 }
 

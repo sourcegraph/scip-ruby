@@ -83,7 +83,7 @@ module T::Private::Methods
       raise "Procs cannot have override/abstract modifiers"
     end
     if decl.mod != PROC_TYPE
-      raise "You are passing a DeclBuilder as a type. Did you accidentally use `self` inside a `sig` block?"
+      raise "You are passing a DeclBuilder as a type. Did you accidentally use `self` inside a `sig` block? Perhaps you wanted the `T.self_type` instead: https://sorbet.org/docs/self-type"
     end
     if decl.returns == ARG_NOT_PROVIDED
       raise "Procs must specify a return type"
@@ -116,6 +116,11 @@ module T::Private::Methods
     # So, we always do the look up by the method on the owner (Base in this example).
     @signatures_by_method[key]
   end
+
+  # Fetch the directory name of the file that defines the `T::Private` constant and
+  # add a trailing slash to allow us to match it as a directory prefix.
+  SORBET_RUNTIME_LIB_PATH = File.dirname(T.const_source_location(:Private).first) + File::SEPARATOR
+  private_constant :SORBET_RUNTIME_LIB_PATH
 
   # when target includes a module with instance methods source_method_names, ensure there is zero intersection between
   # the final instance methods of target and source_method_names. so, for every m in source_method_names, check if there
@@ -158,7 +163,7 @@ module T::Private::Methods
 
         definition_file, definition_line = T::Private::Methods.signature_for_method(ancestor.instance_method(method_name)).method.source_location
         is_redefined = target == ancestor
-        caller_loc = caller_locations&.find {|l| !l.to_s.match?(%r{sorbet-runtime[^/]*/lib/})}
+        caller_loc = caller_locations&.find {|l| !l.to_s.start_with?(SORBET_RUNTIME_LIB_PATH)}
         extra_info = "\n"
         if caller_loc
           extra_info = (is_redefined ? "Redefined" : "Overridden") + " here: #{caller_loc.path}:#{caller_loc.lineno}\n"
@@ -334,9 +339,11 @@ module T::Private::Methods
         nil
       end
 
+    declaration_block.loc = nil
+
     signature =
       if current_declaration
-        build_sig(hook_mod, method_name, original_method, current_declaration, declaration_block.loc)
+        build_sig(hook_mod, method_name, original_method, current_declaration)
       else
         Signature.new_untyped(method: original_method)
       end
@@ -353,7 +360,7 @@ module T::Private::Methods
       .decl
   end
 
-  def self.build_sig(hook_mod, method_name, original_method, current_declaration, loc)
+  def self.build_sig(hook_mod, method_name, original_method, current_declaration)
     begin
       # We allow `sig` in the current module's context (normal case) and
       if hook_mod != current_declaration.mod &&

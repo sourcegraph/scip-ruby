@@ -101,8 +101,6 @@ end
 #     *   URI::REGEXP::PATTERN - (in uri/common.rb)
 #
 # *   URI::Util - (in uri/common.rb)
-# *   [`URI::Escape`](https://docs.ruby-lang.org/en/2.7.0/URI/Escape.html) - (in
-#     uri/common.rb)
 # *   [`URI::Error`](https://docs.ruby-lang.org/en/2.7.0/URI/Error.html) - (in
 #     uri/common.rb)
 #     *   [`URI::InvalidURIError`](https://docs.ruby-lang.org/en/2.7.0/URI/InvalidURIError.html)
@@ -265,21 +263,15 @@ module URI
   end
   def self.encode_www_form_component(str, enc=nil); end
 
+  # Like URI.encode_www_form_component, except that <tt>' '</tt> (space)
+  # is encoded as <tt>'%20'</tt> (instead of <tt>'+'</tt>).
   sig do
     params(
-        arg: String,
-        arg0: Regexp,
-    )
-    .returns(String)
+      str: Object,
+      enc: T.nilable(Encoding)
+    ).returns(String)
   end
-  sig do
-    params(
-        arg: String,
-        arg0: String,
-    )
-    .returns(String)
-  end
-  def self.escape(arg, *arg0); end
+  def self.encode_uri_component(str, enc=nil);end
 
   # ## Synopsis
   #
@@ -460,7 +452,7 @@ module URI
 
   # Returns a [`Hash`](https://docs.ruby-lang.org/en/2.7.0/Hash.html) of the
   # defined schemes.
-  sig {returns(T::Hash[String, Class])}
+  sig {returns(T::Hash[String, T::Class[T.anything]])}
   def self.scheme_list(); end
 
   # ## Synopsis
@@ -510,14 +502,6 @@ module URI
   sig do
     params(
         arg: String,
-    )
-    .returns(String)
-  end
-  def self.unescape(*arg); end
-
-  sig do
-    params(
-        arg: String,
         arg0: Regexp,
     )
     .returns(String)
@@ -550,105 +534,9 @@ end
 class URI::Error < StandardError
 end
 
-# [`Module`](https://docs.ruby-lang.org/en/2.7.0/Module.html) for escaping
-# unsafe characters with codes.
-module URI::Escape
-  # Alias for:
-  # [`unescape`](https://docs.ruby-lang.org/en/2.7.0/URI/Escape.html#method-i-unescape)
-  def decode(*arg); end
-
-  # Alias for:
-  # [`escape`](https://docs.ruby-lang.org/en/2.7.0/URI/Escape.html#method-i-escape)
-  def encode(*arg); end
-
-  # ## Synopsis
-  #
-  # ```
-  # URI.escape(str [, unsafe])
-  # ```
-  #
-  # ## Args
-  #
-  # `str`
-  # :   [`String`](https://docs.ruby-lang.org/en/2.7.0/String.html) to replaces
-  #     in.
-  # `unsafe`
-  # :   [`Regexp`](https://docs.ruby-lang.org/en/2.7.0/Regexp.html) that matches
-  #     all symbols that must be replaced with codes. By default uses `UNSAFE`.
-  #     When this argument is a
-  #     [`String`](https://docs.ruby-lang.org/en/2.7.0/String.html), it
-  #     represents a character set.
-  #
-  #
-  # ## Description
-  #
-  # Escapes the string, replacing all unsafe characters with codes.
-  #
-  # This method is obsolete and should not be used. Instead, use
-  # [`CGI.escape`](https://docs.ruby-lang.org/en/2.7.0/CGI/Util.html#method-i-escape),
-  # [`URI.encode_www_form`](https://docs.ruby-lang.org/en/2.7.0/URI.html#method-c-encode_www_form)
-  # or
-  # [`URI.encode_www_form_component`](https://docs.ruby-lang.org/en/2.7.0/URI.html#method-c-encode_www_form_component)
-  # depending on your specific use case.
-  #
-  # ## Usage
-  #
-  # ```ruby
-  # require 'uri'
-  #
-  # enc_uri = URI.escape("http://example.com/?a=\11\15")
-  # # => "http://example.com/?a=%09%0D"
-  #
-  # URI.unescape(enc_uri)
-  # # => "http://example.com/?a=\t\r"
-  #
-  # URI.escape("@?@!", "!?")
-  # # => "@%3F@%21"
-  # ```
-  #
-  #
-  # Also aliased as:
-  # [`encode`](https://docs.ruby-lang.org/en/2.7.0/URI/Escape.html#method-i-encode)
-  def escape(*arg); end
-
-  # ## Synopsis
-  #
-  # ```ruby
-  # URI.unescape(str)
-  # ```
-  #
-  # ## Args
-  #
-  # `str`
-  # :   [`String`](https://docs.ruby-lang.org/en/2.7.0/String.html) to unescape.
-  #
-  #
-  # ## Description
-  #
-  # This method is obsolete and should not be used. Instead, use
-  # [`CGI.unescape`](https://docs.ruby-lang.org/en/2.7.0/CGI/Util.html#method-i-unescape),
-  # [`URI.decode_www_form`](https://docs.ruby-lang.org/en/2.7.0/URI.html#method-c-decode_www_form)
-  # or
-  # [`URI.decode_www_form_component`](https://docs.ruby-lang.org/en/2.7.0/URI.html#method-c-decode_www_form_component)
-  # depending on your specific use case.
-  #
-  # ## Usage
-  #
-  # ```ruby
-  # require 'uri'
-  #
-  # enc_uri = URI.escape("http://example.com/?a=\11\15")
-  # # => "http://example.com/?a=%09%0D"
-  #
-  # URI.unescape(enc_uri)
-  # # => "http://example.com/?a=\t\r"
-  # ```
-  #
-  #
-  # Also aliased as:
-  # [`decode`](https://docs.ruby-lang.org/en/2.7.0/URI/Escape.html#method-i-decode)
-  def unescape(*arg); end
-
+# The "file" [`URI`](https://docs.ruby-lang.org/en/2.7.0/URI.html) is defined by
+# RFC8089.
+class URI::File < URI::Generic
 end
 
 # [`FTP`](https://docs.ruby-lang.org/en/2.7.0/URI/FTP.html)
@@ -2352,7 +2240,51 @@ end
 module URI::Util
 end
 
-# The "file" [`URI`](https://docs.ruby-lang.org/en/2.7.0/URI.html) is defined by
-# RFC8089.
-class URI::File < URI::Generic
+# The syntax of WS URIs is defined in RFC6455 section 3.
+#
+# Note that the Ruby URI library allows WS URLs containing usernames and
+# passwords. This is not legal as per the RFC, but used to be
+# supported in Internet Explorer 5 and 6, before the MS04-004 security
+# update. See <URL:http://support.microsoft.com/kb/834489>.
+class URI::WS < URI::Generic
+  # A Default port of 80 for URI::WS.
+  DEFAULT_PORT = T.let(T.unsafe(nil), Integer)
+
+  # An Array of the available components for URI::WS.
+  COMPONENT = T.let(T.unsafe(nil), T::Array[Symbol])
+
+  # == Description
+  #
+  # Creates a new URI::WS object from components, with syntax checking.
+  #
+  # The components accepted are userinfo, host, port, path, and query.
+  #
+  # The components should be provided either as an Array, or as a Hash
+  # with keys formed by preceding the component names with a colon.
+  #
+  # If an Array is used, the components must be passed in the
+  # order <code>[userinfo, host, port, path, query]</code>.
+  #
+  # Example:
+  #
+  #     uri = URI::WS.build(host: 'www.example.com', path: '/foo/bar')
+  #
+  #     uri = URI::WS.build([nil, "www.example.com", nil, "/path", "query"])
+  #
+  # Currently, if passed userinfo components this method generates
+  # invalid WS URIs as per RFC 1738.
+  def self.build(args); end
+
+  # == Description
+  #
+  # Returns the full path for a WS URI, as required by Net::HTTP::Get.
+  #
+  # If the URI contains a query, the full path is URI#path + '?' + URI#query.
+  # Otherwise, the path is simply URI#path.
+  #
+  # Example:
+  #
+  #     uri = URI::WS.build(path: '/foo/bar', query: 'test=true')
+  #     uri.request_uri #  => "/foo/bar?test=true"
+  def request_uri; end
 end

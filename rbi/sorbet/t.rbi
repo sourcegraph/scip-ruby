@@ -120,6 +120,10 @@ module T
   # For more information, see https://sorbet.org/docs/noreturn
   def self.noreturn; end
 
+  # Type syntax to declare the "top" type in Sorbet. Every type is a subtype of
+  # this type, but absolutely nothing is known about values of this type.
+  def self.anything; end
+
   # Deprecated. Use `T::Enum` instead.
   #
   # For more information, see https://sorbet.org/docs/tenum
@@ -244,6 +248,14 @@ module T::Generic
   #
   # For more information, see https://sorbet.org/docs/generics#generics-and-runtime-checks
   def [](*types); end
+
+  # Allows using `T.attached_class` in this module, at the expense of only
+  # being allowed to `extend` this module, never `include` it (unless the
+  # module it's included into is also marked `has_attached_class!`).
+  #
+  # For more information, see https://sorbet.org/docs/attached-class
+  sig {params(variance: Symbol, blk: T.untyped).void}
+  def has_attached_class!(variance=:invariant, &blk); end
 end
 
 module T::Helpers
@@ -323,6 +335,10 @@ module T::Range
   # Type syntax to specify the element type of a standard library Range
   def self.[](type); end
 end
+module T::Class
+  # Type syntax to specify the element type of a standard library Class
+  def self.[](type); end
+end
 module T::Enumerable
   # Type syntax to specify the element type of a standard library Enumerable
   def self.[](type); end
@@ -333,6 +349,10 @@ module T::Enumerator
 end
 module T::Enumerator::Lazy
   # Type syntax to specify the element type of a standard library Enumerator::Lazy
+  def self.[](type); end
+end
+module T::Enumerator::Chain
+  # Type syntax to specify the element type of a standard library Enumerator::Chain
   def self.[](type); end
 end
 

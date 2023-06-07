@@ -5,7 +5,7 @@ class <C <U <root>>> < <C <U Object>> ()
   module <C <U O>> < <C <U Sorbet>>::<C <U Private>>::<C <U Static>>::<C <U ImplicitModuleSuperclass>> () @ Loc {file=test/testdata/resolver/stub_missing_class_alias.rb start=4:7 end=4:8}
     class <C <U O>>::<C <U B>> < <C <U Object>> () @ Loc {file=test/testdata/resolver/stub_missing_class_alias.rb start=4:1 end=4:11}
       static-field <C <U O>>::<C <U B>>::<C <U Doc1>> -> Integer @ Loc {file=test/testdata/resolver/stub_missing_class_alias.rb start=9:3 end=9:7}
-      static-field <C <U O>>::<C <U B>>::<C <U Document>> @ Loc {file=test/testdata/resolver/stub_missing_class_alias.rb start=8:3 end=8:11}
+      static-field <C <U O>>::<C <U B>>::<C <U Document>> -> AliasType { symbol = <C <U Sorbet>>::<C <U Private>>::<C <U Static>>::<C <U StubModule>> } @ Loc {file=test/testdata/resolver/stub_missing_class_alias.rb start=8:3 end=8:11}
       class <C <U O>>::<C <U B>>::<C <U J>> < <C <U Object>> () @ Loc {file=test/testdata/resolver/stub_missing_class_alias.rb start=5:3 end=5:10}
       class <C <U O>>::<C <U B>>::<S <C <U J>> $1>[<C <U <AttachedClass>>>] < <S <C <U Object>> $1> () @ Loc {file=test/testdata/resolver/stub_missing_class_alias.rb start=5:3 end=5:10}
         type-member(+) <C <U O>>::<C <U B>>::<S <C <U J>> $1>::<C <U <AttachedClass>>> -> LambdaParam(<C <U O>>::<C <U B>>::<S <C <U J>> $1>::<C <U <AttachedClass>>>, lower=T.noreturn, upper=O::B::J) @ Loc {file=test/testdata/resolver/stub_missing_class_alias.rb start=5:3 end=5:10}
@@ -19,6 +19,5 @@ class <C <U <root>>> < <C <U Object>> ()
         argument arg0<> -> O::B::Document::J (unresolved) @ Loc {file=test/testdata/resolver/stub_missing_class_alias.rb start=16:7 end=16:11}
         argument arg1<> -> O::B::Doc1::J (unresolved) @ Loc {file=test/testdata/resolver/stub_missing_class_alias.rb start=17:7 end=17:11}
         argument <blk><block> -> T.untyped @ Loc {file=test/testdata/resolver/stub_missing_class_alias.rb start=??? end=???}
-  class <S <C <U O>> $1>[<C <U <AttachedClass>>>] < <C <U Module>> () @ Loc {file=test/testdata/resolver/stub_missing_class_alias.rb start=4:7 end=4:8}
-    type-member(+) <S <C <U O>> $1>::<C <U <AttachedClass>>> -> LambdaParam(<S <C <U O>> $1>::<C <U <AttachedClass>>>, lower=T.noreturn, upper=O) @ Loc {file=test/testdata/resolver/stub_missing_class_alias.rb start=4:7 end=4:8}
+  class <S <C <U O>> $1> < <C <U Module>> () @ Loc {file=test/testdata/resolver/stub_missing_class_alias.rb start=4:7 end=4:8}
 
