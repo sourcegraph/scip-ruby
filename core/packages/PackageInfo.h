@@ -15,6 +15,7 @@ class Context;
 } // namespace sorbet::core
 
 namespace sorbet::core::packages {
+
 enum class ImportType {
     Normal,
     Test,
@@ -28,11 +29,17 @@ public:
     virtual std::vector<std::vector<core::NameRef>> exports() const = 0;
     virtual std::vector<std::vector<core::NameRef>> imports() const = 0;
     virtual std::vector<std::vector<core::NameRef>> testImports() const = 0;
+    virtual std::vector<std::vector<core::NameRef>> visibleTo() const = 0;
     virtual std::unique_ptr<PackageInfo> deepCopy() const = 0;
     virtual core::Loc fullLoc() const = 0;
     virtual core::Loc declLoc() const = 0;
     virtual bool exists() const final;
     std::string show(const core::GlobalState &gs) const;
+    core::ClassOrModuleRef getRootSymbolForAutocorrectSearch(const core::GlobalState &gs,
+                                                             core::SymbolRef suggestionScope) const;
+
+    core::ClassOrModuleRef getPackageScope(const core::GlobalState &gs) const;
+    core::ClassOrModuleRef getPackageTestScope(const core::GlobalState &gs) const;
 
     virtual std::optional<ImportType> importsPackage(core::NameRef mangledName) const = 0;
 
@@ -57,7 +64,8 @@ public:
     };
 
     virtual bool ownsSymbol(const core::GlobalState &gs, core::SymbolRef symbol) const = 0;
-    virtual bool strictAutoloaderCompatibility() const = 0;
+    virtual bool legacyAutoloaderCompatibility() const = 0;
+    virtual bool exportAll() const = 0;
 
     // Utilities:
 

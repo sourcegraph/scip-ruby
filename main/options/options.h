@@ -1,9 +1,9 @@
 #ifndef RUBY_TYPER_OPTIONS_H
 #define RUBY_TYPER_OPTIONS_H
-#include "common/ConstExprStr.h"
 #include "common/EarlyReturnWithCode.h"
 #include "common/FileSystem.h"
 #include "common/common.h"
+#include "common/strings/ConstExprStr.h"
 #include "core/StrictLevel.h"
 #include "main/pipeline/semantic_extension/SemanticExtension.h"
 #include "spdlog/spdlog.h"
@@ -82,11 +82,11 @@ struct Printers {
     PrinterConfig MissingConstants;
     PrinterConfig Autogen;
     PrinterConfig AutogenMsgPack;
-    PrinterConfig AutogenAutoloader;
     PrinterConfig AutogenSubclasses;
     PrinterConfig Packager;
     PrinterConfig MinimizeRBI;
     PrinterConfig PayloadSources;
+    PrinterConfig UntypedBlame;
     // Ensure everything here is in PrinterConfig::printers().
 
     std::vector<std::reference_wrapper<PrinterConfig>> printers();
@@ -104,22 +104,6 @@ enum class Phase {
     RESOLVER,
     CFG,
     INFERENCER,
-};
-
-struct AutoloaderConfig {
-    // Top-level modules to include in autoloader output
-    std::vector<std::string> modules;
-    std::string rootDir;
-    std::string preamble;
-    std::string registryModule;
-    std::string rootObject;
-    std::vector<std::string> requireExcludes;
-    std::vector<std::vector<std::string>> sameFileModules;
-    std::vector<std::vector<std::string>> pbalNamespaces;
-    std::vector<std::string> stripPrefixes;
-
-    std::vector<std::string> absoluteIgnorePatterns;
-    std::vector<std::string> relativeIgnorePatterns;
 };
 
 struct AutogenConstCacheConfig {
@@ -142,7 +126,6 @@ constexpr size_t MAX_CACHE_SIZE_BYTES = 1L * 1024 * 1024 * 1024; // 1 GiB
 
 struct Options {
     Printers print;
-    AutoloaderConfig autoloaderConfig;
     Phase stopAfterPhase = Phase::INFERENCER;
     bool noStdlib = false;
 
@@ -184,6 +167,7 @@ struct Options {
     std::vector<std::string> extraPackageFilesDirectoryUnderscorePrefixes;
     std::vector<std::string> extraPackageFilesDirectorySlashPrefixes;
     std::vector<std::string> secondaryTestPackageNamespaces;
+    std::vector<std::string> skipPackageImportVisibilityCheckFor;
     std::string typedSource = "";
     std::string cacheDir = "";
     // This configured both maximum filesystem db size and max virtual memory usage
@@ -267,7 +251,9 @@ struct Options {
     bool lspDocumentSymbolEnabled = false;
     bool lspDocumentFormatRubyfmtEnabled = false;
     bool lspSignatureHelpEnabled = false;
-    bool lspExperimentalFastPathEnabled = false;
+    // Enables out-of-order reference checking
+    bool outOfOrderReferenceChecksEnabled = false;
+    bool trackUntyped = false;
 
     // Experimental feature `requires_ancestor`
     bool requiresAncestorEnabled = false;

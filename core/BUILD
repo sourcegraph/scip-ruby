@@ -4,6 +4,7 @@ cc_library(
         [
             "*.cc",
             "*.h",
+            "errors/*.cc",
             "types/*.cc",
             "lsp/*.cc",
             "packages/*.cc",
@@ -58,8 +59,8 @@ cc_test(
     visibility = ["//tools:__pkg__"],
     deps = [
         ":core",
-        "@doctest",
-        "@doctest//:doctest_main",
+        "@doctest//doctest",
+        "@doctest//doctest:main",
     ],
 )
 

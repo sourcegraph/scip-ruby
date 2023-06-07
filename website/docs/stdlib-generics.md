@@ -9,17 +9,19 @@ containers defined in the Ruby standard library looks different from other
 [class types](class-types.md) despite the fact that Ruby uses classes to
 represent these values, too. Here's the syntax Sorbet uses:
 
-| Type                           | Example value                         |
-| ------------------------------ | ------------------------------------- |
-| `T::Array[Integer]`            | `[1, 2, 3]`                           |
-| `T::Array[String]`             | `["hello", "goodbye"]`                |
-| `T::Hash[Symbol, Integer]`     | `{key: 0}`                            |
-| `T::Hash[String, Float]`       | `{"key" => 0.0}`                      |
-| `T::Set[Integer]`              | `Set[1, 2, 3]`                        |
-| `T::Range[Integer]`            | `0..10`                               |
-| `T::Enumerable[Integer]`       | _interface implemented by many types_ |
-| `T::Enumerator[Integer]`       | [1, 2, 3].each                        |
-| `T::Enumerator::Lazy[Integer]` | [1, 2, 3].each.lazy                   |
+| Type                            | Example value                         |
+| ------------------------------- | ------------------------------------- |
+| `T::Array[Integer]`             | `[1, 2, 3]`                           |
+| `T::Array[String]`              | `["hello", "goodbye"]`                |
+| `T::Hash[Symbol, Integer]`      | `{key: 0}`                            |
+| `T::Hash[String, Float]`        | `{"key" => 0.0}`                      |
+| `T::Set[Integer]`               | `Set[1, 2, 3]`                        |
+| `T::Range[Integer]`             | `0..10`                               |
+| `T::Enumerable[Integer]`        | _interface implemented by many types_ |
+| `T::Enumerator[Integer]`        | [1, 2, 3].each                        |
+| `T::Enumerator::Lazy[Integer]`  | [1, 2, 3].each.lazy                   |
+| `T::Enumerator::Chain[Integer]` | [1, 2].chain([3])                     |
+| `T::Class[Integer]`             | Integer                               |
 
 ## Why the `T::` prefix?
 
@@ -33,8 +35,8 @@ When creating user-defined generic classes, the `sorbet-runtime` gem
 automatically defines this method so that the type annotation syntax works at
 runtime.
 
-But for classes in the Ruby standard library that Sorbet retroactively defined
-as generic classes, the `[]` method will not always be defined at runtime. One
+But for classes in the Ruby standard library, which Sorbet retroactively defined
+as generic classes, the `[]` method will not be defined at runtime. One
 potential option would have been to use `sorbet-runtime` to monkey patch the
 standard library so that the `[]` method is defined for generic classes, but
 some of these Ruby standard library classes **already** define a meaningful `[]`

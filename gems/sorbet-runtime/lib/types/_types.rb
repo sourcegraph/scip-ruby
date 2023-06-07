@@ -47,6 +47,10 @@ module T
     T::Types::NoReturn::Private::INSTANCE
   end
 
+  def self.anything
+    T::Types::Anything::Private::INSTANCE
+  end
+
   # T.all(<Type>, <Type>, ...) -- matches an object that has all of the types listed
   def self.all(type_a, type_b, *types)
     T::Types::Intersection.new([type_a, type_b] + types)
@@ -119,7 +123,7 @@ module T
   #  .returns(T::Array[T.type_parameter(:U)])
   #  def map(&blk); end
   def self.type_parameter(name)
-    T::Types::TypeParameter.new(name)
+    T::Types::TypeParameter.make(name)
   end
 
   # Tells the typechecker that `value` is of type `type`. Use this to get additional checking after
@@ -279,9 +283,9 @@ module T
   module Array
     def self.[](type)
       if type.is_a?(T::Types::Untyped)
-        T::Types::TypedArray::Untyped.new
+        T::Types::TypedArray::Untyped::Private::INSTANCE
       else
-        T::Types::TypedArray.new(type)
+        T::Types::TypedArray::Private::Pool.type_for_module(type)
       end
     end
   end
@@ -324,6 +328,16 @@ module T
         end
       end
     end
+
+    module Chain
+      def self.[](type)
+        if type.is_a?(T::Types::Untyped)
+          T::Types::TypedEnumeratorChain::Untyped.new
+        else
+          T::Types::TypedEnumeratorChain.new(type)
+        end
+      end
+    end
   end
 
   module Range
@@ -338,6 +352,18 @@ module T
         T::Types::TypedSet::Untyped.new
       else
         T::Types::TypedSet.new(type)
+      end
+    end
+  end
+
+  module Class
+    def self.[](type)
+      if type.is_a?(T::Types::Untyped)
+        T::Types::TypedClass::Untyped::Private::INSTANCE
+      elsif type.is_a?(T::Types::Anything)
+        T::Types::TypedClass::Anything::Private::INSTANCE
+      else
+        T::Types::TypedClass::Private::Pool.type_for_module(type)
       end
     end
   end

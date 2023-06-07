@@ -224,7 +224,6 @@
 #^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #      ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #              ^ reference [..] T#
-#                 ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
  def f2
 #    ^^ definition [..] Object#f2().
 #    documentation
@@ -255,7 +254,6 @@
 #^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #      ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #              ^ reference [..] T#
-#                 ^^^^^^^^^^ reference [..] Sorbet#Private#Static#
  def f4 # another undocumented global function
 #    ^^ definition [..] Object#f4().
 #    documentation

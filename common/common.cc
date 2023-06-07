@@ -3,7 +3,7 @@
 #include "common/concurrency/ConcurrentQueue.h"
 #include "common/concurrency/WorkerPool.h"
 #include "common/exception/Exception.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
 #include "os/os.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include <array>
@@ -50,11 +50,13 @@ string sorbet::FileOps::read(const string &filename) {
         fclose(fp);
         if (readBytes != contents.size()) {
             // Error reading file?
-            throw sorbet::FileNotFoundException(fmt::format("Error reading file: `{}`: {}", filename, errno));
+            auto msg = fmt::format("Error reading file: `{}`: {}", filename, errno);
+            throw sorbet::FileNotFoundException(msg);
         }
         return contents;
     }
-    throw sorbet::FileNotFoundException(fmt::format("Cannot open file `{}`", filename));
+    auto msg = fmt::format("Cannot open file `{}`", filename);
+    throw sorbet::FileNotFoundException(msg);
 }
 
 void sorbet::FileOps::write(const string &filename, const vector<uint8_t> &data) {
@@ -64,7 +66,8 @@ void sorbet::FileOps::write(const string &filename, const vector<uint8_t> &data)
         fclose(fp);
         return;
     }
-    throw sorbet::FileNotFoundException(fmt::format("Cannot open file `{}` for writing", filename));
+    auto msg = fmt::format("Cannot open file `{}` for writing", filename);
+    throw sorbet::FileNotFoundException(msg);
 }
 
 bool sorbet::FileOps::dirExists(const string &path) {
@@ -75,7 +78,8 @@ bool sorbet::FileOps::dirExists(const string &path) {
 void sorbet::FileOps::createDir(const string &path) {
     auto err = mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     if (err) {
-        throw sorbet::CreateDirException(fmt::format("Error in createDir('{}'): {}", path, errno));
+        auto msg = fmt::format("Error in createDir('{}'): {}", path, errno);
+        throw sorbet::CreateDirException(msg);
     }
 }
 
@@ -86,7 +90,8 @@ bool sorbet::FileOps::ensureDir(const string &path) {
             return false;
         }
 
-        throw sorbet::CreateDirException(fmt::format("Error in createDir('{}'): {}", path, errno));
+        auto msg = fmt::format("Error in createDir('{}'): {}", path, errno);
+        throw sorbet::CreateDirException(msg);
     }
 
     return true;
@@ -99,7 +104,8 @@ std::string sorbet::FileOps::getCurrentDir() {
 void sorbet::FileOps::removeDir(const string &path) {
     auto err = rmdir(path.c_str());
     if (err) {
-        throw sorbet::CreateDirException(fmt::format("Error in removeDir('{}'): {}", path, errno));
+        auto msg = fmt::format("Error in removeDir('{}'): {}", path, errno);
+        throw sorbet::RemoveDirException(msg);
     }
 }
 
@@ -109,7 +115,8 @@ bool sorbet::FileOps::removeEmptyDir(const string &path) {
         if (errno == ENOTEMPTY) {
             return false;
         }
-        throw sorbet::CreateDirException(fmt::format("Error in removeEmptyDir('{}'): {}", path, errno));
+        auto msg = fmt::format("Error in removeEmptyDir('{}'): {}", path, errno);
+        throw sorbet::RemoveDirException(msg);
     }
 
     return true;
@@ -118,7 +125,8 @@ bool sorbet::FileOps::removeEmptyDir(const string &path) {
 void sorbet::FileOps::removeFile(const string &path) {
     auto err = remove(path.c_str());
     if (err) {
-        throw sorbet::RemoveFileException(fmt::format("Error in removeFile('{}'): {}", path, errno));
+        auto msg = fmt::format("Error in removeFile('{}'): {}", path, errno);
+        throw sorbet::RemoveFileException(msg);
     }
 }
 
@@ -129,7 +137,8 @@ void sorbet::FileOps::write(const string &filename, string_view text) {
         fclose(fp);
         return;
     }
-    throw sorbet::FileNotFoundException(fmt::format("Cannot open file `{}` for writing", filename));
+    auto msg = fmt::format("Cannot open file `{}` for writing", filename);
+    throw sorbet::FileNotFoundException(msg);
 }
 
 bool sorbet::FileOps::writeIfDifferent(const string &filename, string_view text) {
@@ -147,7 +156,8 @@ void sorbet::FileOps::append(const string &filename, string_view text) {
         fclose(fp);
         return;
     }
-    throw sorbet::FileNotFoundException(fmt::format("Cannot open file `{}` for writing", filename));
+    auto msg = fmt::format("Cannot open file `{}` for writing", filename);
+    throw sorbet::FileNotFoundException(msg);
 }
 
 string_view sorbet::FileOps::getFileName(string_view path) {
@@ -332,7 +342,8 @@ void appendFilesInDir(string_view basePath, const string &path, const sorbet::Un
                         }
                         default:
                             // Mirrors other FileOps functions: Assume other errors are from FileNotFound.
-                            throw sorbet::FileNotFoundException(fmt::format("Couldn't open directory `{}`", path));
+                            auto msg = fmt::format("Couldn't open directory `{}`", path);
+                            throw sorbet::FileNotFoundException(msg);
                     }
                 }
 

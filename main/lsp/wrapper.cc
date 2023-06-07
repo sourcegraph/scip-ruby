@@ -24,9 +24,12 @@ void setRequiredLSPOptions(core::GlobalState &gs, options::Options &options) {
         gs.suppressErrorClass(sorbet::core::errors::Namer::MultipleBehaviorDefs.code);
     }
 
+    if (!options.outOfOrderReferenceChecksEnabled) {
+        gs.suppressErrorClass(sorbet::core::errors::Resolver::OutOfOrderConstantAccess.code);
+    }
+
     gs.requiresAncestorEnabled = options.requiresAncestorEnabled;
     gs.ruby3KeywordArgs = options.ruby3KeywordArgs;
-    gs.lspExperimentalFastPathEnabled = options.lspExperimentalFastPathEnabled;
 
     // Ensure LSP is enabled.
     options.runLSP = true;
@@ -161,31 +164,10 @@ unique_ptr<LSPMessage> MultiThreadedLSPWrapper::read(int timeoutMs) {
 }
 
 void LSPWrapper::enableAllExperimentalFeatures() {
-    enableExperimentalFeature(LSPExperimentalFeature::DocumentHighlight);
-    enableExperimentalFeature(LSPExperimentalFeature::DocumentSymbol);
-    enableExperimentalFeature(LSPExperimentalFeature::SignatureHelp);
-    enableExperimentalFeature(LSPExperimentalFeature::DocumentFormat);
-    enableExperimentalFeature(LSPExperimentalFeature::ExperimentalFastPath);
-}
-
-void LSPWrapper::enableExperimentalFeature(LSPExperimentalFeature feature) {
-    switch (feature) {
-        case LSPExperimentalFeature::DocumentHighlight:
-            opts->lspDocumentHighlightEnabled = true;
-            break;
-        case LSPExperimentalFeature::DocumentSymbol:
-            opts->lspDocumentSymbolEnabled = true;
-            break;
-        case LSPExperimentalFeature::SignatureHelp:
-            opts->lspSignatureHelpEnabled = true;
-            break;
-        case LSPExperimentalFeature::DocumentFormat:
-            opts->lspDocumentFormatRubyfmtEnabled = true;
-            break;
-        case LSPExperimentalFeature::ExperimentalFastPath:
-            opts->lspExperimentalFastPathEnabled = true;
-            break;
-    }
+    opts->lspDocumentHighlightEnabled = true;
+    opts->lspDocumentSymbolEnabled = true;
+    opts->lspSignatureHelpEnabled = true;
+    opts->lspDocumentFormatRubyfmtEnabled = true;
 }
 
 int LSPWrapper::getTypecheckCount() {

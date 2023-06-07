@@ -2,8 +2,8 @@
 #include "absl/base/casts.h"
 #include "absl/types/span.h"
 #include "ast/Helpers.h"
-#include "common/Timer.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
+#include "common/timers/Timer.h"
 #include "core/Error.h"
 #include "core/FileHash.h"
 #include "core/GlobalState.h"
@@ -241,7 +241,6 @@ void SerializerImpl::pickle(Pickler &p, shared_ptr<const FileHash> fh) {
     p.putU1(1);
     p.putU4(fh->localSymbolTableHashes.hierarchyHash);
     p.putU4(fh->localSymbolTableHashes.classModuleHash);
-    p.putU4(fh->localSymbolTableHashes.typeArgumentHash);
     p.putU4(fh->localSymbolTableHashes.typeMemberHash);
     p.putU4(fh->localSymbolTableHashes.fieldHash);
     p.putU4(fh->localSymbolTableHashes.staticFieldHash);
@@ -297,7 +296,6 @@ unique_ptr<const FileHash> SerializerImpl::unpickleFileHash(UnPickler &p) {
 
     ret.localSymbolTableHashes.hierarchyHash = p.getU4();
     ret.localSymbolTableHashes.classModuleHash = p.getU4();
-    ret.localSymbolTableHashes.typeArgumentHash = p.getU4();
     ret.localSymbolTableHashes.typeMemberHash = p.getU4();
     ret.localSymbolTableHashes.fieldHash = p.getU4();
     ret.localSymbolTableHashes.staticFieldHash = p.getU4();
@@ -633,6 +631,7 @@ void SerializerImpl::pickle(Pickler &p, const Method &what) {
         pickle(p, a);
     }
     pickle(p, what.resultType);
+    p.putU4(what.intrinsicOffset);
     p.putU4(what.locs().size());
     for (auto &loc : what.locs()) {
         pickle(p, loc);
@@ -665,6 +664,7 @@ Method SerializerImpl::unpickleMethod(UnPickler &p, const GlobalState *gs) {
     }
 
     result.resultType = unpickleType(p, gs);
+    result.intrinsicOffset = p.getU4();
     auto locCount = p.getU4();
     for (int i = 0; i < locCount; i++) {
         result.locs_.emplace_back(unpickleLoc(p));
@@ -1054,13 +1054,12 @@ LocOffsets SerializerImpl::unpickleLocOffsets(UnPickler &p) {
     return LocOffsets{p.getU4(), p.getU4()};
 }
 
-vector<uint8_t> Serializer::store(GlobalState &gs) {
+vector<uint8_t> Serializer::store(const GlobalState &gs) {
     Pickler p = SerializerImpl::pickle(gs);
     return p.result();
 }
 
-std::vector<uint8_t> Serializer::storePayloadAndNameTable(GlobalState &gs) {
-    Timer timeit(gs.tracer(), "Serializer::storePayloadAndNameTable");
+std::vector<uint8_t> Serializer::storePayloadAndNameTable(const GlobalState &gs) {
     Pickler p = SerializerImpl::pickle(gs, true);
     return p.result();
 }
@@ -1070,7 +1069,6 @@ void Serializer::loadGlobalState(GlobalState &gs, const uint8_t *const data) {
             "Can't load into a non-empty state");
     UnPickler p(data, gs.tracer());
     SerializerImpl::unpickleGS(p, gs);
-    gs.installIntrinsics();
 }
 
 uint32_t Serializer::loadGlobalStateUUID(const GlobalState &gs, const uint8_t *const data) {

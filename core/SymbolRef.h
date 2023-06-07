@@ -161,6 +161,8 @@ public:
     };
     std::string show(const GlobalState &gs, ShowOptions options) const;
 
+    bool isOnlyDefinedInFile(const GlobalState &gs, core::FileRef file) const;
+
     // Given a symbol like <PackageSpecRegistry>::Project::Foo, returns true.
     // Given any other symbol, returns false.
     // Also returns false if called on core::Symbols::noClassOrModule().
@@ -440,6 +442,7 @@ public:
     bool isTypeAlias(const GlobalState &gs) const;
     bool isField(const GlobalState &gs) const;
     bool isStaticField(const GlobalState &gs) const;
+    bool isClassAlias(const GlobalState &gs) const;
 
     uint32_t classOrModuleIndex() const {
         ENFORCE_NO_TIMER(kind() == Kind::ClassOrModule);
@@ -491,6 +494,8 @@ public:
         // 0th index is reserved on all symbol vectors for the non existant symbol.
         return unsafeTableIndex() != 0;
     }
+
+    bool isOnlyDefinedInFile(const GlobalState &gs, core::FileRef file) const;
 
     bool isSynthetic() const;
 
@@ -564,6 +569,12 @@ public:
         return show(gs, {});
     };
     std::string show(const GlobalState &gs, ShowOptions options) const;
+
+    /*
+     * Returns true if symbol is under the namespace of otherClass. Foo::Bar::A is under its own namespace, also is
+     * under the namespace of Foo::Bar and Foo.
+     */
+    bool isUnderNamespace(const GlobalState &gs, core::ClassOrModuleRef otherClass) const;
 };
 CheckSize(SymbolRef, 4, 4);
 
@@ -647,169 +658,177 @@ public:
         return ClassOrModuleRef::fromRaw(17);
     }
 
-    static ClassOrModuleRef Class() {
+    static ClassOrModuleRef TSingleton() {
         return ClassOrModuleRef::fromRaw(18);
     }
 
-    static ClassOrModuleRef BasicObject() {
+    static ClassOrModuleRef Class() {
         return ClassOrModuleRef::fromRaw(19);
     }
 
-    static ClassOrModuleRef Kernel() {
+    static ClassOrModuleRef BasicObject() {
         return ClassOrModuleRef::fromRaw(20);
     }
 
-    static ClassOrModuleRef Range() {
+    static ClassOrModuleRef Kernel() {
         return ClassOrModuleRef::fromRaw(21);
     }
 
-    static ClassOrModuleRef Regexp() {
+    static ClassOrModuleRef Range() {
         return ClassOrModuleRef::fromRaw(22);
     }
 
-    static ClassOrModuleRef Magic() {
+    static ClassOrModuleRef Regexp() {
         return ClassOrModuleRef::fromRaw(23);
     }
 
-    static ClassOrModuleRef MagicSingleton() {
+    static ClassOrModuleRef Magic() {
         return ClassOrModuleRef::fromRaw(24);
     }
 
-    static ClassOrModuleRef Module() {
+    static ClassOrModuleRef MagicSingleton() {
         return ClassOrModuleRef::fromRaw(25);
     }
 
-    static ClassOrModuleRef StandardError() {
+    static ClassOrModuleRef Module() {
         return ClassOrModuleRef::fromRaw(26);
     }
 
-    static ClassOrModuleRef Complex() {
+    static ClassOrModuleRef Exception() {
         return ClassOrModuleRef::fromRaw(27);
     }
 
-    static ClassOrModuleRef Rational() {
+    static ClassOrModuleRef StandardError() {
         return ClassOrModuleRef::fromRaw(28);
     }
 
-    static ClassOrModuleRef T_Array() {
+    static ClassOrModuleRef Complex() {
         return ClassOrModuleRef::fromRaw(29);
     }
 
-    static ClassOrModuleRef T_Hash() {
+    static ClassOrModuleRef Rational() {
         return ClassOrModuleRef::fromRaw(30);
     }
 
-    static ClassOrModuleRef T_Proc() {
+    static ClassOrModuleRef T_Array() {
         return ClassOrModuleRef::fromRaw(31);
     }
 
-    static ClassOrModuleRef Proc() {
+    static ClassOrModuleRef T_Hash() {
         return ClassOrModuleRef::fromRaw(32);
     }
 
-    static ClassOrModuleRef Enumerable() {
+    static ClassOrModuleRef T_Proc() {
         return ClassOrModuleRef::fromRaw(33);
     }
 
-    static ClassOrModuleRef Set() {
+    static ClassOrModuleRef Proc() {
         return ClassOrModuleRef::fromRaw(34);
     }
 
-    static ClassOrModuleRef Struct() {
+    static ClassOrModuleRef Enumerable() {
         return ClassOrModuleRef::fromRaw(35);
     }
 
-    static ClassOrModuleRef File() {
+    static ClassOrModuleRef Set() {
         return ClassOrModuleRef::fromRaw(36);
     }
 
-    static ClassOrModuleRef Sorbet() {
+    static ClassOrModuleRef Struct() {
         return ClassOrModuleRef::fromRaw(37);
     }
 
-    static ClassOrModuleRef Sorbet_Private() {
+    static ClassOrModuleRef File() {
         return ClassOrModuleRef::fromRaw(38);
     }
 
-    static ClassOrModuleRef Sorbet_Private_Static() {
+    static ClassOrModuleRef Sorbet() {
         return ClassOrModuleRef::fromRaw(39);
     }
 
-    static ClassOrModuleRef Sorbet_Private_StaticSingleton() {
+    static ClassOrModuleRef Sorbet_Private() {
         return ClassOrModuleRef::fromRaw(40);
+    }
+
+    static ClassOrModuleRef Sorbet_Private_Static() {
+        return ClassOrModuleRef::fromRaw(41);
+    }
+
+    static ClassOrModuleRef Sorbet_Private_StaticSingleton() {
+        return ClassOrModuleRef::fromRaw(42);
     }
 
     // Used as the superclass for symbols created to populate unresolvable ruby
     // constants
     static ClassOrModuleRef StubModule() {
-        return ClassOrModuleRef::fromRaw(41);
+        return ClassOrModuleRef::fromRaw(43);
     }
 
     // Used to mark the presence of a mixin that we were unable to
     // statically resolve to a module
     static ClassOrModuleRef StubMixin() {
-        return ClassOrModuleRef::fromRaw(42);
+        return ClassOrModuleRef::fromRaw(44);
     }
 
     // Used to mark the presence of a mixin that will be replaced with a real
     // ClassOrModuleRef or StubMixin once resolution completes.
     static ClassOrModuleRef PlaceholderMixin() {
-        return ClassOrModuleRef::fromRaw(43);
+        return ClassOrModuleRef::fromRaw(45);
     }
 
     // Used to mark the presence of a superclass that we were unable to
     // statically resolve to a class
     static ClassOrModuleRef StubSuperClass() {
-        return ClassOrModuleRef::fromRaw(44);
-    }
-
-    static ClassOrModuleRef T_Enumerable() {
-        return ClassOrModuleRef::fromRaw(45);
-    }
-
-    static ClassOrModuleRef T_Range() {
         return ClassOrModuleRef::fromRaw(46);
     }
 
-    static ClassOrModuleRef T_Set() {
+    static ClassOrModuleRef T_Enumerable() {
         return ClassOrModuleRef::fromRaw(47);
     }
 
-    static ClassOrModuleRef void_() {
+    static ClassOrModuleRef T_Range() {
         return ClassOrModuleRef::fromRaw(48);
+    }
+
+    static ClassOrModuleRef T_Set() {
+        return ClassOrModuleRef::fromRaw(49);
+    }
+
+    static ClassOrModuleRef void_() {
+        return ClassOrModuleRef::fromRaw(50);
     }
 
     // Synthetic symbol used by resolver to mark type alias assignments.
     static ClassOrModuleRef typeAliasTemp() {
-        return ClassOrModuleRef::fromRaw(49);
-    }
-
-    static ClassOrModuleRef T_Configuration() {
-        return ClassOrModuleRef::fromRaw(50);
-    }
-
-    static ClassOrModuleRef T_Generic() {
         return ClassOrModuleRef::fromRaw(51);
     }
 
-    static ClassOrModuleRef Tuple() {
+    static ClassOrModuleRef T_Configuration() {
         return ClassOrModuleRef::fromRaw(52);
     }
 
-    static ClassOrModuleRef Shape() {
+    static ClassOrModuleRef T_Generic() {
         return ClassOrModuleRef::fromRaw(53);
     }
 
-    static ClassOrModuleRef Subclasses() {
+    static ClassOrModuleRef Tuple() {
         return ClassOrModuleRef::fromRaw(54);
     }
 
-    static ClassOrModuleRef Sorbet_Private_Static_ImplicitModuleSuperClass() {
+    static ClassOrModuleRef Shape() {
         return ClassOrModuleRef::fromRaw(55);
     }
 
-    static ClassOrModuleRef Sorbet_Private_Static_ReturnTypeInference() {
+    static ClassOrModuleRef Subclasses() {
         return ClassOrModuleRef::fromRaw(56);
+    }
+
+    static ClassOrModuleRef Sorbet_Private_Static_ImplicitModuleSuperClass() {
+        return ClassOrModuleRef::fromRaw(57);
+    }
+
+    static ClassOrModuleRef Sorbet_Private_Static_ReturnTypeInference() {
+        return ClassOrModuleRef::fromRaw(58);
     }
 
     static MethodRef noMethod() {
@@ -847,7 +866,7 @@ public:
     }
 
     static ClassOrModuleRef T_Sig() {
-        return ClassOrModuleRef::fromRaw(57);
+        return ClassOrModuleRef::fromRaw(59);
     }
 
     static FieldRef Magic_undeclaredFieldStub() {
@@ -859,55 +878,59 @@ public:
     }
 
     static ClassOrModuleRef T_Helpers() {
-        return ClassOrModuleRef::fromRaw(58);
-    }
-
-    static ClassOrModuleRef DeclBuilderForProcs() {
-        return ClassOrModuleRef::fromRaw(59);
-    }
-
-    static ClassOrModuleRef DeclBuilderForProcsSingleton() {
         return ClassOrModuleRef::fromRaw(60);
     }
 
-    static ClassOrModuleRef Net() {
+    static ClassOrModuleRef DeclBuilderForProcs() {
         return ClassOrModuleRef::fromRaw(61);
     }
 
-    static ClassOrModuleRef Net_IMAP() {
+    static ClassOrModuleRef DeclBuilderForProcsSingleton() {
         return ClassOrModuleRef::fromRaw(62);
     }
 
-    static ClassOrModuleRef Net_Protocol() {
+    static ClassOrModuleRef Net() {
         return ClassOrModuleRef::fromRaw(63);
     }
 
-    static ClassOrModuleRef T_Sig_WithoutRuntime() {
+    static ClassOrModuleRef Net_IMAP() {
         return ClassOrModuleRef::fromRaw(64);
     }
 
-    static ClassOrModuleRef Enumerator() {
+    static ClassOrModuleRef Net_Protocol() {
         return ClassOrModuleRef::fromRaw(65);
     }
 
-    static ClassOrModuleRef T_Enumerator() {
+    static ClassOrModuleRef T_Sig_WithoutRuntime() {
         return ClassOrModuleRef::fromRaw(66);
     }
 
-    static ClassOrModuleRef T_Enumerator_Lazy() {
+    static ClassOrModuleRef Enumerator() {
         return ClassOrModuleRef::fromRaw(67);
     }
 
-    static ClassOrModuleRef T_Struct() {
+    static ClassOrModuleRef T_Enumerator() {
         return ClassOrModuleRef::fromRaw(68);
     }
 
-    static ClassOrModuleRef Singleton() {
+    static ClassOrModuleRef T_Enumerator_Lazy() {
         return ClassOrModuleRef::fromRaw(69);
     }
 
-    static ClassOrModuleRef T_Enum() {
+    static ClassOrModuleRef T_Enumerator_Chain() {
         return ClassOrModuleRef::fromRaw(70);
+    }
+
+    static ClassOrModuleRef T_Struct() {
+        return ClassOrModuleRef::fromRaw(71);
+    }
+
+    static ClassOrModuleRef Singleton() {
+        return ClassOrModuleRef::fromRaw(72);
+    }
+
+    static ClassOrModuleRef T_Enum() {
+        return ClassOrModuleRef::fromRaw(73);
     }
 
     static MethodRef sig() {
@@ -915,39 +938,43 @@ public:
     }
 
     static ClassOrModuleRef Enumerator_Lazy() {
-        return ClassOrModuleRef::fromRaw(71);
-    }
-
-    static ClassOrModuleRef T_Private() {
-        return ClassOrModuleRef::fromRaw(72);
-    }
-
-    static ClassOrModuleRef T_Private_Types() {
-        return ClassOrModuleRef::fromRaw(73);
-    }
-
-    static ClassOrModuleRef T_Private_Types_Void() {
         return ClassOrModuleRef::fromRaw(74);
     }
 
-    static ClassOrModuleRef T_Private_Types_Void_VOID() {
+    static ClassOrModuleRef Enumerator_Chain() {
         return ClassOrModuleRef::fromRaw(75);
     }
 
-    static ClassOrModuleRef T_Private_Types_Void_VOIDSingleton() {
+    static ClassOrModuleRef T_Private() {
         return ClassOrModuleRef::fromRaw(76);
     }
 
-    static ClassOrModuleRef T_Private_Methods() {
+    static ClassOrModuleRef T_Private_Types() {
         return ClassOrModuleRef::fromRaw(77);
     }
 
-    static ClassOrModuleRef T_Private_Methods_DeclBuilder() {
+    static ClassOrModuleRef T_Private_Types_Void() {
         return ClassOrModuleRef::fromRaw(78);
     }
 
-    static ClassOrModuleRef T_Sig_WithoutRuntimeSingleton() {
+    static ClassOrModuleRef T_Private_Types_Void_VOID() {
         return ClassOrModuleRef::fromRaw(79);
+    }
+
+    static ClassOrModuleRef T_Private_Types_Void_VOIDSingleton() {
+        return ClassOrModuleRef::fromRaw(80);
+    }
+
+    static ClassOrModuleRef T_Private_Methods() {
+        return ClassOrModuleRef::fromRaw(81);
+    }
+
+    static ClassOrModuleRef T_Private_Methods_DeclBuilder() {
+        return ClassOrModuleRef::fromRaw(82);
+    }
+
+    static ClassOrModuleRef T_Sig_WithoutRuntimeSingleton() {
+        return ClassOrModuleRef::fromRaw(83);
     }
 
     static MethodRef sigWithoutRuntime() {
@@ -955,7 +982,7 @@ public:
     }
 
     static ClassOrModuleRef T_NonForcingConstants() {
-        return ClassOrModuleRef::fromRaw(80);
+        return ClassOrModuleRef::fromRaw(84);
     }
 
     static MethodRef SorbetPrivateStaticSingleton_sig() {
@@ -963,15 +990,15 @@ public:
     }
 
     static ClassOrModuleRef PackageSpecRegistry() {
-        return ClassOrModuleRef::fromRaw(81);
+        return ClassOrModuleRef::fromRaw(85);
     }
 
     static ClassOrModuleRef PackageSpec() {
-        return ClassOrModuleRef::fromRaw(82);
+        return ClassOrModuleRef::fromRaw(86);
     }
 
     static ClassOrModuleRef PackageSpecSingleton() {
-        return ClassOrModuleRef::fromRaw(83);
+        return ClassOrModuleRef::fromRaw(87);
     }
 
     static MethodRef PackageSpec_import() {
@@ -991,11 +1018,11 @@ public:
     }
 
     static ClassOrModuleRef Encoding() {
-        return ClassOrModuleRef::fromRaw(84);
+        return ClassOrModuleRef::fromRaw(88);
     }
 
     static ClassOrModuleRef Thread() {
-        return ClassOrModuleRef::fromRaw(85);
+        return ClassOrModuleRef::fromRaw(89);
     }
 
     static MethodRef Class_new() {
@@ -1014,36 +1041,52 @@ public:
         return MethodRef::fromRaw(13);
     }
 
+    static MethodRef PackageSpec_visible_to() {
+        return MethodRef::fromRaw(14);
+    }
+
+    static MethodRef PackageSpec_export_all() {
+        return MethodRef::fromRaw(15);
+    }
+
     static ClassOrModuleRef Sorbet_Private_Static_ResolvedSig() {
-        return ClassOrModuleRef::fromRaw(86);
-    }
-
-    static ClassOrModuleRef Sorbet_Private_Static_ResolvedSigSingleton() {
-        return ClassOrModuleRef::fromRaw(87);
-    }
-
-    static ClassOrModuleRef T_Private_Compiler() {
-        return ClassOrModuleRef::fromRaw(88);
-    }
-
-    static ClassOrModuleRef T_Private_CompilerSingleton() {
-        return ClassOrModuleRef::fromRaw(89);
-    }
-
-    static ClassOrModuleRef MagicBindToAttachedClass() {
         return ClassOrModuleRef::fromRaw(90);
     }
 
-    static ClassOrModuleRef MagicBindToSelfType() {
+    static ClassOrModuleRef Sorbet_Private_Static_ResolvedSigSingleton() {
         return ClassOrModuleRef::fromRaw(91);
     }
 
-    static ClassOrModuleRef T_Types() {
+    static ClassOrModuleRef T_Private_Compiler() {
         return ClassOrModuleRef::fromRaw(92);
     }
 
-    static ClassOrModuleRef T_Types_Base() {
+    static ClassOrModuleRef T_Private_CompilerSingleton() {
         return ClassOrModuleRef::fromRaw(93);
+    }
+
+    static ClassOrModuleRef MagicBindToAttachedClass() {
+        return ClassOrModuleRef::fromRaw(94);
+    }
+
+    static ClassOrModuleRef MagicBindToSelfType() {
+        return ClassOrModuleRef::fromRaw(95);
+    }
+
+    static ClassOrModuleRef T_Types() {
+        return ClassOrModuleRef::fromRaw(96);
+    }
+
+    static ClassOrModuleRef T_Types_Base() {
+        return ClassOrModuleRef::fromRaw(97);
+    }
+
+    static ClassOrModuleRef Data() {
+        return ClassOrModuleRef::fromRaw(98);
+    }
+
+    static ClassOrModuleRef T_Class() {
+        return ClassOrModuleRef::fromRaw(99);
     }
 
     static constexpr int MAX_PROC_ARITY = 10;
@@ -1068,11 +1111,11 @@ public:
         return ClassOrModuleRef::fromRaw(MAX_SYNTHETIC_CLASS_SYMBOLS - 1);
     }
 
-    static constexpr int MAX_SYNTHETIC_CLASS_SYMBOLS = 207;
-    static constexpr int MAX_SYNTHETIC_METHOD_SYMBOLS = 48;
-    static constexpr int MAX_SYNTHETIC_FIELD_SYMBOLS = 4;
-    static constexpr int MAX_SYNTHETIC_TYPEARGUMENT_SYMBOLS = 4;
-    static constexpr int MAX_SYNTHETIC_TYPEMEMBER_SYMBOLS = 105;
+    static const int MAX_SYNTHETIC_CLASS_SYMBOLS;
+    static const int MAX_SYNTHETIC_METHOD_SYMBOLS;
+    static const int MAX_SYNTHETIC_FIELD_SYMBOLS;
+    static const int MAX_SYNTHETIC_TYPEARGUMENT_SYMBOLS;
+    static const int MAX_SYNTHETIC_TYPEMEMBER_SYMBOLS;
 };
 
 template <typename H> H AbslHashValue(H h, const SymbolRef &m) {

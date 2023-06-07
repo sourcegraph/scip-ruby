@@ -7,10 +7,10 @@
 #include "ast/desugar/Desugar.h"
 #include "ast/treemap/treemap.h"
 #include "class_flatten/class_flatten.h"
-#include "common/Timer.h"
 #include "common/concurrency/ConcurrentQueue.h"
 #include "common/concurrency/WorkerPool.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
+#include "common/timers/Timer.h"
 #include "core/Context.h"
 #include "core/FileHash.h"
 #include "core/FoundDefinitions.h"
@@ -209,7 +209,92 @@ public:
 
         for (auto &exp : klass.rhs) {
             findClassModifiers(ctx, klassName, exp);
+            addAncestor(ctx, klass, exp);
         }
+
+        if (!klass.ancestors.empty()) {
+            /* Superclass is typeAlias in parent scope, mixins are typeAlias in inner scope */
+            for (auto &anc : klass.ancestors) {
+                if (!isValidAncestor(anc)) {
+                    if (auto e = ctx.beginError(anc.loc(), core::errors::Namer::AncestorNotConstant)) {
+                        e.setHeader("Superclasses must only contain constant literals");
+                    }
+                    anc = ast::MK::EmptyTree();
+                }
+            }
+        }
+
+        auto &foundClass = klassName.klass(*foundDefs);
+        if (foundClass.name != core::Names::Constants::Root() && !ctx.file.data(ctx).isRBI() &&
+            ast::BehaviorHelpers::checkClassDefinesBehavior(klass)) {
+            // TODO(dmitry) This won't find errors in fast-incremental mode.
+            foundClass.definesBehavior = true;
+        }
+    }
+
+    void addAncestor(core::Context ctx, ast::ClassDef &klass, ast::ExpressionPtr &node) {
+        auto send = ast::cast_tree<ast::Send>(node);
+        if (send == nullptr) {
+            ENFORCE(node.get() != nullptr);
+            return;
+        }
+
+        ast::ClassDef::ANCESTORS_store *dest;
+        if (send->fun == core::Names::include()) {
+            dest = &klass.ancestors;
+        } else if (send->fun == core::Names::extend()) {
+            dest = &klass.singletonAncestors;
+        } else {
+            return;
+        }
+        if (!send->recv.isSelfReference()) {
+            // ignore `something.include`
+            return;
+        }
+
+        const auto numPosArgs = send->numPosArgs();
+        if (numPosArgs == 0) {
+            if (auto e = ctx.beginError(send->loc, core::errors::Namer::IncludeMutipleParam)) {
+                e.setHeader("`{}` requires at least one argument", send->fun.show(ctx));
+            }
+            return;
+        }
+
+        if (send->hasBlock()) {
+            if (auto e = ctx.beginError(send->loc, core::errors::Namer::IncludePassedBlock)) {
+                e.setHeader("`{}` can not be passed a block", send->fun.show(ctx));
+            }
+            return;
+        }
+
+        for (auto i = numPosArgs - 1; i >= 0; --i) {
+            // Reverse order is intentional: that's how Ruby does it.
+            auto &arg = send->getPosArg(i);
+            if (ast::isa_tree<ast::EmptyTree>(arg)) {
+                continue;
+            }
+            if (arg.isSelfReference()) {
+                dest->emplace_back(arg.deepCopy());
+                continue;
+            }
+            if (isValidAncestor(arg)) {
+                dest->emplace_back(arg.deepCopy());
+            } else {
+                if (auto e = ctx.beginError(arg.loc(), core::errors::Namer::AncestorNotConstant)) {
+                    e.setHeader("`{}` must only contain constant literals", send->fun.show(ctx));
+                }
+            }
+        }
+    }
+
+    bool isValidAncestor(ast::ExpressionPtr &exp) {
+        if (ast::isa_tree<ast::EmptyTree>(exp) || exp.isSelfReference() || ast::isa_tree<ast::ConstantLit>(exp)) {
+            return true;
+        }
+        if (auto lit = ast::cast_tree<ast::UnresolvedConstantLit>(exp)) {
+            return isValidAncestor(lit->scope);
+        }
+        return false;
     }
 
     void preTransformBlock(core::Context ctx, ast::ExpressionPtr &block) {
@@ -549,7 +634,12 @@ public:
             return false;
         }
 
-        auto *cast = ast::cast_tree<ast::Cast>(asgn.rhs);
+        auto *recur = &asgn.rhs;
+        while (auto *outer = ast::cast_tree<ast::InsSeq>(*recur)) {
+            recur = &outer->expr;
+        }
+
+        auto *cast = ast::cast_tree<ast::Cast>(*recur);
         if (cast == nullptr) {
             return false;
         }
@@ -604,6 +694,15 @@ public:
         }
     }
 };
+
+using BehaviorLocs = InlinedVector<core::Loc, 1>;
+using ClassBehaviorLocsMap = UnorderedMap<core::ClassOrModuleRef, BehaviorLocs>;
+
+bool isBadHasAttachedClass(core::Context ctx, core::NameRef name) {
+    auto owner = ctx.owner.asClassOrModuleRef();
+    return name == core::Names::Constants::AttachedClass() && owner != core::Symbols::Class() &&
+           owner.data(ctx)->isClass() && !owner.data(ctx)->isSingletonClass(ctx);
+}
 
 /**
  * Defines symbols for all of the definitions found via SymbolFinder. Single threaded.
@@ -678,8 +777,7 @@ private:
             "ClassOrModule symbols should always be entered first, so they should never need to mangle something else");
         if (auto e = ctx.beginError(errorLoc, core::errors::Namer::ConstantKindRedefinition)) {
             auto prevSymbolKind = prettySymbolKind(ctx, prevSymbol.kind());
-            if (prevSymbol.kind() == Kind::ClassOrModule &&
-                !prevSymbol.asClassOrModuleRef().data(ctx)->isUndeclared()) {
+            if (prevSymbol.kind() == Kind::ClassOrModule && prevSymbol.asClassOrModuleRef().data(ctx)->isDeclared()) {
                 prevSymbolKind = prevSymbol.asClassOrModuleRef().showKind(ctx);
             }
 
@@ -961,9 +1059,12 @@ private:
             return symbol;
         }
 
-        auto implicitlyPrivate = ctx.owner.enclosingClass(ctx) == core::Symbols::root();
+        // Methods defined at the top level default to private (on Object)
+        // Also, the `initialize` method defaults to private
+        auto implicitlyPrivate =
+            (ctx.owner.enclosingClass(ctx) == core::Symbols::root()) ||
+            (!symbol.data(ctx)->owner.data(ctx)->attachedClass(ctx).exists() && name == core::Names::initialize());
         if (implicitlyPrivate) {
-            // Methods defined at the top level default to private (on Object)
             symbol.data(ctx)->flags.isPrivate = true;
         } else {
             // All other methods default to public (their visibility might be changed later)
@@ -1059,13 +1160,19 @@ private:
                     }
                 }
             }
+
+            // Even though the declaration is erroneous, the class/module is technically "declared".
+            symbol.data(ctx)->setDeclared();
         } else if (!isUnknown) {
             symbol.data(ctx)->setIsModule(isModule);
+            symbol.data(ctx)->setDeclared();
         }
+
         return symbol;
     }
 
-    core::ClassOrModuleRef insertClass(core::MutableContext ctx, const State &state, const core::FoundClass &klass) {
+    core::ClassOrModuleRef insertClass(core::MutableContext ctx, const State &state, const core::FoundClass &klass,
+                                       bool willDeleteOldDefs, ClassBehaviorLocsMap &classBehaviorLocs) {
         auto symbol = getClassSymbol(ctx, state, klass);
 
         if (klass.classKind == core::FoundClass::Kind::Class && !symbol.data(ctx)->superClass().exists() &&
@@ -1080,34 +1187,59 @@ private:
             symbol.data(ctx)->setSuperClass(core::Symbols::Net_Protocol());
         }
 
-        // Skip adding locs when kind is Unknown, becaue that means it was a only a FoundClass for a
-        // class or static field scope (not the class def itself), and we want to treat those as
-        // usage locs, not definition locs.
-        // TODO(jez) This causes known problems on the fast path, where these locs can fail to be
-        // updated and crash. We've chosen the current approach because (1) it matches old behavior
-        // (2) adding O(files) locs for something like Opus is far too slow.
         const bool isUnknown = klass.classKind == core::FoundClass::Kind::Unknown;
-        // Don't add locs for <root>; 1) they aren't useful and 2) they'll end up with O(files in
-        // project) locs!
-        if (symbol != core::Symbols::root() && !isUnknown) {
-            symbol.data(ctx)->addLoc(ctx, ctx.locAt(klass.declLoc));
-        }
-        auto singletonClass = symbol.data(ctx)->singletonClass(ctx); // force singleton class into existence
-        if (symbol != core::Symbols::root() && !isUnknown) {
-            singletonClass.data(ctx)->addLoc(ctx, ctx.locAt(klass.declLoc));
-        }
+        const bool isModule = klass.classKind == core::FoundClass::Kind::Module;
 
-        // Reset resultType to nullptr for idempotency on the fast path--it will always be
-        // re-entered in resolver.
-        symbol.data(ctx)->resultType = nullptr;
-        singletonClass.data(ctx)->resultType = nullptr;
-        // TODO(jez) This is a gross hack. We are basically re-implementing the logic in
-        // singletonClass to reset the <AttachedClass> type template to what it used to be.
-        // Is there a better way to accomplish this? (This is largely the same as the bad locs problem above;
-        // we can probably be more principled about what state calling `singletonClass` sets up/resets.)
-        auto todo = core::make_type<core::ClassType>(core::Symbols::todo());
-        auto tp = singletonClass.data(ctx)->members()[core::Names::Constants::AttachedClass()].asTypeMemberRef();
-        tp.data(ctx)->resultType = core::make_type<core::LambdaParam>(tp, todo, todo);
+        // Don't add locs for <root>; 1) they aren't useful and 2) they'll end up with O(files in project) locs!
+        if (symbol != core::Symbols::root()) {
+            // If the kind is unknown, it means it was only a FoundClass for a class or static field scope, not
+            // the class def itself. We want to generally treat these as usage locs, not definition locs.
+            //
+            // At best, we only want to keep one loc in the codebase per unknown class for perf reasons. We don't
+            // want to store O(files) locs for something like Opus. So if the existing loc (which would have been
+            // brought into existence by getClassSymbol()) is not from this file, we don't add a new loc.
+            //
+            // If the unknown class loc is from the same file, it's still possible that it is from a real
+            // definition in that file. In which case, we check the declared bit on the class.
+            // We only set the loc if the class is not declared.
+            bool updateLoc =
+                !isUnknown || (!symbol.data(ctx)->isDeclared() && symbol.data(ctx)->loc().file() == ctx.file);
+            if (updateLoc) {
+                symbol.data(ctx)->addLoc(ctx, ctx.locAt(klass.declLoc));
+            }
+
+            if (!isUnknown) {
+                if (klass.definesBehavior) {
+                    auto &behaviorLocs = classBehaviorLocs[symbol];
+                    behaviorLocs.emplace_back(ctx.locAt(klass.declLoc));
+                    symbol.data(ctx)->flags.isBehaviorDefining = true;
+                }
+
+                auto singletonClass = symbol.data(ctx)->singletonClass(ctx); // force singleton class into existence
+                singletonClass.data(ctx)->addLoc(ctx, ctx.locAt(klass.declLoc));
+
+                // This willDeleteOldDefs condition is a hack to improve performance when editing within a method body.
+                // Ideally, we would be able to make finalizeSymbols fast/incremental enough to run on all edits.
+                if (willDeleteOldDefs) {
+                    // Reset resultType to nullptr for idempotency on the fast path--it will always be
+                    // re-entered in resolver.
+                    symbol.data(ctx)->resultType = nullptr;
+                    singletonClass.data(ctx)->resultType = nullptr;
+                    // TODO(jez) This is a gross hack. We are basically re-implementing the logic in
+                    // singletonClass to reset the <AttachedClass> type template to what it used to be.
+                    // Is there a better way to accomplish this? (This is largely the same as the bad locs problem
+                    // above; we can probably be more principled about what state calling `singletonClass` sets
+                    // up/resets.)
+                    if (!isModule) {
+                        auto todo = core::make_type<core::ClassType>(core::Symbols::todo());
+                        auto tp = singletonClass.data(ctx)
+                                      ->members()[core::Names::Constants::AttachedClass()]
+                                      .asTypeMemberRef();
+                        tp.data(ctx)->resultType = core::make_type<core::LambdaParam>(tp, todo, todo);
+                    }
+                }
+            }
+        }
 
         // make sure we've added a static init symbol so we have it ready for the flatten pass later
         if (symbol == core::Symbols::root()) {
@@ -1139,9 +1271,7 @@ private:
 
             // T.noreturn here represents the zero-length list of subclasses of this sealed class.
             // We will use T.any to record subclasses when they're resolved.
-            vector<core::TypePtr> targs{core::Types::bottom()};
-            sealedSubclasses.data(ctx)->resultType =
-                core::make_type<core::AppliedType>(core::Symbols::Set(), move(targs));
+            sealedSubclasses.data(ctx)->resultType = core::Types::setOf(core::Types::bottom());
         }
         if (fun == core::Names::declareInterface() || fun == core::Names::declareAbstract()) {
             symbolData->flags.isAbstract = true;
@@ -1509,25 +1639,26 @@ public:
     SymbolDefiner(const core::FoundDefinitions &foundDefs, optional<core::FoundDefHashes> oldFoundHashes)
         : foundDefs(foundDefs), oldFoundHashes(move(oldFoundHashes)) {}
 
-    SymbolDefiner::State enterClassDefinitions(core::MutableContext ctx) {
+    SymbolDefiner::State enterClassDefinitions(core::MutableContext ctx, bool willDeleteOldDefs,
+                                               ClassBehaviorLocsMap &classBehaviorLocs) {
         SymbolDefiner::State state;
         state.definedClasses.reserve(foundDefs.klasses().size());
 
         for (const auto &klass : foundDefs.klasses()) {
-            state.definedClasses.emplace_back(
-                insertClass(ctx.withOwner(getOwnerSymbol(state, klass.owner)), state, klass));
+            state.definedClasses.emplace_back(insertClass(ctx.withOwner(getOwnerSymbol(state, klass.owner)), state,
+                                                          klass, willDeleteOldDefs, classBehaviorLocs));
         }
 
         return state;
     }
 
     void enterNewDefinitions(core::MutableContext ctx, SymbolDefiner::State &&state) {
-        // We have to defer defining "deletable" symbols until this (second) phase of incremental
+        // We have to defer defining non-class constant symbols until this (second) phase of incremental
         // namer so that we don't delete and immediately re-enter a symbol (possibly keeping it
         // alive, if it had multiple locs at the time of deletion) before SymbolDefiner has had a
         // chance to process _all_ files.
 
-        for (auto ref : foundDefs.deletableDefinitions()) {
+        for (auto ref : foundDefs.nonClassConstants()) {
             switch (ref.kind()) {
                 case core::FoundDefinitionRef::Kind::StaticField: {
                     const auto &staticField = ref.staticField(foundDefs);
@@ -1579,9 +1710,6 @@ public:
         }
     }
 };
-
-using BehaviorLocs = InlinedVector<core::Loc, 1>;
-using ClassBehaviorLocsMap = UnorderedMap<core::ClassOrModuleRef, BehaviorLocs>;
 
 /**
  * Inserts newly created symbols (from SymbolDefiner) into a tree.
@@ -1649,71 +1777,6 @@ class TreeSymbolizer {
         return localExpr;
     }
 
-    void addAncestor(core::Context ctx, ast::ClassDef &klass, ast::ExpressionPtr &node) {
-        auto send = ast::cast_tree<ast::Send>(node);
-        if (send == nullptr) {
-            ENFORCE(node.get() != nullptr);
-            return;
-        }
-
-        ast::ClassDef::ANCESTORS_store *dest;
-        if (send->fun == core::Names::include()) {
-            dest = &klass.ancestors;
-        } else if (send->fun == core::Names::extend()) {
-            dest = &klass.singletonAncestors;
-        } else {
-            return;
-        }
-        if (!send->recv.isSelfReference()) {
-            // ignore `something.include`
-            return;
-        }
-
-        const auto numPosArgs = send->numPosArgs();
-        if (numPosArgs == 0) {
-            if (auto e = ctx.beginError(send->loc, core::errors::Namer::IncludeMutipleParam)) {
-                e.setHeader("`{}` requires at least one argument", send->fun.show(ctx));
-            }
-            return;
-        }
-
-        if (send->hasBlock()) {
-            if (auto e = ctx.beginError(send->loc, core::errors::Namer::IncludePassedBlock)) {
-                e.setHeader("`{}` can not be passed a block", send->fun.show(ctx));
-            }
-            return;
-        }
-
-        for (auto i = numPosArgs - 1; i >= 0; --i) {
-            // Reverse order is intentional: that's how Ruby does it.
-            auto &arg = send->getPosArg(i);
-            if (ast::isa_tree<ast::EmptyTree>(arg)) {
-                continue;
-            }
-            if (arg.isSelfReference()) {
-                dest->emplace_back(arg.deepCopy());
-                continue;
-            }
-            if (isValidAncestor(arg)) {
-                dest->emplace_back(arg.deepCopy());
-            } else {
-                if (auto e = ctx.beginError(arg.loc(), core::errors::Namer::AncestorNotConstant)) {
-                    e.setHeader("`{}` must only contain constant literals", send->fun.show(ctx));
-                }
-            }
-        }
-    }
-
-    bool isValidAncestor(ast::ExpressionPtr &exp) {
-        if (ast::isa_tree<ast::EmptyTree>(exp) || exp.isSelfReference() || ast::isa_tree<ast::ConstantLit>(exp)) {
-            return true;
-        }
-        if (auto lit = ast::cast_tree<ast::UnresolvedConstantLit>(exp)) {
-            return isValidAncestor(lit->scope);
-        }
-        return false;
-    }
-
 public:
     TreeSymbolizer() {}
 
@@ -1766,21 +1829,6 @@ public:
         auto allowMissing = true;
         ENFORCE(ctx.state.lookupStaticInitForClass(klass.symbol, allowMissing).exists());
 
-        for (auto &exp : klass.rhs) {
-            addAncestor(ctx, klass, exp);
-        }
-
-        if (!klass.ancestors.empty()) {
-            /* Superclass is typeAlias in parent scope, mixins are typeAlias in inner scope */
-            for (auto &anc : klass.ancestors) {
-                if (!isValidAncestor(anc)) {
-                    if (auto e = ctx.beginError(anc.loc(), core::errors::Namer::AncestorNotConstant)) {
-                        e.setHeader("Superclasses must only contain constant literals");
-                    }
-                    anc = ast::MK::EmptyTree();
-                }
-            }
-        }
         auto loc = klass.declLoc;
         ast::InsSeq::STATS_store retSeqs;
         retSeqs.emplace_back(std::move(tree));
@@ -1790,13 +1838,6 @@ public:
         if (klass.kind == ast::ClassDef::Kind::Class && !klass.ancestors.empty() &&
             shouldLeaveAncestorForIDE(klass.ancestors.front())) {
             retSeqs.emplace_back(ast::MK::KeepForIDE(loc.copyWithZeroLength(), klass.ancestors.front().deepCopy()));
-        }
-
-        if (klass.symbol != core::Symbols::root() && !ctx.file.data(ctx).isRBI() &&
-            ast::BehaviorHelpers::checkClassDefinesBehavior(klass)) {
-            // TODO(dmitry) This won't find errors in fast-incremental mode.
-            auto &locs = classBehaviorLocs[klass.symbol];
-            locs.emplace_back(ctx.locAt(klass.declLoc));
         }
 
         tree = ast::MK::InsSeq(loc, std::move(retSeqs), ast::MK::EmptyTree());
@@ -1945,6 +1986,30 @@ public:
                                     ast::make_expression<ast::Assign>(asgn.loc, std::move(asgn.lhs), std::move(send)));
         }
 
+        if (isBadHasAttachedClass(ctx, typeName->cnst)) {
+            // We could go out of our way to try to not even define the <AttachedClass> type member,
+            // in an attempt to maintain an invariant that <AttachedClass> is only ever defined on
+            // - modules
+            // - class singleton classes
+            // - ::Class itself
+            // But then in GlobalPass, resolveTypeMember would simply mangle rename things so that
+            // the <AttachedClass> symbol pointed to a type member symbol anyways (instead of a
+            // static field or type alias symbol). So let's just report an error and then continue
+            // to let the type member be defined, shedding a single tear that we can't enforce the
+            // invariant we might have otherwise wanted.
+            if (auto e = ctx.beginError(asgn.loc, core::errors::Namer::HasAttachedClassInClass)) {
+                // This is the simple way to explain the error to users, even though the
+                // condition above is more complicated. The one exception to the way this error
+                // is phrased: `::Class` itself, which is a `class`, is allowed to use `has_attached_class!`.
+                //
+                // But since `::Class` is final (even according to the VM), and since we've
+                // already marked `::Class` with `has_attached_class!`, it's not worth leaking
+                // that special case to the user.
+                e.setHeader("`{}` can only be used inside a `{}`, not a `{}`",
+                            core::Names::declareHasAttachedClass().show(ctx), "module", "class");
+            }
+        }
+
         bool isTypeTemplate = send->fun == core::Names::typeTemplate();
         auto onSymbol =
             isTypeTemplate ? ctx.owner.asClassOrModuleRef().data(ctx)->lookupSingletonClass(ctx) : ctx.owner;
@@ -2086,8 +2151,6 @@ public:
             }
         }
     }
-
-    ClassBehaviorLocsMap classBehaviorLocs;
 };
 
 vector<SymbolFinderResult> findSymbols(const core::GlobalState &gs, vector<ast::ParsedFile> trees,
@@ -2191,6 +2254,37 @@ void populateFoundDefHashes(core::Context ctx, core::FoundDefinitions &foundDefs
     }
 }
 
+void findConflictingClassDefs(const core::GlobalState &gs, ClassBehaviorLocsMap &classBehaviorLocs) {
+    vector<pair<core::ClassOrModuleRef, BehaviorLocs>> conflicts;
+    for (auto &[ref, locs] : classBehaviorLocs) {
+        if (locs.size() < 2) {
+            continue;
+        }
+        fast_sort(locs, [](const auto &lhs, const auto &rhs) -> bool { return lhs.file() < rhs.file(); });
+        // In rare cases we see multiple defs in same file. Ignore them.
+        auto last = unique(locs.begin(), locs.end(),
+                           [](const auto &lhs, const auto &rhs) -> bool { return lhs.file() == rhs.file(); });
+        locs.erase(last, locs.end());
+        if (locs.size() < 2) {
+            continue;
+        }
+        conflicts.emplace_back(make_pair(ref, std::move(locs)));
+    }
+    classBehaviorLocs.clear();
+
+    fast_sort(conflicts, [](const auto &lhs, const auto &rhs) -> bool { return lhs.first.id() < rhs.first.id(); });
+    for (const auto &[ref, locs] : conflicts) {
+        core::Loc mainLoc = locs[0];
+        core::Context ctx(gs, core::Symbols::root(), mainLoc.file());
+        if (auto e = ctx.beginError(mainLoc.offsets(), core::errors::Namer::MultipleBehaviorDefs)) {
+            e.setHeader("`{}` has behavior defined in multiple files", ref.show(ctx));
+            for (auto it = locs.begin() + 1; it != locs.end(); ++it) {
+                e.addErrorLine(*it, "Previous definition");
+            }
+        }
+    }
+}
+
 ast::ParsedFilesOrCancelled defineSymbols(core::GlobalState &gs, vector<SymbolFinderResult> allFoundDefinitions,
                                           WorkerPool &workers,
                                           UnorderedMap<core::FileRef, core::FoundDefHashes> &&oldFoundHashesForFiles,
@@ -2201,7 +2295,9 @@ ast::ParsedFilesOrCancelled defineSymbols(core::GlobalState &gs, vector<SymbolFi
     const auto &epochManager = *gs.epochManager;
     uint32_t count = 0;
     uint32_t foundMethods = 0;
+    ClassBehaviorLocsMap classBehaviorLocs;
     UnorderedMap<core::FileRef, SymbolDefiner::State> incrementalDefinitions;
+    auto willDeleteOldDefs = !oldFoundHashesForFiles.empty();
     for (auto &fileFoundDefinitions : allFoundDefinitions) {
         foundMethods += fileFoundDefinitions.names->methods().size();
         count++;
@@ -2219,8 +2315,8 @@ ast::ParsedFilesOrCancelled defineSymbols(core::GlobalState &gs, vector<SymbolFi
         auto oldFoundHashes =
             frefIt == oldFoundHashesForFiles.end() ? optional<core::FoundDefHashes>() : std::move(frefIt->second);
         SymbolDefiner symbolDefiner(*fileFoundDefinitions.names, move(oldFoundHashes));
-        auto state = symbolDefiner.enterClassDefinitions(ctx);
-        if (!oldFoundHashesForFiles.empty()) {
+        auto state = symbolDefiner.enterClassDefinitions(ctx, willDeleteOldDefs, classBehaviorLocs);
+        if (willDeleteOldDefs) {
             symbolDefiner.deleteOldDefinitions(ctx, state);
         }
         incrementalDefinitions[fref] = move(state);
@@ -2229,6 +2325,8 @@ ast::ParsedFilesOrCancelled defineSymbols(core::GlobalState &gs, vector<SymbolFi
             populateFoundDefHashes(ctx, *fileFoundDefinitions.names, *foundHashesOut);
         }
     }
+
+    findConflictingClassDefs(gs, classBehaviorLocs);
     ENFORCE(incrementalDefinitions.size() == allFoundDefinitions.size());
     prodCounterAdd("types.input.foundmethods.total", foundMethods);
     count = 0;
@@ -2254,54 +2352,7 @@ ast::ParsedFilesOrCancelled defineSymbols(core::GlobalState &gs, vector<SymbolFi
 
 struct SymbolizeTreesResult {
     vector<ast::ParsedFile> trees;
-    ClassBehaviorLocsMap classBehaviorLocs;
 };
-
-void mergeClassBehaviorLocs(const core::GlobalState &gs, ClassBehaviorLocsMap &merged,
-                            ClassBehaviorLocsMap &threadRes) {
-    Timer timeit(gs.tracer(), "naming.symbolizeTreesMergeClass");
-    if (merged.empty()) {
-        swap(merged, threadRes);
-        return;
-    }
-    for (auto [ref, threadLocs] : threadRes) {
-        auto &mergedLocs = merged[ref];
-        mergedLocs.insert(mergedLocs.end(), make_move_iterator(threadLocs.begin()),
-                          make_move_iterator(threadLocs.end()));
-    }
-    threadRes.clear();
-}
-
-void findConflictingClassDefs(const core::GlobalState &gs, ClassBehaviorLocsMap &map) {
-    vector<pair<core::ClassOrModuleRef, BehaviorLocs>> conflicts;
-    for (auto &[ref, locs] : map) {
-        if (locs.size() < 2) {
-            continue;
-        }
-        fast_sort(locs, [](const auto &lhs, const auto &rhs) -> bool { return lhs.file() < rhs.file(); });
-        // In rare cases we see multiple defs in same file. Ignore them.
-        auto last = unique(locs.begin(), locs.end(),
-                           [](const auto &lhs, const auto &rhs) -> bool { return lhs.file() == rhs.file(); });
-        locs.erase(last, locs.end());
-        if (locs.size() < 2) {
-            continue;
-        }
-        conflicts.emplace_back(make_pair(ref, std::move(locs)));
-    }
-    map.clear();
-
-    fast_sort(conflicts, [](const auto &lhs, const auto &rhs) -> bool { return lhs.first.id() < rhs.first.id(); });
-    for (const auto &[ref, locs] : conflicts) {
-        core::Loc mainLoc = locs[0];
-        core::Context ctx(gs, core::Symbols::root(), mainLoc.file());
-        if (auto e = ctx.beginError(mainLoc.offsets(), core::errors::Namer::MultipleBehaviorDefs)) {
-            e.setHeader("`{}` has behavior defined in multiple files", ref.show(ctx));
-            for (auto it = locs.begin() + 1; it != locs.end(); ++it) {
-                e.addErrorLine(*it, "Previous definition");
-            }
-        }
-    }
-}
 
 vector<ast::ParsedFile> symbolizeTrees(const core::GlobalState &gs, vector<ast::ParsedFile> trees,
                                        WorkerPool &workers) {
@@ -2326,14 +2377,12 @@ vector<ast::ParsedFile> symbolizeTrees(const core::GlobalState &gs, vector<ast::
             }
         }
         if (!output.trees.empty()) {
-            output.classBehaviorLocs = std::move(inserter.classBehaviorLocs);
             resultq->push(move(output), output.trees.size());
         }
     });
     trees.clear();
 
     {
-        ClassBehaviorLocsMap classBehaviorLocs;
         SymbolizeTreesResult threadResult;
         for (auto result = resultq->wait_pop_timed(threadResult, WorkerPool::BLOCK_INTERVAL(), gs.tracer());
              !result.done();
@@ -2341,10 +2390,8 @@ vector<ast::ParsedFile> symbolizeTrees(const core::GlobalState &gs, vector<ast::
             if (result.gotItem()) {
                 trees.insert(trees.end(), make_move_iterator(threadResult.trees.begin()),
                              make_move_iterator(threadResult.trees.end()));
-                mergeClassBehaviorLocs(gs, classBehaviorLocs, threadResult.classBehaviorLocs);
             }
         }
-        findConflictingClassDefs(gs, classBehaviorLocs);
     }
     fast_sort(trees, [](const auto &lhs, const auto &rhs) -> bool { return lhs.file < rhs.file; });
     return trees;

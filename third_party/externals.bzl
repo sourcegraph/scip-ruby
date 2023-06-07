@@ -17,10 +17,9 @@ def register_sorbet_dependencies():
 
     http_archive(
         name = "doctest",
-        urls = _github_public_urls("doctest/doctest/archive/2.4.1.zip"),
-        sha256 = "d8d304db5a2e6d42e290b23a08a68db05478755e64db57b067cd805738e2c56f",
-        build_file = "@com_stripe_ruby_typer//third_party:doctest.BUILD",
-        strip_prefix = "doctest-2.4.1",
+        urls = _github_public_urls("doctest/doctest/archive/v2.4.9.zip"),
+        sha256 = "88a552f832ef3e4e7b733f9ab4eff5d73d7c37e75bebfef4a3339bf52713350d",
+        strip_prefix = "doctest-2.4.9",
     )
 
     http_archive(
@@ -169,12 +168,19 @@ def register_sorbet_dependencies():
         strip_prefix = "bazel-compilation-database-6b9329e37295eab431f82af5fe24219865403e0f",
     )
 
+    http_archive(
+        name = "rules_cc",
+        sha256 = "b6f34b3261ec02f85dbc5a8bdc9414ce548e1f5f67e000d7069571799cb88b25",
+        strip_prefix = "rules_cc-726dd8157557f1456b3656e26ab21a1646653405",
+        urls = ["https://github.com/bazelbuild/rules_cc/archive/726dd8157557f1456b3656e26ab21a1646653405.tar.gz"],
+    )
+
     # NOTE: we use the sorbet branch for development to keep our changes rebasable on grailio/bazel-toolchain
     http_archive(
         name = "com_grail_bazel_toolchain",
-        urls = _github_public_urls("sorbet/bazel-toolchain/archive/a685e1e6bd1e7cc9a5b84f832539585bb68d8ab4.zip"),
-        sha256 = "90c59f14cada755706a38bdd0f5ad8f0402cbf766387929cfbee9c3f1b4c82d7",
-        strip_prefix = "bazel-toolchain-a685e1e6bd1e7cc9a5b84f832539585bb68d8ab4",
+        urls = _github_public_urls("sorbet/bazel-toolchain/archive/4124470e037b4464a88db71c8565ad44af29664d.zip"),
+        sha256 = "23e9aa7318a6c3bfb2712c4c85e731f1cde8bfdd0d84b39aab6b8746ab7c391e",
+        strip_prefix = "bazel-toolchain-4124470e037b4464a88db71c8565ad44af29664d",
     )
 
     http_archive(
@@ -306,15 +312,6 @@ def register_sorbet_dependencies():
         name = "system_ssl_linux",
         path = "/usr",
         build_file = "@com_stripe_ruby_typer//third_party/openssl:linux.BUILD",
-    )
-
-    http_archive(
-        name = "rules_rust",
-        sha256 = "727b93eb5d57ec411f2afda7e3993e22d7772d0b2555ba745c3dec7323ea955a",
-        strip_prefix = "rules_rust-0768a7f00de134910c3cbdab7bbfdd011d995766",
-
-        # Master branch as of 2021-06-29
-        urls = _github_public_urls("bazelbuild/rules_rust/archive/0768a7f00de134910c3cbdab7bbfdd011d995766.tar.gz"),
     )
 
     http_archive(

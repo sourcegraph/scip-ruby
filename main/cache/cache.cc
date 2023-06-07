@@ -13,7 +13,10 @@ unique_ptr<OwnedKeyValueStore> maybeCreateKeyValueStore(shared_ptr<::spdlog::log
     if (opts.cacheDir.empty()) {
         return nullptr;
     }
-    auto flavor = opts.lspExperimentalFastPathEnabled ? "experimentalfastpath" : "normalfastpath";
+    // Despite being called "experimental," this feature is actually stable. We just didn't want to
+    // bust all existing caches when we promoted the experimental-at-the-time incremental fast path
+    // to the stable version.
+    auto flavor = "experimentalfastpath";
     return make_unique<OwnedKeyValueStore>(make_unique<KeyValueStore>(logger, sorbet_full_version_string, opts.cacheDir,
                                                                       move(flavor), opts.maxCacheSizeBytes));
 }
@@ -33,7 +36,7 @@ unique_ptr<OwnedKeyValueStore> ownIfUnchanged(const core::GlobalState &gs, uniqu
 }
 
 void maybeCacheGlobalStateAndFiles(unique_ptr<KeyValueStore> kvstore, const options::Options &opts,
-                                   core::GlobalState &gs, WorkerPool &workers, vector<ast::ParsedFile> &indexed) {
+                                   core::GlobalState &gs, WorkerPool &workers, const vector<ast::ParsedFile> &indexed) {
     if (kvstore == nullptr) {
         return;
     }

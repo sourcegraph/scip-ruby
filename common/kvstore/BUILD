@@ -8,7 +8,7 @@ cc_library(
         "KeyValueStore.h",
     ],
     linkopts = select({
-        "//tools/config:linux": ["-lm"],
+        "@platforms//os:linux": ["-lm"],
         "//conditions:default": [],
     }),
     linkstatic = select({
@@ -39,7 +39,7 @@ cc_test(
     visibility = ["//tools:__pkg__"],
     deps = [
         "kvstore",
-        "@doctest",
-        "@doctest//:doctest_main",
+        "@doctest//doctest",
+        "@doctest//doctest:main",
     ],
 )

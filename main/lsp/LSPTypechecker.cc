@@ -4,7 +4,7 @@
 #include "absl/synchronization/notification.h"
 #include "ast/treemap/treemap.h"
 #include "common/concurrency/ConcurrentQueue.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
 #include "core/ErrorCollector.h"
 #include "core/ErrorQueue.h"
 #include "core/NullFlusher.h"
@@ -27,6 +27,7 @@
 #include "main/lsp/notifications/indexer_initialization.h"
 #include "main/lsp/notifications/sorbet_resume.h"
 #include "main/pipeline/pipeline.h"
+#include "main/sig_finder/sig_finder.h"
 
 namespace sorbet::realmain::lsp {
 using namespace std;
@@ -63,7 +64,8 @@ LSPTypechecker::LSPTypechecker(std::shared_ptr<const LSPConfiguration> config,
 LSPTypechecker::~LSPTypechecker() {}
 
 void LSPTypechecker::initialize(TaskQueue &queue, std::unique_ptr<core::GlobalState> initialGS,
-                                std::unique_ptr<KeyValueStore> kvstore, WorkerPool &workers) {
+                                std::unique_ptr<KeyValueStore> kvstore, WorkerPool &workers,
+                                const LSPConfiguration &currentConfig) {
     ENFORCE(this_thread::get_id() == typecheckerThreadId, "Typechecker can only be used from the typechecker thread.");
     ENFORCE(!this->initialized);
 
@@ -71,6 +73,7 @@ void LSPTypechecker::initialize(TaskQueue &queue, std::unique_ptr<core::GlobalSt
 
     // Initialize the global state for the indexer
     {
+        initialGS->trackUntyped = currentConfig.getClientConfig().enableHighlightUntyped;
         // Temporarily replace error queue, as it asserts that the same thread that created it uses it and we're
         // going to use it on typechecker thread for this one operation.
         auto savedErrorQueue = initialGS->errorQueue;
@@ -217,8 +220,7 @@ vector<core::FileRef> LSPTypechecker::runFastPath(LSPFileUpdates &updates, Worke
     config->logger->debug("Added {} files that were not part of the edit to the update set", result.extraFiles.size());
     UnorderedMap<core::FileRef, core::FoundDefHashes> oldFoundHashesForFiles;
     auto toTypecheck = move(result.extraFiles);
-    auto shouldRunIncrementalNamer =
-        config->opts.lspExperimentalFastPathEnabled && !result.changedSymbolNameHashes.empty();
+    auto shouldRunIncrementalNamer = !result.changedSymbolNameHashes.empty();
     for (auto [fref, idx] : result.changedFiles) {
         if (shouldRunIncrementalNamer) {
             // Only set oldFoundHashesForFiles if we're processing a real edit.
@@ -246,28 +248,40 @@ vector<core::FileRef> LSPTypechecker::runFastPath(LSPFileUpdates &updates, Worke
         fref.data(*gs).strictLevel = pipeline::decideStrictLevel(*gs, fref, config->opts);
 
         toTypecheck.emplace_back(fref);
+    }
 
-        // Only need to re-run packager if we're going to delete constants and have to re-define
-        // their visibility, which only happens if we're running incrementalNamer.
-        if (shouldRunIncrementalNamer) {
-            // TODO(jez) Using `gs` to access package information here assumes that edits to
-            // __package.rb files don't take the fast path. We'll want (or maybe need) to revisit this
-            // when we start making edits to `__package.rb` take fast paths.
+    UnorderedSet<core::FileRef> packageFiles;
+
+    if (shouldRunIncrementalNamer) {
+        for (auto fref : toTypecheck) {
+            // Only need to re-run packager if we're going to delete constants and have to re-define
+            // their visibility, which only happens if we're running incrementalNamer.
+            // NOTE: Using `gs` to access package information here assumes that edits to __package.rb
+            // files don't take the fast path. We'll want (or maybe need) to revisit this when we start
+            // making edits to `__package.rb` take fast paths.
             if (!(fref.data(*gs).isPackage())) {
-                auto pkgName = gs->packageDB().getPackageNameForFile(fref);
-                if (pkgName.exists()) {
+                auto &pkg = gs->packageDB().getPackageForFile(*gs, fref);
+                if (pkg.exists()) {
                     // Since even no-op (e.g. whitespace-only) edits will cause constants to be deleted
                     // and re-added, we have to add the __package.rb files to set of files to retypecheck
                     // so that we can re-run PropagateVisibility to set export bits for any constants.
-                    auto packageFref = gs->packageDB().getPackageInfo(pkgName).fullLoc().file();
-                    if (result.changedFiles.find(packageFref) == result.changedFiles.end()) {
-                        // Skip duplicates
-                        toTypecheck.emplace_back(packageFref);
+                    auto packageFref = pkg.fullLoc().file();
+                    if (!packageFref.exists()) {
+                        continue;
                     }
+
+                    packageFiles.emplace(packageFref);
                 }
             }
         }
     }
+
+    for (auto packageFref : packageFiles) {
+        if (result.changedFiles.find(packageFref) == result.changedFiles.end()) {
+            toTypecheck.emplace_back(packageFref);
+        }
+    }
+
     fast_sort(toTypecheck);
 
     config->logger->debug("Running fast path over num_files={}", toTypecheck.size());
@@ -453,10 +467,6 @@ bool LSPTypechecker::runSlowPath(LSPFileUpdates updates, WorkerPool &workers,
             return;
         }
 
-        auto &resolved = maybeResolved.result();
-        for (auto &tree : resolved) {
-            ENFORCE(tree.file.exists());
-        }
         if (gs->sleepInSlowPathSeconds.has_value()) {
             auto sleepDuration = gs->sleepInSlowPathSeconds.value();
             for (int i = 0; i < sleepDuration * 10; i++) {
@@ -507,7 +517,7 @@ bool LSPTypechecker::runSlowPath(LSPFileUpdates updates, WorkerPool &workers,
             return;
         }
 
-        auto sorted = sortParsedFiles(*gs, *errorReporter, move(resolved));
+        auto sorted = sortParsedFiles(*gs, *errorReporter, move(maybeResolved.result()));
         const auto presorted = true;
         pipeline::typecheck(*gs, move(sorted), config->opts, workers, cancelable, preemptManager, presorted);
     });
@@ -582,8 +592,15 @@ void tryApplyLocalVarSaver(const core::GlobalState &gs, vector<ast::ParsedFile> 
         return;
     }
     for (auto &t : indexedCopies) {
-        LocalVarSaver localVarSaver;
-        core::Context ctx(gs, core::Symbols::root(), t.file);
+        optional<resolver::ParsedSig> signature;
+        auto ctx = core::Context(gs, core::Symbols::root(), t.file);
+        if (t.file == gs.lspQuery.loc.file()) {
+            // For a VAR query, gs.lspQuery.loc is the enclosing MethodDef's loc, which we can use
+            // to find the signature before that MethodDef.
+            auto queryLoc = gs.lspQuery.loc.copyWithZeroLength();
+            signature = sig_finder::SigFinder::findSignature(ctx, t.tree, queryLoc);
+        }
+        LocalVarSaver localVarSaver(ctx.locAt(t.tree.loc()), move(signature));
         ast::TreeWalk::apply(ctx, localVarSaver, t.tree);
     }
 }
@@ -702,8 +719,8 @@ LSPTypecheckerDelegate::LSPTypecheckerDelegate(TaskQueue &queue, WorkerPool &wor
     : typechecker(typechecker), queue{queue}, workers(workers) {}
 
 void LSPTypecheckerDelegate::initialize(InitializedTask &task, std::unique_ptr<core::GlobalState> gs,
-                                        std::unique_ptr<KeyValueStore> kvstore) {
-    return typechecker.initialize(this->queue, std::move(gs), std::move(kvstore), this->workers);
+                                        std::unique_ptr<KeyValueStore> kvstore, const LSPConfiguration &currentConfig) {
+    return typechecker.initialize(this->queue, std::move(gs), std::move(kvstore), this->workers, currentConfig);
 }
 
 void LSPTypecheckerDelegate::resumeTaskQueue(InitializedTask &task) {

@@ -1,5 +1,7 @@
 # typed: true
 
+extend T::Sig
+
 T.assert_type!(caller, T::Array[String])
 T.assert_type!(caller(10), T.nilable(T::Array[String]))
 
@@ -31,6 +33,11 @@ define_singleton_method('foo') { puts '' }
 
 def raise_test
   raise ArgumentError, 'bad argument', nil
+end
+
+sig { params(obj_or_str: T.any(Exception, String)).void }
+def raise_obj_or_string(obj_or_str)
+  raise obj_or_str
 end
 
 # make sure we don't regress and mark these as errors
@@ -65,9 +72,20 @@ T.assert_type!(obj.object_id, Integer)
 obj = T.let("foo", String)
 T.assert_type!(obj.itself, String)
 
-y = loop do
-end
-puts y # error: This code is unreachable
+
+# These types are deliberately wrong, because `Kernel#p` is difficult to type
+# in an RBI.  See the comments in kernel.rbi.
+p_result = Kernel.p 1
+# This should be `Integer`.
+T.reveal_type(p_result) # error: Revealed type: `NilClass`
+
+p_result = p "string"
+# This should be `String`.
+T.reveal_type(p_result) # error: Revealed type: `NilClass`
+
+p_result = p 1, 2
+# This should be `[1, 2]` or `T::Array[T.untyped]`
+T.reveal_type(p_result) # error: Revealed type: `NilClass`
 
 class CustomError < StandardError
   def initialize(cause, team)
@@ -87,3 +105,34 @@ end
 def fail_class_message
   fail StandardError, "message"
 end
+
+y = loop do
+end
+puts y # error: This code is unreachable
+
+class Test
+  def test
+    a = 1
+    b = 2
+  end
+end
+
+set_trace_func proc { |event, file, line, id, binding, classname|
+    printf "%8s %s:%-2d %10s %8s\n", event, file, line, id, classname
+}
+t = Test.new
+t.test
+
+set_trace_func(nil)
+
+require "continuation"
+callcc {|cont|
+  for i in 0..4
+    print "\n#{i}: "
+    for j in i*5...(i+1)*5
+      cont.call() if j == 17
+      printf "%3d", j
+    end
+  end
+}
+puts

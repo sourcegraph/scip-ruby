@@ -35,6 +35,7 @@ public:
 
     uint32_t _hashValue;
 };
+CheckSize(WithoutUniqueNameHash, 4, 4);
 
 template <typename H> H AbslHashValue(H h, const WithoutUniqueNameHash &m) {
     return H::combine(std::move(h), m._hashValue);
@@ -66,6 +67,7 @@ public:
 
     uint32_t _hashValue;
 };
+CheckSize(FullNameHash, 4, 4);
 
 template <typename H> H AbslHashValue(H h, const FullNameHash &m) {
     return H::combine(std::move(h), m._hashValue);
@@ -89,6 +91,7 @@ struct SymbolHash {
         return this->nameHash < h.nameHash || (!(h.nameHash < this->nameHash) && this->symbolHash < h.symbolHash);
     }
 };
+CheckSize(SymbolHash, 8, 4);
 
 // 28 is the same as the size of an ID in FoundDefinitionRef::_storage
 //
@@ -246,8 +249,6 @@ struct LocalSymbolTableHashes {
     uint32_t hierarchyHash = HASH_STATE_NOT_COMPUTED;
     // A fingerprint for the classes and modules contained in the file.
     uint32_t classModuleHash = HASH_STATE_NOT_COMPUTED;
-    // A fingerprint for the type argument symbols contained in the file.
-    uint32_t typeArgumentHash = HASH_STATE_NOT_COMPUTED;
     // A fingerprint for the type member symbols contained in the file.
     uint32_t typeMemberHash = HASH_STATE_NOT_COMPUTED;
     // A fingerprint for the fields contained in the file.
@@ -287,7 +288,6 @@ struct LocalSymbolTableHashes {
         LocalSymbolTableHashes ret;
         ret.hierarchyHash = HASH_STATE_INVALID_PARSE;
         ret.classModuleHash = HASH_STATE_INVALID_PARSE;
-        ret.typeArgumentHash = HASH_STATE_INVALID_PARSE;
         ret.typeMemberHash = HASH_STATE_INVALID_PARSE;
         ret.fieldHash = HASH_STATE_INVALID_PARSE;
         ret.staticFieldHash = HASH_STATE_INVALID_PARSE;
@@ -300,7 +300,6 @@ struct LocalSymbolTableHashes {
         DEBUG_ONLY(
             if (hierarchyHash == HASH_STATE_INVALID_PARSE) {
                 ENFORCE(classModuleHash == core::LocalSymbolTableHashes::HASH_STATE_INVALID_PARSE);
-                ENFORCE(typeArgumentHash == core::LocalSymbolTableHashes::HASH_STATE_INVALID_PARSE);
                 ENFORCE(typeMemberHash == core::LocalSymbolTableHashes::HASH_STATE_INVALID_PARSE);
                 ENFORCE(fieldHash == core::LocalSymbolTableHashes::HASH_STATE_INVALID_PARSE);
                 ENFORCE(staticFieldHash == core::LocalSymbolTableHashes::HASH_STATE_INVALID_PARSE);
@@ -308,7 +307,6 @@ struct LocalSymbolTableHashes {
                 ENFORCE(methodHash == core::LocalSymbolTableHashes::HASH_STATE_INVALID_PARSE);
             } else {
                 ENFORCE(classModuleHash != core::LocalSymbolTableHashes::HASH_STATE_INVALID_PARSE);
-                ENFORCE(typeArgumentHash != core::LocalSymbolTableHashes::HASH_STATE_INVALID_PARSE);
                 ENFORCE(typeMemberHash != core::LocalSymbolTableHashes::HASH_STATE_INVALID_PARSE);
                 ENFORCE(fieldHash != core::LocalSymbolTableHashes::HASH_STATE_INVALID_PARSE);
                 ENFORCE(staticFieldHash != core::LocalSymbolTableHashes::HASH_STATE_INVALID_PARSE);
@@ -318,6 +316,7 @@ struct LocalSymbolTableHashes {
         return hierarchyHash == HASH_STATE_INVALID_PARSE;
     }
 };
+CheckSize(LocalSymbolTableHashes, 56, 8);
 
 // This structure represents every time a name was used in a place where it could be referencing the
 // name of a (Sorbet) symbol. For example, this program:
@@ -353,6 +352,7 @@ struct FileHash {
     FileHash() = default;
     FileHash(LocalSymbolTableHashes &&localSymbolTableHashes, UsageHash &&usages, FoundDefHashes &&foundHashes);
 };
+CheckSize(FileHash, 176, 8);
 
 }; // namespace sorbet::core
 

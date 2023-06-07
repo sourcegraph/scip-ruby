@@ -54,6 +54,9 @@ module T::Types
       when Enumerator::Lazy
         # Enumerators can be unbounded: see `[:foo, :bar].cycle`
         true
+      when Enumerator::Chain
+        # Enumerators can be unbounded: see `[:foo, :bar].cycle`
+        true
       when Enumerator
         # Enumerators can be unbounded: see `[:foo, :bar].cycle`
         true
@@ -88,6 +91,8 @@ module T::Types
         # both reading and writing. However, Sorbet treats *all*
         # Enumerable subclasses as covariant for ease of adoption.
         @type.subtype_of?(other.type)
+      elsif other.class <= Simple
+        underlying_class <= other.raw_type
       else
         false
       end
@@ -145,6 +150,8 @@ module T::Types
         end
       when Enumerator::Lazy
         T::Enumerator::Lazy[type_from_instances(obj)]
+      when Enumerator::Chain
+        T::Enumerator::Chain[type_from_instances(obj)]
       when Enumerator
         T::Enumerator[type_from_instances(obj)]
       when Set

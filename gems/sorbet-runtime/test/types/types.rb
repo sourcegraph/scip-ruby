@@ -682,7 +682,7 @@ module Opus::Types::Test
       end
     end
 
-    describe "TypedEnumerator" do
+    describe "TypedEnumeratorLazy" do
       it 'describes enumerators' do
         t = T::Enumerator::Lazy[Integer]
         assert_equal(
@@ -700,6 +700,28 @@ module Opus::Types::Test
       it 'can have its metatype instantiated' do
         assert_equal([2, 4, 6], T::Enumerator::Lazy[Integer].new([1, 2, 3]) do |yielder, value|
           yielder << value * 2
+        end.to_a)
+      end
+    end
+
+    describe "TypedEnumeratorChain" do
+      it 'describes enumerators' do
+        t = T::Enumerator::Chain[Integer]
+        assert_equal(
+          "T::Enumerator::Chain[Integer]",
+          t.describe_obj([1, 2].chain([3])))
+      end
+
+      it 'works if the type is right' do
+        type = T::Enumerator::Chain[Integer]
+        value = [1, 2].chain([3])
+        msg = check_error_message_for_obj(type, value)
+        assert_nil(msg)
+      end
+
+      it 'can have its metatype instantiated' do
+        assert_equal([2, 4, 6], T::Enumerator::Chain[Integer].new([1, 2], [3]).map do |value|
+          value * 2
         end.to_a)
       end
     end
@@ -918,6 +940,13 @@ module Opus::Types::Test
         assert_nil(msg)
       end
 
+      it 'does not check chain enumerables (for now)' do
+        type = T::Enumerable[Integer]
+        value = ["bad"].chain([])
+        msg = check_error_message_for_obj(type, value)
+        assert_nil(msg)
+      end
+
       it 'does not check potentially non-finite enumerables' do
         type = T::Enumerable[Integer]
         value = ["bad"].cycle
@@ -945,6 +974,53 @@ module Opus::Types::Test
         msg = type.error_message_for_obj_recursive(value)
         expected_error = "Expected type T::Enumerable[Integer], got T::Array[T.untyped]"
         assert_equal(expected_error, msg)
+      end
+    end
+
+    describe "TypedClass" do
+      it 'works if the type is right' do
+        type = T::Class[Base]
+        value = Base
+        msg = check_error_message_for_obj(type, value)
+        assert_nil(msg)
+      end
+
+      it 'works if the type is wrong, but a class' do
+        type = T::Class[Sub]
+        value = Base
+        msg = check_error_message_for_obj(type, value)
+        assert_nil(msg)
+      end
+
+      it 'cannot have its metatype instantiated' do
+        # People might assume that this creates a class with a supertype of
+        # `Base`. It doesn't, because generics are erased, and also `[...]` can
+        # hold an arbitrary type, not necessarily a class type.
+        #
+        # Also, `Class.new` already has a sig that infers a _better_ type:
+        # Class.new(Base) has an inferred type of `T.class_of(Base)`, which is
+        # more narrow.
+        assert_raises(NoMethodError) do
+          T::Class[Base].new
+        end
+      end
+
+      it 'is not coerced from plain class literal' do
+        # This is for backwards compatibility. If this poses problems for the
+        # sake of runtime checking and reflection, we may want to make this
+        # behavior more like the static system, where `::Class` has type
+        # `T.class_of(Class)`. It looks like we already don't treat `::A` as
+        # coercing to `T.class_of(A)`, which is why I don't know whether it
+        # particularly matters.
+        #
+        # (It's also worth noting: Sorbet doesn't have a separate notion of
+        # `T::Types::Simple` and `T::Types::ClassOf`. A ClassType is used to
+        # model `T::Types::Simple` and _was_ used to model `T.class_of(...)`
+        # until we made all singleton classes generic with `<AttachedClass>`,
+        # when they became AppliedType.)
+        type = T::Utils.coerce(::Class)
+        assert_instance_of(T::Types::Simple, type)
+        assert_equal(::Class, type.raw_type)
       end
     end
 
@@ -1448,6 +1524,31 @@ module Opus::Types::Test
           refute_subtype([String, Numeric], [String, Integer])
           refute_subtype([String], [String, Object])
         end
+
+        it 'compares upwards to TypedArray' do
+          assert_subtype([], T::Array[Integer])
+          assert_subtype([], T::Array[String])
+          assert_subtype([Integer], T::Array[Integer])
+          assert_subtype([Integer, String], T::Array[T.any(Integer, String)])
+
+          refute_subtype([Integer], T::Array[String])
+          refute_subtype([Integer, String], T::Array[Integer])
+        end
+      end
+
+      describe 'shapes' do
+        it 'compares upwards to TypedHash' do
+          assert_subtype({}, T::Hash[Integer, String])
+          assert_subtype({}, T::Hash[String, Symbol])
+          assert_subtype({key: Integer}, T::Hash[Symbol, Integer])
+          assert_subtype({'key' => Integer}, T::Hash[String, Integer])
+          assert_subtype({key: Integer, 'another' => Float}, T::Hash[T.any(Symbol, String), T.any(Integer, Float)])
+
+          refute_subtype({key: Integer}, T::Hash[String, Integer])
+          refute_subtype({key: Integer}, T::Hash[Symbol, Float])
+          refute_subtype({key: Integer, 'another' => Float}, T::Hash[Symbol, T.any(Integer, Float)])
+          refute_subtype({key: Integer, 'another' => Float}, T::Hash[T.any(Symbol, String), Integer])
+        end
       end
 
       describe 'untyped' do
@@ -1466,6 +1567,47 @@ module Opus::Types::Test
         end
       end
 
+      describe 'noreturn' do
+        it 'is a subtype of things' do
+          assert_subtype(T.noreturn, Integer)
+          assert_subtype(T.noreturn, Numeric)
+          assert_subtype(T.noreturn, [String, String])
+          assert_subtype(T.noreturn, T::Array[Integer])
+          assert_subtype(T.noreturn, T.untyped)
+        end
+
+        it 'other things are not a subtype of it' do
+          refute_subtype(Integer, T.noreturn)
+          refute_subtype(Numeric, T.noreturn)
+          refute_subtype([String, String], T.noreturn)
+          refute_subtype(T::Array[Integer], T.noreturn)
+
+          # except this one
+          assert_subtype(T.untyped, T.noreturn)
+        end
+      end
+
+      describe 'anything' do
+        it 'is not a subtype of things' do
+          refute_subtype(T.anything, Integer)
+          refute_subtype(T.anything, Numeric)
+          refute_subtype(T.anything, [String, String])
+          refute_subtype(T.anything, T::Array[Integer])
+
+          # except this one
+          assert_subtype(T.anything, T.untyped)
+        end
+
+        it 'other things are a subtype of it' do
+          assert_subtype(Integer, T.anything)
+          assert_subtype(Numeric, T.anything)
+          assert_subtype([String, String], T.anything)
+          assert_subtype(T::Array[Integer], T.anything)
+
+          assert_subtype(T.untyped, T.anything)
+        end
+      end
+
       describe 'type variables' do
         it 'type members are subtypes of everything' do
           assert_subtype(T::Types::TypeMember.new(:in), T.untyped)
@@ -1474,11 +1616,24 @@ module Opus::Types::Test
                          T::Types::TypeMember.new(:out))
         end
 
+        it 'everything is a subtype of type members' do
+          assert_subtype(T.untyped, T::Types::TypeMember.new(:in))
+          assert_subtype(String, T::Types::TypeMember.new(:in))
+          assert_subtype(T::Types::TypeMember.new(:out),
+                         T::Types::TypeMember.new(:in))
+        end
+
         it 'type parameters are subtypes of everything' do
           assert_subtype(T::Types::TypeParameter.new(:T), T.untyped)
           assert_subtype(T::Types::TypeParameter.new(:T), String)
           assert_subtype(T::Types::TypeParameter.new(:T),
                          T::Types::TypeParameter.new(:V))
+        end
+
+        it 'pools' do
+          assert_equal(T.type_parameter(:T).object_id, T.type_parameter(:T).object_id)
+          refute_equal(T.type_parameter(:T).object_id, T.type_parameter(:U).object_id)
+          refute_equal(T::Types::TypeParameter.new(:T).object_id, T::Types::TypeParameter.new(:T).object_id)
         end
       end
 

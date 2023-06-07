@@ -3,6 +3,16 @@ require_relative '../test_helper'
 
 module Opus::Types::Test
   class ValidateOverrideShapeTest < Critic::Unit::UnitTest
+    class AbstractFoo
+      extend T::Sig
+      extend T::Helpers
+
+      abstract!
+
+      sig {abstract.returns(Integer)}
+      def foo; end
+    end
+
     class Base
       extend T::Sig
       sig do
@@ -11,6 +21,12 @@ module Opus::Types::Test
         .returns(Object)
       end
       def foo(req, opt=nil, kwreq:, kwopt: nil, &blk); end
+    end
+
+    class AbstractBase
+      extend T::Sig
+      sig {abstract.void}
+      def initialize; end
     end
 
     it "succeeds if the override matches the shape" do
@@ -24,6 +40,26 @@ module Opus::Types::Test
         def foo(req, opt=nil, kwreq:, kwopt: nil, &blk); end
       end
       klass.new.foo(1, kwreq: 3) {}
+    end
+
+    it "succeeds specifically for abstract/abstract" do
+      klass = Class.new(AbstractFoo) do
+        extend T::Sig
+        extend T::Helpers
+        abstract!
+
+        sig {abstract.returns(Integer)}
+        def foo; end
+      end
+      another = Class.new(klass) do
+        extend T::Sig
+
+        sig {override.returns(Integer)}
+        def foo
+          0
+        end
+      end
+      assert_equal(0, another.new.foo)
     end
 
     it "succeeds if the override has additional optional args and kwargs" do
@@ -177,6 +213,35 @@ module Opus::Types::Test
         def foo; end
       end
       klass.new.foo
+    end
+
+    it "does opt-in override checking on initialize" do
+      klass = Class.new(AbstractBase) do
+        extend T::Sig
+        sig {override.void}
+        def initialize; end
+
+        def foo
+          0
+        end
+      end
+      assert_equal(0, klass.new.foo)
+    end
+
+    it "raises if initialize is not compatible with parent" do
+      klass = Class.new(AbstractBase) do
+        extend T::Sig
+        sig do
+          override
+          .params(x: Integer)
+          .void
+        end
+        def initialize(x); end
+      end
+      err = assert_raises(RuntimeError) do
+        klass.new(0)
+      end
+      assert_includes(err.message, "must have no more than 0 required argument(s) to be compatible")
     end
   end
 end

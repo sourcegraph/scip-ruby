@@ -377,15 +377,17 @@ public:
         bool isFinal : 1;
         bool isSealed : 1;
         bool isPrivate : 1;
-        bool isUndeclared : 1;
+        bool isDeclared : 1;
         bool isExported : 1;
+        bool isBehaviorDefining : 1;
 
-        constexpr static uint16_t NUMBER_OF_FLAGS = 10;
+        constexpr static uint16_t NUMBER_OF_FLAGS = 11;
         constexpr static uint16_t VALID_BITS_MASK = (1 << NUMBER_OF_FLAGS) - 1;
 
         Flags() noexcept
             : isClass(false), isModule(false), isAbstract(false), isInterface(false), isLinearizationComputed(false),
-              isFinal(false), isSealed(false), isPrivate(false), isUndeclared(false), isExported(false) {}
+              isFinal(false), isSealed(false), isPrivate(false), isDeclared(false), isExported(false),
+              isBehaviorDefining(false) {}
 
         uint16_t serialize() const {
             // Can replace this with std::bit_cast in C++20
@@ -498,11 +500,16 @@ public:
         }
     }
 
-    inline bool isUndeclared() const {
-        if (!isClassModuleSet()) {
-            return true;
+    inline bool isDeclared() const {
+        return flags.isDeclared;
+    }
+
+    inline void setDeclared() {
+        ENFORCE(isClassModuleSet());
+
+        if (!flags.isDeclared) {
+            flags.isDeclared = true;
         }
-        return flags.isUndeclared;
     }
 
     SymbolRef findMember(const GlobalState &gs, NameRef name) const;
@@ -539,7 +546,7 @@ public:
 
     ClassOrModuleRef topAttachedClass(const GlobalState &gs) const;
 
-    void recordSealedSubclass(MutableContext ctx, ClassOrModuleRef subclass);
+    void recordSealedSubclass(GlobalState &gs, ClassOrModuleRef subclass);
 
     // Returns the locations that are allowed to subclass the sealed class.
     const SymbolRef::LOC_store &sealedLocs(const GlobalState &gs) const;

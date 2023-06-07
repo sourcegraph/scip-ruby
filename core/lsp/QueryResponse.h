@@ -10,36 +10,51 @@ class TypeConstraint;
 
 class SendResponse final {
 public:
-    SendResponse(core::Loc termLoc, std::shared_ptr<core::DispatchResult> dispatchResult, core::NameRef callerSideName,
-                 bool isPrivateOk, core::MethodRef enclosingMethod, core::Loc receiverLoc, core::Loc funLoc,
-                 size_t totalArgs)
-        : dispatchResult(std::move(dispatchResult)), callerSideName(callerSideName), termLoc(termLoc),
-          isPrivateOk(isPrivateOk), enclosingMethod(enclosingMethod), receiverLoc(receiverLoc), funLoc(funLoc),
-          totalArgs(totalArgs){};
+    SendResponse(std::shared_ptr<core::DispatchResult> dispatchResult, InlinedVector<core::LocOffsets, 2> argLocOffsets,
+                 core::NameRef callerSideName, core::MethodRef enclosingMethod, bool isPrivateOk, core::FileRef file,
+                 core::LocOffsets termLocOffsets, core::LocOffsets receiverLocOffsets, core::LocOffsets funLocOffsets)
+        : dispatchResult(std::move(dispatchResult)), argLocOffsets(std::move(argLocOffsets)),
+          callerSideName(callerSideName), enclosingMethod(enclosingMethod), isPrivateOk(isPrivateOk), file(file),
+          termLocOffsets(termLocOffsets), receiverLocOffsets(receiverLocOffsets), funLocOffsets(funLocOffsets){};
     const std::shared_ptr<core::DispatchResult> dispatchResult;
+    const InlinedVector<core::LocOffsets, 2> argLocOffsets;
     const core::NameRef callerSideName;
-    const core::Loc termLoc;
-    const bool isPrivateOk;
     const core::MethodRef enclosingMethod;
-    const core::Loc receiverLoc;
-    const core::Loc funLoc;
-    const size_t totalArgs;
+    const bool isPrivateOk;
+    const core::FileRef file;
+    const core::LocOffsets termLocOffsets;
+    const core::LocOffsets receiverLocOffsets;
+    const core::LocOffsets funLocOffsets;
+
+    core::Loc termLoc() const {
+        return core::Loc(file, termLocOffsets);
+    }
+    core::Loc receiverLoc() const {
+        return core::Loc(file, receiverLocOffsets);
+    }
+    core::Loc funLoc() const {
+        return core::Loc(file, funLocOffsets);
+    }
 
     const std::optional<core::Loc> getMethodNameLoc(const core::GlobalState &gs) const;
 };
-CheckSize(SendResponse, 72, 8);
+CheckSize(SendResponse, 80, 8);
 
 class IdentResponse final {
 public:
     IdentResponse(core::Loc termLoc, core::LocalVariable variable, core::TypeAndOrigins retType,
-                  core::MethodRef enclosingMethod)
-        : termLoc(termLoc), variable(variable), enclosingMethod(enclosingMethod), retType(std::move(retType)) {}
+                  core::MethodRef enclosingMethod, core::Loc enclosingMethodLoc)
+        : termLoc(termLoc), variable(variable), enclosingMethod(enclosingMethod),
+          enclosingMethodLoc(enclosingMethodLoc), retType(std::move(retType)) {}
     const core::Loc termLoc;
     const core::LocalVariable variable;
     const core::MethodRef enclosingMethod;
+    // The loc of the MethodDef this ident was in.
+    // (not the declLoc, which can be found by way of the enclosingMethod's entry in the symbol table)
+    const core::Loc enclosingMethodLoc;
     const core::TypeAndOrigins retType;
 };
-CheckSize(IdentResponse, 56, 8);
+CheckSize(IdentResponse, 72, 8);
 
 class LiteralResponse final {
 public:

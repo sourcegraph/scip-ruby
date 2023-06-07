@@ -1,12 +1,12 @@
-#include "doctest.h"
+#include "doctest/doctest.h"
 #include <cxxopts.hpp>
 // has to go first as it violates our requirements
 
 #include "absl/strings/match.h"
 #include "common/FileOps.h"
 #include "common/common.h"
-#include "common/formatting.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
+#include "common/strings/formatting.h"
 #include "common/web_tracer_framework/tracing.h"
 #include "main/lsp/LSPConfiguration.h"
 #include "test/helpers/expectations.h"
@@ -547,9 +547,12 @@ TEST_CASE("LSPTest") {
         opts->ruby3KeywordArgs =
             BooleanPropertyAssertion::getValue("experimental-ruby3-keyword-args", assertions).value_or(false);
         opts->stripeMode = BooleanPropertyAssertion::getValue("stripe-mode", assertions).value_or(false);
+        opts->outOfOrderReferenceChecksEnabled =
+            BooleanPropertyAssertion::getValue("check-out-of-order-constant-references", assertions).value_or(false);
         opts->requiresAncestorEnabled =
             BooleanPropertyAssertion::getValue("enable-experimental-requires-ancestor", assertions).value_or(false);
         opts->stripePackages = BooleanPropertyAssertion::getValue("enable-packager", assertions).value_or(false);
+
         if (opts->stripePackages) {
             auto extraDirUnderscore =
                 StringPropertyAssertion::getValue("extra-package-files-directory-prefix-underscore", assertions);
@@ -562,10 +565,15 @@ TEST_CASE("LSPTest") {
                 opts->extraPackageFilesDirectorySlashPrefixes.emplace_back(extraDirSlash.value());
             }
             opts->secondaryTestPackageNamespaces.emplace_back("Critic");
+            auto skipImportVisibility =
+                StringPropertyAssertion::getValue("skip-package-import-visibility-check-for", assertions);
+            if (skipImportVisibility.has_value()) {
+                opts->skipPackageImportVisibilityCheckFor.emplace_back(skipImportVisibility.value());
+            }
+            opts->secondaryTestPackageNamespaces.emplace_back("Critic");
         }
         opts->disableWatchman = true;
         opts->rubyfmtPath = "test/testdata/lsp/rubyfmt-stub/rubyfmt";
-        opts->lspExperimentalFastPathEnabled = true;
 
         // Set to a number that is reasonable large for tests, but small enough that we can have a test to handle
         // this edge case. If you change this number, `fast_path/{too_many_files,not_enough_files,initialize}` will
@@ -597,6 +605,8 @@ TEST_CASE("LSPTest") {
         string rootUri = fmt::format("file://{}", rootPath);
         auto sorbetInitOptions = make_unique<SorbetInitializationOptions>();
         sorbetInitOptions->enableTypecheckInfo = true;
+        sorbetInitOptions->highlightUntyped =
+            BooleanPropertyAssertion::getValue("highlight-untyped-values", assertions).value_or(false);
         auto initializedResponses = initializeLSP(rootPath, rootUri, *lspWrapper, nextId, true,
                                                   shouldUseCodeActionResolve, move(sorbetInitOptions));
         INFO("Should not receive any response to 'initialized' message.");
@@ -645,8 +655,14 @@ TEST_CASE("LSPTest") {
             }
             auto responses = getLSPResponsesFor(*lspWrapper, move(updates));
             updateDiagnostics(config, testFileUris, responses, diagnostics);
-            slowPathPassed = ErrorAssertion::checkAll(
+            bool errorAssertionsPassed = ErrorAssertion::checkAll(
                 test.sourceFileContents, RangeAssertion::getErrorAssertions(assertions), diagnostics, errorPrefixes[i]);
+
+            bool untypedAssertionsPassed =
+                UntypedAssertion::checkAll(test.sourceFileContents, RangeAssertion::getUntypedAssertions(assertions),
+                                           diagnostics, errorPrefixes[i]);
+
+            slowPathPassed = errorAssertionsPassed && untypedAssertionsPassed;
         }
     }
 
@@ -822,6 +838,9 @@ TEST_CASE("LSPTest") {
     // Hover assertions
     HoverAssertion::checkAll(assertions, test.sourceFileContents, *lspWrapper, nextId);
 
+    // Hover multiline assertions
+    HoverLineAssertion::checkAll(assertions, test.sourceFileContents, *lspWrapper, nextId);
+
     // sorbet/showSymbol assertions
     ShowSymbolAssertion::checkAll(assertions, test.sourceFileContents, *lspWrapper, nextId);
 
@@ -921,6 +940,9 @@ TEST_CASE("LSPTest") {
 
             // Check any new HoverAssertions in the updates.
             HoverAssertion::checkAll(assertions, updatesAndContents, *lspWrapper, nextId);
+
+            // Check and new HoverMultilneAsserions assertions
+            HoverLineAssertion::checkAll(assertions, test.sourceFileContents, *lspWrapper, nextId);
         }
     }
 

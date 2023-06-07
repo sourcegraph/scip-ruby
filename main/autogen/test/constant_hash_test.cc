@@ -1,4 +1,4 @@
-#include "doctest.h"
+#include "doctest/doctest.h"
 // has to go first as it violates our requirements
 #include "ast/desugar/Desugar.h"
 #include "core/ErrorQueue.h"
@@ -184,6 +184,18 @@ TEST_CASE("Require") { // NOLINT
     // other sends should not affect the hash
     CHECK_EQ(req, helper.hashExample("require 'foo'\n"
                                      "do_the_thing!"));
+}
+
+TEST_CASE("Package Autoloader Compatibility") { // NOLINT
+    Helper helper;
+
+    auto req = helper.hashExample("autoloader_compatibility 'legacy'\n");
+
+    // removing the annotation should affect the hash
+    CHECK_NE(req, helper.hashExample("\n"));
+
+    // changing the annotation should affect the hash
+    CHECK_NE(req, helper.hashExample("autoloader_compatibility 'strict'\n"));
 }
 
 TEST_CASE("Extend/Include") {

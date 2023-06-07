@@ -8,11 +8,14 @@
 #include "rewriter/Cleanup.h"
 #include "rewriter/Command.h"
 #include "rewriter/Concern.h"
+#include "rewriter/ConstantAssumeType.h"
 #include "rewriter/DSLBuilder.h"
+#include "rewriter/Data.h"
 #include "rewriter/DefDelegator.h"
 #include "rewriter/Delegate.h"
 #include "rewriter/Flatfiles.h"
 #include "rewriter/Flatten.h"
+#include "rewriter/HasAttachedClass.h"
 #include "rewriter/Initializer.h"
 #include "rewriter/InterfaceWrapper.h"
 #include "rewriter/Mattr.h"
@@ -23,9 +26,7 @@
 #include "rewriter/Prop.h"
 #include "rewriter/Rails.h"
 #include "rewriter/Regexp.h"
-#include "rewriter/SelfNew.h"
 #include "rewriter/SigRewriter.h"
-#include "rewriter/Singleton.h"
 #include "rewriter/Struct.h"
 #include "rewriter/TEnum.h"
 #include "rewriter/TestCase.h"
@@ -51,7 +52,6 @@ public:
         Flatfiles::run(ctx, classDef);
         Prop::run(ctx, classDef);
         TypeMembers::run(ctx, classDef);
-        Singleton::run(ctx, classDef);
         Concern::run(ctx, classDef);
         TestCase::run(ctx, classDef);
 
@@ -73,6 +73,12 @@ public:
                         return;
                     }
 
+                    nodes = Data::run(ctx, &assign);
+                    if (!nodes.empty()) {
+                        replaceNodes[stat.get()] = std::move(nodes);
+                        return;
+                    }
+
                     nodes = ClassNew::run(ctx, &assign);
                     if (!nodes.empty()) {
                         replaceNodes[stat.get()] = std::move(nodes);
@@ -84,6 +90,9 @@ public:
                         replaceNodes[stat.get()] = std::move(nodes);
                         return;
                     }
+
+                    // This has to come after the `Class.new` rewriter, because they would otherwise overlap.
+                    ConstantAssumeType::run(ctx, &assign);
                 },
 
                 [&](ast::Send &send) {
@@ -138,6 +147,13 @@ public:
                         replaceNodes[stat.get()] = std::move(nodes);
                         return;
                     }
+
+                    // This one is also a little different: it gets the ClassDef kind
+                    nodes = HasAttachedClass::run(ctx, isClass, &send);
+                    if (!nodes.empty()) {
+                        replaceNodes[stat.get()] = std::move(nodes);
+                        return;
+                    }
                 },
 
                 [&](ast::MethodDef &mdef) { Initializer::run(ctx, &mdef, prevStat); },
@@ -178,11 +194,6 @@ public:
         }
 
         if (auto expr = InterfaceWrapper::run(ctx, send)) {
-            tree = std::move(expr);
-            return;
-        }
-
-        if (auto expr = SelfNew::run(ctx, send)) {
             tree = std::move(expr);
             return;
         }

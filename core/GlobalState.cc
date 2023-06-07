@@ -1,7 +1,7 @@
 #include "GlobalState.h"
 
-#include "common/Timer.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
+#include "common/timers/Timer.h"
 #include "core/Error.h"
 #include "core/FileHash.h"
 #include "core/Names.h"
@@ -14,12 +14,14 @@
 #include "core/lsp/Task.h"
 #include "core/lsp/TypecheckEpochManager.h"
 #include <filesystem>
+#include <string_view>
 #include <utility>
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "core/ErrorQueue.h"
 #include "core/errors/infer.h"
+#include "core/packages/MangledName.h"
 #include "main/pipeline/semantic_extension/SemanticExtension.h"
 
 template class std::vector<std::pair<unsigned int, unsigned int>>;
@@ -350,6 +352,8 @@ void GlobalState::initEmpty() {
     ENFORCE(klass == Symbols::untyped());
     klass = synthesizeClass(core::Names::Constants::T(), Symbols::todo().id(), true);
     ENFORCE(klass == Symbols::T());
+    klass = klass.data(*this)->singletonClass(*this);
+    ENFORCE(klass == Symbols::TSingleton());
     klass = synthesizeClass(core::Names::Constants::Class(), 0);
     ENFORCE(klass == Symbols::Class());
     klass = synthesizeClass(core::Names::Constants::BasicObject(), 0);
@@ -366,6 +370,8 @@ void GlobalState::initEmpty() {
     ENFORCE(klass == Symbols::MagicSingleton());
     klass = synthesizeClass(core::Names::Constants::Module());
     ENFORCE(klass == Symbols::Module());
+    klass = synthesizeClass(core::Names::Constants::Exception());
+    ENFORCE(klass == Symbols::Exception());
     klass = synthesizeClass(core::Names::Constants::StandardError());
     ENFORCE(klass == Symbols::StandardError());
     klass = synthesizeClass(core::Names::Constants::Complex());
@@ -393,6 +399,7 @@ void GlobalState::initEmpty() {
     klass = enterClassSymbol(Loc::none(), Symbols::Sorbet(), core::Names::Constants::Private());
     ENFORCE(klass == Symbols::Sorbet_Private());
     klass = enterClassSymbol(Loc::none(), Symbols::Sorbet_Private(), core::Names::Constants::Static());
+    klass.data(*this)->setIsModule(true); // explicitly set isModule so we can immediately call singletonClass
     ENFORCE(klass == Symbols::Sorbet_Private_Static());
     klass = Symbols::Sorbet_Private_Static().data(*this)->singletonClass(*this);
     ENFORCE(klass == Symbols::Sorbet_Private_StaticSingleton());
@@ -420,16 +427,20 @@ void GlobalState::initEmpty() {
     klass = enterClassSymbol(Loc::none(), Symbols::T(), core::Names::Constants::Generic());
     ENFORCE(klass == Symbols::T_Generic());
     klass = enterClassSymbol(Loc::none(), Symbols::Sorbet_Private_Static(), core::Names::Constants::Tuple());
+    klass.data(*this)->setIsModule(false);
     ENFORCE(klass == Symbols::Tuple());
     klass = enterClassSymbol(Loc::none(), Symbols::Sorbet_Private_Static(), core::Names::Constants::Shape());
+    klass.data(*this)->setIsModule(false);
     ENFORCE(klass == Symbols::Shape());
     klass = enterClassSymbol(Loc::none(), Symbols::Sorbet_Private_Static(), core::Names::Constants::Subclasses());
     ENFORCE(klass == Symbols::Subclasses());
     klass = enterClassSymbol(Loc::none(), Symbols::Sorbet_Private_Static(),
                              core::Names::Constants::ImplicitModuleSuperclass());
+    klass.data(*this)->setIsModule(false);
     ENFORCE(klass == Symbols::Sorbet_Private_Static_ImplicitModuleSuperClass());
     klass =
         enterClassSymbol(Loc::none(), Symbols::Sorbet_Private_Static(), core::Names::Constants::ReturnTypeInference());
+    klass.data(*this)->setIsModule(false);
     ENFORCE(klass == Symbols::Sorbet_Private_Static_ReturnTypeInference());
     method =
         enterMethod(*this, Symbols::Sorbet_Private_Static(), core::Names::guessedTypeTypeParameterHolder()).build();
@@ -483,6 +494,7 @@ void GlobalState::initEmpty() {
     Symbols::Net_Protocol().data(*this)->setIsModule(false);
 
     klass = enterClassSymbol(Loc::none(), Symbols::T_Sig(), core::Names::Constants::WithoutRuntime());
+    klass.data(*this)->setIsModule(true); // explicitly set isModule so we can immediately call singletonClass
     ENFORCE(klass == Symbols::T_Sig_WithoutRuntime());
 
     klass = synthesizeClass(core::Names::Constants::Enumerator());
@@ -491,8 +503,11 @@ void GlobalState::initEmpty() {
     ENFORCE(klass == Symbols::T_Enumerator());
     klass = enterClassSymbol(Loc::none(), Symbols::T_Enumerator(), core::Names::Constants::Lazy());
     ENFORCE(klass == Symbols::T_Enumerator_Lazy());
+    klass = enterClassSymbol(Loc::none(), Symbols::T_Enumerator(), core::Names::Constants::Chain());
+    ENFORCE(klass == Symbols::T_Enumerator_Chain());
 
     klass = enterClassSymbol(Loc::none(), Symbols::T(), core::Names::Constants::Struct());
+    klass.data(*this)->setIsModule(false);
     ENFORCE(klass == Symbols::T_Struct());
 
     klass = synthesizeClass(core::Names::Constants::Singleton(), 0, true);
@@ -508,7 +523,13 @@ void GlobalState::initEmpty() {
 
     // Enumerator::Lazy
     klass = enterClassSymbol(Loc::none(), Symbols::Enumerator(), core::Names::Constants::Lazy());
+    klass.data(*this)->setIsModule(false);
     ENFORCE(klass == Symbols::Enumerator_Lazy());
+
+    // Enumerator::Chain
+    klass = enterClassSymbol(Loc::none(), Symbols::Enumerator(), core::Names::Constants::Chain());
+    klass.data(*this)->setIsModule(false);
+    ENFORCE(klass == Symbols::Enumerator_Chain());
 
     klass = enterClassSymbol(Loc::none(), Symbols::T(), Names::Constants::Private());
     ENFORCE(klass == Symbols::T_Private());
@@ -518,6 +539,7 @@ void GlobalState::initEmpty() {
     klass.data(*this)->setIsModule(false);
     ENFORCE(klass == Symbols::T_Private_Types_Void());
     klass = enterClassSymbol(Loc::none(), Symbols::T_Private_Types_Void(), Names::Constants::VOID());
+    klass.data(*this)->setIsModule(true); // explicitly set isModule so we can immediately call singletonClass
     ENFORCE(klass == Symbols::T_Private_Types_Void_VOID());
     klass = klass.data(*this)->singletonClass(*this);
     ENFORCE(klass == Symbols::T_Private_Types_Void_VOIDSingleton());
@@ -594,12 +616,20 @@ void GlobalState::initEmpty() {
                  .build();
     ENFORCE(method == Symbols::PackageSpec_autoloader_compatibility());
 
+    method = enterMethod(*this, Symbols::PackageSpecSingleton(), Names::visible_to()).arg(Names::arg0()).build();
+    ENFORCE(method == Symbols::PackageSpec_visible_to());
+
+    method = enterMethod(*this, Symbols::PackageSpecSingleton(), Names::exportAll()).build();
+    ENFORCE(method == Symbols::PackageSpec_export_all());
+
     klass = enterClassSymbol(Loc::none(), Symbols::Sorbet_Private_Static(), core::Names::Constants::ResolvedSig());
+    klass.data(*this)->setIsModule(true); // explicitly set isModule so we can immediately call singletonClass
     ENFORCE(klass == Symbols::Sorbet_Private_Static_ResolvedSig());
     klass = Symbols::Sorbet_Private_Static_ResolvedSig().data(*this)->singletonClass(*this);
     ENFORCE(klass == Symbols::Sorbet_Private_Static_ResolvedSigSingleton());
 
     klass = enterClassSymbol(Loc::none(), Symbols::T_Private(), core::Names::Constants::Compiler());
+    klass.data(*this)->setIsModule(true); // explicitly set isModule so we can immediately call singletonClass
     ENFORCE(klass == Symbols::T_Private_Compiler());
     klass = Symbols::T_Private_Compiler().data(*this)->singletonClass(*this);
     ENFORCE(klass == Symbols::T_Private_CompilerSingleton());
@@ -615,7 +645,15 @@ void GlobalState::initEmpty() {
     ENFORCE(klass == Symbols::T_Types());
 
     klass = enterClassSymbol(Loc::none(), Symbols::T_Types(), core::Names::Constants::Base());
+    klass.data(*this)->setIsModule(false);
     ENFORCE(klass == Symbols::T_Types_Base());
+
+    klass = enterClassSymbol(Loc::none(), Symbols::root(), core::Names::Constants::Data());
+    klass.data(*this)->setIsModule(false);
+    ENFORCE(klass == Symbols::Data());
+
+    klass = enterClassSymbol(Loc::none(), Symbols::T(), core::Names::Constants::Class());
+    ENFORCE(klass == Symbols::T_Class());
 
     typeArgument =
         enterTypeArgument(Loc::none(), Symbols::noMethod(), Names::Constants::TodoTypeArgument(), Variance::CoVariant);
@@ -694,10 +732,6 @@ void GlobalState::initEmpty() {
                  .untypedArg(Names::arg1()) // field kind (instance or class)
                  .untypedArg(Names::arg2()) // method name where assign is
                  .untypedArg(Names::arg3()) // name of variable
-                 .buildWithResultUntyped();
-    // Synthesize <Magic>.<self-new>(arg: *T.untyped) => T.untyped
-    method = enterMethod(*this, Symbols::MagicSingleton(), Names::selfNew())
-                 .repeatedUntypedArg(Names::arg0())
                  .buildWithResultUntyped();
     // Synthesize <Magic>.attachedClass(arg: *T.untyped) => T.untyped
     // (accept any args to avoid repeating errors that would otherwise be reported by type syntax parsing)
@@ -819,6 +853,9 @@ void GlobalState::initEmpty() {
     // Collect size prior to loop since singletons will cause vector to grow.
     size_t classAndModulesSize = classAndModules.size();
     for (uint32_t i = 1; i < classAndModulesSize; i++) {
+        if (!classAndModules[i].isClassModuleSet()) {
+            classAndModules[i].setIsModule(true);
+        }
         classAndModules[i].singletonClass(*this);
     }
 
@@ -869,7 +906,6 @@ void GlobalState::initEmpty() {
     Symbols::Symbol().data(*this)->resultType = Types::Symbol();
     Symbols::Float().data(*this)->resultType = Types::Float();
     Symbols::Object().data(*this)->resultType = Types::Object();
-    Symbols::Class().data(*this)->resultType = Types::classClass();
 
     // First file is used to indicate absence of a file
     files.emplace_back();
@@ -1655,8 +1691,8 @@ NameRef GlobalState::freshNameUnique(UniqueNameKind uniqueNameKind, NameRef orig
 FileRef GlobalState::enterFile(const shared_ptr<File> &file) {
     ENFORCE(!fileTableFrozen);
 
-    DEBUG_ONLY(for (auto &f
-                    : this->files) {
+    SLOW_DEBUG_ONLY(for (auto &f
+                         : this->files) {
         if (f) {
             if (f->path() == file->path()) {
                 Exception::raise("Request to `enterFile` for already-entered file path?");
@@ -1782,6 +1818,8 @@ void GlobalState::mangleRenameForOverload(MethodRef what, NameRef origName) {
 // similar to mangleRenameMethod, so it's nice to have the implementation in the same file). But in
 // spirit, this is a private Namer helper function.
 void GlobalState::deleteMethodSymbol(MethodRef what) {
+    ENFORCE(!symbolTableFrozen);
+
     const auto &whatData = what.data(*this);
     auto owner = whatData->owner;
     auto &ownerMembers = owner.data(*this)->members();
@@ -1800,6 +1838,8 @@ void GlobalState::deleteMethodSymbol(MethodRef what) {
 //
 // NOTE: This method does double duty, deleting both static-field and field symbols.
 void GlobalState::deleteFieldSymbol(FieldRef what) {
+    ENFORCE(!symbolTableFrozen);
+
     const auto &whatData = what.data(*this);
     auto owner = whatData->owner;
     auto &ownerMembers = owner.data(*this)->members();
@@ -1812,6 +1852,8 @@ void GlobalState::deleteFieldSymbol(FieldRef what) {
 
 // Before using this method, double check the disclaimer on GlobalState::deleteMethodSymbol above.
 void GlobalState::deleteTypeMemberSymbol(TypeMemberRef what) {
+    ENFORCE(!symbolTableFrozen);
+
     const auto &whatData = what.data(*this);
     // Should always be a class or module for type members, but we use core::TypeParameter to model both
     // `type_members` and `type_parameters` (which are owned by `Method` symbols).
@@ -2010,7 +2052,8 @@ unique_ptr<GlobalState> GlobalState::deepCopy(bool keepId) const {
     result->sleepInSlowPathSeconds = this->sleepInSlowPathSeconds;
     result->requiresAncestorEnabled = this->requiresAncestorEnabled;
     result->ruby3KeywordArgs = this->ruby3KeywordArgs;
-    result->lspExperimentalFastPathEnabled = this->lspExperimentalFastPathEnabled;
+    result->trackUntyped = this->trackUntyped;
+    result->printingFileTable = this->printingFileTable;
     result->isSCIPRuby = this->isSCIPRuby;
 
     if (keepId) {
@@ -2106,11 +2149,11 @@ unique_ptr<GlobalState> GlobalState::copyForIndex() const {
     result->ensureCleanStrings = this->ensureCleanStrings;
     result->runningUnderAutogen = this->runningUnderAutogen;
     result->censorForSnapshotTests = this->censorForSnapshotTests;
-    result->lspExperimentalFastPathEnabled = this->lspExperimentalFastPathEnabled;
     result->isSCIPRuby = this->isSCIPRuby;
     result->sleepInSlowPathSeconds = this->sleepInSlowPathSeconds;
     result->requiresAncestorEnabled = this->requiresAncestorEnabled;
     result->ruby3KeywordArgs = this->ruby3KeywordArgs;
+    result->trackUntyped = this->trackUntyped;
     result->kvstoreUuid = this->kvstoreUuid;
     result->errorUrlBase = this->errorUrlBase;
     result->suppressedErrorClasses = this->suppressedErrorClasses;
@@ -2222,8 +2265,7 @@ bool GlobalState::shouldReportErrorOn(Loc loc, ErrorClass what) const {
             }
         } else if (level == StrictLevel::Stdlib) {
             level = StrictLevel::Strict;
-            if (what == errors::Resolver::OverloadNotAllowed || what == errors::Resolver::VariantTypeMemberInClass ||
-                what == errors::Infer::UntypedMethod) {
+            if (what == errors::Resolver::OverloadNotAllowed || what == errors::Infer::UntypedMethod) {
                 return false;
             }
         }
@@ -2275,6 +2317,7 @@ void GlobalState::setPackagerOptions(const std::vector<std::string> &secondaryTe
                                      const std::vector<std::string> &extraPackageFilesDirectoryUnderscorePrefixes,
                                      const std::vector<std::string> &extraPackageFilesDirectorySlashPrefixes,
                                      const std::vector<std::string> &packageSkipRBIExportEnforcementDirs,
+                                     const std::vector<std::string> &skipImportVisibilityCheckFor,
                                      std::string errorHint) {
     ENFORCE(packageDB_.secondaryTestPackageNamespaceRefs_.size() == 0);
     ENFORCE(!packageDB_.frozen);
@@ -2286,6 +2329,14 @@ void GlobalState::setPackagerOptions(const std::vector<std::string> &secondaryTe
     packageDB_.extraPackageFilesDirectoryUnderscorePrefixes_ = extraPackageFilesDirectoryUnderscorePrefixes;
     packageDB_.extraPackageFilesDirectorySlashPrefixes_ = extraPackageFilesDirectorySlashPrefixes;
     packageDB_.skipRBIExportEnforcementDirs_ = packageSkipRBIExportEnforcementDirs;
+
+    std::vector<core::NameRef> skipImportVisibilityCheckFor_;
+    for (const string &pkgName : skipImportVisibilityCheckFor) {
+        std::vector<string_view> pkgNameParts = absl::StrSplit(pkgName, "::");
+        auto mangledName = core::packages::MangledName::mangledNameFromParts(*this, pkgNameParts);
+        skipImportVisibilityCheckFor_.emplace_back(mangledName);
+    }
+    packageDB_.skipImportVisibilityCheckFor_ = skipImportVisibilityCheckFor_;
     packageDB_.errorHint_ = errorHint;
 }
 
@@ -2303,7 +2354,6 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash() const {
     constexpr bool DEBUG_HASHING_TAIL = false;
     uint32_t hierarchyHash = 0;
     uint32_t classModuleHash = 0;
-    uint32_t typeArgumentHash = 0; // TODO(jez) Delete at same time as lspExperimentalFastPathEnabled
     uint32_t typeMemberHash = 0;
     uint32_t fieldHash = 0;
     uint32_t staticFieldHash = 0;
@@ -2319,14 +2369,9 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash() const {
             uint32_t symhash = sym.hash(*this, skipTypeMemberNames);
             target = mix(target, symhash);
 
-            if (this->lspExperimentalFastPathEnabled) {
-                uint32_t classOrModuleShapeHash = sym.classOrModuleShapeHash(*this);
-                hierarchyHash = mix(hierarchyHash, classOrModuleShapeHash);
-                classModuleHash = mix(classModuleHash, classOrModuleShapeHash);
-            } else {
-                hierarchyHash = mix(hierarchyHash, symhash);
-                classModuleHash = mix(classModuleHash, symhash);
-            }
+            uint32_t classOrModuleShapeHash = sym.classOrModuleShapeHash(*this);
+            hierarchyHash = mix(hierarchyHash, classOrModuleShapeHash);
+            classModuleHash = mix(classModuleHash, classOrModuleShapeHash);
 
             counter++;
             if (DEBUG_HASHING_TAIL && counter > this->classAndModules.size() - 15) {
@@ -2338,19 +2383,6 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash() const {
     // Type arguments are included in Method::hash. If only a type argument changes, the method's
     // hash will change but the hierarchyHash will not change, so Sorbet will take the fast path and
     // delete the method and all its arguments
-    if (!this->lspExperimentalFastPathEnabled) {
-        counter = 0;
-        for (const auto &typeArg : this->typeArguments) {
-            counter++;
-            // No type arguments are ignored in hashing.
-            uint32_t symhash = typeArg.hash(*this);
-            hierarchyHash = mix(hierarchyHash, symhash);
-            typeArgumentHash = mix(typeArgumentHash, symhash);
-            if (DEBUG_HASHING_TAIL && counter > this->typeArguments.size() - 15) {
-                errorQueue->logger.info("Hashing symbols: {}, {}", hierarchyHash, typeArg.name.show(*this));
-            }
-        }
-    }
 
     counter = 0;
     for (const auto &typeMember : this->typeMembers) {
@@ -2359,10 +2391,6 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash() const {
         uint32_t symhash = typeMember.hash(*this);
         auto &target = retypecheckableSymbolHashesMap[WithoutUniqueNameHash(*this, typeMember.name)];
         target = mix(target, symhash);
-        if (!this->lspExperimentalFastPathEnabled) {
-            hierarchyHash = mix(hierarchyHash, symhash);
-            typeMemberHash = mix(typeMemberHash, symhash);
-        }
         if (DEBUG_HASHING_TAIL && counter > this->typeMembers.size() - 15) {
             errorQueue->logger.info("Hashing symbols: {}, {}", hierarchyHash, typeMember.name.show(*this));
         }
@@ -2377,15 +2405,9 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash() const {
             // Either normal static-field or static-field-type-alias
             auto &target = retypecheckableSymbolHashesMap[WithoutUniqueNameHash(*this, field.name)];
             target = mix(target, symhash);
-            if (!this->lspExperimentalFastPathEnabled) {
-                uint32_t staticFieldShapeHash = field.fieldShapeHash(*this);
-                hierarchyHash = mix(hierarchyHash, staticFieldShapeHash);
-                staticFieldHash = mix(staticFieldHash, staticFieldShapeHash);
-            }
         } else if (field.flags.isStaticField) {
             const auto &dealiased = field.dealias(*this);
-            if (this->lspExperimentalFastPathEnabled && dealiased.isTypeMember() &&
-                field.name == dealiased.name(*this) &&
+            if (dealiased.isTypeMember() && field.name == dealiased.name(*this) &&
                 dealiased.owner(*this) == field.owner.data(*this)->lookupSingletonClass(*this)) {
                 // This is a static field class alias that forwards to a type_template on the singleton class
                 // (in service of constant literal resolution). Treat this as a type member (which we can
@@ -2399,11 +2421,6 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash() const {
             ENFORCE(field.flags.isField);
             auto &target = retypecheckableSymbolHashesMap[WithoutUniqueNameHash(*this, field.name)];
             target = mix(target, symhash);
-            if (!this->lspExperimentalFastPathEnabled) {
-                uint32_t fieldShapeHash = field.fieldShapeHash(*this);
-                hierarchyHash = mix(hierarchyHash, fieldShapeHash);
-                fieldHash = mix(fieldHash, fieldShapeHash);
-            }
         }
 
         if (DEBUG_HASHING_TAIL && counter > this->fields.size() - 15) {
@@ -2416,22 +2433,15 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash() const {
         if (!sym.ignoreInHashing(*this)) {
             auto &target = retypecheckableSymbolHashesMap[WithoutUniqueNameHash(*this, sym.name)];
             target = mix(target, sym.hash(*this));
-            auto needMethodShapeHash =
-                this->lspExperimentalFastPathEnabled
-                    ? (sym.name == Names::unresolvedAncestors() || sym.name == Names::requiredAncestors() ||
-                       sym.name == Names::requiredAncestorsLin())
-                    : true;
+            auto needMethodShapeHash = sym.name == Names::unresolvedAncestors() ||
+                                       sym.name == Names::requiredAncestors() ||
+                                       sym.name == Names::requiredAncestorsLin();
             if (needMethodShapeHash) {
                 uint32_t methodShapeHash = sym.methodShapeHash(*this);
                 hierarchyHash = mix(hierarchyHash, methodShapeHash);
-                if (this->lspExperimentalFastPathEnabled) {
-                    // With this feature enabled, the only three methods that trigger a method
-                    // change anymore all relate to inheritance. Let's blame this to a change to
-                    // class symbols, not to methods
-                    classModuleHash = mix(classModuleHash, methodShapeHash);
-                } else {
-                    methodHash = mix(methodHash, methodShapeHash);
-                }
+                // The only three methods that trigger a method change anymore all relate to inheritance.
+                // Let's blame this to a change to class symbols, not to methods
+                classModuleHash = mix(classModuleHash, methodShapeHash);
             }
 
             counter++;
@@ -2451,7 +2461,6 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash() const {
 
     result->hierarchyHash = LocalSymbolTableHashes::patchHash(hierarchyHash);
     result->classModuleHash = LocalSymbolTableHashes::patchHash(classModuleHash);
-    result->typeArgumentHash = LocalSymbolTableHashes::patchHash(typeArgumentHash);
     result->typeMemberHash = LocalSymbolTableHashes::patchHash(typeMemberHash);
     result->fieldHash = LocalSymbolTableHashes::patchHash(fieldHash);
     result->staticFieldHash = LocalSymbolTableHashes::patchHash(staticFieldHash);

@@ -5,10 +5,10 @@
 
 #include "absl/strings/str_split.h"
 #include "common/FileOps.h"
-#include "common/Timer.h"
 #include "common/concurrency/WorkerPool.h"
-#include "common/formatting.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
+#include "common/strings/formatting.h"
+#include "common/timers/Timer.h"
 #include "core/Error.h"
 #include "core/errors/infer.h"
 #include "main/options/ConfigParser.h"
@@ -76,11 +76,11 @@ const vector<PrintOptions> print_options({
     {"missing-constants", &Printers::MissingConstants},
     {"autogen", &Printers::Autogen},
     {"autogen-msgpack", &Printers::AutogenMsgPack},
-    {"autogen-autoloader", &Printers::AutogenAutoloader, true, false},
     {"autogen-subclasses", &Printers::AutogenSubclasses},
     {"package-tree", &Printers::Packager, false},
     {"minimized-rbi", &Printers::MinimizeRBI},
     {"payload-sources", &Printers::PayloadSources},
+    {"untyped-blame", &Printers::UntypedBlame},
 });
 
 PrinterConfig::PrinterConfig() : state(make_shared<GuardedState>()){};
@@ -148,16 +148,16 @@ vector<reference_wrapper<PrinterConfig>> Printers::printers() {
         MissingConstants,
         Autogen,
         AutogenMsgPack,
-        AutogenAutoloader,
         AutogenSubclasses,
         Packager,
         MinimizeRBI,
         PayloadSources,
+        UntypedBlame,
     });
 }
 
 bool Printers::isAutogen() const {
-    return Autogen.enabled || AutogenMsgPack.enabled || AutogenSubclasses.enabled || AutogenAutoloader.enabled;
+    return Autogen.enabled || AutogenMsgPack.enabled || AutogenSubclasses.enabled;
 }
 
 struct StopAfterOptions {
@@ -349,9 +349,6 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
                                     "Enable experimental LSP feature: Document Highlight");
     options.add_options("advanced")("enable-experimental-lsp-signature-help",
                                     "Enable experimental LSP feature: Signature Help");
-    options.add_options("advanced")("enable-experimental-lsp-fast-path",
-                                    "Enable experimental LSP feature: a faster fast path using symbol deletions",
-                                    cxxopts::value<bool>()->default_value("true"));
     options.add_options("advanced")("enable-experimental-requires-ancestor",
                                     "Enable experimental `requires_ancestor` annotation");
 
@@ -400,36 +397,11 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
         "Secondary top-level namespaces which contain test code (in addition to Test, which is primary). "
         "This option must be used in conjunction with --stripe-packages",
         cxxopts::value<vector<string>>(), "string");
-
-    options.add_options("advanced")(
-        "autogen-autoloader-exclude-require",
-        "Names that should be excluded from top-level require statements in autoloader output. (e.g. 'pry')",
-        cxxopts::value<vector<string>>());
-    options.add_options("advanced")("autogen-autoloader-ignore",
-                                    "Input files to exclude from autoloader output. (See --ignore for formatting.)",
-                                    cxxopts::value<vector<string>>());
-    options.add_options("advanced")("autogen-autoloader-modules", "Top-level modules to include in autoloader output",
-                                    cxxopts::value<vector<string>>());
-    options.add_options("advanced")("autogen-autoloader-preamble", "Preamble to add to each autoloader file",
-                                    cxxopts::value<string>()->default_value(""));
-    options.add_options("advanced")("autogen-autoloader-root", "Root directory for autoloader output",
-                                    cxxopts::value<string>()->default_value("autoloader"));
-    options.add_options("advanced")("autogen-registry-module", "Name of Ruby module used for autoloader registry",
-                                    cxxopts::value<string>()->default_value("Opus::Require"));
-    options.add_options("advanced")("autogen-root-object",
-                                    "Name of Ruby object on which root autoloads should be installed",
-                                    cxxopts::value<string>()->default_value("Object"));
-    options.add_options("advanced")("autogen-autoloader-samefile",
-                                    "Modules that should never be collapsed into their parent. This helps break cycles "
-                                    "in certain cases. (e.g. Foo::Bar::Baz)",
-                                    cxxopts::value<vector<string>>());
-    options.add_options("advanced")("autogen-autoloader-pbal-namespaces",
-                                    "Namespaces for which path-based autoloading is enabled.",
-                                    cxxopts::value<vector<string>>());
-    options.add_options("advanced")("autogen-autoloader-strip-prefix",
-                                    "Prefixes to strip from file output paths. "
-                                    "If path does not start with prefix, nothing is stripped",
-                                    cxxopts::value<vector<string>>());
+    options.add_options("dev")("skip-package-import-visibility-check-for",
+                               "Packages for which the visible_to check does not apply. They can import any package "
+                               "regardless of visible_to annotations."
+                               "This option must be used in conjunction with --stripe-packages",
+                               cxxopts::value<vector<string>>(), "string");
     buildAutogenCacheOptions(options);
 
     options.add_options("advanced")("error-url-base",
@@ -438,6 +410,9 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
                                     cxxopts::value<string>()->default_value(empty.errorUrlBase), "url-base");
     options.add_options("advanced")("experimental-ruby3-keyword-args",
                                     "Enforce use of new (Ruby 3.0-style) keyword arguments", cxxopts::value<bool>());
+    options.add_options("advanced")("check-out-of-order-constant-references",
+                                    "Enable out-of-order constant reference checks (error 5027)");
+    options.add_options("advanced")("track-untyped", "Track untyped usage statistics in the file-table output");
 
     // Developer options
     options.add_options("dev")("p,print", to_string(all_prints), cxxopts::value<vector<string>>(), "type");
@@ -528,6 +503,7 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
     if (sorbet::debug_mode) {
         options.add_options("dev")("suggest-sig", "Report typing candidates. Only supported in debug builds");
     }
+
     options.add_options("dev")("suggest-typed", "Suggest which typed: sigils to add or upgrade");
     options.add_options("dev")("suggest-unsafe",
                                "In as many errors as possible, suggest autocorrects to wrap problem code with "
@@ -591,10 +567,6 @@ bool extractPrinters(cxxopts::ParseResult &raw, Options &opts, shared_ptr<spdlog
                         logger->error("--print={} is incompatible with --cache-dir. Ignoring cache", opt);
                         opts.cacheDir = "";
                     }
-                }
-                if (opt == "autogen-autoloader" && outPath.empty()) {
-                    logger->error("--print={} requires an output path to be specified", opt);
-                    throw EarlyReturnWithCode(1);
                 }
                 found = true;
                 break;
@@ -660,39 +632,6 @@ void parseIgnorePatterns(const vector<string> &rawIgnorePatterns, vector<string>
     }
 }
 
-bool extractAutoloaderConfig(cxxopts::ParseResult &raw, Options &opts, shared_ptr<spdlog::logger> logger) {
-    AutoloaderConfig &cfg = opts.autoloaderConfig;
-    if (raw.count("autogen-autoloader-exclude-require") > 0) {
-        cfg.requireExcludes = raw["autogen-autoloader-exclude-require"].as<vector<string>>();
-    }
-    if (raw.count("autogen-autoloader-ignore") > 0) {
-        auto rawIgnorePatterns = raw["autogen-autoloader-ignore"].as<vector<string>>();
-        parseIgnorePatterns(rawIgnorePatterns, cfg.absoluteIgnorePatterns, cfg.relativeIgnorePatterns);
-    }
-    if (raw.count("autogen-autoloader-modules") > 0) {
-        cfg.modules = raw["autogen-autoloader-modules"].as<vector<string>>();
-    }
-    if (raw.count("autogen-autoloader-strip-prefix") > 0) {
-        cfg.stripPrefixes = raw["autogen-autoloader-strip-prefix"].as<vector<string>>();
-    }
-    if (raw.count("autogen-autoloader-samefile") > 0) {
-        for (auto &fullName : raw["autogen-autoloader-samefile"].as<vector<string>>()) {
-            cfg.sameFileModules.emplace_back(absl::StrSplit(fullName, "::"));
-        }
-    }
-    if (raw.count("autogen-autoloader-pbal-namespaces") > 0) {
-        for (auto &fullName : raw["autogen-autoloader-pbal-namespaces"].as<vector<string>>()) {
-            cfg.pbalNamespaces.emplace_back(absl::StrSplit(fullName, "::"));
-        }
-    }
-    cfg.preamble = raw["autogen-autoloader-preamble"].as<string>();
-    cfg.registryModule = raw["autogen-registry-module"].as<string>();
-    cfg.rootDir = stripTrailingSlashes(raw["autogen-autoloader-root"].as<string>());
-
-    cfg.rootObject = raw["autogen-root-object"].as<string>();
-    return true;
-}
-
 void addFilesFromDir(Options &opts, string_view dir, WorkerPool &workerPool, shared_ptr<spdlog::logger> logger) {
     auto fileNormalized = stripTrailingSlashes(dir);
     opts.rawInputDirNames.emplace_back(fileNormalized);
@@ -701,8 +640,8 @@ void addFilesFromDir(Options &opts, string_view dir, WorkerPool &workerPool, sha
     try {
         containedFiles = opts.fs->listFilesInDir(fileNormalized, opts.allowedExtensions, workerPool, true,
                                                  opts.absoluteIgnorePatterns, opts.relativeIgnorePatterns);
-    } catch (sorbet::FileNotFoundException e) {
-        logger->error(e.what());
+    } catch (sorbet::FileNotFoundException &e) {
+        logger->error("{}", e.what());
         throw EarlyReturnWithCode(1);
     } catch (sorbet::FileNotDirException) {
         logger->error("Path `{}` is not a directory", dir);
@@ -796,8 +735,8 @@ void readOptions(Options &opts,
         opts.lspDocumentFormatRubyfmtEnabled =
             FileOps::exists(opts.rubyfmtPath) &&
             (enableAllLSPFeatures || raw["enable-experimental-lsp-document-formatting-rubyfmt"].as<bool>());
-
-        opts.lspExperimentalFastPathEnabled = raw["enable-experimental-lsp-fast-path"].as<bool>();
+        opts.outOfOrderReferenceChecksEnabled = raw["check-out-of-order-constant-references"].as<bool>();
+        opts.trackUntyped = raw["track-untyped"].as<bool>();
 
         if (raw.count("lsp-directories-missing-from-client") > 0) {
             auto lspDirsMissingFromClient = raw["lsp-directories-missing-from-client"].as<vector<string>>();
@@ -849,8 +788,7 @@ void readOptions(Options &opts,
 
         // Certain features only need certain passes
         if (opts.print.isAutogen() && (opts.stopAfterPhase != Phase::NAMER)) {
-            logger->error(
-                "-p autogen{-msgpack,-classlist,-subclasses,-autoloader} must also include --stop-after=namer");
+            logger->error("-p autogen{-msgpack,-classlist,-subclasses} must also include --stop-after=namer");
             throw EarlyReturnWithCode(1);
         }
 
@@ -877,13 +815,18 @@ void readOptions(Options &opts,
         }
 
         if (raw.count("autogen-behavior-allowed-in-rbi-files-paths") > 0) {
-            if (!opts.print.isAutogen() || opts.print.AutogenAutoloader.enabled) {
+            if (!opts.print.isAutogen()) {
                 logger->error("autogen-behavior-allowed-in-rbi-files-paths can only be used with -p autogen or -p "
                               "autogen-msgpack");
                 throw EarlyReturnWithCode(1);
             }
             opts.autogenBehaviorAllowedInRBIFilesPaths =
                 raw["autogen-behavior-allowed-in-rbi-files-paths"].as<vector<string>>();
+        }
+
+        if (opts.print.UntypedBlame.enabled && !opts.trackUntyped) {
+            logger->error("-p untyped-blame:<output-path> must also include --track-untyped");
+            throw EarlyReturnWithCode(1);
         }
 
         extractAutogenConstCacheConfig(raw, opts.autogenConstantCacheConfig);
@@ -1017,6 +960,25 @@ void readOptions(Options &opts,
                 opts.secondaryTestPackageNamespaces.emplace_back(ns);
             }
         }
+
+        if (raw.count("skip-package-import-visibility-check-for")) {
+            if (!opts.stripePackages) {
+                logger->error(
+                    "--skip-package-import-visibility-check-for can only be specified in --stripe-packages mode");
+                throw EarlyReturnWithCode(1);
+            }
+            std::regex nsValid("[A-Z][a-zA-Z0-9:]+");
+            for (const string &ns : raw["skip-package-import-visibility-check-for"].as<vector<string>>()) {
+                if (!std::regex_match(ns, nsValid)) {
+                    logger->error(
+                        "--skip-package-import-visibility-check-for must contain items that start with a capital "
+                        "letter and are alphanumeric.");
+                    throw EarlyReturnWithCode(1);
+                }
+                opts.skipPackageImportVisibilityCheckFor.emplace_back(ns);
+            }
+        }
+
         opts.stripePackagesHint = raw["stripe-packages-hint-message"].as<string>();
         if (!opts.stripePackagesHint.empty() && !opts.stripePackages) {
             if (!opts.stripePackages) {
@@ -1071,7 +1033,6 @@ void readOptions(Options &opts,
             }
         }
 
-        extractAutoloaderConfig(raw, opts, logger);
         opts.errorUrlBase = raw["error-url-base"].as<string>();
         opts.noErrorSections = raw["no-error-sections"].as<bool>();
         opts.ruby3KeywordArgs = raw["experimental-ruby3-keyword-args"].as<bool>();

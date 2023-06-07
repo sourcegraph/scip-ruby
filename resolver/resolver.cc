@@ -3,7 +3,7 @@
 #include "ast/Trees.h"
 #include "ast/ast.h"
 #include "ast/treemap/treemap.h"
-#include "common/sort.h"
+#include "common/sort/sort.h"
 #include "core/Error.h"
 #include "core/Names.h"
 #include "core/StrictLevel.h"
@@ -17,8 +17,8 @@
 #include "absl/algorithm/container.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
-#include "common/Timer.h"
 #include "common/concurrency/ConcurrentQueue.h"
+#include "common/timers/Timer.h"
 #include "core/Symbols.h"
 #include <utility>
 #include <vector>
@@ -129,7 +129,16 @@ private:
 
         Nesting(shared_ptr<Nesting> parent, core::SymbolRef scope) : parent(std::move(parent)), scope(scope) {}
     };
+
     shared_ptr<Nesting> nesting_;
+
+    // Map of SymbolRef to first location of a symbol definition in a file. This is used for out-of-order reference
+    // checking. When present in this map, the loc stored is different than a symbol's canonical loc. Specifically,
+    // in case there are multiple definitions of a symbol in the same file, we store the loc of the *first* one.
+    UnorderedMap<core::SymbolRef, core::LocOffsets> firstDefinitionLocs;
+
+    // Increments to track whether we're at a class top level or whether we're inside a block/method body.
+    int loadScopeDepth_;
 
     struct ConstantResolutionItem {
         shared_ptr<Nesting> scope;
@@ -295,10 +304,47 @@ private:
         return !checker.seenUnresolved;
     }
 
+    // Find load-time out-of-order references.
+    // Algorithm:
+    // if resolved symbol is only defined in the current file, and
+    //    the definition is after the reference loc,
+    // then, report an error.
+    static void checkReferenceOrder(core::Context ctx, core::SymbolRef resolutionResult,
+                                    const ast::UnresolvedConstantLit &c,
+                                    const UnorderedMap<core::SymbolRef, core::LocOffsets> &firstDefinitionLocs) {
+        if (!ctx.file.data(ctx).isRBI() && resolutionResult.exists() &&
+            resolutionResult.isOnlyDefinedInFile(ctx.state, ctx.file)) {
+            core::LocOffsets defLoc;
+            const auto it = firstDefinitionLocs.find(resolutionResult);
+
+            if (it != firstDefinitionLocs.end()) {
+                // Use the loc from the local first defs table, if it exists.
+                // When the symbol is declared multiple times in the same file, we want to ensure that
+                // we compare against the *first* definition.
+                defLoc = it->second;
+            } else {
+                // If the symbol isn't in the local first defs table, that means its loc
+                // in the symbol table is the same as its first definition in this file.
+                // (We skip storing redundant information in firstDefinitionLocs to save memory)
+                defLoc = resolutionResult.loc(ctx).offsets();
+            }
+
+            // Check for ordering between reference loc and definition loc.
+            const auto &refLoc = c.loc;
+            if (defLoc.beginPos() > refLoc.endPos()) {
+                if (auto e = ctx.beginError(c.loc, core::errors::Resolver::OutOfOrderConstantAccess)) {
+                    e.setHeader("`{}` referenced before it is defined", resolutionResult.show(ctx));
+                    e.addErrorLine(ctx.locAt(defLoc), "Defined here");
+                }
+            }
+        }
+    }
+
     static core::SymbolRef resolveConstant(core::Context ctx, const shared_ptr<Nesting> &nesting,
                                            const ast::UnresolvedConstantLit &c, bool &resolutionFailed) {
         if (ast::isa_tree<ast::EmptyTree>(c.scope)) {
             core::SymbolRef result = resolveLhs(ctx, nesting, c.cnst);
+
             return result;
         }
         if (auto *id = ast::cast_tree<ast::ConstantLit>(c.scope)) {
@@ -329,6 +375,7 @@ private:
                     e.setHeader("Non-private reference to private constant `{}` referenced", result.show(ctx));
                 }
             }
+
             return result;
         }
 
@@ -396,7 +443,7 @@ private:
         PackageStub stub;
         vector<core::NameRef> exports;
 
-        // NOTE: these are the public-facing exports of the package that start with the `Test::` special prefix.  They
+        // NOTE: these are the public-facing exports of the package that start with the `Test::` special prefix. They
         // are not the names exported to the implicit test package via `export_for_test`.
         vector<core::NameRef> testExports;
 
@@ -488,6 +535,7 @@ private:
                                                  ast::cast_tree<ast::UnresolvedConstantLit>(out->original)->cnst);
 
         auto data = symbol.data(ctx);
+        data->setIsModule(true); // This is what would happen in finalizeAncestors
         // force a singleton into existence
         auto singletonClass = data->singletonClass(ctx);
         if (possibleGenericType) {
@@ -731,46 +779,84 @@ private:
                 if (!foundCommonTypo && suggestionCount < MAX_SUGGESTION_COUNT && suggestScope.exists() &&
                     suggestScope.isClassOrModule()) {
                     suggestionCount++;
+
                     auto suggested =
                         suggestScope.asClassOrModuleRef().data(ctx)->findMemberFuzzyMatch(ctx, original.cnst);
+
+                    if (ctx.file.data(ctx).isPackage() &&
+                        !suggestScope.asClassOrModuleRef().isPackageSpecSymbol(ctx.state)) {
+                        // In case the file is a __package.rb file, and the scope is not a PackageSpec-scoped symbol,
+                        // the resolution error must be in an export statement. In this case, suggestions must be
+                        // restricted to within the current package only. They must not cross package boundaries as
+                        // out-of-package suggestions would be inherently invalid.
+
+                        // TODO (aadi-stripe) Find a less brittle way of ascertaining whether the error comes from an
+                        // export statement. Currently (1/9/23) this happens to work because export statements are the
+                        // only part of the packager DSL that do not prepend PackageSpec to the relevant constant.
+
+                        // Can't use pkg.ownsSymbol since it uses symbol definition locs, which have an edge case that
+                        // isn't handled until the VisibilityChecker pass.
+                        const auto pkgRootSymbol = ctx.state.packageDB()
+                                                       .getPackageForFile(ctx.state, ctx.file)
+                                                       .getRootSymbolForAutocorrectSearch(ctx.state, suggestScope);
+
+                        auto it = std::remove_if(suggested.begin(), suggested.end(),
+                                                 [&pkgRootSymbol, &gs](auto &suggestion) -> bool {
+                                                     return !suggestion.symbol.isUnderNamespace(gs, pkgRootSymbol);
+                                                 });
+                        suggested.erase(it, suggested.end());
+                    }
+
                     if (suggested.size() > 3) {
                         suggested.resize(3);
                     }
-                    if (!suggested.empty()) {
-                        for (auto suggestion : suggested) {
-                            const auto replacement = suggestion.symbol.show(ctx);
-                            e.didYouMean(replacement, ctx.locAt(job.out->loc));
-                            e.addErrorLine(suggestion.symbol.loc(ctx), "`{}` defined here", replacement);
+                    for (auto suggestion : suggested) {
+                        const auto replacement = suggestion.symbol.show(ctx);
+                        auto replaceLoc = ctx.locAt(job.out->loc);
+                        if (replaceLoc.source(ctx) == replacement) {
+                            // The replacement is the same as the original.
+                            // This can happen for a number of reasons, usually due to things
+                            // where one of the names has an unprintable name from a rewriter.
+                            // It's confusing to see those bad did you mean and they don't
+                            // provide value.
+                            continue;
                         }
+                        e.didYouMean(replacement, replaceLoc);
+                        e.addErrorLine(suggestion.symbol.loc(ctx), "`{}` defined here", replacement);
                     }
                 }
             }
         }
     }
 
-    static bool resolveJob(core::Context ctx, ConstantResolutionItem &job) {
-        if (isAlreadyResolved(ctx, *job.out)) {
-            if (job.possibleGenericType) {
+    static bool resolveConstantJob(core::Context ctx, const shared_ptr<Nesting> &nesting, ast::ConstantLit *out,
+                                   bool &resolutionFailed, const bool possibleGenericType) {
+        if (isAlreadyResolved(ctx, *out)) {
+            if (possibleGenericType) {
                 return false;
             }
             return true;
         }
-        auto &original = ast::cast_tree_nonnull<ast::UnresolvedConstantLit>(job.out->original);
-        auto resolved = resolveConstant(ctx.withOwner(job.scope->scope), job.scope, original, job.resolutionFailed);
+        auto &original = ast::cast_tree_nonnull<ast::UnresolvedConstantLit>(out->original);
+        auto resolved = resolveConstant(ctx.withOwner(nesting->scope), nesting, original, resolutionFailed);
         if (!resolved.exists()) {
             return false;
         }
         if (resolved.isTypeAlias(ctx)) {
             auto resolvedField = resolved.asFieldRef();
             if (resolvedField.data(ctx)->resultType != nullptr) {
-                job.out->symbol = resolved;
+                out->symbol = resolved;
                 return true;
             }
             return false;
         }
 
-        job.out->symbol = resolved;
+        out->symbol = resolved;
         return true;
+    }
+
+    static bool resolveJob(core::Context ctx, ConstantResolutionItem &job) {
+        return resolveConstantJob(ctx, job.scope, job.out, job.resolutionFailed, job.possibleGenericType);
     }
 
     static bool resolveConstantResolutionItems(const core::GlobalState &gs,
@@ -1059,7 +1145,7 @@ private:
                 continue;
             }
             auto idSymbol = id->symbol.asClassOrModuleRef();
-            if (idSymbol.data(gs)->isUndeclared()) {
+            if (!idSymbol.data(gs)->isDeclared()) {
                 if (auto e = gs.beginError(idLoc, core::errors::Resolver::InvalidMixinDeclaration)) {
                     e.setHeader("`{}` is declared implicitly, but must be defined as a `{}` explicitly",
                                 id->symbol.show(gs), "module");
@@ -1200,18 +1286,6 @@ private:
         owner.data(gs)->recordRequiredAncestor(gs, symbol, blockLoc);
     }
 
-    static void tryRegisterSealedSubclass(core::MutableContext ctx, AncestorResolutionItem &job) {
-        ENFORCE(job.ancestor->symbol.exists(), "Ancestor must exist, or we can't check whether it's sealed.");
-        auto ancestorSym = job.ancestor->symbol.dealias(ctx).asClassOrModuleRef();
-
-        if (!ancestorSym.data(ctx)->flags.isSealed) {
-            return;
-        }
-        Timer timeit(ctx.state.tracer(), "resolver.registerSealedSubclass");
-
-        ancestorSym.data(ctx)->recordSealedSubclass(ctx, job.klass);
-    }
-
     void transformAncestor(core::Context ctx, core::ClassOrModuleRef klass, ast::ExpressionPtr &ancestor,
                            bool isInclude, bool isSuperclass = false) {
         if (auto *constScope = ast::cast_tree<ast::UnresolvedConstantLit>(ancestor)) {
@@ -1266,10 +1340,28 @@ private:
             walkUnresolvedConstantLit(ctx, c->scope);
             auto loc = c->loc;
             auto out = ast::make_expression<ast::ConstantLit>(loc, core::Symbols::noSymbol(), std::move(tree));
-            ConstantResolutionItem job{nesting_, ast::cast_tree<ast::ConstantLit>(out)};
-            if (resolveJob(ctx, job)) {
+            auto *constant = ast::cast_tree<ast::ConstantLit>(out);
+            bool resolutionFailed = false;
+            const bool possibleGenericType = false;
+            if (resolveConstantJob(ctx, nesting_, constant, resolutionFailed, possibleGenericType)) {
                 categoryCounterInc("resolve.constants.nonancestor", "firstpass");
+                if (loadScopeDepth_ == 0 && (!constant->symbol.isClassOrModule() ||
+                                             constant->symbol.asClassOrModuleRef().data(ctx)->isDeclared())) {
+                    // While Sorbet treats class A::B; end like an implicit definition of A, it's actually a
+                    // reference of A--Ruby will require a proper definition of A elsewhere. Long term,
+                    // Sorbet should be taught to emit errors when these references are not actually defined,
+                    // matching Ruby's behavior. Then the reference order checks will be able to check all
+                    // references against their definitions, and not limit them to only isDeclared symbols here.
+
+                    // (Historically, Stripe's custom autoloader used static analysis to predeclare these
+                    // intermediate namespaces, so they would always be defined at the right time. As Stripe's
+                    // codebase moves away from this legacy autoloader, it will be easier to introduce such
+                    // changes into Sorbet.)
+                    checkReferenceOrder(ctx, constant->symbol, *c, firstDefinitionLocs);
+                }
             } else {
+                ConstantResolutionItem job{nesting_, constant};
+                job.resolutionFailed = resolutionFailed;
                 todo_.emplace_back(std::move(job));
             }
             tree = std::move(out);
@@ -1285,14 +1377,62 @@ private:
     }
 
 public:
-    ResolveConstantsWalk() : nesting_(nullptr) {}
+    ResolveConstantsWalk() : nesting_(nullptr), loadScopeDepth_(0) {}
 
-    void preTransformClassDef(core::Context ctx, ast::ExpressionPtr &tree) {
-        nesting_ = make_unique<Nesting>(std::move(nesting_), ast::cast_tree_nonnull<ast::ClassDef>(tree).symbol);
+    void preTransformMethodDef(core::Context ctx, ast::ExpressionPtr &tree) {
+        ENFORCE(loadScopeDepth_ >= 0);
+        loadScopeDepth_++;
+    }
+
+    void postTransformMethodDef(core::Context ctx, ast::ExpressionPtr &tree) {
+        ENFORCE(loadScopeDepth_ > 0);
+        loadScopeDepth_--;
+    }
+
+    void preTransformBlock(core::Context ctx, ast::ExpressionPtr &tree) {
+        ENFORCE(loadScopeDepth_ >= 0);
+        loadScopeDepth_++;
+    }
+
+    void postTransformBlock(core::Context ctx, ast::ExpressionPtr &tree) {
+        ENFORCE(loadScopeDepth_ > 0);
+        loadScopeDepth_--;
     }
 
     void postTransformUnresolvedConstantLit(core::Context ctx, ast::ExpressionPtr &tree) {
         walkUnresolvedConstantLit(ctx, tree);
+    }
+
+    void preTransformClassDef(core::Context ctx, ast::ExpressionPtr &tree) {
+        auto &original = ast::cast_tree_nonnull<ast::ClassDef>(tree);
+        auto sym = original.symbol;
+
+        // Populate local first definitions table for out-of-order reference checking.
+        // We only do this when we know we're going to need to consult the first definition loc and
+        // we know the information in the symbol table is insufficient. This avoids reundant memory
+        // storage overhead.
+        //
+        // In particular, `firstDefinitionLocs` does not store anything if this symbol is defined in
+        // more than one non-RBI file or if it's only defined once in this file.
+        // Otherwise, it stores the loc of the first definition of the symbol in this file.
+        if (!ctx.file.data(ctx).isRBI() && loadScopeDepth_ == 0 && sym.isOnlyDefinedInFile(ctx.state, ctx.file)) {
+            auto defLoc = sym.data(ctx)->loc();
+
+            if (!defLoc.file().data(ctx).isRBI()) {
+                ENFORCE(defLoc.file() == ctx.file);
+                auto declLoc = original.declLoc;
+
+                if (defLoc.beginPos() > declLoc.endPos()) {
+                    // When this condition is met, it means the file has multiple definitions of the symbol.
+                    // If the insert succeeds below, the current definition is the first one.
+                    // We need to use the first def for out-of-order checking, since any
+                    // reference *before* the first def will be out of order.
+                    firstDefinitionLocs.insert(std::make_pair(sym, declLoc));
+                }
+            }
+        }
+
+        nesting_ = make_unique<Nesting>(std::move(nesting_), sym);
     }
 
     void postTransformClassDef(core::Context ctx, ast::ExpressionPtr &tree) {
@@ -1386,7 +1526,7 @@ public:
         }
 
         const auto &precedingSymKlass = precedingSymForCurDef.asClassOrModuleRef().data(ctx);
-        if (!precedingSymKlass->isUndeclared()) {
+        if (precedingSymKlass->isDeclared()) {
             // Not a filler def, but a real def
             return defaultSymbol;
         }
@@ -1418,6 +1558,32 @@ public:
         auto *id = ast::cast_tree<ast::ConstantLit>(asgn.lhs);
         if (id == nullptr || !id->symbol.isStaticField(ctx)) {
             return;
+        }
+
+        // Populate local first definitions table for out-of-order reference checking.
+        // We only do this when we know we're going to need to consult the first definition loc and
+        // we know the information in the symbol table is insufficient. This avoids reundant memory
+        // storage overhead.
+        //
+        // In particular, `firstDefinitionLocs` does not store anything if this symbol is defined in
+        // more than one non-RBI file or if it's only defined once in this file.
+        // Otherwise, it stores the loc of the first definition of the symbol in this file.
+        if (!ctx.file.data(ctx).isRBI() && loadScopeDepth_ == 0 &&
+            id->symbol.isOnlyDefinedInFile(ctx.state, ctx.file)) {
+            auto defLoc = id->symbol.loc(ctx);
+
+            if (!defLoc.file().data(ctx).isRBI()) {
+                ENFORCE(defLoc.file() == ctx.file);
+                auto declLoc = asgn.loc;
+
+                if (defLoc.beginPos() > declLoc.endPos()) {
+                    // When this condition is met, it means the file has multiple definitions of the symbol.
+                    // If the insert succeeds below, the current definition is the first one.
+                    // We need to use the first def for out-of-order checking, since any
+                    // reference *before* the first def will be out of order.
+                    firstDefinitionLocs.insert(std::make_pair(id->symbol, declLoc));
+                }
+            }
         }
 
         auto *send = ast::cast_tree<ast::Send>(asgn.rhs);
@@ -1659,9 +1825,6 @@ public:
                     const auto origSize = job.items.size();
                     auto g = [&](AncestorResolutionItem &item) -> bool {
                         auto resolved = resolveAncestorJob(ctx, item, false);
-                        if (resolved) {
-                            tryRegisterSealedSubclass(ctx, item);
-                        }
                         return resolved;
                     };
                     auto fileIt = remove_if(job.items.begin(), job.items.end(), std::move(g));
@@ -1803,12 +1966,10 @@ public:
                 }
             }
 
-            if (singlePackageRbiGeneration) {
-                for (auto &job : todoClassAliases) {
-                    core::MutableContext ctx(gs, core::Symbols::root(), job.file);
-                    for (auto &item : job.items) {
-                        resolveClassAliasJob(ctx, item);
-                    }
+            for (auto &job : todoClassAliases) {
+                core::MutableContext ctx(gs, core::Symbols::root(), job.file);
+                for (auto &item : job.items) {
+                    resolveClassAliasJob(ctx, item);
                 }
             }
 
@@ -1893,6 +2054,11 @@ class ResolveTypeMembersAndFieldsWalk {
         core::NameRef fromName;
     };
 
+    struct RecordSealedSubclassItem {
+        core::ClassOrModuleRef sealedClass;
+        core::ClassOrModuleRef subclass;
+    };
+
     struct ResolveTypeMembersAndFieldsWorkerResult {
         vector<ast::ParsedFile> files;
         vector<ResolveAssignItem> todoAssigns;
@@ -1903,6 +2069,7 @@ class ResolveTypeMembersAndFieldsWalk {
         vector<ResolveStaticFieldItem> todoResolveStaticFieldItems;
         vector<ResolveSimpleStaticFieldItem> todoResolveSimpleStaticFieldItems;
         vector<ResolveMethodAliasItem> todoMethodAliasItems;
+        vector<RecordSealedSubclassItem> todoSealedSubclassItems;
     };
 
     struct ResolveTypeMembersAndFieldsResult {
@@ -1918,6 +2085,7 @@ class ResolveTypeMembersAndFieldsWalk {
     vector<ResolveStaticFieldItem> todoResolveStaticFieldItems_;
     vector<ResolveSimpleStaticFieldItem> todoResolveSimpleStaticFieldItems_;
     vector<ResolveMethodAliasItem> todoMethodAliasItems_;
+    vector<RecordSealedSubclassItem> todoSealedSubclassItems_;
 
     // State for tracking type usage inside of a type alias or type member
     // definition
@@ -2119,7 +2287,8 @@ class ResolveTypeMembersAndFieldsWalk {
                     return;
                 }
 
-                if (cast.cast != core::Names::let() && cast.cast != core::Names::uncheckedLet()) {
+                if (cast.cast != core::Names::let() && cast.cast != core::Names::uncheckedLet() &&
+                    cast.cast != core::Names::assumeType()) {
                     if (auto e = ctx.beginError(cast.loc, core::errors::Resolver::ConstantAssertType)) {
                         e.setHeader("Use `{}` to specify the type of constants", "T.let");
                     }
@@ -2708,6 +2877,25 @@ public:
         if (isGenericResolved(ctx, klass.symbol)) {
             todoAttachedClassItems_.emplace_back(ResolveAttachedClassItem{ctx.owner, klass.symbol, ctx.file});
         }
+
+        for (const auto &ancestor : klass.ancestors) {
+            auto *ancestorCnst = ast::cast_tree<ast::ConstantLit>(ancestor);
+            if (ancestorCnst == nullptr) {
+                continue;
+            }
+
+            auto dealiased = ancestorCnst->symbol.dealias(ctx);
+            if (!dealiased.isClassOrModule()) {
+                continue;
+            }
+
+            auto ancestorSym = dealiased.asClassOrModuleRef();
+            if (!ancestorSym.data(ctx)->flags.isSealed) {
+                continue;
+            }
+
+            todoSealedSubclassItems_.emplace_back(RecordSealedSubclassItem{ancestorSym, klass.symbol});
+        }
     }
 
     void postTransformClassDef(core::Context ctx, ast::ExpressionPtr &tree) {
@@ -2805,10 +2993,26 @@ public:
     }
 
     void postTransformCast(core::Context ctx, ast::ExpressionPtr &tree) {
+        auto *cast = ast::cast_tree<ast::Cast>(tree);
+        if (cast->cast == core::Names::assumeType()) {
+            // This cast was not written by the user. Before we attempt to parse it as a type, let's
+            // make sure that it's even possible to be valid.
+            auto *cnst = ast::cast_tree<ast::ConstantLit>(cast->typeExpr);
+            ENFORCE(cnst != nullptr, "Rewriter should always use const for typeExpr, which should now be resolved");
+            if (!cnst->symbol.isClassOrModule() || cnst->symbol.asClassOrModuleRef().data(ctx)->flags.isModule ||
+                cnst->symbol.asClassOrModuleRef().data(ctx)->typeArity(ctx) > 0) {
+                // The rewriter was over-eager in attempting to infer type `A` for `A.new` because
+                // `A` was not a class (or was a generic class, and thus generated the wrong annotation).
+                // Get rid of the cast, replace it with the original arg.
+                tree = move(cast->arg);
+                return;
+            }
+        }
+
         ResolveCastItem item;
         item.file = ctx.file;
         item.owner = ctx.owner;
-        item.cast = ast::cast_tree<ast::Cast>(tree);
+        item.cast = cast;
         item.inFieldAssign = this->inFieldAssign.back();
         if (!tryResolveSimpleClassCastItem(ctx.state, item)) {
             todoResolveCastItems_.emplace_back(move(item));
@@ -2841,6 +3045,7 @@ public:
                 case core::Names::let().rawId():
                 case core::Names::bind().rawId():
                 case core::Names::uncheckedLet().rawId():
+                case core::Names::assumeType().rawId():
                 case core::Names::assertType().rawId():
                 case core::Names::cast().rawId(): {
                     if (send.numPosArgs() < 2) {
@@ -3025,6 +3230,7 @@ public:
                 output.todoResolveStaticFieldItems = move(walk.todoResolveStaticFieldItems_);
                 output.todoResolveSimpleStaticFieldItems = move(walk.todoResolveSimpleStaticFieldItems_);
                 output.todoMethodAliasItems = move(walk.todoMethodAliasItems_);
+                output.todoSealedSubclassItems = move(walk.todoSealedSubclassItems_);
                 auto count = output.files.size();
                 outputq->push(move(output), count);
             }
@@ -3041,6 +3247,7 @@ public:
         vector<vector<ResolveStaticFieldItem>> combinedTodoResolveStaticFieldItems;
         vector<vector<ResolveSimpleStaticFieldItem>> combinedTodoResolveSimpleStaticFieldItems;
         vector<vector<ResolveMethodAliasItem>> combinedTodoMethodAliasItems;
+        vector<vector<RecordSealedSubclassItem>> combinedTodoSealedSubclassItems;
 
         {
             ResolveTypeMembersAndFieldsWorkerResult threadResult;
@@ -3062,6 +3269,7 @@ public:
                     combinedTodoResolveSimpleStaticFieldItems.emplace_back(
                         move(threadResult.todoResolveSimpleStaticFieldItems));
                     combinedTodoMethodAliasItems.emplace_back(move(threadResult.todoMethodAliasItems));
+                    combinedTodoSealedSubclassItems.emplace_back(move(threadResult.todoSealedSubclassItems));
                 }
             }
         }
@@ -3169,6 +3377,14 @@ public:
             for (auto &job : threadTodos) {
                 core::MutableContext ctx(gs, job.owner, job.file);
                 resolveMethodAlias(ctx, job);
+            }
+        }
+        {
+            Timer timeit(gs.tracer(), "resolver.registerSealedSubclass");
+            for (auto &threadTodos : combinedTodoSealedSubclassItems) {
+                for (auto &[sealedClass, subclass] : threadTodos) {
+                    sealedClass.data(gs)->recordSealedSubclass(gs, subclass);
+                }
             }
         }
 
@@ -3438,9 +3654,7 @@ private:
             if (spec != sig.argTypes.end()) {
                 ENFORCE(spec->type != nullptr);
 
-                // TODO(#4095) Raise error if `bind` used for non-`&blk` arg
-                if (!isBlkArg && (spec->rebind == core::Symbols::MagicBindToAttachedClass() ||
-                                  spec->rebind == core::Symbols::MagicBindToSelfType())) {
+                if (!isBlkArg && spec->rebind.exists()) {
                     if (auto e = ctx.state.beginError(spec->nameLoc, core::errors::Resolver::BindNonBlockParameter)) {
                         e.setHeader("Using `{}` is not permitted here", "bind");
                         e.addErrorNote("Only block arguments can use `{}`", "bind");
@@ -3774,6 +3988,7 @@ public:
                 overloadSym =
                     ctx.state.enterNewMethodOverload(ctx.locAt(sig.loc), mdef.symbol, originalName, i, sig.argsToKeep);
                 overloadSym.data(ctx)->setMethodVisibility(mdef.symbol.data(ctx)->methodVisibility());
+                overloadSym.data(ctx)->intrinsicOffset = mdef.symbol.data(ctx)->intrinsicOffset;
                 if (i != sigs.size() - 1) {
                     overloadSym.data(ctx)->flags.isOverloaded = true;
                 }
@@ -4082,14 +4297,15 @@ vector<ast::ParsedFile> resolveSigs(core::GlobalState &gs, vector<ast::ParsedFil
     return trees;
 }
 void sanityCheck(const core::GlobalState &gs, vector<ast::ParsedFile> &trees) {
-    if (debug_mode) {
+    SLOW_DEBUG_ONLY({
         Timer timeit(gs.tracer(), "resolver.sanity_check");
         ResolveSanityCheckWalk sanity;
         for (auto &tree : trees) {
             core::Context ctx(gs, core::Symbols::root(), tree.file);
+            ENFORCE(tree.tree);
             ast::TreeWalk::apply(ctx, sanity, tree.tree);
         }
-    }
+    });
 }
 
 void verifyLinearizationComputed(const core::GlobalState &gs) {
@@ -4116,6 +4332,7 @@ ast::ParsedFilesOrCancelled Resolver::run(core::GlobalState &gs, vector<ast::Par
     if (epochManager.wasTypecheckingCanceled()) {
         return ast::ParsedFilesOrCancelled::cancel(move(trees), workers);
     }
+
     auto rtmafResult = ResolveTypeMembersAndFieldsWalk::run(gs, std::move(trees), workers);
     if (epochManager.wasTypecheckingCanceled()) {
         return ast::ParsedFilesOrCancelled::cancel(move(rtmafResult.trees), workers);
@@ -4131,7 +4348,8 @@ ast::ParsedFilesOrCancelled Resolver::run(core::GlobalState &gs, vector<ast::Par
     return result;
 }
 
-ast::ParsedFilesOrCancelled Resolver::runIncremental(core::GlobalState &gs, vector<ast::ParsedFile> trees) {
+ast::ParsedFilesOrCancelled Resolver::runIncremental(core::GlobalState &gs, vector<ast::ParsedFile> trees,
+                                                     bool ranIncrementalNamer) {
     auto workers = WorkerPool::create(0, gs.tracer());
     trees = ResolveConstantsWalk::resolveConstants(gs, std::move(trees), *workers);
     // NOTE: Linearization does not need to be recomputed as we do not mutate mixins() during incremental resolve.
@@ -4139,7 +4357,13 @@ ast::ParsedFilesOrCancelled Resolver::runIncremental(core::GlobalState &gs, vect
     // (verifyLinearizationComputed vs finalizeAncestors is currently the only difference between
     // `run` and `runIncremental`. If we ever change the fast path in a way that needs linearization
     // to be recomputed, we can simply make `runIncremental` be `run`.)
-    Resolver::finalizeSymbols(gs);
+    // Note: While this ^ is technically true from a correctness perspective, finalizeSymbols is too
+    // slow to run on all fast path edits, and so is skipped for performance (unless required).
+    // If we had a faster/incremental way to do finalizeSymbols, we could maybe start
+    // unconditionally finalizing symbols again, and then the above note about lineraization would apply.
+    if (ranIncrementalNamer) {
+        Resolver::finalizeSymbols(gs);
+    }
     auto rtmafResult = ResolveTypeMembersAndFieldsWalk::run(gs, std::move(trees), *workers);
     auto result = resolveSigs(gs, std::move(rtmafResult.trees), *workers);
     ResolveTypeMembersAndFieldsWalk::resolvePendingCastItems(gs, rtmafResult.todoResolveCastItems);

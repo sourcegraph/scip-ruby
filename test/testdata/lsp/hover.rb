@@ -81,11 +81,11 @@ class BigFoo; extend T::Sig
   # Tests return markdown output
   sig {void}
   def tests_return_markdown
-    # ^^^^^^^^^^^^^^^^^^^^^ hover: ```ruby
-    # ^^^^^^^^^^^^^^^^^^^^^ hover: sig {void}
-    # ^^^^^^^^^^^^^^^^^^^^^ hover: ```
-    # ^^^^^^^^^^^^^^^^^^^^^ hover: ---
-    # ^^^^^^^^^^^^^^^^^^^^^ hover: Tests return markdown output
+    # ^^^^^^^^^^^^^^^^^^^^^ hover-line: 1 ```ruby
+    # ^^^^^^^^^^^^^^^^^^^^^ hover-line: 2 sig {void}
+    # ^^^^^^^^^^^^^^^^^^^^^ hover-line: 4 ```
+    # ^^^^^^^^^^^^^^^^^^^^^ hover-line: 6 ---
+    # ^^^^^^^^^^^^^^^^^^^^^ hover-line: 8 Tests return markdown output
   end
 end
 
@@ -105,9 +105,9 @@ def main
   # Test primitive types
   n = nil
 # ^ hover: NilClass
-  t = true 
+  t = true
 # ^ hover: TrueClass
-  f = false 
+  f = false
 # ^ hover: FalseClass
   r = //
 # ^ hover: Regexp
@@ -144,5 +144,5 @@ def main
   hoo = BigFoo::LittleFoo1.new
                          # ^^^ hover: sig {returns(BigFoo::LittleFoo1)}
   raise "error message"
-# ^ hover: sig {params(arg0: String).returns(T.noreturn)}
+  # ^ hover-line: 4     arg0: T.any(T::Class[T.anything], Exception, String)
 end

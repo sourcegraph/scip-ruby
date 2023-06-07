@@ -36,8 +36,8 @@ cc_binary(
         "//rewriter",
         "//test/helpers",
         "@cxxopts",
-        "@doctest",
-        "@doctest//:doctest_custom_main",
+        "@doctest//doctest",
+        "@doctest//doctest:custom_main",
     ],
 )
 
@@ -58,8 +58,8 @@ cc_binary(
         "//payload",
         "//test/helpers",
         "@cxxopts",
-        "@doctest",
-        "@doctest//:doctest_custom_main",
+        "@doctest//doctest",
+        "@doctest//doctest:custom_main",
     ],
 )
 
@@ -99,8 +99,8 @@ cc_binary(
         "//test/helpers",
         "@com_google_absl//absl/strings",
         "@cxxopts",
-        "@doctest",
-        "@doctest//:doctest_custom_main",
+        "@doctest//doctest",
+        "@doctest//doctest:custom_main",
     ],
 )
 
@@ -133,8 +133,8 @@ cc_binary(
         "//rewriter",
         "//test/helpers",
         "@cxxopts",
-        "@doctest",
-        "@doctest//:doctest_custom_main",
+        "@doctest//doctest",
+        "@doctest//doctest:custom_main",
     ],
 )
 
@@ -181,8 +181,8 @@ cc_test(
         "//parser",
         "//payload",
         "@cxxopts",
-        "@doctest",
-        "@doctest//:doctest_main",
+        "@doctest//doctest",
+        "@doctest//doctest:main",
     ],
 )
 
@@ -204,8 +204,8 @@ cc_test(
         "//local_vars",
         "//packager",
         "//parser",
-        "@doctest",
-        "@doctest//:doctest_main",
+        "@doctest//doctest",
+        "@doctest//doctest:main",
     ],
 )
 
@@ -224,8 +224,8 @@ cc_test(
         "//common",
         "//core",
         "//parser",
-        "@doctest",
-        "@doctest//:doctest_main",
+        "@doctest//doctest",
+        "@doctest//doctest:main",
     ],
 )
 
@@ -423,6 +423,9 @@ sh_binary(
         "//main:sorbet",
         "@sorbet_ruby_2_7//:ruby",
     ],
+    # This is to get the test to run on the compiler build job,
+    # so we can avoid building ruby on the test-static-sanitized job.
+    tags = ["compiler"],
     deps = [
         ":logging",
         "@bazel_tools//tools/bash/runfiles",

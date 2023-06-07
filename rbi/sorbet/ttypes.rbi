@@ -73,6 +73,17 @@ class T::Types::Untyped < T::Types::Base
   def valid?(obj); end
 end
 
+class T::Types::Anything < T::Types::Base
+  sig {void}
+  def initialize; end
+
+  sig {returns(String)}
+  def name; end
+
+  sig {params(obj: T.anything).returns(T::Boolean)}
+  def valid?(obj); end
+end
+
 class T::Types::Proc < T::Types::Base
   def initialize(arg_types, returns); end
   def name; end
@@ -93,6 +104,14 @@ class T::Types::Enum < T::Types::Base
   def name; end
   def describe_obj(obj); end
   def values; end
+end
+
+class T::Types::TEnum < T::Types::Base
+  def initialize(val); end
+  def valid?(obj); end
+  def name; end
+  def describe_obj(obj); end
+  def val; end
 end
 
 class T::Types::SelfType < T::Types::Base
@@ -122,6 +141,7 @@ class T::Types::TypeParameter < T::Types::Base
   def valid?(obj); end
   def subtype_of_single?(type); end
   def name; end
+  def self.make(name); end
 end
 
 # --- stdlib generics ---
@@ -176,3 +196,26 @@ class T::Types::TypedEnumeratorLazy < T::Types::TypedEnumerable
   def type; end
 end
 
+class T::Types::TypedEnumeratorChain < T::Types::TypedEnumerable
+  def name; end
+  def valid?(obj); end
+  def new(*args); end
+  def type; end
+end
+
+class T::Types::TypedClass < T::Types::Base
+  sig {params(type: T.untyped).void}
+  def initialize(type); end
+
+  sig {returns(String)}
+  def name; end
+
+  sig {params(obj: T.anything).returns(T::Boolean)}
+  def valid?(obj); end
+
+  sig {returns(T::Types::Base)}
+  def type; end
+
+  sig {returns(T.class_of(Class))}
+  def underlying_class; end
+end

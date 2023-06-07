@@ -130,6 +130,46 @@ Workspace symbol search:
 
 <img src="/img/lsp/symbolsearch.png" width="75%"/>
 
+Custom extension: Copy Symbol to Clipboard
+
+<video autoplay loop muted playsinline width="597">
+  <source src="/img/copy-symbol.mp4" type="video/mp4">
+</video>
+
+(If you are not using the Sorbet VS Code, you can reimplement this feature in
+your preferred LSP client using the [`sorbet/showSymbol` LSP request].)
+
+[`sorbet/showsymbol` lsp request]:
+  https://github.com/sorbet/sorbet/blob/ec02be89e3d1895ea51bc72464538073d27b812c/vscode_extension/src/LanguageClient.ts#L154-L179
+
+Highlight `T.untyped` code. This feature is in beta.
+
+This feature reports diagnostics to the editor for occurrences of `T.untyped`
+code. Note that it is not yet perfect and may miss occurrences of such values.
+
+It can be enabled by adding the following to your VS Code `settings.json` and
+either reopening VS Code or restarting Sorbet.
+
+```json
+"sorbet.highlightUntyped": true
+```
+
+or by using the `Sorbet: Toggle Highlight untyped values` command from the
+command palette (note this causes a full restart of Sorbet).
+
+To enable this feature in other language clients, configure your language client
+to send
+
+```json
+"initializationOptions": {
+  "highlightUntyped": true
+}
+```
+
+when sending the LSP initialize request to the Sorbet language server.
+
+<img src="/img/lsp/highlight_untyped.png" />
+
 ## Switching between configurations
 
 The Sorbet extension supports switching between multiple configurations to make
@@ -220,7 +260,7 @@ Could not locate Gemfile or .bundle/ directory
 
 If the errors are persistent, and you can reproduce your problem in the sandbox
 at https://sorbet.run/, then you've found an issue with Sorbet in general, not
-necessarily the VSCode Sorbet extension. Please file a bug tagged with "IDE" on
+necessarily the VS Code Sorbet extension. Please file a bug tagged with "IDE" on
 the [issue tracker](https://github.com/sorbet/sorbet/issues).
 
 If the errors are not persistent:

@@ -212,9 +212,9 @@ BasicBlock *CFGBuilder::walkHash(CFGContext cctx, ast::Hash &h, BasicBlock *curr
     synthesizeExpr(current, magic, core::LocOffsets::none(), make_insn<Alias>(core::Symbols::Magic()));
 
     auto isPrivateOk = false;
-    current->exprs.emplace_back(
-        cctx.target, h.loc,
-        make_insn<Send>(magic, h.loc, method, core::LocOffsets::none(), vars.size(), vars, locs, isPrivateOk));
+    current->exprs.emplace_back(cctx.target, h.loc,
+                                make_insn<Send>(magic, h.loc, method, core::LocOffsets::none(), vars.size(), vars,
+                                                std::move(locs), isPrivateOk));
     return current;
 }
 
@@ -581,8 +581,8 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                         argFlags.emplace_back(e.flags);
                     }
                     auto link = make_shared<core::SendAndBlockLink>(s.fun, move(argFlags), newRubyRegionId);
-                    auto send = make_insn<Send>(recv, s.recv.loc(), s.fun, s.funLoc, s.numPosArgs(), args, argLocs,
-                                                !!s.flags.isPrivateOk, link);
+                    auto send = make_insn<Send>(recv, s.recv.loc(), s.fun, s.funLoc, s.numPosArgs(), args,
+                                                std::move(argLocs), !!s.flags.isPrivateOk, link);
                     LocalRef sendTemp = cctx.newTemporary(core::Names::blockPreCallTemp());
                     auto solveConstraint = make_insn<SolveConstraint>(link, sendTemp);
                     current->exprs.emplace_back(LocalOccurrence::synthetic(sendTemp), s.loc, move(send));
@@ -598,49 +598,52 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                     auto bodyLoops = cctx.loops + 1;
                     auto bodyBlock = cctx.inWhat.freshBlock(bodyLoops, newRubyRegionId);
 
-                    auto argTemp = cctx.newTemporaryOccurrence(core::Names::blkArg());
                     bodyBlock->exprs.emplace_back(LocalOccurrence::synthetic(LocalRef::selfVariable()), s.loc,
                                                   make_insn<LoadSelf>(link, LocalRef::selfVariable()));
-                    bodyBlock->exprs.emplace_back(argTemp, s.block()->loc, make_insn<LoadYieldParams>(link));
 
                     auto *argBlock = bodyBlock;
-                    for (int i = 0; i < blockArgFlags.size(); ++i) {
-                        auto &arg = blockArgFlags[i];
-                        auto argLoc = LocalOccurrence{cctx.inWhat.enterLocal(arg.local), arg.loc};
+                    if (!blockArgFlags.empty()) {
+                        auto argTemp = LocalOccurrence::synthetic(cctx.newTemporary(core::Names::blkArg()));
+                        bodyBlock->exprs.emplace_back(argTemp, s.block()->loc, make_insn<LoadYieldParams>(link));
 
-                        if (arg.flags.isRepeated) {
-                            // Mixing positional and rest args in blocks is
-                            // not currently supported, but we'll handle that in
-                            // inference.
-                            argBlock->exprs.emplace_back(argLoc, arg.loc,
-                                                         make_insn<YieldLoadArg>(i, arg.flags, argTemp));
-                            continue;
-                        }
+                        for (int i = 0; i < blockArgFlags.size(); ++i) {
+                            auto &arg = blockArgFlags[i];
+                            auto argLoc = LocalOccurrence{cctx.inWhat.enterLocal(arg.local), arg.loc};
 
-                        if (auto *opt = ast::cast_tree<ast::OptionalArg>(blockArgs[i])) {
-                            auto *presentBlock = cctx.inWhat.freshBlock(bodyLoops, newRubyRegionId);
-                            auto *missingBlock = cctx.inWhat.freshBlock(bodyLoops, newRubyRegionId);
-
-                            // add a test for YieldParamPresent
-                            auto present = cctx.newTemporary(core::Names::argPresent());
-                            synthesizeExpr(argBlock, present, arg.loc,
-                                           make_insn<YieldParamPresent>(static_cast<uint16_t>(i)));
-                            conditionalJump(argBlock, present, presentBlock, missingBlock, cctx.inWhat, arg.loc);
-
-                            // make a new block for the present and missing blocks to join
-                            argBlock = cctx.inWhat.freshBlock(bodyLoops, newRubyRegionId);
-
-                            // compile the argument fetch in the present block
-                            presentBlock->exprs.emplace_back(argLoc, arg.loc,
+                            if (arg.flags.isRepeated) {
+                                // Mixing positional and rest args in blocks is
+                                // not currently supported, but we'll handle that in
+                                // inference.
+                                argBlock->exprs.emplace_back(argLoc, arg.loc,
                                                              make_insn<YieldLoadArg>(i, arg.flags, argTemp));
-                            unconditionalJump(presentBlock, argBlock, cctx.inWhat, arg.loc);
+                                continue;
+                            }
 
-                            // compile the default expr in `missingBlock`
-                            auto *missingLast = walk(cctx.withTarget(argLoc), opt->default_, missingBlock);
-                            unconditionalJump(missingLast, argBlock, cctx.inWhat, arg.loc);
-                        } else {
-                            argBlock->exprs.emplace_back(argLoc, arg.loc,
-                                                         make_insn<YieldLoadArg>(i, arg.flags, argTemp));
+                            if (auto *opt = ast::cast_tree<ast::OptionalArg>(blockArgs[i])) {
+                                auto *presentBlock = cctx.inWhat.freshBlock(bodyLoops, newRubyRegionId);
+                                auto *missingBlock = cctx.inWhat.freshBlock(bodyLoops, newRubyRegionId);
+
+                                // add a test for YieldParamPresent
+                                auto present = cctx.newTemporary(core::Names::argPresent());
+                                synthesizeExpr(argBlock, present, arg.loc,
+                                               make_insn<YieldParamPresent>(static_cast<uint16_t>(i)));
+                                conditionalJump(argBlock, present, presentBlock, missingBlock, cctx.inWhat, arg.loc);
+
+                                // make a new block for the present and missing blocks to join
+                                argBlock = cctx.inWhat.freshBlock(bodyLoops, newRubyRegionId);
+
+                                // compile the argument fetch in the present block
+                                presentBlock->exprs.emplace_back(argLoc, arg.loc,
+                                                                 make_insn<YieldLoadArg>(i, arg.flags, argTemp));
+                                unconditionalJump(presentBlock, argBlock, cctx.inWhat, arg.loc);
+
+                                // compile the default expr in `missingBlock`
+                                auto *missingLast = walk(cctx.withTarget(argLoc), opt->default_, missingBlock);
+                                unconditionalJump(missingLast, argBlock, cctx.inWhat, arg.loc);
+                            } else {
+                                argBlock->exprs.emplace_back(argLoc, arg.loc,
+                                                             make_insn<YieldLoadArg>(i, arg.flags, argTemp));
+                            }
                         }
                     }
 
@@ -657,7 +660,23 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                                           s.block()->body, argBlock);
                     if (blockLast != cctx.inWhat.deadBlock()) {
                         LocalRef dead = cctx.newTemporary(core::Names::blockReturnTemp());
-                        synthesizeExpr(blockLast, dead, s.block()->loc, make_insn<BlockReturn>(link, blockrv));
+
+                        core::LocOffsets blockReturnLoc = s.block()->loc;
+                        if (blockLast->exprs.empty() || isa_instruction<LoadSelf>(blockLast->exprs.back().value) ||
+                            isa_instruction<YieldLoadArg>(blockLast->exprs.back().value)) {
+                            auto blockEndPos = blockReturnLoc.copyEndWithZeroLength();
+                            auto endKwLoc = cctx.ctx.locAt(blockEndPos).adjustLen(cctx.ctx, -3, 3);
+                            auto endBraceLoc = cctx.ctx.locAt(blockEndPos).adjustLen(cctx.ctx, -1, 1);
+                            if (endKwLoc.source(cctx.ctx) == "end") {
+                                blockReturnLoc = endKwLoc.offsets();
+                            } else if (endBraceLoc.source(cctx.ctx) == "}") {
+                                blockReturnLoc = endBraceLoc.offsets();
+                            }
+                        } else {
+                            blockReturnLoc = blockLast->exprs.back().loc;
+                        }
+
+                        synthesizeExpr(blockLast, dead, blockReturnLoc, make_insn<BlockReturn>(link, blockrv));
                     }
 
                     unconditionalJump(blockLast, headerBlock, cctx.inWhat, s.loc);
@@ -689,7 +708,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                 } else {
                     current->exprs.emplace_back(cctx.target, s.loc,
                                                 make_insn<Send>(recv, s.recv.loc(), s.fun, s.funLoc, s.numPosArgs(),
-                                                                args, argLocs, !!s.flags.isPrivateOk));
+                                                                args, std::move(argLocs), !!s.flags.isPrivateOk));
                 }
 
                 ret = current;
@@ -757,7 +776,8 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                     // that the break unwinds through.
                     synthesizeExpr(afterBreak, ignored, core::LocOffsets::none(),
                                    make_insn<Send>(magic, core::LocOffsets::none(), core::Names::blockBreak(),
-                                                   core::LocOffsets::none(), args.size(), args, locs, isPrivateOk));
+                                                   core::LocOffsets::none(), args.size(), args, std::move(locs),
+                                                   isPrivateOk));
                 }
 
                 afterBreak->exprs.emplace_back(LocalOccurrence::synthetic(cctx.blockBreakTarget), a.loc,
@@ -791,7 +811,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                     auto isPrivateOk = false;
                     synthesizeExpr(current, retryTemp, core::LocOffsets::none(),
                                    make_insn<Send>(magic, what.loc(), core::Names::retry(), core::LocOffsets::none(),
-                                                   args.size(), args, argLocs, isPrivateOk));
+                                                   args.size(), args, std::move(argLocs), isPrivateOk));
                     unconditionalJump(current, cctx.rescueScope, cctx.inWhat, a.loc);
                 }
                 ret = cctx.inWhat.deadBlock();
@@ -819,16 +839,29 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                 auto rescueHandlersBlock = cctx.inWhat.freshBlock(cctx.loops, handlersRubyRegionId);
                 auto bodyBlock = cctx.inWhat.freshBlock(cctx.loops, bodyRubyRegionId);
                 auto exceptionValue = cctx.newTemporary(core::Names::exceptionValue());
-                synthesizeExpr(rescueHeaderBlock, exceptionValue, what.loc(), make_insn<GetCurrentException>());
-                conditionalJump(rescueHeaderBlock, exceptionValue, rescueHandlersBlock, bodyBlock, cctx.inWhat, a.loc);
+                // In `rescue; ...; end`, we don't want the conditional jumps' variables nor the
+                // GetCurrentException calls to look like they blame to the whole `rescue; ...; end`
+                // body. Better to just point at the `rescue` keyword.
+                //
+                // Might be better to point at exception variable like the "e" in `rescue => e`, but
+                // that involves picking one (of possibly many) rescueCases.
+                auto rescueKeywordLoc = (!a.rescueCases.empty() && (a.rescueCases.front().loc().endPos() -
+                                                                    a.rescueCases.front().loc().beginPos()) > 6)
+                                            ? core::LocOffsets{a.rescueCases.front().loc().beginPos(),
+                                                               a.rescueCases.front().loc().beginPos() + 6}
+                                            : a.loc.copyWithZeroLength();
+                synthesizeExpr(rescueHeaderBlock, exceptionValue, rescueKeywordLoc, make_insn<GetCurrentException>());
+                conditionalJump(rescueHeaderBlock, exceptionValue, rescueHandlersBlock, bodyBlock, cctx.inWhat,
+                                rescueKeywordLoc);
 
                 // cctx.loops += 1; // should formally be here but this makes us report a lot of false errors
                 bodyBlock = walk(cctx, a.body, bodyBlock);
 
                 // else is only executed if body didn't raise an exception
                 auto elseBody = cctx.inWhat.freshBlock(cctx.loops, elseRubyRegionId);
-                synthesizeExpr(bodyBlock, exceptionValue, what.loc(), make_insn<GetCurrentException>());
-                conditionalJump(bodyBlock, exceptionValue, rescueHandlersBlock, elseBody, cctx.inWhat, a.loc);
+                synthesizeExpr(bodyBlock, exceptionValue, rescueKeywordLoc, make_insn<GetCurrentException>());
+                conditionalJump(bodyBlock, exceptionValue, rescueHandlersBlock, elseBody, cctx.inWhat,
+                                rescueKeywordLoc);
 
                 elseBody = walk(cctx, a.else_, elseBody);
                 auto ensureBody = cctx.inWhat.freshBlock(cctx.loops, ensureRubyRegionId);
@@ -859,7 +892,8 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                     auto argLocs = {what.loc()};
                     synthesizeExpr(caseBody, res, rescueCase->loc,
                                    make_insn<Send>(magic, rescueCase->loc, core::Names::keepForCfg(),
-                                                   core::LocOffsets::none(), args.size(), args, argLocs, isPrivateOk));
+                                                   core::LocOffsets::none(), args.size(), args, std::move(argLocs),
+                                                   isPrivateOk));
 
                     if (exceptions.empty()) {
                         // rescue without a class catches StandardError
@@ -876,13 +910,13 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                         auto isaCheck = cctx.newTemporary(core::Names::isaCheckTemp());
                         InlinedVector<cfg::LocalRef, 2> args;
                         InlinedVector<core::LocOffsets, 2> argLocs = {loc};
-                        args.emplace_back(exceptionClass);
+                        args.emplace_back(localVar);
 
                         auto isPrivateOk = false;
-                        rescueHandlersBlock->exprs.emplace_back(LocalOccurrence::synthetic(isaCheck), loc,
-                                                                make_insn<Send>(localVar, loc, core::Names::isA_p(),
-                                                                                core::LocOffsets::none(), args.size(),
-                                                                                args, argLocs, isPrivateOk));
+                        rescueHandlersBlock->exprs.emplace_back(
+                            LocalOccurrence::synthetic(isaCheck), loc,
+                            make_insn<Send>(exceptionClass, loc, core::Names::tripleEq(), loc.copyWithZeroLength(),
+                                            args.size(), args, std::move(argLocs), isPrivateOk));
 
                         auto otherHandlerBlock = cctx.inWhat.freshBlock(cctx.loops, handlersRubyRegionId);
                         conditionalJump(rescueHandlersBlock, isaCheck, caseBody, otherHandlerBlock, cctx.inWhat, loc);
@@ -925,8 +959,8 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                 auto isPrivateOk = false;
                 current->exprs.emplace_back(cctx.target, a.loc,
                                             make_insn<Send>(magic, a.loc, core::Names::buildArray(),
-                                                            core::LocOffsets::none(), vars.size(), vars, locs,
-                                                            isPrivateOk));
+                                                            core::LocOffsets::none(), vars.size(), vars,
+                                                            std::move(locs), isPrivateOk));
                 ret = current;
             },
 

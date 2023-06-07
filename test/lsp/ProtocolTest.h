@@ -1,10 +1,10 @@
 #ifndef TEST_LSP_PROTOCOLTEST_H
 #define TEST_LSP_PROTOCOLTEST_H
 
-#include "doctest.h"
+#include "doctest/doctest.h"
 // ^ Violates linting rules, so include first.
-#include "common/Counters.h"
-#include "common/Counters_impl.h"
+#include "common/counters/Counters.h"
+#include "common/counters/Counters_impl.h"
 #include "main/lsp/json_types.h"
 #include "main/lsp/wrapper.h"
 #include "test/helpers/CounterStateDatabase.h"
