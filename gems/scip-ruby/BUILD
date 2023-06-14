@@ -23,8 +23,8 @@ build_gems(
         "//conditions:default": "scip-ruby",
     }),
     gem_target_os = select({
-        "//tools/config:linux": "linux",
-        "//tools/config:darwin": "darwin",
+        "@platforms//os:linux": "linux",
+        "@platforms//os:osx": "darwin",
     }),
     visibility = ["//visibility:public"],
 )
