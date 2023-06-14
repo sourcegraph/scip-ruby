@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.3.4
+
+- Updated with changes from upstream Sorbet as of June 6 2023. (0f6fd90cdf20d507f20dcbe928431dc16d3e1793)
+
 ## v0.3.3
 
 ### Auto-indexing
