@@ -11,7 +11,7 @@ RUN apk add --no-cache bash wget make libstdc++ gcc g++ automake autoconf gcompa
 # because release builds are very time-consuming.
 #
 # The release version is verified by tools/scripts/publish-scip-ruby.sh
-RUN wget https://github.com/sourcegraph/scip-ruby/releases/download/scip-ruby-v0.3.4/scip-ruby-x86_64-linux -O /usr/bin/scip-ruby && chmod +x /usr/bin/scip-ruby
+RUN wget https://github.com/sourcegraph/scip-ruby/releases/download/scip-ruby-v0.3.5/scip-ruby-x86_64-linux -O /usr/bin/scip-ruby && chmod +x /usr/bin/scip-ruby
 
 COPY scip_indexer/autoindex.sh /usr/bin/scip-ruby-autoindex
 
