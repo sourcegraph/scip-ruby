@@ -115,7 +115,7 @@ see the [Design Decisions doc][].
 
 The generated binary is located at `./bazel-bin/main/scip-ruby`.
 
-For more information about configurations, see the [Sorbet README](./sorbet-README.md). If you run into a build issue, check if it matches one of the [Known build issues][]; you may need to change your configuration.
+For more information about configurations, see the [Sorbet README](/sorbet-README.md). If you run into a build issue, check if it matches one of the [Known build issues][]; you may need to change your configuration.
 
 ### Building gems
 
@@ -129,7 +129,7 @@ To build a different version, pass `--//gem/scip-ruby:version=M.N.P`.
 
 ## IDE Integration
 
-Generate `compile_commands.json` as per the [Sorbet README](./sorbet-README.md),
+Generate `compile_commands.json` as per the [Sorbet README](/sorbet-README.md),
 and point your editor to it. In case you see an error in VS Code saying that
 `clangd` could not be found at a path under `bazel-sorbet/`, create a symlink:
 
