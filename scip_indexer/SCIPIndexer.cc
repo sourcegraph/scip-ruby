@@ -924,8 +924,9 @@ public:
             auto [namedSym, _] = symRef.value();
             auto check =
                 isMethodFileStaticInit ||
-                method == gs.lookupStaticInitForClass(namedSym.asSymbolRef().asClassOrModuleRef().data(gs)->owner,
-                                                      /*allowMissing*/ true);
+                (namedSym.kind() != GenericSymbolRef::Kind::Field &&
+                 method == gs.lookupStaticInitForClass(namedSym.asSymbolRef().asClassOrModuleRef().data(gs)->owner,
+                                                       /*allowMissing*/ true));
             absl::Status status;
             string kind;
             if (check) {
