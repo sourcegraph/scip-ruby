@@ -303,6 +303,8 @@ public:
     bool isSCIPRuby = true;
 
     // --- begin scip-ruby specific state
+    // Mapping describing which field references in a class are still
+    // marked as "unresolved" after name resolution is complete.
     UnorderedMap<core::ClassOrModuleRef, UnorderedSet<core::NameRef>> unresolvedFields;
     // --- end scip-ruby specific state
 

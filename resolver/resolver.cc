@@ -4188,6 +4188,15 @@ public:
                 gs.unresolvedFields.insert(make_move_iterator(threadResult.unresolvedFields.begin()),
                                            make_move_iterator(threadResult.unresolvedFields.end()));
             }
+            // NOTE(varun): This walker is meant to be invoked after name resolution is finished.
+            // As such, one might expect that the unresolved fields across classes stay the same
+            // across runs, as all the single-threaded merging which requires cross-file data
+            // is complete. However, that's not the case. 😕
+            //
+            // In particular, when testing on the shopify-ruby-codebase, printing the
+            // printing the number of unresolved fields for each class gave varying results
+            // (e.g. in one run, a class would have 85 unresolved fields, in another run,
+            // it would have 87 unresolved fields).
         }
 
         fast_sort(trees, [](const auto &lhs, const auto &rhs) -> bool { return lhs.file < rhs.file; });
