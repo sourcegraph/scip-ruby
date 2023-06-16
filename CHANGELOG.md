@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## v0.3.6
+
+In debug builds, scip-ruby would sometimes emit spurious log messages.
+
+- Fields not being found in classes.
+- Type information not being found in `# typed: false` files.
+
+Both of these have been fixed.
+(https://github.com/sourcegraph/scip-ruby/pull/186,
+https://github.com/sourcegraph/scip-ruby/pull/187)
+
+This release doesn't affect any behavior in release builds.
+
 ## v0.3.5
 
 - Fixed a bug which caused a segfault in release builds,
