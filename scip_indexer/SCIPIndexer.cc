@@ -858,12 +858,14 @@ private:
             if (it != this->localDefinitionType.end()) {
                 overrideType = computeOverrideType(it->second, type);
             } else {
-                LOG_DEBUG(
-                    gs, core::Loc(file, loc),
-                    fmt::format(
-                        "failed to find type info; are you using a code pattern unsupported by Sorbet?\ndebugging "
-                        "information: aliasMap: {}",
-                        this->aliasMap.showRaw(gs, file, cfg)));
+                if (file.data(gs).strictLevel >= core::StrictLevel::True) {
+                    LOG_DEBUG(
+                        gs, core::Loc(file, loc),
+                        fmt::format(
+                            "failed to find type info; are you using a code pattern unsupported by Sorbet?\ndebugging "
+                            "information: aliasMap: {}",
+                            this->aliasMap.showRaw(gs, file, cfg)));
+                }
                 overrideType = type;
             }
             if (isDefinition) {
