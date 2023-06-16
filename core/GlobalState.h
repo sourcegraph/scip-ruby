@@ -525,6 +525,7 @@ public:
     int globalStateId;
     // SCIP records unresolved fields for navigation through untyped code.
     bool isSCIPRuby = true;
+    // Field references remaining unresolved after name resolution, grouped by class.
     UnorderedMap<core::ClassOrModuleRef, UnorderedSet<core::NameRef>> unresolvedFields;
 
     bool silenceErrors = false;

@@ -78,24 +78,6 @@ core::ClassOrModuleRef FieldResolver::findUnresolvedFieldInInheritanceChain(cons
     }
     start = FieldResolver::normalizeParentForClassVar(gs, start, fieldText);
 
-    if (gs.unresolvedFields.find(start) == gs.unresolvedFields.end() ||
-        !gs.unresolvedFields.find(start)->second.contains(field)) {
-        // Triggered by code patterns like:
-        //   # top-level
-        //   def MyClass.method
-        //     # blah
-        //   end
-        // which is not supported by Sorbet.
-        LOG_DEBUG(gs, debugLoc,
-                  fmt::format("couldn't find field {} in class {};\n"
-                              "are you using a code pattern like def MyClass.method which is unsupported by Sorbet?",
-                              field.exists() ? field.toString(gs) : "<non-existent>",
-                              start.exists() ? start.showFullName(gs) : "<non-existent>"));
-        // As a best-effort guess, assume that the definition is
-        // in this class but we somehow missed it.
-        return start;
-    }
-
     auto best = start;
     auto cur = start;
     while (cur.exists()) {
