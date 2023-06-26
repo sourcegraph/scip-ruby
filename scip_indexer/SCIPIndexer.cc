@@ -1128,6 +1128,34 @@ public:
 
 namespace sorbet::pipeline::semantic_extension {
 
+struct IndexWriter {
+    scip::Index index;
+    ostream &outputStream;
+
+    ~IndexWriter() {
+        this->write();
+    }
+
+    void writeDocument(scip::Document &&doc) {
+        *this->index.add_documents() = std::move(doc);
+        this->write();
+    }
+
+    void writeExternalSymbol(scip::SymbolInformation &&symbolInfo) {
+        *this->index.add_external_symbols() = std::move(symbolInfo);
+        if (this->index.external_symbols_size() % 1024 == 0) {
+            this->write();
+        }
+    }
+
+private:
+    void write() {
+        this->index.SerializeToOstream(&this->outputStream);
+        this->index.clear_documents();
+        this->index.clear_external_symbols();
+    }
+};
+
 using LocalSymbolTable = UnorderedMap<core::LocalVariable, core::Loc>;
 
 class SCIPSemanticExtension : public SemanticExtension {
@@ -1269,19 +1297,20 @@ public:
             return s1.symbol() < s2.symbol();
         });
 
+        // TODO: Is it OK to do I/O here? Or should it be elsewhere?
+        ofstream out(indexFilePath);
+
         scip::Index index;
         *index.mutable_metadata() = metadata;
+        index.SerializeToOstream(&out);
+
+        IndexWriter writer{scip::Index{}, out};
         for (auto &document : allDocuments) {
-            *index.add_documents() = move(document);
+            writer.writeDocument(move(document));
         }
         for (auto &symbol : allExternalSymbols) {
-            *index.add_external_symbols() = move(symbol);
+            writer.writeExternalSymbol(move(symbol));
         }
-
-        ofstream out(indexFilePath);
-        // TODO: Is it OK to do I/O here? Or should it be elsewhere?
-        index.SerializeToOstream(&out);
-        out.close();
     };
 
     virtual void typecheck(const core::GlobalState &gs, core::FileRef file, cfg::CFG &cfg,
