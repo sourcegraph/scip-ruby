@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.3.7
+
+Fixes an issue when emitting indexes over 2GB in size,
+which may be hit for codebases over 10M+ SLOC.
+(https://github.com/sourcegraph/scip-ruby/pull/190)
+
 ## v0.3.6
 
 In debug builds, scip-ruby would sometimes emit spurious log messages.
