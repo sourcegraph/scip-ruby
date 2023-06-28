@@ -155,7 +155,15 @@ class SCIPState {
     /// Note that the SymbolRole is a part of the key too, because we can
     /// have a read-reference and write-reference at the same location
     /// (we don't merge those for now).
-    UnorderedMap<pair<core::LocOffsets, /*SymbolRole*/ int32_t>, uint32_t> localOccurrenceCache;
+    ///
+    /// There are some edge cases when different locals (i.e. different counters)
+    /// have the same role and the same location. For example,
+    /// 1. When a function uses ... for its arguments.
+    /// 2. Some situations around types in signatures (not exactly sure when,
+    ///    but these were discovered on a private codebase)
+    ///
+    /// That's why the value is an InlinedVector rather than a single uint32_t.
+    UnorderedMap<pair<core::LocOffsets, /*SymbolRole*/ int32_t>, InlinedVector<uint32_t, 1>> localOccurrenceCache;
     // ^ The 'value' in the map is purely for sanity-checking. It's a bit
     // cumbersome to conditionalize the type to be a set in non-debug and
     // map in debug, so keeping it a map.
@@ -345,16 +353,16 @@ private:
         //   (This wouldn't have happened if x was always stashed away into
         //    a temporary first, but the temporary only appears in the CFG if
         //    evaluating one of the cases has a chance to modify x.)
-        auto [it, inserted] = this->localOccurrenceCache.insert({{occ.offsets, symbolRoles}, occ.counter});
-        if (inserted) {
-            return false;
-        }
-        auto savedCounter = it->second;
-        ENFORCE(occ.counter == savedCounter, "found distinct local variable {} at same location in {}:\n{}",
-                (symbolRoles & scip::SymbolRole::Definition) ? "definitions" : "references", file.data(gs).path(),
-                core::Loc(file, occ.offsets).toString(gs));
 
-        return true;
+        auto &counters = this->localOccurrenceCache[{occ.offsets, symbolRoles}]; // deliberate default init
+        // The vast majority of cases will be the empty vector or a single element
+        // vector, so using absl::c_find is fine here, as a longer linear search
+        // will be quite rare.
+        if (absl::c_find(counters, occ.counter) != counters.end()) {
+            return true;
+        }
+        counters.push_back(occ.counter);
+        return false;
     }
 
     bool cacheOccurrence(const core::GlobalState &gs, core::Loc loc, GenericSymbolRef sym, int32_t symbolRoles) {
