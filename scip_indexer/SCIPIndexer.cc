@@ -854,19 +854,15 @@ private:
         } else {
             uint32_t localId = this->functionLocals[localRef];
             auto it = this->localDefinitionType.find(localId);
-            optional<core::TypePtr> overrideType;
+            optional<core::TypePtr> overrideType = nullopt;
             if (it != this->localDefinitionType.end()) {
                 overrideType = computeOverrideType(it->second, type);
             } else {
-                if (file.data(gs).strictLevel >= core::StrictLevel::True) {
-                    LOG_DEBUG(
-                        gs, core::Loc(file, loc),
-                        fmt::format(
-                            "failed to find type info; are you using a code pattern unsupported by Sorbet?\ndebugging "
-                            "information: aliasMap: {}",
-                            this->aliasMap.showRaw(gs, file, cfg)));
+                // TODO: It's unclear when exactly this case is triggered. Work around
+                // that by going for a best-effort solution.
+                if (type) {
+                    overrideType = type;
                 }
-                overrideType = type;
             }
             if (isDefinition) {
                 status = this->scipState.saveDefinition(gs, file, OwnedLocal{this->ctx.owner, localId, loc}, type);
