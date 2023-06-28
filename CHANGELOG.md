@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v0.3.8
+
+Fixes 3 different bugs related to assertions being hit
+in debug builds.
+
+(https://github.com/sourcegraph/scip-ruby/pull/197,
+https://github.com/sourcegraph/scip-ruby/pull/198,
+https://github.com/sourcegraph/scip-ruby/pull/200)
+
+These may potentially have caused crashes in release builds.
+
 ## v0.3.7
 
 Fixes an issue when emitting indexes over 2GB in size,
