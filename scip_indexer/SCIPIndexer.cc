@@ -807,6 +807,16 @@ private:
     // The type should be provided if we have an lvalue.
     bool emitLocalOccurrence(const cfg::CFG &cfg, const cfg::BasicBlock *bb, cfg::LocalOccurrence local,
                              ValueCategory category, core::TypePtr type) {
+        auto loc = local.loc;
+        if (!loc.exists() || loc.empty()) {
+            // Safeguard against incorrect merges from upstream Sorbet, where
+            // some changes cause empty source locations to propagate down here.
+            //
+            // FIXME: Investigate which code patterns trigger this; normally
+            // locals should carry non-empty locations, but this was
+            // triggered on some private code.
+            return false;
+        }
         auto localRef = local.variable;
         auto localVar = localRef.data(cfg);
         auto symRef = this->aliasMap.try_consume(localRef);
@@ -848,7 +858,6 @@ private:
         }
         ENFORCE(this->functionLocals.contains(localRef), "should've added local earlier if it was missing");
         absl::Status status;
-        auto loc = local.loc;
         auto &gs = this->ctx.state;
         auto file = this->ctx.file;
         if (symRef.has_value()) {
