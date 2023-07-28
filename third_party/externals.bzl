@@ -1,4 +1,4 @@
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load("//third_party:ruby_externals.bzl", "register_ruby_dependencies")
 load("//third_party/openssl:system_openssl_repository.bzl", "system_openssl_repository")
 load("//third_party:test_gem_data.bzl", "gem_build_info")
