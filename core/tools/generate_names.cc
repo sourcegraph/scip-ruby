@@ -445,13 +445,14 @@ NameDef names[] = {
 
     // Packager
     {"import"},
-    {"test_import"},
+    {"testImport", "test_import"},
     {"export_", "export"},
-    {"restrict_to_service"},
-    {"autoloader_compatibility"},
+    {"restrictToService", "restrict_to_service"},
+    {"autoloaderCompatibility", "autoloader_compatibility"},
     {"legacy"},
     {"strict"},
-    {"visible_to"},
+    {"visibleTo", "visible_to"},
+    {"tests"},
     {"exportAll", "export_all!"},
     {"PackageSpec", "PackageSpec", true},
     {"PackageSpecRegistry", "<PackageSpecRegistry>", true},
@@ -501,6 +502,16 @@ NameDef names[] = {
     {"Rational", "Rational", true},
     // A magic non user-creatable class with methods to keep state between passes
     {"Magic", "<Magic>", true},
+    // A magic non user-creatable class to attach symbols for blaming untyped to
+    {"UntypedSource", "<UntypedSource>", true},
+    {"tupleUnderlying", "<tupleUnderlying>", true},
+    {"shapeUnderlying", "<shapeUnderlying>", true},
+    {"tupleLub", "<tupleLub>", true},
+    {"shapeLub", "<shapeLub>", true},
+    {"YieldLoadArg", "<YieldLoadArg>", true},
+    {"GetCurrentException", "<GetCurrentException>", true},
+    {"LoadYieldParams", "<LoadYieldParams>", true},
+    {"shapeSquareBracketsEq", "<shapeSquareBracketsEq>", true},
     // A magic non user-creatable class for binding procs to attached_class
     {"BindToAttachedClass", "<BindToAttachedClass>", true},
     // A magic non user-creatable class for binding procs to self_type
@@ -559,6 +570,8 @@ NameDef names[] = {
     {"Tokens", "Tokens", true},
     {"AccountModelMerchant", "AccountModelMerchant", true},
     {"Token", "Token", true},
+    {"Account", "Account", true},
+    {"Merchant", "Merchant", true},
 
     // Typos
     {"Int", "Int", true},

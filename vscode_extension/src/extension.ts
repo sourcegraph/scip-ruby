@@ -1,10 +1,14 @@
-import { commands, ExtensionContext, Uri, workspace } from "vscode";
-import { TextDocumentItem } from "vscode-languageclient";
+import { commands, ExtensionContext, workspace } from "vscode";
+import { TextDocumentPositionParams } from "vscode-languageclient";
 import * as cmdIds from "./commandIds";
-import { SetLogLevel } from "./commands/setLogLevel";
-import { ShowSorbetActions } from "./commands/showSorbetActions";
-import { ShowSorbetConfigurationPicker } from "./commands/showSorbetConfigurationPicker";
-import { getLogLevelFromEnvironment } from "./log";
+import { copySymbolToClipboard } from "./commands/copySymbolToClipboard";
+import { renameSymbol } from "./commands/renameSymbol";
+import { setLogLevel } from "./commands/setLogLevel";
+import { showSorbetActions } from "./commands/showSorbetActions";
+import { showSorbetConfigurationPicker } from "./commands/showSorbetConfigurationPicker";
+import { toggleUntypedCodeHighlighting } from "./commands/toggleUntypedCodeHighlighting";
+import { getLogLevelFromEnvironment, LogLevel } from "./log";
+import { SorbetContentProvider, SORBET_SCHEME } from "./sorbetContentProvider";
 import { SorbetExtensionContext } from "./sorbetExtensionContext";
 import { SorbetStatusBarEntry } from "./sorbetStatusBarEntry";
 import { ServerStatus, RestartReason } from "./types";
@@ -38,44 +42,34 @@ export function activate(context: ExtensionContext) {
 
   // Register providers
   context.subscriptions.push(
-    workspace.registerTextDocumentContentProvider("sorbet", {
-      // URIs are of the form sorbet:[file_path]
-      provideTextDocumentContent: async (uri: Uri): Promise<string> => {
-        let content: string;
-        const { activeLanguageClient } = sorbetExtensionContext.statusProvider;
-        sorbetExtensionContext.log.info(`Opening sorbet: file. URI:${uri}`);
-        if (activeLanguageClient) {
-          const response: TextDocumentItem = await activeLanguageClient.languageClient.sendRequest(
-            "sorbet/readFile",
-            {
-              uri: uri.toString(),
-            },
-          );
-          content = response.text;
-        } else {
-          sorbetExtensionContext.log.warning(
-            " > Cannot retrieve file content, no active client.",
-          );
-          content = "";
-        }
-        return content;
-      },
-    }),
+    workspace.registerTextDocumentContentProvider(
+      SORBET_SCHEME,
+      new SorbetContentProvider(sorbetExtensionContext),
+    ),
   );
 
   // Register commands
   context.subscriptions.push(
-    commands.registerCommand(cmdIds.SET_LOGLEVEL_COMMAND_ID, () =>
-      new SetLogLevel(sorbetExtensionContext).execute(),
+    commands.registerCommand(cmdIds.COPY_SYMBOL_COMMAND_ID, () =>
+      copySymbolToClipboard(sorbetExtensionContext),
+    ),
+    commands.registerCommand(
+      cmdIds.RENAME_SYMBOL_COMMAND_ID,
+      (params: TextDocumentPositionParams) =>
+        renameSymbol(sorbetExtensionContext, params),
+    ),
+    commands.registerCommand(
+      cmdIds.SET_LOGLEVEL_COMMAND_ID,
+      (level?: LogLevel) => setLogLevel(sorbetExtensionContext, level),
     ),
     commands.registerCommand(cmdIds.SHOW_ACTIONS_COMMAND_ID, () =>
-      new ShowSorbetActions(sorbetExtensionContext).execute(),
+      showSorbetActions(sorbetExtensionContext),
     ),
     commands.registerCommand(cmdIds.SHOW_CONFIG_PICKER_COMMAND_ID, () =>
-      new ShowSorbetConfigurationPicker(sorbetExtensionContext).execute(),
+      showSorbetConfigurationPicker(sorbetExtensionContext),
     ),
     commands.registerCommand(cmdIds.SHOW_OUTPUT_COMMAND_ID, () =>
-      sorbetExtensionContext.log.outputChannel.show(true),
+      sorbetExtensionContext.logOutputChannel.show(true),
     ),
     commands.registerCommand(cmdIds.SORBET_ENABLE_COMMAND_ID, () =>
       sorbetExtensionContext.configuration.setEnabled(true),
@@ -88,16 +82,8 @@ export function activate(context: ExtensionContext) {
       (reason: RestartReason = RestartReason.COMMAND) =>
         sorbetExtensionContext.statusProvider.restartSorbet(reason),
     ),
-    commands.registerCommand("sorbet.toggleHighlightUntyped", () =>
-      sorbetExtensionContext.configuration
-        .setHighlightUntyped(
-          !sorbetExtensionContext.configuration.highlightUntyped,
-        )
-        .then(() =>
-          sorbetExtensionContext.statusProvider.restartSorbet(
-            RestartReason.CONFIG_CHANGE,
-          ),
-        ),
+    commands.registerCommand(cmdIds.TOGGLE_HIGHLIGHT_UNTYPED_COMMAND_ID, () =>
+      toggleUntypedCodeHighlighting(sorbetExtensionContext),
     ),
   );
 

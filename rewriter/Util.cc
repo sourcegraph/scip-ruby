@@ -251,12 +251,14 @@ ast::ExpressionPtr ASTUtil::mkKwArgsHash(const ast::Send *send) {
 
 ast::ExpressionPtr ASTUtil::mkGet(core::Context ctx, core::LocOffsets loc, core::NameRef name, core::LocOffsets nameLoc,
                                   ast::ExpressionPtr rhs, ast::MethodDef::Flags flags) {
+    flags.isAttrBestEffortUIOnly = true;
     auto ret = ast::MK::SyntheticMethod0(loc, loc, nameLoc, name, move(rhs), flags);
     return ret;
 }
 
 ast::ExpressionPtr ASTUtil::mkSet(core::Context ctx, core::LocOffsets loc, core::NameRef name, core::LocOffsets nameLoc,
                                   ast::ExpressionPtr rhs, ast::MethodDef::Flags flags) {
+    flags.isAttrBestEffortUIOnly = true;
     return ast::MK::SyntheticMethod1(loc, loc, nameLoc, name, ast::MK::Local(nameLoc, core::Names::arg0()), move(rhs),
                                      flags);
 }

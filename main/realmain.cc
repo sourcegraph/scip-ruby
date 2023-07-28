@@ -470,9 +470,8 @@ int realmain(int argc, char *argv[]) {
     }
     gs->unsilenceErrors = opts.unsilenceErrors;
     gs->logRecordedFilepaths = opts.logRecordedFilepaths;
-    if (opts.autocorrect) {
-        gs->autocorrect = true;
-    }
+    gs->autocorrect = opts.autocorrect;
+    gs->didYouMean = opts.didYouMean;
     if (opts.print.isAutogen()) {
         gs->runningUnderAutogen = true;
     }

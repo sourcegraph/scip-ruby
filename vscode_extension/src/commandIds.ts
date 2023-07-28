@@ -1,4 +1,14 @@
 /**
+ * Copy Symbol to Clipboard.
+ */
+export const COPY_SYMBOL_COMMAND_ID = "sorbet.copySymbolToClipboard";
+
+/**
+ * Rename Symbol at a given document position.
+ */
+export const RENAME_SYMBOL_COMMAND_ID = "sorbet.rename";
+
+/**
  * Set log level available actions.
  */
 export const SET_LOGLEVEL_COMMAND_ID = "sorbet.setLogLevel";
@@ -19,16 +29,22 @@ export const SHOW_CONFIG_PICKER_COMMAND_ID = "sorbet.configure";
 export const SHOW_OUTPUT_COMMAND_ID = "sorbet.showOutput";
 
 /**
- * Enable Sorbet.
- */
-export const SORBET_ENABLE_COMMAND_ID = "sorbet.enable";
-
-/**
  * Disable Sorbet.
  */
 export const SORBET_DISABLE_COMMAND_ID = "sorbet.disable";
 
 /**
+ * Enable Sorbet.
+ */
+export const SORBET_ENABLE_COMMAND_ID = "sorbet.enable";
+
+/**
  * Restart Sorbet.
  */
 export const SORBET_RESTART_COMMAND_ID = "sorbet.restart";
+
+/**
+ * Toggle highlighting of untyped code.
+ */
+export const TOGGLE_HIGHLIGHT_UNTYPED_COMMAND_ID =
+  "sorbet.toggleHighlightUntyped";

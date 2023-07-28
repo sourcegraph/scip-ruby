@@ -115,6 +115,14 @@ def register_sorbet_dependencies():
     )
 
     http_archive(
+        name = "mimalloc",
+        urls = _github_public_urls("microsoft/mimalloc/archive/refs/tags/v2.1.2.zip"),  # 2.1.2
+        sha256 = "86281c918921c1007945a8a31e5ad6ae9af77e510abfec20d000dd05d15123c7",
+        build_file = "@com_stripe_ruby_typer//third_party:mimalloc.BUILD",
+        strip_prefix = "mimalloc-2.1.2",
+    )
+
+    http_archive(
         name = "concurrentqueue",
         urls = _github_public_urls("cameron314/concurrentqueue/archive/79cec4c3bf1ca23ea4a03adfcd3c2c3659684dd2.zip"),
         sha256 = "a78ff232e2996927ad6fbd015d1f15dfb20bf524a87ce2893e64dbbe1f04051e",
@@ -345,6 +353,14 @@ def register_sorbet_dependencies():
         build_file = "@com_stripe_ruby_typer//third_party:shellcheck.BUILD",
         sha256 = "e065d4afb2620cc8c1d420a9b3e6243c84ff1a693c1ff0e38f279c8f31e86634",
         strip_prefix = "shellcheck-v{}".format(shellcheck_version),
+    )
+
+    # Needed to build CMake projects
+    http_archive(
+        name = "rules_foreign_cc",
+        urls = _github_public_urls("bazelbuild/rules_foreign_cc/archive/d74623f0ad47f4e375de81baa454eb106715a416.zip"),
+        sha256 = "47b61d25dd52bdaa1d571dab6705d076f05ba3d7a1bbbfed36145f8281c0403f",
+        strip_prefix = "rules_foreign_cc-d74623f0ad47f4e375de81baa454eb106715a416",
     )
 
     register_ruby_dependencies()
