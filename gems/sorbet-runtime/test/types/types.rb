@@ -130,6 +130,49 @@ module Opus::Types::Test
           There might be a constant reloading problem in your application.
         MSG
       end
+
+      it "uses constant name for class with #name defined" do
+        NamedClass = Class.new do
+          def self.name
+            "String"
+          end
+        end
+
+        x = T::Types::Simple.new(NamedClass)
+
+        assert_equal("#{TypesTest.name}::NamedClass", x.name)
+      ensure
+        TypesTest.send(:remove_const, :NamedClass)
+      end
+
+      it "uses #name for anonymous classes" do
+        klass = Class.new do
+          def self.name
+            "String"
+          end
+        end
+
+        x = T::Types::Simple.new(klass)
+
+        assert_equal("String", x.name)
+      end
+
+      it "handles equality with a class that has overridden its #name method" do
+        NamedClass = Class.new
+
+        klass = Class.new do
+          def self.name
+            "NamedClass"
+          end
+        end
+
+        x = T::Types::Simple.new(klass)
+        y = T::Types::Simple.new(NamedClass)
+
+        refute_equal(x.name, y.name)
+      ensure
+        TypesTest.send(:remove_const, :NamedClass)
+      end
     end
 
     describe "Union" do
@@ -1021,6 +1064,29 @@ module Opus::Types::Test
         type = T::Utils.coerce(::Class)
         assert_instance_of(T::Types::Simple, type)
         assert_equal(::Class, type.raw_type)
+      end
+    end
+
+    describe "T.class_of(...)[...]" do
+      it 'works if the type is right' do
+        type = T.class_of(Base)[Base]
+        value = Base
+        msg = check_error_message_for_obj(type, value)
+        assert_nil(msg)
+      end
+
+      it 'errors if the type is a subclass' do
+        type = T.class_of(Sub)[Sub]
+        value = Base
+        msg = check_error_message_for_obj(type, value)
+        assert_match(/Expected type T.class_of\(Opus::Types::Test::TypesTest::Sub\), got Opus::Types::Test::TypesTest::Base/, msg)
+      end
+
+      it 'does not error if the attached class is wrong (erased generics)' do
+        type = T.class_of(Base)[Sub]
+        value = Base
+        msg = check_error_message_for_obj(type, value)
+        assert_nil(msg)
       end
     end
 

@@ -3,8 +3,9 @@ import * as assert from "assert";
 import * as path from "path";
 import * as sinon from "sinon";
 
-import { LogLevelQuickPickItem, SetLogLevel } from "../../commands/setLogLevel";
-import { LogLevel, OutputChannelLog } from "../../log";
+import { createLogStub } from "../testUtils";
+import { LogLevelQuickPickItem, setLogLevel } from "../../commands/setLogLevel";
+import { LogLevel } from "../../log";
 import { SorbetExtensionContext } from "../../sorbetExtensionContext";
 
 suite(`Test Suite: ${path.basename(__filename, ".test.js")}`, () => {
@@ -18,15 +19,8 @@ suite(`Test Suite: ${path.basename(__filename, ".test.js")}`, () => {
     testRestorables.forEach((r) => r.restore());
   });
 
-  test("Shows dropdown when target-level argument is NOT provided", async () => {
+  test("setLogLevel: Shows dropdown when target-level argument is NOT provided", async () => {
     const expectedLogLevel = LogLevel.Warning;
-    const createOutputChannelStub = sinon
-      .stub(vscode.window, "createOutputChannel")
-      .returns(<vscode.OutputChannel>{
-        appendLine(_value: string) {},
-      });
-    testRestorables.push(createOutputChannelStub);
-
     const showQuickPickSingleStub = sinon
       .stub(vscode.window, "showQuickPick")
       .resolves(<LogLevelQuickPickItem>{
@@ -35,12 +29,12 @@ suite(`Test Suite: ${path.basename(__filename, ".test.js")}`, () => {
       });
     testRestorables.push(showQuickPickSingleStub);
 
-    const log = new OutputChannelLog("Test", LogLevel.Info);
-    const context = <SorbetExtensionContext>{ log };
-
-    const command = new SetLogLevel(context);
-    await assert.doesNotReject(command.execute());
-    assert.strictEqual(log.level, expectedLogLevel);
+    const context = <SorbetExtensionContext>{
+      log: createLogStub(LogLevel.Info),
+    };
+    assert.ok(context.log.level !== expectedLogLevel);
+    await assert.doesNotReject(setLogLevel(context));
+    assert.strictEqual(context.log.level, expectedLogLevel);
 
     sinon.assert.calledWithExactly(
       showQuickPickSingleStub,
@@ -78,29 +72,20 @@ suite(`Test Suite: ${path.basename(__filename, ".test.js")}`, () => {
         placeHolder: "Select log level",
       },
     );
-    sinon.assert.calledOnce(createOutputChannelStub);
   });
 
-  test("Shows no-dropdown when target-level argument is provided ", async () => {
+  test("setLogLevel: Shows no-dropdown when target-level argument is provided ", async () => {
     const expectedLogLevel = LogLevel.Warning;
-    const createOutputChannelStub = sinon
-      .stub(vscode.window, "createOutputChannel")
-      .returns(<vscode.OutputChannel>{
-        appendLine(_value: string) {},
-      });
-    testRestorables.push(createOutputChannelStub);
 
     const showQuickPickSingleStub = sinon.stub(vscode.window, "showQuickPick");
     testRestorables.push(showQuickPickSingleStub);
 
-    const log = new OutputChannelLog("Test", LogLevel.Info);
+    const log = createLogStub();
     const context = <SorbetExtensionContext>{ log };
 
-    const command = new SetLogLevel(context);
-    await assert.doesNotReject(command.execute(expectedLogLevel));
+    await assert.doesNotReject(setLogLevel(context, expectedLogLevel));
     assert.strictEqual(log.level, expectedLogLevel);
 
     sinon.assert.notCalled(showQuickPickSingleStub);
-    sinon.assert.calledOnce(createOutputChannelStub);
   });
 });

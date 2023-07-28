@@ -4,12 +4,11 @@ import { Disposable, StatusBarAlignment, StatusBarItem, window } from "vscode";
 import { SHOW_ACTIONS_COMMAND_ID } from "./commandIds";
 import { SorbetExtensionContext } from "./sorbetExtensionContext";
 import { StatusChangedEvent } from "./sorbetStatusProvider";
-import { ShowOperationParams, ServerStatus, RestartReason } from "./types";
+import { RestartReason, ServerStatus } from "./types";
 
 export class SorbetStatusBarEntry implements Disposable {
   private readonly context: SorbetExtensionContext;
   private readonly disposable: Disposable;
-  private operationStack: ShowOperationParams[];
   private serverStatus: ServerStatus;
   private readonly spinner: () => string;
   private spinnerTimer?: NodeJS.Timer;
@@ -17,7 +16,6 @@ export class SorbetStatusBarEntry implements Disposable {
 
   constructor(context: SorbetExtensionContext) {
     this.context = context;
-    this.operationStack = [];
     this.serverStatus = ServerStatus.DISABLED;
     this.spinner = Spinner();
     this.statusBarItem = window.createStatusBarItem(
@@ -31,9 +29,7 @@ export class SorbetStatusBarEntry implements Disposable {
       this.context.statusProvider.onStatusChanged((e) =>
         this.onServerStatusChanged(e),
       ),
-      this.context.statusProvider.onShowOperation((params) =>
-        this.onServerShowOperation(params),
-      ),
+      this.context.statusProvider.onShowOperation((_params) => this.render()),
       this.statusBarItem,
     );
 
@@ -52,26 +48,12 @@ export class SorbetStatusBarEntry implements Disposable {
     const isError =
       this.serverStatus !== e.status && e.status === ServerStatus.ERROR;
     this.serverStatus = e.status;
-    if (e.stopped) {
-      this.operationStack = [];
-    }
     this.render();
     if (isError) {
       await this.context.statusProvider.restartSorbet(
         RestartReason.CRASH_EXT_ERROR,
       );
     }
-  }
-
-  private onServerShowOperation(p: ShowOperationParams) {
-    if (p.status === "end") {
-      this.operationStack = this.operationStack.filter(
-        (otherP) => otherP.operationName !== p.operationName,
-      );
-    } else {
-      this.operationStack.push(p);
-    }
-    this.render();
   }
 
   private getSpinner() {
@@ -84,8 +66,8 @@ export class SorbetStatusBarEntry implements Disposable {
   }
 
   private render() {
-    const numOperations = this.operationStack.length;
-    const { activeLspConfig } = this.context.configuration;
+    const { operations } = this.context.statusProvider;
+    const { activeLspConfig, highlightUntyped } = this.context.configuration;
     const sorbetName = activeLspConfig?.name ?? "Sorbet";
 
     let text: string;
@@ -94,11 +76,11 @@ export class SorbetStatusBarEntry implements Disposable {
     if (
       activeLspConfig &&
       this.serverStatus !== ServerStatus.ERROR &&
-      numOperations > 0
+      operations.length > 0
     ) {
-      const latestOp = this.operationStack[numOperations - 1];
+      const latestOp = operations[operations.length - 1];
       text = `${sorbetName}: ${latestOp.description} ${this.getSpinner()}`;
-      tooltip = latestOp.description;
+      tooltip = getRunningTooltip();
     } else {
       switch (this.serverStatus) {
         case ServerStatus.DISABLED:
@@ -123,7 +105,7 @@ export class SorbetStatusBarEntry implements Disposable {
           break;
         case ServerStatus.RUNNING:
           text = `${sorbetName}: Idle`;
-          tooltip = "The Sorbet server is currently running.";
+          tooltip = getRunningTooltip();
           break;
         default:
           this.context.log.error(`Invalid ServerStatus: ${this.serverStatus}`);
@@ -135,5 +117,13 @@ export class SorbetStatusBarEntry implements Disposable {
 
     this.statusBarItem.text = text;
     this.statusBarItem.tooltip = tooltip;
+
+    function getRunningTooltip() {
+      let txt = "The Sorbet server is currently running.";
+      if (highlightUntyped) {
+        txt += "\n  - Highlight untyped code";
+      }
+      return txt;
+    }
   }
 }

@@ -182,6 +182,10 @@ public:
         return exportAll_;
     }
 
+    bool visibleToTests() const {
+        return visibleToTests_;
+    }
+
     // The possible path prefixes associated with files in the package, including path separator at end.
     vector<std::string> packagePathPrefixes;
     PackageName name;
@@ -206,6 +210,9 @@ public:
     // The other packages to which this package is visible. If this vector is empty, then it means
     // the package is fully public and can be imported by anything.
     vector<PackageName> visibleTo_;
+
+    // Whether `visible_to` directives should be ignored for test code
+    bool visibleToTests_;
 
     // PackageInfoImpl is the only implementation of PackageInfoImpl
     const static PackageInfoImpl &from(const core::packages::PackageInfo &pkg) {
@@ -965,7 +972,7 @@ struct PackageInfoFinder {
             }
         }
 
-        if ((send.fun == core::Names::import() || send.fun == core::Names::test_import()) && send.numPosArgs() == 1) {
+        if ((send.fun == core::Names::import() || send.fun == core::Names::testImport()) && send.numPosArgs() == 1) {
             // null indicates an invalid import.
             if (auto target = verifyConstant(ctx, send.fun, send.getPosArg(0))) {
                 auto name = getPackageName(ctx, target);
@@ -987,7 +994,7 @@ struct PackageInfoFinder {
             }
         }
 
-        if (send.fun == core::Names::restrict_to_service() && send.numPosArgs() == 1) {
+        if (send.fun == core::Names::restrictToService() && send.numPosArgs() == 1) {
             // Transform: `restrict_to_service Foo` -> `restrict_to_service <PackageSpecRegistry>::Foo`
             auto importArg = move(send.getPosArg(0));
             send.removePosArg(0);
@@ -999,7 +1006,7 @@ struct PackageInfoFinder {
             info->exportAll_ = true;
         }
 
-        if (send.fun == core::Names::autoloader_compatibility() && send.numPosArgs() == 1) {
+        if (send.fun == core::Names::autoloaderCompatibility() && send.numPosArgs() == 1) {
             // Parse autoloader_compatibility DSL and set strict bit on PackageInfoImpl if configured
             auto *compatibilityAnnotationLit = ast::cast_tree<ast::Literal>(send.getPosArg(0));
             if (compatibilityAnnotationLit == nullptr || !compatibilityAnnotationLit->isString()) {
@@ -1040,8 +1047,18 @@ struct PackageInfoFinder {
             }
         }
 
-        if (send.fun == core::Names::visible_to() && send.numPosArgs() == 1) {
-            if (auto target = verifyConstant(ctx, send.fun, send.getPosArg(0))) {
+        if (send.fun == core::Names::visibleTo() && send.numPosArgs() == 1) {
+            if (auto target = ast::cast_tree<ast::Literal>(send.getPosArg(0))) {
+                // the only valid literal here is `visible_to "tests"`; others should be rejected
+                if (!target->isString() || target->asString() != core::Names::tests()) {
+                    if (auto e = ctx.beginError(target->loc, core::errors::Packager::InvalidConfiguration)) {
+                        e.setHeader("Argument to `{}` must be a constant or the string literal `{}`",
+                                    send.fun.show(ctx), "\"tests\"");
+                    }
+                    return;
+                }
+                info->visibleToTests_ = true;
+            } else if (auto target = verifyConstant(ctx, send.fun, send.getPosArg(0))) {
                 auto name = getPackageName(ctx, target);
                 ENFORCE(name.mangledName.exists());
 
@@ -1174,11 +1191,11 @@ struct PackageInfoFinder {
     bool isSpecMethod(const sorbet::ast::Send &send) const {
         switch (send.fun.rawId()) {
             case core::Names::import().rawId():
-            case core::Names::test_import().rawId():
+            case core::Names::testImport().rawId():
             case core::Names::export_().rawId():
-            case core::Names::restrict_to_service().rawId():
-            case core::Names::autoloader_compatibility().rawId():
-            case core::Names::visible_to().rawId():
+            case core::Names::restrictToService().rawId():
+            case core::Names::autoloaderCompatibility().rawId():
+            case core::Names::visibleTo().rawId():
             case core::Names::exportAll().rawId():
                 return true;
             default:
@@ -1190,7 +1207,7 @@ struct PackageInfoFinder {
         switch (send.fun.rawId()) {
             case core::Names::import().rawId():
                 return ImportType::Normal;
-            case core::Names::test_import().rawId():
+            case core::Names::testImport().rawId():
                 return ImportType::Test;
             default:
                 ENFORCE(false);
@@ -1349,7 +1366,11 @@ ast::ParsedFile validatePackage(core::Context ctx, ast::ParsedFile file) {
             }
 
             const auto &visibleTo = otherPkg.visibleTo();
-            if (visibleTo.empty()) {
+            if (visibleTo.empty() && !otherPkg.visibleToTests()) {
+                continue;
+            }
+
+            if (otherPkg.visibleToTests() && i.type == ImportType::Test) {
                 continue;
             }
 
