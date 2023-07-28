@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.3.9
+
+- Updated with changes from upstream Sorbet as of July 28 2023. (05866f6cfc5339e1e7a6d7e399ff92af594e3f9b)
+  - This includes a fix for an assertion triggered in type-checking.
+    (https://github.com/sourcegraph/scip-ruby/issues/192)
+
 ## v0.3.8
 
 Fixes 3 different bugs related to assertions being hit
