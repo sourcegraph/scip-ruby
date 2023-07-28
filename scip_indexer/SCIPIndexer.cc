@@ -61,7 +61,7 @@ static uint32_t fnv1a_32(const string &s) {
     return h;
 }
 
-const char scip_ruby_version[] = "0.3.8";
+const char scip_ruby_version[] = "0.3.9";
 
 // Last updated: https://github.com/sourcegraph/scip-ruby/pull/205
 const char scip_ruby_sync_upstream_sorbet_sha[] = "05866f6cfc5339e1e7a6d7e399ff92af594e3f9b";
