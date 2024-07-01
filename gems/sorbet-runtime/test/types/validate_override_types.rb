@@ -124,6 +124,22 @@ module Opus::Types::Test
       child.new.example
     end
 
+    it "allows T::Class to be compatible with Class" do
+      parent = Class.new do
+        extend T::Sig
+        sig {overridable.returns(T::Class[T.anything])}
+        def example; Object; end
+      end
+
+      child = Class.new(parent) do
+        extend T::Sig
+        sig {override.returns(Class)}
+        def example; Object; end
+      end
+
+      child.new.example
+    end
+
     it "allows T::Class to be compatible with T.class_of in child" do
       parent = Class.new do
         extend T::Sig
@@ -151,6 +167,22 @@ module Opus::Types::Test
         extend T::Sig
         sig {override.returns(T::Hash[Symbol, T.untyped])}
         def example; {}; end
+      end
+
+      child.new.example
+    end
+
+    it "allows returns(T.anything) to be compatible with .void" do
+      parent = Class.new do
+        extend T::Sig
+        sig {overridable.void}
+        def example; end
+      end
+
+      child = Class.new(parent) do
+        extend T::Sig
+        sig {override.returns(T.anything)}
+        def example; end
       end
 
       child.new.example

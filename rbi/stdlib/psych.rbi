@@ -318,7 +318,6 @@ module Psych
   sig do
     params(
       yaml: T.any(String, StringIO, IO),
-      legacy_filename: Object,
       permitted_classes: T::Array[T::Class[T.anything]],
       permitted_symbols: T::Array[Symbol],
       aliases: T::Boolean,
@@ -326,10 +325,11 @@ module Psych
       fallback: T.untyped,
       symbolize_names: T::Boolean,
       freeze: T::Boolean,
+      strict_integer: T::Boolean,
     )
     .returns(T.untyped)
   end
-  def self.load(yaml, legacy_filename = T.unsafe(nil), permitted_classes: [Symbol], permitted_symbols: [], aliases: false, filename: T.unsafe(nil), fallback: T.unsafe(nil), symbolize_names: T.unsafe(nil), freeze: T.unsafe(nil)); end
+  def self.load(yaml, permitted_classes: [Symbol], permitted_symbols: [], aliases: false, filename: nil, fallback: nil, symbolize_names: false, freeze: false, strict_integer: false); end
 
   ###
   # Safely load the yaml string in `yaml`. By default, only the following
@@ -392,10 +392,6 @@ module Psych
   sig do
     params(
       yaml: T.any(String, StringIO, IO),
-      legacy_permitted_classes: Object,
-      legacy_permitted_symbols: Object,
-      legacy_aliases: Object,
-      legacy_filename: Object,
       permitted_classes: T::Array[T::Class[T.anything]],
       permitted_symbols: T::Array[Symbol],
       aliases: T::Boolean,
@@ -403,10 +399,11 @@ module Psych
       fallback: T.untyped,
       symbolize_names: T::Boolean,
       freeze: T::Boolean,
+      strict_integer: T::Boolean,
     )
     .returns(T.untyped)
   end
-  def self.safe_load(yaml, legacy_permitted_classes = T.unsafe(nil), legacy_permitted_symbols = T.unsafe(nil), legacy_aliases = T.unsafe(nil), legacy_filename = T.unsafe(nil), permitted_classes: T.unsafe(nil), permitted_symbols: T.unsafe(nil), aliases: T.unsafe(nil), filename: T.unsafe(nil), fallback: T.unsafe(nil), symbolize_names: T.unsafe(nil), freeze: T.unsafe(nil)); end
+  def self.safe_load(yaml, permitted_classes: T.unsafe(nil), permitted_symbols: T.unsafe(nil), aliases: T.unsafe(nil), filename: T.unsafe(nil), fallback: T.unsafe(nil), symbolize_names: T.unsafe(nil), freeze: T.unsafe(nil), strict_integer: T.unsafe(nil)); end
 
   ###
   # Parse a [`YAML`](https://docs.ruby-lang.org/en/2.7.0/YAML.html) string in
@@ -440,13 +437,11 @@ module Psych
   sig do
     params(
       yaml: T.any(String, StringIO, IO),
-      legacy_filename: Object,
       filename: T.nilable(String),
-      fallback: T.untyped,
     )
     .returns(T.untyped)
   end
-  def self.parse(yaml, legacy_filename = T.unsafe(nil), filename: T.unsafe(nil), fallback: T.unsafe(nil)); end
+  def self.parse(yaml, filename: nil); end
 
   ###
   # Parse a file at `filename`. Returns the
@@ -516,13 +511,12 @@ module Psych
   sig do
     params(
       yaml: T.any(String, StringIO, IO),
-      legacy_filename: Object,
       filename: T.nilable(String),
       block: T.nilable(T.proc.params(node: Psych::Nodes::Document).void),
     )
     .returns(Psych::Nodes::Stream)
   end
-  def self.parse_stream(yaml, legacy_filename = T.unsafe(nil), filename: T.unsafe(nil), &block); end
+  def self.parse_stream(yaml, filename: T.unsafe(nil), &block); end
 
   ###
   # Dump Ruby object `o` to a
@@ -616,13 +610,14 @@ module Psych
   sig do
     params(
       yaml: T.any(String, StringIO, IO),
-      legacy_filename: Object,
       filename: T.nilable(String),
       fallback: T.untyped,
+      kwargs: T.untyped,
+      block: T.nilable(T.proc.params(node: T.untyped).void),
     )
     .returns(T::Array[T.untyped])
   end
-  def self.load_stream(yaml, legacy_filename = T.unsafe(nil), filename: T.unsafe(nil), fallback: T.unsafe(nil)); end
+  def self.load_stream(yaml, filename: nil, fallback: [], **kwargs, &block); end
 
   ###
   # Load the document contained in `filename`. Returns the yaml contained in
@@ -773,7 +768,7 @@ end
 
 class Psych::DisallowedClass < Psych::Exception
 
-  def initialize(klass_name); end
+  def initialize(action, klass_name); end
 end
 
 class Psych::Emitter < Psych::Handler
@@ -952,7 +947,7 @@ class Psych::Handler
   #
   # `value` is the string value of the scalar `anchor` is an associated anchor
   # or nil `tag` is an associated tag or nil `plain` is a boolean value `quoted`
-  # is a boolean value `style` is an integer idicating the string style
+  # is a boolean value `style` is an integer indicating the string style
   #
   # See the constants in
   # [`Psych::Nodes::Scalar`](https://docs.ruby-lang.org/en/2.7.0/Psych/Nodes/Scalar.html)
@@ -1464,7 +1459,7 @@ class Psych::Nodes::Node
   #
   # Also aliased as:
   # [`transform`](https://docs.ruby-lang.org/en/2.7.0/Psych/Nodes/Node.html#method-i-transform)
-  def to_ruby(); end
+  def to_ruby(symbolize_names: T.unsafe(nil), freeze: T.unsafe(nil), strict_integer: T.unsafe(nil)); end
 
   # Alias for:
   # [`yaml`](https://docs.ruby-lang.org/en/2.7.0/Psych/Nodes/Node.html#method-i-yaml)
@@ -1472,7 +1467,7 @@ class Psych::Nodes::Node
 
   # Alias for:
   # [`to_ruby`](https://docs.ruby-lang.org/en/2.7.0/Psych/Nodes/Node.html#method-i-to_ruby)
-  def transform(); end
+  def transform(symbolize_names: T.unsafe(nil), freeze: T.unsafe(nil), strict_integer: T.unsafe(nil)); end
 
   # Convert this node to
   # [`YAML`](https://docs.ruby-lang.org/en/2.7.0/YAML.html).
@@ -1754,7 +1749,7 @@ class Psych::Parser
   # See [`Psych::Parser`](https://docs.ruby-lang.org/en/2.7.0/Psych/Parser.html)
   # and
   # [`Psych::Parser#handler`](https://docs.ruby-lang.org/en/2.7.0/Psych/Parser.html#attribute-i-handler)
-  def parse(*arg0); end
+  def parse(yaml, path = T.unsafe(nil)); end
 end
 
 class Psych::Parser::Mark
@@ -1783,7 +1778,7 @@ class Psych::ScalarScanner
 
   def class_loader(); end
 
-  def initialize(class_loader); end
+  def initialize(class_loader, strict_integer: T.unsafe(nil)); end
 
   # Parse and return an int from `string`
   def parse_int(string); end
@@ -1983,7 +1978,7 @@ class Psych::Visitors::ToRuby < Psych::Visitors::Visitor
 
   def class_loader(); end
 
-  def initialize(ss, class_loader); end
+  def initialize(ss, class_loader, symbolize_names: T.unsafe(nil), freeze: T.unsafe(nil)); end
 
   def visit_Psych_Nodes_Alias(o); end
 
@@ -1997,7 +1992,7 @@ class Psych::Visitors::ToRuby < Psych::Visitors::Visitor
 
   def visit_Psych_Nodes_Stream(o); end
 
-  def self.create(); end
+  def self.create(symbolize_names: T.unsafe(nil), freeze: T.unsafe(nil), strict_integer: T.unsafe(nil)); end
 end
 
 class Psych::Visitors::Visitor

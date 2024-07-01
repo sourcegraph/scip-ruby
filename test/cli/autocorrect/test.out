@@ -24,7 +24,7 @@ autocorrect.rb:19: Method `params` does not exist on `T.class_of(<root>)` https:
 
 autocorrect.rb:4: Method `[]` does not exist on `NilClass` component of `T.nilable(String)` https://srb.help/7003
      4 |foo[0]
-        ^^^^^^
+           ^^^
   Got `T.nilable(String)` originating from:
     autocorrect.rb:3:
      3 |foo = T.let(nil, T.nilable(String))
@@ -86,18 +86,15 @@ autocorrect.rb:12: Method `bar` does not exist on `NilClass` component of `T.nil
     12 |foo.bar ||= "a"
         ^^^^^^^
 
-autocorrect.rb:12: Method `bar=` does not exist on `String` component of `T.nilable(String)` https://srb.help/7003
+autocorrect.rb:12: Setter method `bar=` does not exist on `String` component of `T.nilable(String)` https://srb.help/7003
     12 |foo.bar ||= "a"
         ^^^^^^^
   Got `T.nilable(String)` originating from:
     autocorrect.rb:3:
      3 |foo = T.let(nil, T.nilable(String))
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    https://github.com/sorbet/sorbet/tree/master/rbi/core/kernel.rbi#LCENSORED: Did you mean: `Kernel#warn`
-      NN |  def warn(*msg); end
-            ^^^^^^^^^^^^^^
 
-autocorrect.rb:12: Method `bar=` does not exist on `NilClass` component of `T.nilable(String)` https://srb.help/7003
+autocorrect.rb:12: Setter method `bar=` does not exist on `NilClass` component of `T.nilable(String)` https://srb.help/7003
     12 |foo.bar ||= "a"
         ^^^^^^^
   Got `T.nilable(String)` originating from:
@@ -129,18 +126,15 @@ autocorrect.rb:13: Method `bar` does not exist on `NilClass` component of `T.nil
     13 |foo.bar &&= "a"
         ^^^^^^^
 
-autocorrect.rb:13: Method `bar=` does not exist on `String` component of `T.nilable(String)` https://srb.help/7003
+autocorrect.rb:13: Setter method `bar=` does not exist on `String` component of `T.nilable(String)` https://srb.help/7003
     13 |foo.bar &&= "a"
         ^^^^^^^
   Got `T.nilable(String)` originating from:
     autocorrect.rb:3:
      3 |foo = T.let(nil, T.nilable(String))
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    https://github.com/sorbet/sorbet/tree/master/rbi/core/kernel.rbi#LCENSORED: Did you mean: `Kernel#warn`
-      NN |  def warn(*msg); end
-            ^^^^^^^^^^^^^^
 
-autocorrect.rb:13: Method `bar=` does not exist on `NilClass` component of `T.nilable(String)` https://srb.help/7003
+autocorrect.rb:13: Setter method `bar=` does not exist on `NilClass` component of `T.nilable(String)` https://srb.help/7003
     13 |foo.bar &&= "a"
         ^^^^^^^
   Got `T.nilable(String)` originating from:
@@ -172,18 +166,15 @@ autocorrect.rb:14: Method `bar` does not exist on `NilClass` component of `T.nil
     14 |foo.bar |= "a"
         ^^^^^^^
 
-autocorrect.rb:14: Method `bar=` does not exist on `String` component of `T.nilable(String)` https://srb.help/7003
+autocorrect.rb:14: Setter method `bar=` does not exist on `String` component of `T.nilable(String)` https://srb.help/7003
     14 |foo.bar |= "a"
         ^^^^^^^
   Got `T.nilable(String)` originating from:
     autocorrect.rb:3:
      3 |foo = T.let(nil, T.nilable(String))
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    https://github.com/sorbet/sorbet/tree/master/rbi/core/kernel.rbi#LCENSORED: Did you mean: `Kernel#warn`
-      NN |  def warn(*msg); end
-            ^^^^^^^^^^^^^^
 
-autocorrect.rb:14: Method `bar=` does not exist on `NilClass` component of `T.nilable(String)` https://srb.help/7003
+autocorrect.rb:14: Setter method `bar=` does not exist on `NilClass` component of `T.nilable(String)` https://srb.help/7003
     14 |foo.bar |= "a"
         ^^^^^^^
   Got `T.nilable(String)` originating from:
@@ -215,18 +206,15 @@ autocorrect.rb:15: Method `bar` does not exist on `NilClass` component of `T.nil
     15 |foo.bar &= "a"
         ^^^^^^^
 
-autocorrect.rb:15: Method `bar=` does not exist on `String` component of `T.nilable(String)` https://srb.help/7003
+autocorrect.rb:15: Setter method `bar=` does not exist on `String` component of `T.nilable(String)` https://srb.help/7003
     15 |foo.bar &= "a"
         ^^^^^^^
   Got `T.nilable(String)` originating from:
     autocorrect.rb:3:
      3 |foo = T.let(nil, T.nilable(String))
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    https://github.com/sorbet/sorbet/tree/master/rbi/core/kernel.rbi#LCENSORED: Did you mean: `Kernel#warn`
-      NN |  def warn(*msg); end
-            ^^^^^^^^^^^^^^
 
-autocorrect.rb:15: Method `bar=` does not exist on `NilClass` component of `T.nilable(String)` https://srb.help/7003
+autocorrect.rb:15: Setter method `bar=` does not exist on `NilClass` component of `T.nilable(String)` https://srb.help/7003
     15 |foo.bar &= "a"
         ^^^^^^^
   Got `T.nilable(String)` originating from:
@@ -240,7 +228,7 @@ autocorrect.rb:15: Method `bar=` does not exist on `NilClass` component of `T.ni
 
 autocorrect.rb:17: Method `[]` does not exist on `NilClass` component of `T.nilable(Integer)` https://srb.help/7003
     17 |[1].max_by {|l,r| 1}[2]
-        ^^^^^^^^^^^^^^^^^^^^^^^
+                            ^^^
   Got `T.nilable(Integer)` originating from:
     autocorrect.rb:17:
     17 |[1].max_by {|l,r| 1}[2]

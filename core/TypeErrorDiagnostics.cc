@@ -35,8 +35,12 @@ namespace {
 }
 } // namespace
 
-void TypeErrorDiagnostics::explainTypeMismatch(const GlobalState &gs, ErrorBuilder &e, const TypePtr &expected,
+void TypeErrorDiagnostics::explainTypeMismatch(const GlobalState &gs, ErrorBuilder &e,
+                                               const ErrorSection::Collector &collector, const TypePtr &expected,
                                                const TypePtr &got) {
+    e.addErrorSections(std::move(collector));
+    // TODO: the rest of this function should eventually be moved to isSubTypeUnderConstraint,
+    // as calls to collector.addErrorDetails
     auto expectedSelfTypeParam = isa_type<SelfTypeParam>(expected);
     auto gotClassType = isa_type<ClassType>(got);
     if (expectedSelfTypeParam && gotClassType) {
@@ -81,12 +85,13 @@ void TypeErrorDiagnostics::maybeAutocorrect(const GlobalState &gs, ErrorBuilder 
 
         auto withoutNil = Types::dropNil(gs, actualType);
         if (!withoutNil.isBottom() &&
-            Types::isSubTypeUnderConstraint(gs, *constr, withoutNil, expectedType, UntypedMode::AlwaysCompatible)) {
+            Types::isSubTypeUnderConstraint(gs, *constr, withoutNil, expectedType, UntypedMode::AlwaysCompatible,
+                                            ErrorSection::Collector::NO_OP)) {
             e.replaceWith("Wrap in `T.must`", loc, "T.must({})", loc.source(gs).value());
         } else if (isa_type<MetaType>(actualType) && !isa_type<MetaType>(expectedType) &&
-                   core::Types::isSubTypeUnderConstraint(gs, *constr,
-                                                         core::Symbols::T_Types_Base().data(gs)->externalType(),
-                                                         expectedType, UntypedMode::AlwaysCompatible)) {
+                   core::Types::isSubTypeUnderConstraint(
+                       gs, *constr, core::Symbols::T_Types_Base().data(gs)->externalType(), expectedType,
+                       UntypedMode::AlwaysCompatible, ErrorSection::Collector::NO_OP)) {
             e.replaceWith("Wrap in `T::Utils.coerce`", loc, "T::Utils.coerce({})", loc.source(gs).value());
         }
     }
@@ -122,15 +127,21 @@ void TypeErrorDiagnostics::insertTypeArguments(const GlobalState &gs, ErrorBuild
 void TypeErrorDiagnostics::explainUntyped(const GlobalState &gs, ErrorBuilder &e, ErrorClass what,
                                           const TypeAndOrigins &untyped, Loc originForUninitialized) {
     e.addErrorSection(untyped.explainGot(gs, originForUninitialized));
-    if (what == core::errors::Infer::UntypedValue) {
-        e.addErrorNote("Support for `{}` is minimal. Consider using `{}` instead.", "typed: strong", "typed: strict");
-    }
-}
 
-void TypeErrorDiagnostics::explainUntyped(const GlobalState &gs, ErrorBuilder &e, ErrorClass what, TypePtr untyped,
-                                          Loc origin, Loc originForUninitialized) {
-    auto untypedTpo = TypeAndOrigins{untyped, origin};
-    e.addErrorSection(untypedTpo.explainGot(gs, originForUninitialized));
+    if constexpr (sorbet::track_untyped_blame_mode || sorbet::debug_mode) {
+        auto blameSymbol = untyped.type.untypedBlame();
+        if (blameSymbol.exists()) {
+            auto loc = blameSymbol.loc(gs);
+            if (loc.exists()) {
+                e.addErrorLine(loc, "Blames to `{}`, defined here", blameSymbol.show(gs));
+            } else {
+                e.addErrorNote("Blames to `{}`", blameSymbol.show(gs));
+            }
+        } else {
+            e.addErrorNote("Blames to `{}`", "<none>");
+        }
+    }
+
     if (what == core::errors::Infer::UntypedValue) {
         e.addErrorNote("Support for `{}` is minimal. Consider using `{}` instead.", "typed: strong", "typed: strict");
     }
@@ -177,7 +188,7 @@ TypeErrorDiagnostics::editForDSLMethod(const GlobalState &gs, FileRef fileToEdit
     }
 
     auto inCurrentFile = [&](const auto &loc) { return loc.file() == fileToEdit; };
-    auto &classLocs = inWhat->locs();
+    auto classLocs = inWhat->locs();
     auto classLoc = absl::c_find_if(classLocs, inCurrentFile);
 
     if (classLoc == classLocs.end()) {

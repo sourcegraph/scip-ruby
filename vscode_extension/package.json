@@ -4,7 +4,7 @@
   "description": "Ruby IDE features, powered by Sorbet.",
   "author": "Stripe Inc.",
   "license": "Apache-2.0",
-  "version": "0.3.23",
+  "version": "0.3.35",
   "publisher": "sorbet",
   "icon": "icon.png",
   "repository": {
@@ -24,12 +24,14 @@
   ],
   "activationEvents": [
     "onCommand:sorbet.configure",
+    "onCommand:sorbet.configureHighlightUntyped",
     "onCommand:sorbet.disable",
     "onCommand:sorbet.enable",
     "onCommand:sorbet.restart",
     "onCommand:sorbet.setLogLevel",
     "onCommand:sorbet.showOutput",
     "onCommand:sorbet.toggleHighlightUntyped",
+    "onCommand:sorbet.toggleTypedFalseCompletionNudges",
     "onLanguage:ruby",
     "workspaceContains:sorbet/*"
   ],
@@ -55,6 +57,12 @@
         "category": "Sorbet"
       },
       {
+        "command": "sorbet.configureHighlightUntyped",
+        "title": "Configure untyped code highlighting",
+        "category": "Sorbet",
+        "enablement": "workbenchState != empty"
+      },
+      {
         "command": "sorbet.copySymbolToClipboard",
         "title": "Copy Symbol to Clipboard",
         "category": "Sorbet",
@@ -69,12 +77,6 @@
         "command": "sorbet.enable",
         "title": "Enable",
         "category": "Sorbet"
-      },
-      {
-        "command": "sorbet.rename",
-        "title": "Rename Symbol",
-        "category": "Sorbet",
-        "enablement": "editorLangId == ruby"
       },
       {
         "command": "sorbet.restart",
@@ -94,6 +96,12 @@
       {
         "command": "sorbet.toggleHighlightUntyped",
         "title": "Toggle highlighting untyped code",
+        "category": "Sorbet",
+        "enablement": "workbenchState != empty"
+      },
+      {
+        "command": "sorbet.toggleTypedFalseCompletionNudges",
+        "title": "Toggle the auto-complete nudge in `typed: false` files",
         "category": "Sorbet",
         "enablement": "workbenchState != empty"
       }
@@ -222,6 +230,15 @@
                 "format": "uri-reference",
                 "default": "${workspaceFolder}"
               },
+              "env": {
+                "description": "Environment variables to set when launching sorbet",
+                "type": "object",
+                "minItems": 1,
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {}
+              },
               "command": {
                 "description": "Full command line to invoke sorbet",
                 "type": "array",
@@ -236,6 +253,9 @@
               "name": "My Custom Sorbet Configuration",
               "description": "A longer description of this Sorbet Configuration for use in hover text",
               "cwd": "${workspaceFolder}",
+              "env": {
+                "MY_ENV_VAR": "my-value"
+              },
               "command": [
                 "bundle",
                 "exec",
@@ -254,9 +274,18 @@
           "default": false
         },
         "sorbet.highlightUntyped": {
-          "type": "boolean",
+          "enum": [
+            "nowhere",
+            "everywhere-but-tests",
+            "everywhere"
+          ],
           "description": "Shows warning for untyped values.",
-          "default": false
+          "default": "nowhere"
+        },
+        "sorbet.typedFalseCompletionNudges": {
+          "type": "boolean",
+          "description": "Displays an auto-complete nudge in `typed: false` files.",
+          "default": true
         },
         "sorbet.configFilePatterns": {
           "type": "array",
@@ -296,7 +325,7 @@
     "test": "yarn compile && ./scripts/run_tests.sh .",
     "test:ci": "node --preserve-symlinks-main ./out/scripts/runTests.js .",
     "generate-package": "yarn install && yarn compile && yarn vsce package --out sorbet.vsix",
-    "vscode-install": "yarn generate-package && code --force --install-extension sorbet.vsix"
+    "launch": "VSCODE_SORBETEXT_LOG_LEVEL=trace code --extensionDevelopmentPath=$PWD"
   },
   "dependencies": {
     "async": "^2.6.4",
@@ -311,6 +340,7 @@
     "@types/node": "^10.11.7",
     "@types/sinon": "^7.5.0",
     "@types/vscode": "~1.65",
+    "@typescript-eslint/eslint-plugin": "^5.17.0",
     "@typescript-eslint/parser": "^5.17.0",
     "eslint": "^7.32.0",
     "eslint-config-airbnb": "^17.1.0",

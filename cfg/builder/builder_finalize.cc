@@ -11,10 +11,6 @@ using namespace std;
 namespace sorbet::cfg {
 
 void CFGBuilder::simplify(core::Context ctx, CFG &cfg) {
-    if (!ctx.state.lspQuery.isEmpty()) {
-        return;
-    }
-
     sanityCheck(ctx, cfg);
     bool changed = true;
     while (changed) {
@@ -50,7 +46,7 @@ void CFGBuilder::simplify(core::Context ctx, CFG &cfg) {
                 bb->bexit.cond = LocalOccurrence{LocalRef::unconditional(), bb->bexit.loc}; // TODO(varun): right loc?
             }
             if (thenb == elseb && thenb != cfg.deadBlock() && thenb != bb &&
-                bb->rubyRegionId == thenb->rubyRegionId) { // can be squashed togather
+                bb->rubyRegionId == thenb->rubyRegionId) { // can be squashed together
                 if (thenb->backEdges.size() == 1 && thenb->outerLoops == bb->outerLoops) {
                     bb->exprs.insert(bb->exprs.end(), make_move_iterator(thenb->exprs.begin()),
                                      make_move_iterator(thenb->exprs.end()));
@@ -124,7 +120,7 @@ void CFGBuilder::sanityCheck(core::Context ctx, CFG &cfg) {
             continue;
         }
         if (bb.get() != cfg.entry()) {
-            ENFORCE((bb->flags & CFG::WAS_JUMP_DESTINATION) != 0, "block {} was never linked into cfg", bb->id);
+            ENFORCE(bb->flags.wasJumpDestination, "block {} was never linked into cfg", bb->id);
         }
         auto thenFnd = absl::c_find(bb->bexit.thenb->backEdges, bb.get());
         auto elseFnd = absl::c_find(bb->bexit.elseb->backEdges, bb.get());
@@ -242,7 +238,7 @@ void CFGBuilder::markLoopHeaders(core::Context ctx, CFG &cfg) {
     for (unique_ptr<BasicBlock> &bb : cfg.basicBlocks) {
         for (auto *parent : bb->backEdges) {
             if (parent->outerLoops < bb->outerLoops) {
-                bb->flags |= CFG::LOOP_HEADER;
+                bb->flags.isLoopHeader = true;
                 continue;
             }
         }

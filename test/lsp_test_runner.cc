@@ -546,11 +546,16 @@ TEST_CASE("LSPTest") {
         opts->noStdlib = BooleanPropertyAssertion::getValue("no-stdlib", assertions).value_or(false);
         opts->ruby3KeywordArgs =
             BooleanPropertyAssertion::getValue("experimental-ruby3-keyword-args", assertions).value_or(false);
+        opts->typedSuper = BooleanPropertyAssertion::getValue("typed-super", assertions).value_or(true);
+        // TODO(jez) Allow suppressPayloadSuperclassRedefinitionFor in a testdata test assertion?
         opts->stripeMode = BooleanPropertyAssertion::getValue("stripe-mode", assertions).value_or(false);
         opts->outOfOrderReferenceChecksEnabled =
             BooleanPropertyAssertion::getValue("check-out-of-order-constant-references", assertions).value_or(false);
         opts->requiresAncestorEnabled =
             BooleanPropertyAssertion::getValue("enable-experimental-requires-ancestor", assertions).value_or(false);
+        opts->lspExtractToVariableEnabled =
+            BooleanPropertyAssertion::getValue("enable-experimental-lsp-extract-to-variable", assertions)
+                .value_or(false);
         opts->stripePackages = BooleanPropertyAssertion::getValue("enable-packager", assertions).value_or(false);
 
         if (opts->stripePackages) {
@@ -564,13 +569,11 @@ TEST_CASE("LSPTest") {
             if (extraDirSlash.has_value()) {
                 opts->extraPackageFilesDirectorySlashPrefixes.emplace_back(extraDirSlash.value());
             }
-            opts->secondaryTestPackageNamespaces.emplace_back("Critic");
             auto skipImportVisibility =
-                StringPropertyAssertion::getValue("skip-package-import-visibility-check-for", assertions);
+                StringPropertyAssertion::getValue("allow-relaxed-packager-checks-for", assertions);
             if (skipImportVisibility.has_value()) {
-                opts->skipPackageImportVisibilityCheckFor.emplace_back(skipImportVisibility.value());
+                opts->allowRelaxedPackagerChecksFor.emplace_back(skipImportVisibility.value());
             }
-            opts->secondaryTestPackageNamespaces.emplace_back("Critic");
         }
         opts->disableWatchman = true;
         opts->rubyfmtPath = "test/testdata/lsp/rubyfmt-stub/rubyfmt";
@@ -607,6 +610,8 @@ TEST_CASE("LSPTest") {
         sorbetInitOptions->enableTypecheckInfo = true;
         sorbetInitOptions->highlightUntyped =
             BooleanPropertyAssertion::getValue("highlight-untyped-values", assertions).value_or(false);
+        sorbetInitOptions->enableTypedFalseCompletionNudges =
+            BooleanPropertyAssertion::getValue("enable-typed-false-completion-nudges", assertions).value_or(true);
         auto initializedResponses = initializeLSP(rootPath, rootUri, *lspWrapper, nextId, true,
                                                   shouldUseCodeActionResolve, move(sorbetInitOptions));
         INFO("Should not receive any response to 'initialized' message.");
@@ -795,7 +800,7 @@ TEST_CASE("LSPTest") {
                     // importUsageAssertions.
                     UsageAssertion::check(test.sourceFileContents, *lspWrapper, nextId, symbol, *queryLoc,
                                           importUsageAssertions);
-                } else {
+                } else if (dynamic_pointer_cast<GoToDefSpecialAssertion>(assertion) == nullptr) {
                     // For a regular UsageAssertion, check that a reference request at this location returns
                     // entryAssertions.
                     UsageAssertion::check(test.sourceFileContents, *lspWrapper, nextId, symbol, *queryLoc,

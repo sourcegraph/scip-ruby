@@ -1,6 +1,18 @@
 # Version history
+
+## 0.3.26
+- Add option to toggle the auto-complete nudge in `typed: false` files
+
+## 0.3.25
+- Toggling highlighting of untyped code does not require a restart now
+  - Sends workspace/didChangeConfiguration notification to LSP server instead
+
 ## 0.3.24
-- Disable the `Copy Symbol to Clipboard` command when there is a text selection.
+
+- `Copy Symbol to Clipboard`
+  - Disable command when there is a text selection.
+  - Show a progress dialog when Sorbet is not ready to process commands.
+- Auto-save `__package.rb` files when edited by a quickfix
 
 ## 0.3.23
 - Fix: Sorbet extension fails when opening a project containing Ruby code but no active configuration.
@@ -14,7 +26,7 @@
 
 ## 0.3.20
 - `Sorbet` status bar item shows a quick-pick drop down instead of a notification dialog when clicked.
-- `Sorbet: Set Log Level…` command allows to control what messages are logged to the `Sorbet` output pane. 
+- `Sorbet: Set Log Level…` command allows to control what messages are logged to the `Sorbet` output pane.
   - Defaults to `info` and does not persist between sessions.
   - The `VSCODE_SORBETEXT_LOG_LEVEL` environment variable, if defined, changes the initial value. Use one of these values: `trace`, `debug`, `info`, `warning`, `error` (case-insensitive).
 

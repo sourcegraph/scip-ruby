@@ -5,8 +5,9 @@ import * as sinon from "sinon";
 
 import { createLogStub } from "../testUtils";
 import { showSorbetConfigurationPicker } from "../../commands/showSorbetConfigurationPicker";
-import { SorbetExtensionConfig, SorbetLspConfig } from "../../config";
+import { SorbetExtensionConfig } from "../../config";
 import { SorbetExtensionContext } from "../../sorbetExtensionContext";
+import { SorbetLspConfig } from "../../sorbetLspConfig";
 
 suite(`Test Suite: ${path.basename(__filename, ".test.js")}`, () => {
   let testRestorables: { restore: () => void }[];
@@ -25,6 +26,7 @@ suite(`Test Suite: ${path.basename(__filename, ".test.js")}`, () => {
       name: "test-config-id-active",
       description: "",
       cwd: "",
+      env: {},
       command: [],
     });
     const otherLspConfig = new SorbetLspConfig({
@@ -32,6 +34,7 @@ suite(`Test Suite: ${path.basename(__filename, ".test.js")}`, () => {
       name: "test-config-id",
       description: "",
       cwd: "",
+      env: {},
       command: [],
     });
 
@@ -50,7 +53,7 @@ suite(`Test Suite: ${path.basename(__filename, ".test.js")}`, () => {
     await assert.doesNotReject(showSorbetConfigurationPicker(context));
 
     sinon.assert.calledOnce(showQuickPickSingleStub);
-    assert.deepStrictEqual(await showQuickPickSingleStub.firstCall.args[0], [
+    assert.deepStrictEqual(showQuickPickSingleStub.firstCall.args[0], [
       {
         label: `• ${activeLspConfig.name}`,
         description: activeLspConfig.description,
@@ -68,7 +71,7 @@ suite(`Test Suite: ${path.basename(__filename, ".test.js")}`, () => {
         description: "Disable the Sorbet extension",
       },
     ]);
-    assert.deepStrictEqual(await showQuickPickSingleStub.firstCall.args[1], {
+    assert.deepStrictEqual(showQuickPickSingleStub.firstCall.args[1], {
       placeHolder: "Select a Sorbet configuration",
     });
   });

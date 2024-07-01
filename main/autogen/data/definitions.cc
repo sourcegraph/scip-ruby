@@ -122,7 +122,8 @@ string ParsedFile::toString(const core::GlobalState &gs, int version) const {
     fmt::format_to(std::back_inserter(out), "## refs:\n");
     for (auto &ref : refs) {
         vector<string> nestingStrings;
-        for (auto &scope : ref.nesting) {
+        auto &nesting = nestings[ref.nestingId];
+        for (auto &scope : nesting) {
             auto fullScopeName = showFullName(gs, scope);
             nestingStrings.emplace_back(fmt::format("[{}]", fmt::map_join(fullScopeName, " ", nameToString)));
         }
@@ -170,8 +171,23 @@ vector<string> ParsedFile::listAllClasses(core::Context ctx) {
 
 // Convert this parsedfile to a msgpack representation
 string ParsedFile::toMsgpack(core::Context ctx, int version, const AutogenConfig &autogenCfg) {
-    MsgpackWriter write(version);
-    return write.pack(ctx, *this, autogenCfg);
+    if (autogenCfg.msgpackSkipReferenceMetadata) {
+        MsgpackWriterLite write(version);
+
+        return write.pack(ctx, *this, autogenCfg);
+    } else {
+        MsgpackWriter write(version);
+
+        return write.pack(ctx, *this, autogenCfg);
+    }
+}
+
+string ParsedFile::msgpackGlobalHeader(int version, size_t numFiles, const AutogenConfig &autogenCfg) {
+    if (autogenCfg.msgpackSkipReferenceMetadata) {
+        return MsgpackWriterLite::msgpackGlobalHeader(version, numFiles);
+    } else {
+        return MsgpackWriter::msgpackGlobalHeader(version, numFiles);
+    }
 }
 
 } // namespace sorbet::autogen

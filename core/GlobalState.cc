@@ -85,6 +85,13 @@ struct MethodBuilder {
         return *this;
     }
 
+    MethodBuilder &defaultKeywordArg(NameRef name) {
+        auto &arg = gs.enterMethodArgumentSymbol(Loc::none(), method, name);
+        arg.flags.isDefault = true;
+        arg.flags.isKeyword = true;
+        return *this;
+    }
+
     MethodBuilder &repeatedArg(NameRef name) {
         auto &arg = gs.enterMethodArgumentSymbol(Loc::none(), method, name);
         arg.flags.isRepeated = true;
@@ -365,6 +372,8 @@ void GlobalState::initEmpty() {
     ENFORCE(klass == Symbols::Class());
     klass = synthesizeClass(core::Names::Constants::BasicObject(), 0);
     ENFORCE(klass == Symbols::BasicObject());
+    method = enterMethod(*this, Symbols::BasicObject(), Names::initialize()).build();
+    ENFORCE(method == Symbols::BasicObject_initialize());
     klass = synthesizeClass(core::Names::Constants::Kernel(), 0, true);
     ENFORCE(klass == Symbols::Kernel());
     klass = synthesizeClass(core::Names::Constants::Range());
@@ -411,12 +420,16 @@ void GlobalState::initEmpty() {
     klass = Symbols::Sorbet_Private_Static().data(*this)->singletonClass(*this);
     ENFORCE(klass == Symbols::Sorbet_Private_StaticSingleton());
     klass = enterClassSymbol(Loc::none(), Symbols::Sorbet_Private_Static(), core::Names::Constants::StubModule());
+    klass.data(*this)->setIsModule(true);
     ENFORCE(klass == Symbols::StubModule());
     klass = enterClassSymbol(Loc::none(), Symbols::Sorbet_Private_Static(), core::Names::Constants::StubMixin());
+    klass.data(*this)->setIsModule(true);
     ENFORCE(klass == Symbols::StubMixin());
     klass = enterClassSymbol(Loc::none(), Symbols::Sorbet_Private_Static(), core::Names::Constants::PlaceholderMixin());
+    klass.data(*this)->setIsModule(true);
     ENFORCE(klass == Symbols::PlaceholderMixin());
     klass = enterClassSymbol(Loc::none(), Symbols::Sorbet_Private_Static(), core::Names::Constants::StubSuperClass());
+    klass.data(*this)->setIsModule(false);
     ENFORCE(klass == Symbols::StubSuperClass());
     klass = enterClassSymbol(Loc::none(), Symbols::T(), core::Names::Constants::Enumerable());
     ENFORCE(klass == Symbols::T_Enumerable());
@@ -556,6 +569,15 @@ void GlobalState::initEmpty() {
     klass.data(*this)->setIsModule(false);
     ENFORCE(klass == Symbols::T_Private_Methods_DeclBuilder());
 
+    method = enterMethod(*this, Symbols::T_Private_Methods_DeclBuilder(), Names::abstract()).build();
+    ENFORCE(method == Symbols::T_Private_Methods_DeclBuilder_abstract());
+    method = enterMethod(*this, Symbols::T_Private_Methods_DeclBuilder(), Names::overridable()).build();
+    ENFORCE(method == Symbols::T_Private_Methods_DeclBuilder_overridable());
+    method = enterMethod(*this, Symbols::T_Private_Methods_DeclBuilder(), Names::override_())
+                 .defaultKeywordArg(Names::allowIncompatible())
+                 .build();
+    ENFORCE(method == Symbols::T_Private_Methods_DeclBuilder_override());
+
     // T.class_of(T::Sig::WithoutRuntime)
     klass = Symbols::T_Sig_WithoutRuntime().data(*this)->singletonClass(*this);
     ENFORCE(klass == Symbols::T_Sig_WithoutRuntimeSingleton());
@@ -617,11 +639,6 @@ void GlobalState::initEmpty() {
     method = this->staticInitForClass(core::Symbols::root(), Loc::none());
     ENFORCE(method == Symbols::rootStaticInit());
 
-    method = enterMethod(*this, Symbols::PackageSpecSingleton(), Names::autoloaderCompatibility())
-                 .arg(Names::arg0())
-                 .build();
-    ENFORCE(method == Symbols::PackageSpec_autoloader_compatibility());
-
     method = enterMethod(*this, Symbols::PackageSpecSingleton(), Names::visibleTo()).arg(Names::arg0()).build();
     ENFORCE(method == Symbols::PackageSpec_visible_to());
 
@@ -633,12 +650,6 @@ void GlobalState::initEmpty() {
     ENFORCE(klass == Symbols::Sorbet_Private_Static_ResolvedSig());
     klass = Symbols::Sorbet_Private_Static_ResolvedSig().data(*this)->singletonClass(*this);
     ENFORCE(klass == Symbols::Sorbet_Private_Static_ResolvedSigSingleton());
-
-    klass = enterClassSymbol(Loc::none(), Symbols::T_Private(), core::Names::Constants::Compiler());
-    klass.data(*this)->setIsModule(true); // explicitly set isModule so we can immediately call singletonClass
-    ENFORCE(klass == Symbols::T_Private_Compiler());
-    klass = Symbols::T_Private_Compiler().data(*this)->singletonClass(*this);
-    ENFORCE(klass == Symbols::T_Private_CompilerSingleton());
 
     // Magic classes for special proc bindings
     klass = enterClassSymbol(Loc::none(), Symbols::Magic(), core::Names::Constants::BindToAttachedClass());
@@ -663,6 +674,9 @@ void GlobalState::initEmpty() {
 
     method = enterMethod(*this, Symbols::T_Generic(), Names::squareBrackets()).repeatedTopArg(Names::args()).build();
     ENFORCE(method == Symbols::T_Generic_squareBrackets());
+
+    method = enterMethod(*this, Symbols::Kernel(), Names::lambdaTLet()).typedArg(Names::type(), Types::top()).build();
+    ENFORCE(method == Symbols::Kernel_lambdaTLet());
 
     typeArgument =
         enterTypeArgument(Loc::none(), Symbols::noMethod(), Names::Constants::TodoTypeArgument(), Variance::CoVariant);
@@ -820,10 +834,10 @@ void GlobalState::initEmpty() {
                  .untypedArg(Names::arg0())
                  .buildWithResultUntyped();
 
-    // Synthesize <Magic>.<defined-instance-var>(arg0: T.untyped) => T.untyped
+    // Synthesize <Magic>.<defined-instance-var>(arg0: T.untyped) => T.nilable(String)
     method = enterMethod(*this, Symbols::MagicSingleton(), Names::definedInstanceVar())
                  .untypedArg(Names::arg0())
-                 .buildWithResultUntyped();
+                 .buildWithResult(Types::any(*this, Types::nilClass(), Types::String()));
 
     // Synthesize <DeclBuilderForProcs>.params(args: T.untyped) => DeclBuilderForProcs
     method = enterMethod(*this, Symbols::DeclBuilderForProcsSingleton(), Names::params())
@@ -1282,6 +1296,13 @@ TypeArgumentRef GlobalState::enterTypeArgument(Loc loc, MethodRef owner, NameRef
         if (typeArg.dataAllowingNone(*this)->name == name) {
             ENFORCE(typeArg.dataAllowingNone(*this)->flags.hasFlags(flags), "existing symbol has wrong flags");
             counterInc("symbols.hit");
+            if (!symbolTableFrozen) {
+                typeArg.data(*this)->addLoc(*this, loc);
+            } else {
+                // Sometimes this method is called when the symbol table is frozen for the purposes of sanity
+                // checking. Don't mutate the symbol table in those cases. This loc should already be there.
+                ENFORCE(!loc.exists() || absl::c_count(typeArg.data(*this)->locs(), loc) == 1);
+            }
             return typeArg;
         }
     }
@@ -1410,7 +1431,17 @@ FieldRef GlobalState::enterStaticFieldSymbol(Loc loc, ClassOrModuleRef owner, Na
     if (store.exists()) {
         ENFORCE(store.isStaticField(*this), "existing symbol is not a static field");
         counterInc("symbols.hit");
-        return store.asFieldRef();
+
+        // Ensures that locs get properly updated on the fast path
+        auto fieldRef = store.asFieldRef();
+        if (!symbolTableFrozen) {
+            fieldRef.data(*this)->addLoc(*this, loc);
+        } else {
+            // Sometimes this method is called when the symbol table is frozen for the purposes of sanity
+            // checking. Don't mutate the symbol table in those cases. This loc should already be there.
+            ENFORCE(!loc.exists() || absl::c_count(fieldRef.data(*this)->locs(), loc) == 1);
+        }
+        return fieldRef;
     }
 
     ENFORCE(!symbolTableFrozen);
@@ -2114,6 +2145,8 @@ unique_ptr<GlobalState> GlobalState::deepCopy(bool keepId) const {
     result->sleepInSlowPathSeconds = this->sleepInSlowPathSeconds;
     result->requiresAncestorEnabled = this->requiresAncestorEnabled;
     result->ruby3KeywordArgs = this->ruby3KeywordArgs;
+    result->typedSuper = this->typedSuper;
+    result->suppressPayloadSuperclassRedefinitionFor = this->suppressPayloadSuperclassRedefinitionFor;
     result->trackUntyped = this->trackUntyped;
     result->printingFileTable = this->printingFileTable;
     result->isSCIPRuby = this->isSCIPRuby;
@@ -2216,6 +2249,8 @@ unique_ptr<GlobalState> GlobalState::copyForIndex() const {
     result->sleepInSlowPathSeconds = this->sleepInSlowPathSeconds;
     result->requiresAncestorEnabled = this->requiresAncestorEnabled;
     result->ruby3KeywordArgs = this->ruby3KeywordArgs;
+    result->typedSuper = this->typedSuper;
+    result->suppressPayloadSuperclassRedefinitionFor = this->suppressPayloadSuperclassRedefinitionFor;
     result->trackUntyped = this->trackUntyped;
     result->kvstoreUuid = this->kvstoreUuid;
     result->errorUrlBase = this->errorUrlBase;
@@ -2376,30 +2411,25 @@ const packages::PackageDB &GlobalState::packageDB() const {
     return packageDB_;
 }
 
-void GlobalState::setPackagerOptions(const std::vector<std::string> &secondaryTestPackageNamespaces,
-                                     const std::vector<std::string> &extraPackageFilesDirectoryUnderscorePrefixes,
+void GlobalState::setPackagerOptions(const std::vector<std::string> &extraPackageFilesDirectoryUnderscorePrefixes,
                                      const std::vector<std::string> &extraPackageFilesDirectorySlashPrefixes,
                                      const std::vector<std::string> &packageSkipRBIExportEnforcementDirs,
-                                     const std::vector<std::string> &skipImportVisibilityCheckFor,
+                                     const std::vector<std::string> &allowRelaxedPackagerChecksFor,
                                      std::string errorHint) {
-    ENFORCE(packageDB_.secondaryTestPackageNamespaceRefs_.size() == 0);
     ENFORCE(!packageDB_.frozen);
 
-    for (const string &ns : secondaryTestPackageNamespaces) {
-        packageDB_.secondaryTestPackageNamespaceRefs_.emplace_back(enterNameConstant(ns));
-    }
-
+    packageDB_.enabled_ = true;
     packageDB_.extraPackageFilesDirectoryUnderscorePrefixes_ = extraPackageFilesDirectoryUnderscorePrefixes;
     packageDB_.extraPackageFilesDirectorySlashPrefixes_ = extraPackageFilesDirectorySlashPrefixes;
     packageDB_.skipRBIExportEnforcementDirs_ = packageSkipRBIExportEnforcementDirs;
 
-    std::vector<core::NameRef> skipImportVisibilityCheckFor_;
-    for (const string &pkgName : skipImportVisibilityCheckFor) {
+    std::vector<core::packages::MangledName> allowRelaxedPackagerChecksFor_;
+    for (const string &pkgName : allowRelaxedPackagerChecksFor) {
         std::vector<string_view> pkgNameParts = absl::StrSplit(pkgName, "::");
         auto mangledName = core::packages::MangledName::mangledNameFromParts(*this, pkgNameParts);
-        skipImportVisibilityCheckFor_.emplace_back(mangledName);
+        allowRelaxedPackagerChecksFor_.emplace_back(mangledName);
     }
-    packageDB_.skipImportVisibilityCheckFor_ = skipImportVisibilityCheckFor_;
+    packageDB_.allowRelaxedPackagerChecksFor_ = allowRelaxedPackagerChecksFor_;
     packageDB_.errorHint_ = errorHint;
 }
 
@@ -2543,6 +2573,9 @@ MethodRef GlobalState::staticInitForClass(ClassOrModuleRef klass, Loc loc) {
         auto blkLoc = core::Loc::none(loc.file());
         auto &blkSym = enterMethodArgumentSymbol(blkLoc, sym, core::Names::blkArg());
         blkSym.flags.isBlock = true;
+    } else {
+        // Ensures that locs get properly updated on the fast path
+        sym.data(*this)->addLoc(*this, loc);
     }
     return sym;
 }
@@ -2562,6 +2595,9 @@ MethodRef GlobalState::staticInitForFile(Loc loc) {
         auto blkLoc = core::Loc::none(loc.file());
         auto &blkSym = this->enterMethodArgumentSymbol(blkLoc, sym, core::Names::blkArg());
         blkSym.flags.isBlock = true;
+    } else {
+        // Ensures that locs get properly updated on the fast path
+        sym.data(*this)->addLoc(*this, loc);
     }
     return sym;
 }

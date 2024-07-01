@@ -13,7 +13,7 @@ def dropExtension(p):
     return p.partition(".")[0]
 
 _TEST_SCRIPT = """#!/usr/bin/env bash
-export ASAN_SYMBOLIZER_PATH=`pwd`/external/llvm_toolchain_12_0_0/bin/llvm-symbolizer
+export ASAN_SYMBOLIZER_PATH=`pwd`/external/llvm_toolchain_15_0_7/bin/llvm-symbolizer
 set -x
 exec {runner} --single_test="{test}"
 """
@@ -99,10 +99,10 @@ def single_package_rbi_test(name, rb_files):
     end_to_end_rbi_test(
         name = name,
         rb_files = rb_files,
-        size = "small",
-        # This is to get the test to run on the compiler build job,
-        # so we can avoid building ruby on the test-static-sanitized job.
-        tags = ["compiler"],
+        # This is to get the test to run on the rbi-gen build job, because I
+        # can't figure out how to disable the leak sanitizer when running this.
+        tags = ["manual"],
+        size = "medium",
     )
 
 _TEST_RUNNERS = {
@@ -114,7 +114,7 @@ _TEST_RUNNERS = {
 }
 
 def pipeline_tests(suite_name, all_paths, test_name_prefix, extra_files = [], tags = []):
-    tests = {}  # test_name-> {"path": String, "prefix": String, "sentinel": String}
+    tests = {}  # test_name-> {"path": String, "prefix": String, "sentinel": String, "isPackage": bool}
 
     # The packager step needs folder-based steps since folder structure dictates package membership.
     # All immediate subdirs of `/packager/` are individual tests.
@@ -139,6 +139,7 @@ def pipeline_tests(suite_name, all_paths, test_name_prefix, extra_files = [], ta
                         "isMultiFile": False,
                         "isDirectory": True,
                         "disabled": "disabled" in test_name,
+                        "isPackage": True,
                     }
                     tests[test_name] = data
                 continue
@@ -157,6 +158,7 @@ def pipeline_tests(suite_name, all_paths, test_name_prefix, extra_files = [], ta
                 "isMultiFile": "__" in path,
                 "isDirectory": False,
                 "disabled": "disabled" in path,
+                "isPackage": False,
             }
             tests[test_name] = data
 
@@ -165,6 +167,7 @@ def pipeline_tests(suite_name, all_paths, test_name_prefix, extra_files = [], ta
         fail(msg = "Unknown pipeline test type: {}".format(test_name_prefix))
 
     enabled_tests = []
+    enabled_packager_tests = []
     disabled_tests = []
     for name in tests.keys():
         test_name = "test_{}/{}".format(test_name_prefix, name)
@@ -179,6 +182,8 @@ def pipeline_tests(suite_name, all_paths, test_name_prefix, extra_files = [], ta
             disabled_tests.append(test_name)
         else:
             enabled_tests.append(test_name)
+            if tests[name]["isPackage"]:
+                enabled_packager_tests.append(test_name)
 
         data = []
         data += extra_files
@@ -190,6 +195,7 @@ def pipeline_tests(suite_name, all_paths, test_name_prefix, extra_files = [], ta
             data += [sentinel]
             data += native.glob(["{}.*.exp".format(prefix)])
             data += native.glob(["{}.*.rbupdate".format(prefix)])
+            data += native.glob(["{}.*.rbiupdate".format(prefix)])
             data += native.glob(["{}.*.rbedited".format(prefix)])
             data += native.glob(["{}.*.minimize.rbi".format(prefix)])
 
@@ -206,6 +212,12 @@ def pipeline_tests(suite_name, all_paths, test_name_prefix, extra_files = [], ta
         name = suite_name,
         tests = enabled_tests,
     )
+
+    if len(enabled_packager_tests) > 0:
+        native.test_suite(
+            name = "{}_packager".format(suite_name),
+            tests = enabled_packager_tests,
+        )
 
     if len(disabled_tests) > 0:
         native.test_suite(

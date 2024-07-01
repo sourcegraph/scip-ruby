@@ -74,6 +74,12 @@ in the editor.
 You can use the `sorbet.lspConfigs` setting described above to have the VS Code
 extension always pass these command line flags when starting Sorbet.
 
+Also, watchman requires that watched projects either be version controlled (e.g.
+have a `.git` folder in the project root) or have a `.watchmanconfig` file at
+the root of the project. Without one of these, watchman will not be able to
+start successfully. See [LSP: A note on watchman](lsp.md#a-note-on-watchman) for
+more.
+
 ## Features
 
 Live error squiggles for Sorbet typechecking errors
@@ -141,34 +147,6 @@ your preferred LSP client using the [`sorbet/showSymbol` LSP request].)
 
 [`sorbet/showsymbol` lsp request]:
   https://github.com/sorbet/sorbet/blob/ec02be89e3d1895ea51bc72464538073d27b812c/vscode_extension/src/LanguageClient.ts#L154-L179
-
-Highlight `T.untyped` code. This feature is in beta.
-
-This feature reports diagnostics to the editor for occurrences of `T.untyped`
-code. Note that it is not yet perfect and may miss occurrences of such values.
-
-It can be enabled by adding the following to your VS Code `settings.json` and
-either reopening VS Code or restarting Sorbet.
-
-```json
-"sorbet.highlightUntyped": true
-```
-
-or by using the `Sorbet: Toggle Highlight untyped values` command from the
-command palette (note this causes a full restart of Sorbet).
-
-To enable this feature in other language clients, configure your language client
-to send
-
-```json
-"initializationOptions": {
-  "highlightUntyped": true
-}
-```
-
-when sending the LSP initialize request to the Sorbet language server.
-
-<img src="/img/lsp/highlight_untyped.png" />
 
 ## Switching between configurations
 
@@ -341,52 +319,17 @@ that variable as having ever been defined.
 Otherwise, try to reproduce the issue on https://sorbet.run/ and file a bug on
 the [issue tracker](https://github.com/sorbet/sorbet/issues).
 
-### Go to Definition/Go to Type Definition/Find all References
+### Find all References
 
-#### Go to Definition/Go to Type Definition/Find all References is not working / Find all References is missing some expected results.
+#### Find all References is not working / Find all References is missing some expected results.
 
-First, make sure that Sorbet is running. You should see "Sorbet: Idle" in VS
-Code's status bar.
+Make sure that Sorbet is running. You should see "Sorbet: Idle" in VS Code's
+status bar. Otherwise, see
+[Feature support by strictness level](lsp-typed-level.md).
 
-It's possible that the feature is working as intended. Go to Definition and Find
-all References are not available in all circumstances. A ‘Yes’ entry in the
-following table indicates two distinct things:
-
-- A _language construct_ where these features work. For example, you can right
-  click a class reference and go to its definition or find its references in
-  typed and untyped files.
-- An item that will be included in the results of these features. For example,
-  the result of Find all References on a method includes method calls in typed
-  files, but not method calls in untyped files.
-
-|                                               | `# typed: true` or above | `# typed: false`  |
-| --------------------------------------------- | ------------------------ | ----------------- |
-| Class/module/constant definition or reference | Yes                      | Yes               |
-| ivar (@foo)                                   | Yes, if defined\*        | Yes, if defined\* |
-| cvar (@@foo)                                  | Yes, if defined\*        | Yes, if defined\* |
-| Method definition                             | Yes                      | Results only\*\*  |
-| Method call                                   | Yes                      | No                |
-| Local variable                                | Yes                      | No                |
-
-\* Indicates that the variable
-[_must_ be defined with `T.let`](/docs/type-annotations#declaring-class-and-instance-variables).
-Otherwise, Sorbet doesn’t see that variable as having ever been defined.
-
-\*\* You cannot use either feature from this language construct, but this item
-will be included in Go to Definition/Find all References results from typed
-files.
-
-We have these restrictions in place to avoid weird/nonsensical behavior caused
-by untyped files, which may have partial and potentially incorrect type
-information. We heartily encourage you to type files to gain access to these
-features.
-
-Note that some items marked "Yes" in the table may not work with these features
-if Sorbet does not have the necessary type information. In particular, method
-calls on an object `foo` where `foo` is untyped will not be included in Find all
-References and will not work with Go to Definition because Sorbet is unable to
-resolve which method is being called at that location. Using `# typed: strict`
-should suss out most of these untyped locations on a per-file basis.
+If the information in that document doesn't apply (e.g., the current file is
+`# typed: true` or higher), check whether the expression is `T.untyped`. See
+[Troubleshooting](troubleshooting.md) for more information.
 
 #### Find all References is slow.
 
@@ -400,14 +343,7 @@ one file.
 Find all References also waits for "Typechecking in background..." to complete
 so that it does not contend with typechecking for CPU time.
 
-#### Go to Definition/Go to Type Definition brought me to what I believe is the wrong location.
-
-Ensure that you see "Sorbet: Idle" and not "Sorbet: Disabled" at the bottom of
-VS Code. If Sorbet is enabled and it is returning a weird/unexpected definition
-site, please try to reproduce the issue on https://sorbet.run/ and file a bug on
-the [issue tracker](https://github.com/sorbet/sorbet/issues).
-
-#### Go to Definition/Go to Type Definition/Find all References brought me to a file that I cannot edit.
+#### Find all References brought me to a file that I cannot edit.
 
 These features may return results in type definitions for core Ruby libraries,
 which are baked directly into the Sorbet executable and are not present on the
@@ -417,67 +353,6 @@ In order to display these files in your editor and to support navigating through
 them, we've configured the Sorbet extension to display them in this read-only
 view. Note that certain extension features, like hover and Go to Definition,
 will not function in some of these special files.
-
-### Completion
-
-#### I don't see any completion results.
-
-- Are you in a `typed: false` file? No completion results are expected.
-- Is the place where you're trying to see results unreachable? For example,
-  after a return statement, or in an else condition that can't happen? Sorbet
-  can't provide completion results here.
-- Can you see completion results for other things? Sorbet only supports
-  completing local variables, methods, keywords, suggested sigs, classes,
-  modules, and constants right now. Notably, it doesn't support completing the
-  names of instance variables.
-
-#### I don't see any completion results right after I type A:: or x.
-
-You'll have to type at least one character after the dot (like x.f) or after the
-colon (like A::B) before completion results show up.
-
-We tried to get this working before the initial ship, but it ended up being a
-more complicated change than we expected. We have a couple ideas how to support
-this, so expect this to be supported in the future.
-
-#### The completion results look wrong.
-
-Completion results can come from many different extensions, not just Sorbet. You
-can try to figure out what extension returned the results by looking at the icon
-that VS Code shows in the completion list:
-
-![](/img/lsp/vscode-completion-list.png)
-
-Results from Sorbet will only ever have 1 of 6 icons (currently): `method`,
-`variable`, `field`, `class`, `interface`, `module`, `enum`, `keyword`, and
-`snippet`.
-
-**Notably**, the abc icon (`word`) means the results came either from VS Code’s
-`editor.wordBasedSuggestions` setting or some other generic autocomplete
-extension.
-
-Also, `snippet` results can come from other extensions. Snippet results that
-come from Sorbet will always say `(sorbet)` somewhere in the snippet
-description. Sorbet does not have control over any snippet results that don't
-say `(sorbet)` in them; if they look wrong, the only suggestion is to turn them
-off.
-
-#### Can I have Sorbet only suggest method names, not the entire snippet, with types?
-
-Sorbet inserts a suggested snippet into the document when accepting a completion
-result.
-
-- Snippet results will have highlighted sections inside them.
-- These represent "holes" (tabstops) that you'll need to fill in—the aim is that
-  every tabstop is for a required argument (i.e., optional / default arguments
-  won't be present).
-- As the default text for each of these holes, Sorbet uses the type of the
-  corresponding argument.
-- Press `TAB` to cycle through the holes (tabstops), or press `ESC` to deselect
-  all the tabstops.
-
-It is not possible to opt-out of these completion snippets. If you find that
-this is annoying, please let us know.
 
 ## Reporting metrics
 

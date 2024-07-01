@@ -112,6 +112,11 @@ class Index extends React.Component {
                   link: '/docs/talks/ruby-conf-2019',
                   venue: 'RubyConf 2019',
                 },
+                {
+                  title: 'Compiling Ruby to Native Code with Sorbet and LLVM',
+                  link: '/docs/talks/ruby-conf-2021',
+                  venue: 'RubyConf 2021',
+                },
               ]}
             />
           </div>
@@ -128,12 +133,6 @@ class Index extends React.Component {
                   link: 'https://github.com/sorbet/sorbet-typed',
                   description:
                     'A central repository for sharing type definitions for Ruby gems',
-                },
-                {
-                  title: 'sorbet-rails',
-                  link: 'https://github.com/chanzuckerberg/sorbet-rails',
-                  description:
-                    'A set of tools to make Sorbet work with Rails seamlessly',
                 },
                 {
                   title: 'Sord',
@@ -190,6 +189,12 @@ class Index extends React.Component {
                   title: 'spoom',
                   link: 'https://github.com/Shopify/spoom',
                   description: 'Useful tools for Sorbet enthusiasts',
+                },
+                {
+                  title: 'rubymine-sorbet-lsp',
+                  link: 'https://github.com/simoleone/rubymine-sorbet-lsp',
+                  description:
+                    'RubyMine plugin for error highlights and fixes powered by Sorbet language server',
                 },
               ]}
             />

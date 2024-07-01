@@ -22,6 +22,7 @@ namespace sorbet::realmain::lsp {
 class ResponseError;
 class InitializedTask;
 class TaskQueue;
+class DidChangeConfigurationParams;
 
 struct LSPQueryResult {
     std::vector<std::unique_ptr<core::lsp::QueryResponse>> responses;
@@ -73,12 +74,6 @@ class LSPTypechecker final {
     /** Commits the given file updates to LSPTypechecker. Does not send diagnostics. */
     void commitFileUpdates(LSPFileUpdates &updates, bool couldBeCanceled);
 
-    /**
-     * Get an LSPFileUpdates containing the latest versions of the given files. It's a "no-op" file update because it
-     * doesn't actually change anything.
-     */
-    LSPFileUpdates getNoopUpdate(std::vector<core::FileRef> frefs) const;
-
     /** Deep copy all entries in `indexed` that contain ASTs, except for those with IDs in the ignore set. Returns true
      * on success, false if the operation was canceled. */
     bool copyIndexed(WorkerPool &workers, const UnorderedSet<int> &ignore, std::vector<ast::ParsedFile> &out) const;
@@ -114,6 +109,15 @@ public:
                          WorkerPool &workers) const;
 
     /**
+     * Returns the parsed file for the given file, up to the desugar pass.
+     *
+     * This is never cached, which means that the file will be re-parsed from scratch.
+     * This is slower than getting the indexed tree (everything before namer), so if
+     * You can use the indexed tree that will be more performant. Certain IDE actions
+     * need particularly fine-grained fidelity in the AST (precludes rewriter).
+     */
+    ast::ExpressionPtr getDesugared(core::FileRef fref) const;
+    /**
      * Returns the parsed file for the given file, up to the index passes (does not include resolver passes).
      */
     const ast::ParsedFile &getIndexed(core::FileRef fref) const;
@@ -121,7 +125,7 @@ public:
     /**
      * Returns the parsed files for the given files, including resolver.
      */
-    std::vector<ast::ParsedFile> getResolved(const std::vector<core::FileRef> &frefs) const;
+    std::vector<ast::ParsedFile> getResolved(const std::vector<core::FileRef> &frefs, WorkerPool &workers) const;
 
     /**
      * Returns the currently active GlobalState.
@@ -143,6 +147,18 @@ public:
      * this flag to `false` will immediately unblock any currently blocked slow paths.
      */
     void setSlowPathBlocked(bool blocked);
+
+    /**
+     * Exposes very limited mutability to typechecker's global state in order to support the client changing
+     * options (such as highlighting untyped code) without doing a full restart of Sorbet.
+     */
+    void updateGsFromOptions(const DidChangeConfigurationParams &options) const;
+
+    /**
+     * Get an LSPFileUpdates containing the latest versions of the given files. It's a "no-op" file update because it
+     * doesn't actually change anything.
+     */
+    LSPFileUpdates getNoopUpdate(std::vector<core::FileRef> frefs) const;
 };
 
 /**
@@ -181,7 +197,11 @@ public:
     LSPQueryResult query(const core::lsp::Query &q, const std::vector<core::FileRef> &filesForQuery) const;
     const ast::ParsedFile &getIndexed(core::FileRef fref) const;
     std::vector<ast::ParsedFile> getResolved(const std::vector<core::FileRef> &frefs) const;
+    ast::ExpressionPtr getDesugared(core::FileRef fref) const;
     const core::GlobalState &state() const;
+
+    void updateGsFromOptions(const DidChangeConfigurationParams &options) const;
+    LSPFileUpdates getNoopUpdate(std::vector<core::FileRef> frefs) const;
 };
 } // namespace sorbet::realmain::lsp
 #endif

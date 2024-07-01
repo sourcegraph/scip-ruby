@@ -127,6 +127,7 @@ module T
   # Deprecated. Use `T::Enum` instead.
   #
   # For more information, see https://sorbet.org/docs/tenum
+  sig { params(values: T.any(T::Set[T.anything], T::Array[T.anything])).returns(T.untyped) }
   def self.deprecated_enum(values); end
 
   # Type syntax to opt out of static type checking.
@@ -198,7 +199,7 @@ module T
   # Statically, declares to Sorbet that the argument is never `nil`, despite
   # what the type system would otherwise infer for the type.
   #
-  # At runtime, raises an exception contining the provided reason if the
+  # At runtime, raises an exception containing the provided reason if the
   # argument is ever `nil`.
   #
   # Takes the reason as a block that should return a `String`, so that the code
@@ -322,38 +323,56 @@ end
 module T::Array
   # Type syntax to specify the element type of a standard library Array
   def self.[](type); end
+  # Don't use case/when on T::Array--just use `when Array` instead.
+  def self.===(arg0); end
 end
 module T::Hash
   # Type syntax to specify the key and value types of a standard library Hash
   def self.[](keys, values); end
+  # Don't use case/when on T::Hash--just use `when Hash` instead.
+  def self.===(arg0); end
 end
 module T::Set
   # Type syntax to specify the element type of a standard library Set
   def self.[](type); end
+  # Don't use case/when on T::Set--just use `when Set` instead.
+  def self.===(arg0); end
 end
 module T::Range
   # Type syntax to specify the element type of a standard library Range
   def self.[](type); end
+  # Don't use case/when on T::Range--just use `when Range` instead.
+  def self.===(arg0); end
 end
 module T::Class
   # Type syntax to specify the element type of a standard library Class
   def self.[](type); end
+  # Don't use case/when on T::Class--just use `when Class` instead.
+  def self.===(arg0); end
 end
 module T::Enumerable
   # Type syntax to specify the element type of a standard library Enumerable
   def self.[](type); end
+  # Don't use case/when on T::Enumerable--just use `when Enumerable` instead.
+  def self.===(arg0); end
 end
 module T::Enumerator
   # Type syntax to specify the element type of a standard library Enumerator
   def self.[](type); end
+  # Don't use case/when on T::Enumerator--just use `when Enumerator` instead.
+  def self.===(arg0); end
 end
 module T::Enumerator::Lazy
   # Type syntax to specify the element type of a standard library Enumerator::Lazy
   def self.[](type); end
+  # Don't use case/when on T::Enumerator::Lazy--just use `when Enumerator::Lazy` instead.
+  def self.===(arg0); end
 end
 module T::Enumerator::Chain
   # Type syntax to specify the element type of a standard library Enumerator::Chain
   def self.[](type); end
+  # Don't use case/when on T::Enumerator::Chain--just use `when Enumerator::Chain` instead.
+  def self.===(arg0); end
 end
 
 # Type syntax for either a `true` or `false` value.
@@ -425,7 +444,7 @@ module T::Utils
   def self.coerce(val); end
 
   def self.resolve_alias(type); end
-  def self.run_all_sig_blocks; end
+  def self.run_all_sig_blocks(force_type_init: true); end
   def self.signature_for_method(method); end
   def self.signature_for_instance_method(mod, method_name); end
   def self.unwrap_nilable(type); end
@@ -444,10 +463,6 @@ module T::AbstractUtils
   def self.declared_abstract_methods_for(mod); end
 end
 
-class T::InterfaceWrapper
-  def self.dynamic_cast(obj, mod); end
-end
-
 module T::Utils::Nilable
   def self.get_type_info(prop_type); end
   def self.get_underlying_type(prop_type); end
@@ -456,6 +471,6 @@ end
 
 module T::NonForcingConstants
   # See <https://sorbet.org/docs/non-forcing-constants> for full docs.
-  sig {params(val: BasicObject, klass: String, package: T.nilable(String)).returns(T::Boolean)}
-  def self.non_forcing_is_a?(val, klass, package: nil); end
+  sig {params(val: BasicObject, klass: String).returns(T::Boolean)}
+  def self.non_forcing_is_a?(val, klass); end
 end

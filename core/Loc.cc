@@ -23,6 +23,12 @@ LocOffsets LocOffsets::join(LocOffsets other) const {
     return LocOffsets{min(this->beginPos(), other.beginPos()), max(this->endPos(), other.endPos())};
 }
 
+bool LocOffsets::contains(const LocOffsets &other) const {
+    ENFORCE_NO_TIMER(this->exists());
+    ENFORCE_NO_TIMER(other.exists());
+    return other.beginPos() >= beginPos() && other.endPos() <= endPos();
+}
+
 Loc Loc::join(Loc other) const {
     if (!this->exists()) {
         return other;
@@ -108,7 +114,7 @@ string leftPad(string s, int l) {
 
 constexpr unsigned int WINDOW_SIZE = 10; // how many lines of source to print
 constexpr unsigned int WINDOW_HALF_SIZE = WINDOW_SIZE / 2;
-static_assert((WINDOW_SIZE & 1) == 0, "WINDOW_SIZE should be divisable by 2");
+static_assert((WINDOW_SIZE & 1) == 0, "WINDOW_SIZE should be divisible by 2");
 
 void addLocLine(stringstream &buf, int line, const File &file, int tabs, int posWidth, bool censorForSnapshotTests) {
     printTabs(buf, tabs);
@@ -310,7 +316,7 @@ optional<string_view> Loc::source(const GlobalState &gs) const {
 bool Loc::contains(const Loc &other) const {
     ENFORCE_NO_TIMER(this->exists());
     ENFORCE_NO_TIMER(other.exists());
-    return file() == other.file() && other.beginPos() >= beginPos() && other.endPos() <= endPos();
+    return file() == other.file() && offsets().contains(other.offsets());
 }
 
 bool Loc::operator==(const Loc &rhs) const {
@@ -388,6 +394,18 @@ pair<Loc, uint32_t> Loc::findStartOfLine(const GlobalState &gs) const {
     }
     uint32_t startOffset = lineStart + padding;
     return make_pair(Loc(this->file(), startOffset, startOffset), padding);
+}
+
+Loc Loc::truncateToFirstLine(const GlobalState &gs) const {
+    auto [beginPos, endPos] = this->position(gs);
+    if (beginPos.line == endPos.line) {
+        return *this;
+    }
+
+    const auto &lineBreaks = this->file().data(gs).lineBreaks();
+    // Detail::line is 1-indexed. We want one after the 0-indexed line, so line - 1 + 1 = line
+    auto firstNewline = lineBreaks[beginPos.line];
+    return Loc(this->file(), this->beginPos(), firstNewline);
 }
 
 } // namespace sorbet::core

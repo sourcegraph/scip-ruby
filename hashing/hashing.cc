@@ -76,9 +76,11 @@ unique_ptr<core::FileHash> computeFileHashForAST(spdlog::logger &logger, unique_
     vector<ast::ParsedFile> single;
     single.emplace_back(move(file));
 
+    // We run computeFileHashForAST with the empty set of options which means we can skip calling pipeline::package()
+
     auto workers = WorkerPool::create(0, lgs->tracer());
     core::FoundDefHashes foundHashes; // out parameter
-    realmain::pipeline::resolve(lgs, move(single), opts(), *workers, &foundHashes);
+    realmain::pipeline::nameAndResolve(lgs, move(single), opts(), *workers, &foundHashes);
 
     return make_unique<core::FileHash>(move(*lgs->hash()), move(usageHash), move(foundHashes));
 }
@@ -90,6 +92,8 @@ core::FileRef makeEmptyGlobalStateForFile(spdlog::logger &logger, shared_ptr<cor
     lgs = core::GlobalState::makeEmptyGlobalStateForHashing(logger);
     lgs->requiresAncestorEnabled = hashingOpts.requiresAncestorEnabled;
     lgs->ruby3KeywordArgs = hashingOpts.ruby3KeywordArgs;
+    lgs->typedSuper = hashingOpts.typedSuper;
+    lgs->suppressPayloadSuperclassRedefinitionFor = hashingOpts.suppressPayloadSuperclassRedefinitionFor;
     {
         core::UnfreezeFileTable fileTableAccess(*lgs);
         auto fref = lgs->enterFile(forWhat);
@@ -164,7 +168,7 @@ void Hashing::computeFileHashes(const vector<shared_ptr<core::File>> &files, spd
 
 vector<ast::ParsedFile> Hashing::indexAndComputeFileHashes(unique_ptr<core::GlobalState> &gs,
                                                            const realmain::options::Options &opts,
-                                                           spdlog::logger &logger, vector<core::FileRef> &files,
+                                                           spdlog::logger &logger, absl::Span<core::FileRef> files,
                                                            WorkerPool &workers,
                                                            const unique_ptr<const OwnedKeyValueStore> &kvstore) {
     auto asts = realmain::pipeline::index(*gs, files, opts, workers, kvstore);

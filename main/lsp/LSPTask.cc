@@ -198,6 +198,8 @@ ConstExprStr LSPTask::methodString() const {
             return "textDocument.typeDefinition";
         case LSPMethod::WorkspaceSymbol:
             return "workspace.symbol";
+        case LSPMethod::WorkspaceDidChangeConfiguration:
+            return "worksapce.didChangeConfiguration";
         case LSPMethod::TextDocumentImplementation:
             return "textDocument.implementation";
         case LSPMethod::CodeActionResolve:
@@ -299,7 +301,7 @@ LSPTask::getReferencesToSymbol(LSPTypecheckerDelegate &typechecker, core::Symbol
 }
 
 vector<unique_ptr<core::lsp::QueryResponse>>
-LSPTask::getReferencesToSymbolInPackage(LSPTypecheckerDelegate &typechecker, core::NameRef packageName,
+LSPTask::getReferencesToSymbolInPackage(LSPTypecheckerDelegate &typechecker, core::packages::MangledName packageName,
                                         core::SymbolRef symbol,
                                         vector<unique_ptr<core::lsp::QueryResponse>> &&priorRefs) const {
     if (symbol.exists()) {
@@ -451,10 +453,6 @@ AccessorInfo LSPTask::getAccessorInfo(const core::GlobalState &gs, core::SymbolR
             return info;
         }
         info.fieldSymbol = gs.lookupFieldSymbol(ownerCls, fieldName);
-        if (!info.fieldSymbol.exists()) {
-            // field symbol does not exist, so `symbol` must not be an accessor.
-            return info;
-        }
     }
 
     if (!info.readerSymbol.exists()) {

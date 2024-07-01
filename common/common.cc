@@ -1,4 +1,5 @@
 #include "common/common.h"
+#include "absl/strings/escaping.h"
 #include "common/FileOps.h"
 #include "common/concurrency/ConcurrentQueue.h"
 #include "common/concurrency/WorkerPool.h"
@@ -324,7 +325,7 @@ void appendFilesInDir(string_view basePath, const string &path, const sorbet::Un
                 if (!result.gotItem()) {
                     continue;
                 }
-                if (auto *token = std::get_if<QuitToken>(&job)) {
+                if (std::holds_alternative<QuitToken>(job)) {
                     break;
                 }
 
@@ -419,6 +420,8 @@ void appendFilesInDir(string_view basePath, const string &path, const sorbet::Un
 
     {
         JobOutput threadResult;
+        optional<sorbet::FileNotFoundException> fileNotFound;
+        optional<sorbet::FileNotDirException> fileNotDir;
         auto &logger = *spdlog::default_logger();
         for (auto result = resultq->wait_pop_timed(threadResult, sorbet::WorkerPool::BLOCK_INTERVAL(), logger);
              !result.done();
@@ -431,13 +434,27 @@ void appendFilesInDir(string_view basePath, const string &path, const sorbet::Un
                 }
 
                 if (auto *e = std::get_if<sorbet::FileNotFoundException>(&threadResult)) {
-                    throw *e;
+                    if (!fileNotFound.has_value()) {
+                        fileNotFound = *e;
+                    }
                 } else if (auto *e = std::get_if<sorbet::FileNotDirException>(&threadResult)) {
-                    throw *e;
+                    if (!fileNotDir.has_value()) {
+                        fileNotDir = *e;
+                    }
                 } else {
                     ENFORCE(false, "should never get here!");
                 }
             }
+        }
+
+        // If there was an error, don't raise it until after all the worker threads have finished,
+        // because they might be working on something, attempting to write to the pendingJobs
+        // variable stored on our stack, and then suddenly see that stack address gone because we've
+        // raised and jumped elsewhere.
+        if (fileNotFound.has_value()) {
+            throw fileNotFound.value();
+        } else if (fileNotDir.has_value()) {
+            throw fileNotDir.value();
         }
     }
 }
@@ -492,7 +509,39 @@ vector<int> sorbet::findLineBreaks(string_view s) {
 class SetTerminateHandler {
 public:
     static void on_terminate() {
+        auto eptr = current_exception();
+        if (eptr) {
+            try {
+                // Apparently this is the only way to convert a std::exception_ptr to std::exception
+                std::rethrow_exception(eptr);
+            } catch (const std::exception &e) {
+                sorbet::fatalLogger->error("Sorbet raised uncaught exception type=\"{}\" what=\"{}\"",
+                                           demangle(typeid(e).name()), absl::CEscape(e.what()));
+            } catch (const std::string &s) {
+                sorbet::fatalLogger->error("Sorbet raised uncaught exception type=std::string what=\"{}\"",
+                                           absl::CEscape(s));
+            } catch (const char *s) {
+                sorbet::fatalLogger->error("Sorbet raised uncaught exception type=\"char *\" what=\"{}\"",
+                                           absl::CEscape(s));
+            } catch (...) {
+                sorbet::fatalLogger->error("Sorbet raised uncaught exception type=<unknown> what=\"\"");
+            }
+        } else {
+            sorbet::fatalLogger->error("Sorbet raised uncaught exception type=<unknown> what=\"\"");
+        }
+
+        // Might print the backtrace twice if it's a SorbetException, because
+        // Exception::raise already prints the backtrace when the exception is raised. But
+        // SorbetException are caught at various places inside Sorbet, and so might not
+        // always terminate the process.
         sorbet::Exception::printBacktrace();
+
+        // "A std::terminate_handler shall terminate execution of the program without returning to
+        // the caller, otherwise the behavior is undefined."
+        //
+        // In libc++, the behavior is to print "terminate_handler unexpectedly returned" and then
+        // call abort()
+        abort();
     }
 
     SetTerminateHandler() {

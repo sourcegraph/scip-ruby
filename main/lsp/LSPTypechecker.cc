@@ -90,8 +90,8 @@ void LSPTypechecker::initialize(TaskQueue &queue, std::unique_ptr<core::GlobalSt
             inputFiles = pipeline::reserveFiles(initialGS, config->opts.inputFileNames);
             indexed.resize(initialGS->filesUsed());
 
-            auto asts = hashing::Hashing::indexAndComputeFileHashes(initialGS, config->opts, *config->logger,
-                                                                    inputFiles, workers, ownedKvstore);
+            auto asts = hashing::Hashing::indexAndComputeFileHashes(
+                initialGS, config->opts, *config->logger, absl::Span<core::FileRef>(inputFiles), workers, ownedKvstore);
             // asts are in fref order, but we (currently) don't index and compute file hashes for payload files, so
             // vector index != FileRef ID. Fix that by slotting them into `indexed`.
             for (auto &ast : asts) {
@@ -311,10 +311,10 @@ vector<core::FileRef> LSPTypechecker::runFastPath(LSPFileUpdates &updates, Worke
     }
 
     ENFORCE(gs->lspQuery.isEmpty());
-    auto resolved =
-        shouldRunIncrementalNamer
-            ? pipeline::incrementalResolve(*gs, move(updatedIndexed), std::move(oldFoundHashesForFiles), config->opts)
-            : pipeline::incrementalResolve(*gs, move(updatedIndexed), nullopt, config->opts);
+    auto resolved = shouldRunIncrementalNamer
+                        ? pipeline::incrementalResolve(*gs, move(updatedIndexed), std::move(oldFoundHashesForFiles),
+                                                       config->opts, workers)
+                        : pipeline::incrementalResolve(*gs, move(updatedIndexed), nullopt, config->opts, workers);
     auto sorted = sortParsedFiles(*gs, *errorReporter, move(resolved));
     const auto presorted = true;
     const auto cancelable = false;
@@ -386,7 +386,11 @@ bool LSPTypechecker::copyIndexed(WorkerPool &workers, const UnorderedSet<int> &i
             }
         }
     }
-    return !epochManager.wasTypecheckingCanceled();
+    if (epochManager.wasTypecheckingCanceled()) {
+        return true;
+    }
+    fast_sort(out, [](const auto &lhs, const auto &rhs) -> bool { return lhs.file < rhs.file; });
+    return epochManager.wasTypecheckingCanceled();
 }
 
 bool LSPTypechecker::runSlowPath(LSPFileUpdates updates, WorkerPool &workers,
@@ -437,7 +441,7 @@ bool LSPTypechecker::runSlowPath(LSPFileUpdates updates, WorkerPool &workers,
         // We use `gs` rather than the moved `finalGS` from this point forward.
 
         // Copy the indexes of unchanged files.
-        if (!copyIndexed(workers, updatedFiles, indexedCopies)) {
+        if (copyIndexed(workers, updatedFiles, indexedCopies)) {
             // Canceled.
             return;
         }
@@ -460,9 +464,22 @@ bool LSPTypechecker::runSlowPath(LSPFileUpdates updates, WorkerPool &workers,
                 }
             }
         }
+
+        pipeline::setPackagerOptions(*gs, config->opts);
+        // TODO(jez) Splitting this like how the pipeline intersperses this with indexing is going
+        // to take more work. Punting for now.
+        pipeline::package(*gs, absl::Span<ast::ParsedFile>(indexedCopies), config->opts, workers);
+
         // Only need to compute FoundDefHashes when running to compute a FileHash
         auto foundHashes = nullptr;
-        auto maybeResolved = pipeline::resolve(gs, move(indexedCopies), config->opts, workers, foundHashes);
+        auto canceled =
+            pipeline::name(*gs, absl::Span<ast::ParsedFile>(indexedCopies), config->opts, workers, foundHashes);
+        if (canceled) {
+            ast::ParsedFilesOrCancelled::cancel(move(indexedCopies), workers);
+            return;
+        }
+
+        auto maybeResolved = pipeline::resolve(gs, move(indexedCopies), config->opts, workers);
         if (!maybeResolved.hasResult()) {
             return;
         }
@@ -555,10 +572,8 @@ void LSPTypechecker::commitFileUpdates(LSPFileUpdates &updates, bool couldBeCanc
         indexedFinalGS.clear();
     }
 
-    int i = -1;
     ENFORCE(updates.updatedFileIndexes.size() == updates.updatedFiles.size());
     for (auto &ast : updates.updatedFileIndexes) {
-        i++;
         const int id = ast.file.id();
         if (id >= indexed.size()) {
             indexed.resize(id + 1);
@@ -601,7 +616,7 @@ void tryApplyLocalVarSaver(const core::GlobalState &gs, vector<ast::ParsedFile> 
             signature = sig_finder::SigFinder::findSignature(ctx, t.tree, queryLoc);
         }
         LocalVarSaver localVarSaver(ctx.locAt(t.tree.loc()), move(signature));
-        ast::TreeWalk::apply(ctx, localVarSaver, t.tree);
+        ast::ConstTreeWalk::apply(ctx, localVarSaver, t.tree);
     }
 }
 
@@ -633,7 +648,7 @@ LSPQueryResult LSPTypechecker::query(const core::lsp::Query &q, const std::vecto
     ENFORCE(gs->errorQueue->isEmpty());
     ENFORCE(gs->lspQuery.isEmpty());
     gs->lspQuery = q;
-    auto resolved = getResolved(filesForQuery);
+    auto resolved = getResolved(filesForQuery, workers);
     tryApplyDefLocSaver(*gs, resolved);
     tryApplyLocalVarSaver(*gs, resolved);
 
@@ -670,6 +685,10 @@ std::vector<std::unique_ptr<core::Error>> LSPTypechecker::retypecheck(vector<cor
     return errorCollector->drainErrors();
 }
 
+ast::ExpressionPtr LSPTypechecker::getDesugared(core::FileRef fref) const {
+    return pipeline::desugarOne(config->opts, *gs, fref);
+}
+
 const ast::ParsedFile &LSPTypechecker::getIndexed(core::FileRef fref) const {
     const auto id = fref.id();
     auto treeFinalGS = indexedFinalGS.find(id);
@@ -680,7 +699,7 @@ const ast::ParsedFile &LSPTypechecker::getIndexed(core::FileRef fref) const {
     return indexed[id];
 }
 
-vector<ast::ParsedFile> LSPTypechecker::getResolved(const vector<core::FileRef> &frefs) const {
+vector<ast::ParsedFile> LSPTypechecker::getResolved(const vector<core::FileRef> &frefs, WorkerPool &workers) const {
     ENFORCE(this_thread::get_id() == typecheckerThreadId, "Typechecker can only be used from the typechecker thread.");
     vector<ast::ParsedFile> updatedIndexed;
 
@@ -696,7 +715,7 @@ vector<ast::ParsedFile> LSPTypechecker::getResolved(const vector<core::FileRef> 
     // In getResolved, we want the LSP query behavior, not the file update behavior, which we get by passing nullopt.
     auto foundHashesForFiles = nullopt;
 
-    return pipeline::incrementalResolve(*gs, move(updatedIndexed), move(foundHashesForFiles), config->opts);
+    return pipeline::incrementalResolve(*gs, move(updatedIndexed), move(foundHashesForFiles), config->opts, workers);
 }
 
 const core::GlobalState &LSPTypechecker::state() const {
@@ -713,6 +732,23 @@ void LSPTypechecker::changeThread() {
 void LSPTypechecker::setSlowPathBlocked(bool blocked) {
     absl::MutexLock lck(&slowPathBlockedMutex);
     slowPathBlocked = blocked;
+}
+
+void LSPTypechecker::updateGsFromOptions(const DidChangeConfigurationParams &options) const {
+    this->gs->trackUntyped =
+        LSPClientConfiguration::parseEnableHighlightUntyped(*options.settings, this->gs->trackUntyped);
+
+    if (options.settings->enableTypecheckInfo.has_value() ||
+        options.settings->enableTypedFalseCompletionNudges.has_value() ||
+        options.settings->supportsOperationNotifications.has_value() ||
+        options.settings->supportsSorbetURIs.has_value()) {
+        auto msg =
+            "Currently `highlightUntyped` is the only updateable setting using the workspace/didChangeConfiguration "
+            "notification";
+        auto params = make_unique<ShowMessageParams>(MessageType::Warning, msg);
+        config->output->write(make_unique<LSPMessage>(
+            make_unique<NotificationMessage>("2.0", LSPMethod::WindowShowMessage, move(params))));
+    }
 }
 
 LSPTypecheckerDelegate::LSPTypecheckerDelegate(TaskQueue &queue, WorkerPool &workers, LSPTypechecker &typechecker)
@@ -753,11 +789,22 @@ const ast::ParsedFile &LSPTypecheckerDelegate::getIndexed(core::FileRef fref) co
 }
 
 std::vector<ast::ParsedFile> LSPTypecheckerDelegate::getResolved(const std::vector<core::FileRef> &frefs) const {
-    return typechecker.getResolved(frefs);
+    return typechecker.getResolved(frefs, workers);
+}
+
+ast::ExpressionPtr LSPTypecheckerDelegate::getDesugared(core::FileRef fref) const {
+    return typechecker.getDesugared(fref);
 }
 
 const core::GlobalState &LSPTypecheckerDelegate::state() const {
     return typechecker.state();
+}
+void LSPTypecheckerDelegate::updateGsFromOptions(const DidChangeConfigurationParams &options) const {
+    typechecker.updateGsFromOptions(options);
+}
+
+LSPFileUpdates LSPTypecheckerDelegate::getNoopUpdate(std::vector<core::FileRef> frefs) const {
+    return typechecker.getNoopUpdate(frefs);
 }
 
 } // namespace sorbet::realmain::lsp

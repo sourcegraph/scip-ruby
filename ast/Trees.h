@@ -287,8 +287,6 @@ template <class To> bool isa_tree(const ExpressionPtr &what) {
 
 bool isa_reference(const ExpressionPtr &what);
 
-bool isa_declaration(const ExpressionPtr &what);
-
 template <class To> To *cast_tree(ExpressionPtr &what) {
     if (isa_tree<To>(what)) {
         return reinterpret_cast<To *>(what.get());
@@ -341,9 +339,11 @@ template <> inline const ExpressionPtr &ExpressionPtr::cast<ExpressionPtr>(const
     return tree;
 }
 
-#define EXPRESSION(name)                                                                  \
-    class name;                                                                           \
-    template <> struct ExpressionToTag<name> { static constexpr Tag value = Tag::name; }; \
+#define EXPRESSION(name)                        \
+    class name;                                 \
+    template <> struct ExpressionToTag<name> {  \
+        static constexpr Tag value = Tag::name; \
+    };                                          \
     class __attribute__((aligned(8))) name final
 
 EXPRESSION(ClassDef) {
@@ -1091,8 +1091,7 @@ public:
     std::string toStringWithTabs(const core::GlobalState &gs, int tabs = 0) const;
     std::string showRaw(const core::GlobalState &gs, int tabs = 0) const;
     std::string nodeName() const;
-    std::optional<std::pair<core::SymbolRef, std::vector<core::NameRef>>> fullUnresolvedPath(
-        const core::GlobalState &gs) const;
+    std::optional<std::pair<core::SymbolRef, std::vector<core::NameRef>>> fullUnresolvedPath(core::Context ctx) const;
 
     void _sanityCheck();
 };

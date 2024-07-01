@@ -108,8 +108,20 @@ public:
 };
 
 ast::ExpressionPtr addSigVoid(ast::ExpressionPtr expr) {
-    return ast::MK::InsSeq1(expr.loc(), ast::MK::SigVoid(expr.loc(), {}), std::move(expr));
+    core::LocOffsets declLoc;
+    if (auto *mdef = ast::cast_tree<ast::MethodDef>(expr)) {
+        declLoc = mdef->declLoc;
+    } else {
+        ENFORCE(false, "Added a sig to something that wasn't a method def");
+        declLoc = expr.loc();
+    }
+    return ast::MK::InsSeq1(expr.loc(), ast::MK::SigVoid(declLoc, {}), std::move(expr));
 }
+
+core::LocOffsets declLocForSendWithBlock(const ast::Send &send) {
+    return send.loc.copyWithZeroLength().join(send.block()->loc.copyWithZeroLength());
+}
+
 } // namespace
 
 ast::ExpressionPtr recurse(core::MutableContext ctx, bool isClass, ast::ExpressionPtr body);
@@ -182,20 +194,34 @@ ast::ExpressionPtr getIteratee(ast::ExpressionPtr &exp) {
     }
 }
 
+ast::ExpressionPtr prepareTestEachBody(core::MutableContext ctx, core::NameRef eachName, ast::ExpressionPtr body,
+                                       ast::MethodDef::ARGS_store &args, ast::InsSeq::STATS_store destructuringStmts,
+                                       ast::ExpressionPtr &iteratee);
+
 // this applies to each statement contained within a `test_each`: if it's an `it`-block, then convert it appropriately,
 // otherwise flag an error about it
 ast::ExpressionPtr runUnderEach(core::MutableContext ctx, core::NameRef eachName,
-                                const ast::InsSeq::STATS_store &destructuringStmts, ast::ExpressionPtr stmt,
+                                ast::InsSeq::STATS_store &destructuringStmts, ast::ExpressionPtr stmt,
                                 ast::MethodDef::ARGS_store &args, ast::ExpressionPtr &iteratee) {
     // this statement must be a send
     if (auto *send = ast::cast_tree<ast::Send>(stmt)) {
         // the send must be a call to `it` with a single argument (the test name) and a block with no arguments
-        if (send->fun == core::Names::it() && send->numPosArgs() == 1 && send->hasBlock() &&
-            send->block()->args.size() == 0) {
-            // we use this for the name of our test
-            auto &arg0 = send->getPosArg(0);
-            auto argString = to_s(ctx, arg0);
-            auto name = ctx.state.enterNameUTF8("<it '" + argString + "'>");
+        if ((send->fun == core::Names::it() && send->numPosArgs() == 1 && send->hasBlock() &&
+             send->block()->args.size() == 0) ||
+            ((send->fun == core::Names::before() || send->fun == core::Names::after()) && send->numPosArgs() == 0 &&
+             send->hasBlock() && send->block()->args.size() == 0)) {
+            core::NameRef name;
+            core::Loc arg0Loc = core::Loc::none();
+            if (send->fun == core::Names::before()) {
+                name = core::Names::beforeAngles();
+            } else if (send->fun == core::Names::after()) {
+                name = core::Names::afterAngles();
+            } else {
+                // we use this for the name of our test
+                arg0Loc = send->getPosArg(0).loc();
+                auto argString = to_s(ctx, send->getPosArg(0));
+                name = ctx.state.enterNameUTF8("<it '" + argString + "'>");
+            }
 
             // pull constants out of the block
             ConstantMover constantMover;
@@ -217,20 +243,28 @@ ast::ExpressionPtr runUnderEach(core::MutableContext ctx, core::NameRef eachName
                 body = ast::MK::InsSeq(body.loc(), std::move(stmts), std::move(body));
             }
 
-            auto blk = ast::MK::Block(send->loc, move(body), std::move(new_args));
+            auto blk = ast::MK::Block(send->block()->loc, move(body), std::move(new_args));
             auto each = ast::MK::Send0Block(send->loc, iteratee.deepCopy(), core::Names::each(),
                                             send->loc.copyWithZeroLength(), move(blk));
             // put that into a method def named the appropriate thing
-            auto method =
-                addSigVoid(ast::MK::SyntheticMethod0(send->loc, send->loc, arg0.loc(), move(name), move(each)));
+            auto declLoc = declLocForSendWithBlock(*send);
+            auto method = addSigVoid(ast::MK::SyntheticMethod0(send->loc, declLoc, arg0Loc, move(name), move(each)));
             // add back any moved constants
             return constantMover.addConstantsToExpression(send->loc, move(method));
+        } else if (send->fun == core::Names::describe() && send->numPosArgs() == 1 && send->hasBlock() &&
+                   send->block()->args.size() == 0) {
+            return prepareTestEachBody(ctx, eachName, std::move(send->block()->body), args,
+                                       std::move(destructuringStmts), iteratee);
         }
     }
 
     // if any of the above tests were not satisfied, then mark this statement as being invalid here
     if (auto e = ctx.beginError(stmt.loc(), core::errors::Rewriter::BadTestEach)) {
-        e.setHeader("Only valid `{}`-blocks can appear within `{}`", "it", eachName.show(ctx));
+        e.setHeader("Only valid `{}`, `{}`, `{}`, and `{}` blocks can appear within `{}`", "it", "before", "after",
+                    "describe", eachName.show(ctx));
+        e.addErrorNote("For other things, like constant and variable assignments,"
+                       "    hoist them to constants or methods defined outside the `{}` block.",
+                       eachName.show(ctx));
     }
 
     return stmt;
@@ -334,7 +368,7 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, ast::Send *
         auto iteratee = getIteratee(send->getPosArg(0));
         // and then reconstruct the send but with a modified body
         return ast::MK::Send(
-            send->loc, ast::MK::Self(send->loc), send->fun, send->funLoc, 1,
+            send->loc, ast::MK::Self(send->recv.loc()), send->fun, send->funLoc, 1,
             ast::MK::SendArgs(
                 move(send->getPosArg(0)),
                 ast::MK::Block(block->loc,
@@ -355,11 +389,12 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, ast::Send *
     }
 
     if (send->numPosArgs() == 0 && (send->fun == core::Names::before() || send->fun == core::Names::after())) {
-        auto name = send->fun == core::Names::after() ? core::Names::afterAngles() : core::Names::initialize();
+        auto name = send->fun == core::Names::after() ? core::Names::afterAngles() : core::Names::beforeAngles();
         ConstantMover constantMover;
         ast::TreeWalk::apply(ctx, constantMover, block->body);
-        auto method = addSigVoid(ast::MK::SyntheticMethod0(send->loc, send->loc, send->funLoc, name,
-                                                           prepareBody(ctx, isClass, std::move(block->body))));
+        auto declLoc = declLocForSendWithBlock(*send);
+        auto method = addSigVoid(
+            ast::MK::SyntheticMethod0(send->loc, declLoc, send->funLoc, name, prepareBody(ctx, isClass, std::move(block->body))));
         return constantMover.addConstantsToExpression(send->loc, move(method));
     }
 
@@ -383,13 +418,15 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, ast::Send *
         rhs.emplace_back(prepareBody(ctx, bodyIsClass, std::move(block->body)));
         auto name = ast::MK::UnresolvedConstant(arg.loc(), ast::MK::EmptyTree(),
                                                 ctx.state.enterNameConstant("<describe '" + argString + "'>"));
-        return ast::MK::Class(send->loc, send->loc, std::move(name), std::move(ancestors), std::move(rhs));
+        auto declLoc = declLocForSendWithBlock(*send);
+        return ast::MK::Class(send->loc, declLoc, std::move(name), std::move(ancestors), std::move(rhs));
     } else if (send->fun == core::Names::it()) {
         ConstantMover constantMover;
         ast::TreeWalk::apply(ctx, constantMover, block->body);
         auto name = ctx.state.enterNameUTF8("<it '" + argString + "'>");
         const bool bodyIsClass = false;
-        auto method = addSigVoid(ast::MK::SyntheticMethod0(send->loc, send->loc, arg.loc(), std::move(name),
+        auto declLoc = declLocForSendWithBlock(*send);
+        auto method = addSigVoid(ast::MK::SyntheticMethod0(send->loc, declLoc, arg.loc(), std::move(name),
                                                            prepareBody(ctx, bodyIsClass, std::move(block->body))));
         method = ast::MK::InsSeq1(send->loc, send->getPosArg(0).deepCopy(), move(method));
         return constantMover.addConstantsToExpression(send->loc, move(method));

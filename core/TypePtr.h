@@ -71,8 +71,12 @@ public:
 
     // A mapping from type to the type returned by `cast_type_nonnull`.
     template <typename T, bool isInlined> struct TypeToCastType {};
-    template <typename T> struct TypeToCastType<T, true> { using type = T; };
-    template <typename T> struct TypeToCastType<T, false> { using type = const T &; };
+    template <typename T> struct TypeToCastType<T, true> {
+        using type = T;
+    };
+    template <typename T> struct TypeToCastType<T, false> {
+        using type = const T &;
+    };
 
     // Required for typecase.
     template <class To> static bool isa(const TypePtr &what);
@@ -84,7 +88,7 @@ public:
     template <class To>
     static typename TypeToCastType<To, TypeToIsInlined<To>::value>::type cast(TypePtr &&what) = delete;
 
-    // Disallowing this and requiring people to cast to `const TypePtr &` is simplier
+    // Disallowing this and requiring people to cast to `const TypePtr &` is simpler
     // than creating a parallel `TypeToCastType` for non-const argument types.
     template <class To> static auto cast(TypePtr &what) = delete;
 
@@ -254,6 +258,20 @@ public:
     bool isFullyDefined() const;
 
     bool hasUntyped() const;
+
+    // This is a hacky, unprincipled method that simply looks for void inside the type at the top
+    // level.
+    //
+    // Before using this method or attempting to cargo-cult it, instead you almost certainly want to
+    // take the principled approach of composing calls methods like  `Types::all` or `isSubType` or
+    // `dropSubtypesOf` (etc.).
+    //
+    // We can't use those for this method because:
+    //
+    // - Checking whether a type uses `void` can't use `isSubType`, because that will say that
+    //   `Object` etc. "use" void.
+    // - Using `dropSubtypesOf` sometimes expand sealed classes to a union of subclasses.
+    bool hasTopLevelVoid() const;
 
     void sanityCheck(const GlobalState &gs) const {
         if constexpr (!debug_mode)

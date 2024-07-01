@@ -1080,11 +1080,11 @@ class Regexp < Object
         options: BasicObject,
         kcode: String,
     )
-    .returns(Object)
+    .void
   end
   sig do
     params(
-        arg0: Regexp,
+        arg0: T.any(Regexp, String),
     )
     .void
   end
@@ -1363,4 +1363,12 @@ class Regexp < Object
     params(pats: T.untyped).returns(Regexp)
   end
   def self.union(*pats); end
+
+
+  # [TimeoutError](https://docs.ruby-lang.org/en/3.2/Regexp/TimeoutError.html)
+  # is raised when the timeout set by calling
+  # [::timeout=][https://docs.ruby-lang.org/en/3.2/Regexp.html#method-c-timeout-3D]
+  # is reached during matching.
+  class TimeoutError < RegexpError
+  end
 end

@@ -443,6 +443,9 @@ module IRB
   # Quits irb
   def self.irb_exit(irb, ret); end
 
+  sig { params(ap_path: T.nilable(String), argv: T::Array[String]).void }
+  def self.setup(ap_path, argv: ::ARGV); end
+
   # Initializes [`IRB`](https://docs.ruby-lang.org/en/2.7.0/IRB.html) and
   # creates a new Irb.irb object at the `TOPLEVEL_BINDING`
   def self.start(ap_path = _); end
@@ -1681,4 +1684,38 @@ class IRB::WorkSpace
   # The top-level workspace of this context, also available as
   # `IRB.conf[:__MAIN__]`
   def main; end
+end
+
+module IRB::Command
+  class << self
+    attr_reader :commands
+
+    def register(name, command_class); end
+  end
+end
+
+class IRB::Command::Base
+  class << self
+    def category(category = nil); end
+
+    def description(description = nil); end
+
+    def help_message(help_message = nil); end
+  end
+end
+
+module IRB::HelperMethod
+  class << self
+    attr_reader :helper_methods
+
+    def register(name, helper_class); end
+
+    def all_helper_methods_info; end
+  end
+end
+
+class IRB::HelperMethod::Base
+  class << self
+    def description(description = nil); end
+  end
 end

@@ -1032,3 +1032,96 @@ end
 # This exception is raised if a parser error occurs.
 class JSON::ParserError < JSON::JSONError
 end
+
+class Array
+  include JSON::Ext::Generator::GeneratorMethods::Array
+end
+
+class FalseClass
+  include JSON::Ext::Generator::GeneratorMethods::FalseClass
+end
+
+class Float
+  include JSON::Ext::Generator::GeneratorMethods::Float
+end
+
+class Hash
+  include JSON::Ext::Generator::GeneratorMethods::Hash
+end
+
+class Integer
+  include JSON::Ext::Generator::GeneratorMethods::Integer
+end
+
+class NilClass
+  include JSON::Ext::Generator::GeneratorMethods::NilClass
+end
+
+class Object
+  include JSON::Ext::Generator::GeneratorMethods::Object
+end
+
+class String
+  include JSON::Ext::Generator::GeneratorMethods::String
+end
+
+class TrueClass
+  include JSON::Ext::Generator::GeneratorMethods::TrueClass
+end
+
+# source://json//lib/json/add/exception.rb#6
+class Exception
+  # Methods <tt>Exception#as_json</tt> and +Exception.json_create+ may be used
+  # to serialize and deserialize a \Exception object;
+  # see Marshal[https://docs.ruby-lang.org/en/master/Marshal.html].
+  #
+  # \Method <tt>Exception#as_json</tt> serializes +self+,
+  # returning a 2-element hash representing +self+:
+  #
+  #   require 'json/add/exception'
+  #   x = Exception.new('Foo').as_json # => {"json_class"=>"Exception", "m"=>"Foo", "b"=>nil}
+  #
+  # \Method +JSON.create+ deserializes such a hash, returning a \Exception object:
+  #
+  #   Exception.json_create(x) # => #<Exception: Foo>
+  #
+  # source://json//lib/json/add/exception.rb#29
+  sig do
+    params(
+      _arg0: ::T.untyped,
+    )
+    .returns(::T.untyped)
+  end
+  def as_json(*_arg0); end
+
+  # Returns a JSON string representing +self+:
+  #
+  #   require 'json/add/exception'
+  #   puts Exception.new('Foo').to_json
+  #
+  # Output:
+  #
+  #   {"json_class":"Exception","m":"Foo","b":null}
+  #
+  # source://json//lib/json/add/exception.rb#46
+  sig do
+    params(
+      args: ::T.untyped,
+    )
+    .returns(::T.untyped)
+  end
+  def to_json(*args); end
+
+  class << self
+    # See #as_json.
+    #
+    # source://json//lib/json/add/exception.rb#9
+    sig do
+      params(
+        object: ::T.untyped,
+      )
+      .returns(::T.untyped)
+    end
+    def json_create(object); end
+  end
+end

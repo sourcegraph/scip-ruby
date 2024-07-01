@@ -167,18 +167,56 @@ void ErrorReporter::pushDiagnostics(uint32_t epoch, core::FileRef file, const ve
 
         vector<unique_ptr<DiagnosticRelatedInformation>> relatedInformation;
         for (auto &section : error->sections) {
+            if (section.isAutocorrectDescription && !section.isDidYouMean) {
+                // Just show the "fix available" in the error message, and let the code action title
+                // describe the fix. De-clutters the error message in LSP view.
+                continue;
+            }
+
             string sectionHeader = section.header;
 
+            if (section.messages.empty()) {
+                // Sometimes we just use section headers to report extra information, not connected
+                // to a specific line. The LSP spec needs a location, so let's just re-use the error->loc.
+                auto location = config->loc2Location(gs, error->loc);
+                relatedInformation.push_back(
+                    make_unique<DiagnosticRelatedInformation>(move(location), move(sectionHeader)));
+                continue;
+            }
+
+            bool usedSectionHeader = false;
             for (auto &errorLine : section.messages) {
-                string message = errorLine.formattedMessage.length() > 0 ? errorLine.formattedMessage : sectionHeader;
                 auto location = config->loc2Location(gs, errorLine.loc);
                 if (location == nullptr) {
                     // This was probably from an addErrorNote call. Still want to report the note.
                     location = config->loc2Location(gs, error->loc);
-                    message = "\n    " + message;
                 }
                 if (location == nullptr) {
                     continue;
+                }
+
+                string message;
+                if (section.isAutocorrectDescription && section.isDidYouMean) {
+                    message = fmt::format("{} (fix available)", sectionHeader);
+                    usedSectionHeader = true;
+                } else if (errorLine.formattedMessage.length() > 0) {
+                    if (!usedSectionHeader) {
+                        relatedInformation.push_back(
+                            make_unique<DiagnosticRelatedInformation>(location->copy(), sectionHeader));
+                        usedSectionHeader = true;
+                    }
+                    message = errorLine.formattedMessage;
+                } else {
+                    message = sectionHeader;
+                }
+
+                // VSCode strips out leading whitespace, but we use leading whitespaces to convey
+                // indentation/nesting. This replaces all leading whitespace with a NBSP.
+                auto firstNonWhitespace = message.find_first_not_of(' ');
+                for (string::size_type pos = 0; pos != string::npos && pos < firstNonWhitespace;
+                     pos = message.find(' ', pos)) {
+                    message.replace(pos, 1, "\u00A0");
+                    pos += 1;
                 }
                 relatedInformation.push_back(make_unique<DiagnosticRelatedInformation>(std::move(location), message));
             }

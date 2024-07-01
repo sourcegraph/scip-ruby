@@ -1,5 +1,6 @@
 #include "main/lsp/requests/signature_help.h"
 #include "core/lsp/QueryResponse.h"
+#include "core/source_generator/source_generator.h"
 #include "main/lsp/LSPLoop.h"
 #include "main/lsp/LSPQuery.h"
 #include "main/lsp/json_types.h"
@@ -15,7 +16,7 @@ void addSignatureHelpItem(const core::GlobalState &gs, core::MethodRef method,
         return;
     }
     // Label is mandatory, so method name (i.e B#add) is shown for now. Might want to add markup highlighting
-    // wtih respect to activeParameter here.
+    // with respect to activeParameter here.
     auto sig = make_unique<SignatureInformation>(method.show(gs));
 
     vector<unique_ptr<ParameterInformation>> parameters;
@@ -37,9 +38,10 @@ void addSignatureHelpItem(const core::GlobalState &gs, core::MethodRef method,
         if (i != args.size() - 1) {
             methodDocumentation += ", ";
         }
-        parameter->documentation = getResultType(gs, arg.type, method, resp.dispatchResult->main.receiver,
-                                                 resp.dispatchResult->main.constr.get())
-                                       .show(gs);
+        parameter->documentation =
+            core::source_generator::getResultType(gs, arg.type, method, resp.dispatchResult->main.receiver,
+                                                  resp.dispatchResult->main.constr.get())
+                .show(gs);
         parameters.push_back(move(parameter));
         i += 1;
     }
