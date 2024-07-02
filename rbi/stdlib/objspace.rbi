@@ -154,6 +154,73 @@ module ObjectSpace
 
   # Clear recorded tracing information.
   def self.trace_object_allocations_clear; end
+
+  # Counts objects size (in bytes) for each type.
+  # Note that this information is incomplete. You need to deal with this information as only a HINT. Especially, total size of T_DATA may be wrong.
+  # It returns a hash as:
+  # {:TOTAL=>1461154, :T_CLASS=>158280, :T_MODULE=>20672, :T_STRING=>527249, ...}
+  # If the optional argument, result_hash, is given, it is overwritten and returned. This is intended to avoid probe effect.
+  # The contents of the returned hash is implementation defined. It may be changed in future.
+  # This method is only expected to work with C Ruby.
+  sig { params(result_hash: T.nilable(T::Hash[T.untyped, T.untyped])).returns(T::Hash[T.untyped, T.untyped]) }
+  sig { returns(T::Hash[Symbol, Integer])}
+  def self.count_objects_size(result_hash=nil); end
+
+  # Counts objects for each T_IMEMO type.
+  # This method is only for MRI developers interested in performance and memory usage of Ruby programs.
+  # It returns a hash as:
+  # {:imemo_ifunc=>8,
+  # :imemo_svar=>7,
+  # :imemo_cref=>509,
+  # :imemo_memo=>1,
+  # :imemo_throw_data=>1}
+  # If the optional argument, result_hash, is given, it is overwritten and returned. This is intended to avoid probe effect.
+  # The contents of the returned hash is implementation specific and may change in the future.
+  # In this version, keys are symbol objects.
+  # This method is only expected to work with C Ruby.
+  sig { params(result_hash: T.nilable(T::Hash[T.untyped, T.untyped])).returns(T::Hash[T.untyped, T.untyped]) }
+  sig { returns(T::Hash[Symbol, Integer])}
+  def self.count_imemo_objects(result_hash=nil); end
+
+  # Counts objects for each T_DATA type.
+  # This method is only for MRI developers interested in performance and memory usage of Ruby programs.
+  # It returns a hash as:
+  # {RubyVM::InstructionSequence=>504, :parser=>5, :barrier=>6,
+  # :mutex=>6, Proc=>60, RubyVM::Env=>57, Mutex=>1, Encoding=>99,
+  # ThreadGroup=>1, Binding=>1, Thread=>1, RubyVM=>1, :iseq=>1,
+  # Random=>1, ARGF.class=>1, Data=>1, :autoload=>3, Time=>2}
+  # # T_DATA objects existing at startup on r32276.
+  # If the optional argument, result_hash, is given, it is overwritten and returned. This is intended to avoid probe effect.
+  # The contents of the returned hash is implementation specific and may change in the future.
+  # In this version, keys are Class object or Symbol object.
+  # If object is kind of normal (accessible) object, the key is Class object. If object is not a kind of normal (internal) object, the key is symbol name, registered by rb_data_type_struct.
+  # This method is only expected to work with C Ruby.
+  sig { params(result_hash: T.nilable(T::Hash[T.untyped, T.untyped])).returns(T::Hash[T.untyped, T.untyped]) }
+  sig { returns(T::Hash[T.any(T::Class[T.anything], Symbol), Integer])}
+  def self.count_tdata_objects(result_hash=nil); end
+
+  # Return consuming memory size of obj.
+  # Note that the return size is incomplete. You need to deal with this information as only a HINT. Especially, the size of T_DATA may not be correct.
+  # This method is only expected to work with C Ruby.
+  # From Ruby 2.2, ::memsize_of(obj) returns a memory size includes sizeof(RVALUE).
+  sig { params(klass: Object).returns(Integer) }
+  def self.memsize_of(klass); end
+
+  # Return consuming memory size of all living objects.
+  # If klass (should be Class object) is given, return the total memory size of instances of the given class.
+  # Note that the returned size is incomplete. You need to deal with this information as only a HINT. Especially, the size of T_DATA may not be correct.
+  # Note that this method does NOT return total malloc’ed memory size.
+  # This method can be defined by the following Ruby code:
+  # def memsize_of_all klass = false
+  #   total = 0
+  #   ObjectSpace.each_object{|e|
+  #     total += ObjectSpace.memsize_of(e) if klass == false || e.kind_of?(klass)
+  #   }
+  #   total
+  # end
+  # This method is only expected to work with C Ruby.
+  sig { params(klass: T::Class[T.anything]).returns(Integer) }
+  def self.memsize_of_all(klass=nil); end
 end
 
 # An
@@ -211,4 +278,89 @@ class ObjectSpace::WeakMap < Object
   # Iterates over values and objects in a weakly referenced object
   def values; end
 
+end
+
+# An
+# [`ObjectSpace::WeakKeyMap`](https://docs.ruby-lang.org/en/3.3/ObjectSpace/WeakKeyMap.html)
+# is a key-value map that holds weak references to its keys, so they can be garbage collected 
+# when there is no more references.
+# 
+# Unlike ObjectSpace::WeakMap:
+#  - references to values are strong, so they aren’t garbage collected while they are in the map;
+#  - keys are compared by value (using Object#eql?), not by identity;
+#  - only garbage-collectable objects can be used as keys.
+#  
+#    map = ObjectSpace::WeakKeyMap.new
+#    val = Time.new(2023, 12, 7)
+#    key = "name"
+#    map[key] = val
+#
+#    # Value is fetched by equality: the instance of string "name" is
+#    # different here, but it is equal to the key
+#    map["name"] #=> 2023-12-07 00:00:00 +0200
+#
+#    val = nil
+#    GC.start
+#    # There is no more references to `val`, yet the pair isn't
+#    # garbage-collected.
+#    map["name"] #=> 2023-12-07 00:00:00 +0200
+#
+#    key = nil
+#    GC.start
+#    # There is no more references to `key`, key and value are
+#    # garbage-collected.
+#   
+#    map["name"] #=> nil
+#
+# (Note that GC.start is used here only for demonstrational purposes and might not always lead to demonstrated results.)
+#
+# The collection is especially useful for implementing caches of lightweight value objects, so that only one copy of 
+# each value representation would be stored in memory, but the copies that aren’t used would be garbage-collected.
+#
+#   CACHE = ObjectSpace::WeakKeyMap
+# 
+#   def make_value(**)
+#     val = ValueObject.new(**)
+#     if (existing = @cache.getkey(val))
+#        # if the object with this value exists, we return it
+#        existing
+#     else
+#        # otherwise, put it in the cache
+#        @cache[val] = true
+#        val
+#     end
+#  end
+#
+# This will result in make_value returning the same object for same set of attributes always, but the values that
+# aren’t needed anymore woudn’t be sitting in the cache forever.
+class ObjectSpace::WeakKeyMap < Object
+  
+  # Returns the value associated with the given key if found
+  # If key is not found, returns nil
+  def [](_); end
+  
+  # Associates the given value with the given key
+  # The reference to key is weak, so when there is no other reference to key it may be garbage collected
+  # If the given key exists, replaces its value with the given value; the ordering is not affected
+  def []=(_,_); end
+  
+  # Removes all map entries; returns self.
+  sig {returns(T.self_type)}
+  def clear; end
+  
+  # Deletes the entry for the given key and returns its associated value
+  # If no block is given and key is found, deletes the entry and returns the associated value
+  def delete(_); end
+  
+  # Returns the existing equal key if it exists, otherwise returns nil.
+  # This might be useful for implementing caches, so that only one copy of some object would be used everywhere in the program
+  def getkey(_); end
+  
+  # Returns a new String containing informations about the map
+  sig {returns(String)}
+  def inspect; end
+  
+  # Returns true if key is a key in self, otherwise false.
+  sig {params(key: T.any).returns(T::Boolean)}
+  def key?(key); end
 end

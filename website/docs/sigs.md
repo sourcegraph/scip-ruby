@@ -223,7 +223,16 @@ Using `void` instead of `returns(...)` does a number of things:
 
 - In the runtime, `sorbet-runtime` will _throw away_ the result of our method,
   and return a dummy value instead. (All `void` methods return the same dummy
-  value.) This prevents untyped code from silently depending on what we return.
+  value.)
+
+  If you do not want this behavior, either use `returns(T.anything)` instead
+  ([docs for `T.anything`](anything.md)), or
+  [disable runtime checking](runtime.md) for that method (or all methods).
+
+Replacing the return value with a meaningless value prevents untyped code from
+silently depending on what a typed method returns, so that the implementation is
+free to change without worry of breaking existing code which silently depended
+on the result of the method being meaningful.
 
 Concretely, here's a full example of how to use `void` to type methods with
 useless returns:
@@ -341,3 +350,45 @@ calls:
   `T.let` and `T.cast` to do type refinements and assertions are central to
   Sorbet being a gradual type system). Since types must already be valid Ruby,
   it makes sense to have `sig`s be valid Ruby too.
+
+## Can I skip writing `extend T::Sig` everywhere?
+
+To skip writing `extend T::Sig` inside every class that wants to use `sig`, use
+this monkey patch:
+
+```ruby
+class Module
+  include T::Sig
+end
+```
+
+Since every singleton class descends from `Module`, this will make the `sig`
+method available in every class body.
+
+This involves a monkey patch, and is **not** required to use Sorbet. But the
+most earnest users of Sorbet all eventually add this monkey patch, because
+`extend T::Sig` ends up getting written into almost every class.
+
+We recommend putting this monkeypatch in the same file that
+
+- requires `sorbet-runtime`, and
+- sets up any [`T::Configuration`](tconfiguration.md) `sorbet-runtime`
+  configurations
+
+So that it's impossible to get one of these three things without the others.
+
+The upside:
+
+- Drops the "activation energy" required to add the first `sig` to a class.
+  Simply start writing `sig` above the current method.
+
+- Fewer lines dedicated to type annotations.
+
+The downside:
+
+- Adds a monkey patch to a Ruby standard library class, which might conflict
+  with other methods defined by the current project or its gems.
+
+- If users have _only_ required `sorbet-runtime` and forgotten to require the
+  file defining this monkey patch, the code can fail at runtime in unexpected
+  ways.

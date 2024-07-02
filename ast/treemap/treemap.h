@@ -18,6 +18,8 @@ public:
     // Not including the member will skip the branch
     // you may return the same pointer that you are given
     // caller is responsible to handle it
+    ExpressionPtr preTransformExpression(core::MutableContext ctx, ExpressionPtr original);
+
     ExpressionPtr preTransformClassDef(core::MutableContext ctx, ClassDef *original);
     ExpressionPtr postTransformClassDef(core::MutableContext ctx, ExpressionPtr original);
 
@@ -72,7 +74,7 @@ public:
     ExpressionPtr postTransformInsSeq(core::MutableContext ctx, ExpressionPtr original);
 };
 
-// NOTE: Implementations must use a context type parameter that `MutableContext` is convertable to.
+// NOTE: Implementations must use a context type parameter that `MutableContext` is convertible to.
 // That is, either `Context` or `MutableContext`.
 #define GENERATE_HAS_MEMBER_VISITOR(X, arg_types...) GENERATE_HAS_MEMBER(X, arg_types)
 
@@ -86,56 +88,58 @@ public:
     GENERATE_CALL_MEMBER(postTransform##X, Exception::raise("should never be called. Incorrect use of TreeMap?"); \
                          return nullptr, arg_types)
 
-#define GENERATE_METAPROGRAMMING_FOR(arg_types...)                               \
-    GENERATE_HAS_MEMBER_VISITOR(preTransformUnresolvedIdent, arg_types);         \
-    GENERATE_HAS_MEMBER_VISITOR(preTransformLocal, arg_types);                   \
-    GENERATE_HAS_MEMBER_VISITOR(preTransformUnresolvedConstantLit, arg_types);   \
-    GENERATE_HAS_MEMBER_VISITOR(preTransformConstantLit, arg_types);             \
-    GENERATE_HAS_MEMBER_VISITOR(preTransformLiteral, arg_types);                 \
-    GENERATE_HAS_MEMBER_VISITOR(preTransformRuntimeMethodDefinition, arg_types); \
-                                                                                 \
-    GENERATE_POSTPONE_PRECLASS(Expression, arg_types);                           \
-    GENERATE_POSTPONE_PRECLASS(ClassDef, arg_types);                             \
-    GENERATE_POSTPONE_PRECLASS(MethodDef, arg_types);                            \
-    GENERATE_POSTPONE_PRECLASS(If, arg_types);                                   \
-    GENERATE_POSTPONE_PRECLASS(While, arg_types);                                \
-    GENERATE_POSTPONE_PRECLASS(Break, arg_types);                                \
-    GENERATE_POSTPONE_PRECLASS(Retry, arg_types);                                \
-    GENERATE_POSTPONE_PRECLASS(Next, arg_types);                                 \
-    GENERATE_POSTPONE_PRECLASS(Return, arg_types);                               \
-    GENERATE_POSTPONE_PRECLASS(RescueCase, arg_types);                           \
-    GENERATE_POSTPONE_PRECLASS(Rescue, arg_types);                               \
-    GENERATE_POSTPONE_PRECLASS(Assign, arg_types);                               \
-    GENERATE_POSTPONE_PRECLASS(Send, arg_types);                                 \
-    GENERATE_POSTPONE_PRECLASS(Hash, arg_types);                                 \
-    GENERATE_POSTPONE_PRECLASS(Array, arg_types);                                \
-    GENERATE_POSTPONE_PRECLASS(Block, arg_types);                                \
-    GENERATE_POSTPONE_PRECLASS(InsSeq, arg_types);                               \
-    GENERATE_POSTPONE_PRECLASS(Cast, arg_types);                                 \
-                                                                                 \
-    GENERATE_POSTPONE_POSTCLASS(ClassDef, arg_types);                            \
-    GENERATE_POSTPONE_POSTCLASS(MethodDef, arg_types);                           \
-    GENERATE_POSTPONE_POSTCLASS(If, arg_types);                                  \
-    GENERATE_POSTPONE_POSTCLASS(While, arg_types);                               \
-    GENERATE_POSTPONE_POSTCLASS(Break, arg_types);                               \
-    GENERATE_POSTPONE_POSTCLASS(Retry, arg_types);                               \
-    GENERATE_POSTPONE_POSTCLASS(Next, arg_types);                                \
-    GENERATE_POSTPONE_POSTCLASS(Return, arg_types);                              \
-    GENERATE_POSTPONE_POSTCLASS(RescueCase, arg_types);                          \
-    GENERATE_POSTPONE_POSTCLASS(Rescue, arg_types);                              \
-    GENERATE_POSTPONE_POSTCLASS(UnresolvedIdent, arg_types);                     \
-    GENERATE_POSTPONE_POSTCLASS(Assign, arg_types);                              \
-    GENERATE_POSTPONE_POSTCLASS(Send, arg_types);                                \
-    GENERATE_POSTPONE_POSTCLASS(Hash, arg_types);                                \
-    GENERATE_POSTPONE_POSTCLASS(Array, arg_types);                               \
-    GENERATE_POSTPONE_POSTCLASS(Local, arg_types);                               \
-    GENERATE_POSTPONE_POSTCLASS(Literal, arg_types);                             \
-    GENERATE_POSTPONE_POSTCLASS(UnresolvedConstantLit, arg_types);               \
-    GENERATE_POSTPONE_POSTCLASS(ConstantLit, arg_types);                         \
-    GENERATE_POSTPONE_POSTCLASS(Block, arg_types);                               \
-    GENERATE_POSTPONE_POSTCLASS(InsSeq, arg_types);                              \
-    GENERATE_POSTPONE_POSTCLASS(Cast, arg_types);                                \
-    GENERATE_POSTPONE_POSTCLASS(RuntimeMethodDefinition, arg_types);
+#define GENERATE_METAPROGRAMMING_FOR(arg_types...)                                                          \
+    GENERATE_HAS_MEMBER_VISITOR(preTransformUnresolvedIdent, arg_types, VISITOR_ARG_TYPE(UnresolvedIdent)); \
+    GENERATE_HAS_MEMBER_VISITOR(preTransformLocal, arg_types, VISITOR_ARG_TYPE(Local));                     \
+    GENERATE_HAS_MEMBER_VISITOR(preTransformUnresolvedConstantLit, arg_types,                               \
+                                VISITOR_ARG_TYPE(UnresolvedConstantLit));                                   \
+    GENERATE_HAS_MEMBER_VISITOR(preTransformConstantLit, arg_types, VISITOR_ARG_TYPE(ConstantLit));         \
+    GENERATE_HAS_MEMBER_VISITOR(preTransformLiteral, arg_types, VISITOR_ARG_TYPE(Literal));                 \
+    GENERATE_HAS_MEMBER_VISITOR(preTransformRuntimeMethodDefinition, arg_types,                             \
+                                VISITOR_ARG_TYPE(RuntimeMethodDefinition));                                 \
+                                                                                                            \
+    GENERATE_POSTPONE_PRECLASS(ExpressionPtr, arg_types, VISITOR_ARG_TYPE(ExpressionPtr));                  \
+    GENERATE_POSTPONE_PRECLASS(ClassDef, arg_types, VISITOR_ARG_TYPE(ClassDef));                            \
+    GENERATE_POSTPONE_PRECLASS(MethodDef, arg_types, VISITOR_ARG_TYPE(MethodDef));                          \
+    GENERATE_POSTPONE_PRECLASS(If, arg_types, VISITOR_ARG_TYPE(If));                                        \
+    GENERATE_POSTPONE_PRECLASS(While, arg_types, VISITOR_ARG_TYPE(While));                                  \
+    GENERATE_POSTPONE_PRECLASS(Break, arg_types, VISITOR_ARG_TYPE(Break));                                  \
+    GENERATE_POSTPONE_PRECLASS(Retry, arg_types, VISITOR_ARG_TYPE(Retry));                                  \
+    GENERATE_POSTPONE_PRECLASS(Next, arg_types, VISITOR_ARG_TYPE(Next));                                    \
+    GENERATE_POSTPONE_PRECLASS(Return, arg_types, VISITOR_ARG_TYPE(Return));                                \
+    GENERATE_POSTPONE_PRECLASS(RescueCase, arg_types, VISITOR_ARG_TYPE(RescueCase));                        \
+    GENERATE_POSTPONE_PRECLASS(Rescue, arg_types, VISITOR_ARG_TYPE(Rescue));                                \
+    GENERATE_POSTPONE_PRECLASS(Assign, arg_types, VISITOR_ARG_TYPE(Assign));                                \
+    GENERATE_POSTPONE_PRECLASS(Send, arg_types, VISITOR_ARG_TYPE(Send));                                    \
+    GENERATE_POSTPONE_PRECLASS(Hash, arg_types, VISITOR_ARG_TYPE(Hash));                                    \
+    GENERATE_POSTPONE_PRECLASS(Array, arg_types, VISITOR_ARG_TYPE(Array));                                  \
+    GENERATE_POSTPONE_PRECLASS(Block, arg_types, VISITOR_ARG_TYPE(Block));                                  \
+    GENERATE_POSTPONE_PRECLASS(InsSeq, arg_types, VISITOR_ARG_TYPE(InsSeq));                                \
+    GENERATE_POSTPONE_PRECLASS(Cast, arg_types, VISITOR_ARG_TYPE(Cast));                                    \
+                                                                                                            \
+    GENERATE_POSTPONE_POSTCLASS(ClassDef, arg_types, VISITOR_ARG_TYPE(ClassDef));                           \
+    GENERATE_POSTPONE_POSTCLASS(MethodDef, arg_types, VISITOR_ARG_TYPE(MethodDef));                         \
+    GENERATE_POSTPONE_POSTCLASS(If, arg_types, VISITOR_ARG_TYPE(If));                                       \
+    GENERATE_POSTPONE_POSTCLASS(While, arg_types, VISITOR_ARG_TYPE(While));                                 \
+    GENERATE_POSTPONE_POSTCLASS(Break, arg_types, VISITOR_ARG_TYPE(Break));                                 \
+    GENERATE_POSTPONE_POSTCLASS(Retry, arg_types, VISITOR_ARG_TYPE(Retry));                                 \
+    GENERATE_POSTPONE_POSTCLASS(Next, arg_types, VISITOR_ARG_TYPE(Next));                                   \
+    GENERATE_POSTPONE_POSTCLASS(Return, arg_types, VISITOR_ARG_TYPE(Return));                               \
+    GENERATE_POSTPONE_POSTCLASS(RescueCase, arg_types, VISITOR_ARG_TYPE(RescueCase));                       \
+    GENERATE_POSTPONE_POSTCLASS(Rescue, arg_types, VISITOR_ARG_TYPE(Rescue));                               \
+    GENERATE_POSTPONE_POSTCLASS(UnresolvedIdent, arg_types, VISITOR_ARG_TYPE(UnresolvedIdent));             \
+    GENERATE_POSTPONE_POSTCLASS(Assign, arg_types, VISITOR_ARG_TYPE(Assign));                               \
+    GENERATE_POSTPONE_POSTCLASS(Send, arg_types, VISITOR_ARG_TYPE(Send));                                   \
+    GENERATE_POSTPONE_POSTCLASS(Hash, arg_types, VISITOR_ARG_TYPE(Hash));                                   \
+    GENERATE_POSTPONE_POSTCLASS(Array, arg_types, VISITOR_ARG_TYPE(Array));                                 \
+    GENERATE_POSTPONE_POSTCLASS(Local, arg_types, VISITOR_ARG_TYPE(Local));                                 \
+    GENERATE_POSTPONE_POSTCLASS(Literal, arg_types, VISITOR_ARG_TYPE(Literal));                             \
+    GENERATE_POSTPONE_POSTCLASS(UnresolvedConstantLit, arg_types, VISITOR_ARG_TYPE(UnresolvedConstantLit)); \
+    GENERATE_POSTPONE_POSTCLASS(ConstantLit, arg_types, VISITOR_ARG_TYPE(ConstantLit));                     \
+    GENERATE_POSTPONE_POSTCLASS(Block, arg_types, VISITOR_ARG_TYPE(Block));                                 \
+    GENERATE_POSTPONE_POSTCLASS(InsSeq, arg_types, VISITOR_ARG_TYPE(InsSeq));                               \
+    GENERATE_POSTPONE_POSTCLASS(Cast, arg_types, VISITOR_ARG_TYPE(Cast));                                   \
+    GENERATE_POSTPONE_POSTCLASS(RuntimeMethodDefinition, arg_types, VISITOR_ARG_TYPE(RuntimeMethodDefinition));
 
 // Used to indicate that TreeMap has already reported location for this exception
 struct ReportedRubyException {
@@ -146,6 +150,7 @@ struct ReportedRubyException {
 enum class TreeMapKind {
     Map,
     Walk,
+    ConstWalk,
 };
 
 template <TreeMapKind> struct MapFunctions;
@@ -156,7 +161,9 @@ template <> struct MapFunctions<TreeMapKind::Map> {
     static ExpressionPtr &&pass(ExpressionPtr &p) {
         return static_cast<ExpressionPtr &&>(p);
     }
-    GENERATE_METAPROGRAMMING_FOR(std::declval<core::MutableContext>(), std::declval<ExpressionPtr>());
+#define VISITOR_ARG_TYPE(_class_name) std::declval<ExpressionPtr>()
+    GENERATE_METAPROGRAMMING_FOR(std::declval<core::MutableContext>());
+#undef VISITOR_ARG_TYPE
 };
 
 template <> struct MapFunctions<TreeMapKind::Walk> {
@@ -165,7 +172,20 @@ template <> struct MapFunctions<TreeMapKind::Walk> {
     static ExpressionPtr &pass(ExpressionPtr &p) {
         return p;
     }
-    GENERATE_METAPROGRAMMING_FOR(std::declval<core::MutableContext>(), std::declval<ExpressionPtr &>());
+#define VISITOR_ARG_TYPE(_class_name) std::declval<ExpressionPtr &>()
+    GENERATE_METAPROGRAMMING_FOR(std::declval<core::MutableContext>());
+#undef VISITOR_ARG_TYPE
+};
+
+template <> struct MapFunctions<TreeMapKind::ConstWalk> {
+    using return_type = void;
+    using arg_type = const ExpressionPtr &;
+    static const ExpressionPtr &pass(const ExpressionPtr &p) {
+        return p;
+    }
+#define VISITOR_ARG_TYPE(class_name) std::declval<const class_name &>()
+    GENERATE_METAPROGRAMMING_FOR(std::declval<core::MutableContext>());
+#undef VISITOR_ARG_TYPE
 };
 
 enum class TreeMapDepthKind {
@@ -185,6 +205,8 @@ private:
     friend class ShallowMap;
     friend class TreeWalk;
     friend class ShallowWalk;
+    friend class ConstTreeWalk;
+    friend class ConstShallowWalk;
 
     using Funcs = MapFunctions<Kind>;
     using return_type = typename Funcs::return_type;
@@ -202,32 +224,40 @@ private:
 
     TreeMapper(FUNC &func) : func(func) {}
 
-#define CALL_PRE(member)                                                                                 \
-    if constexpr (Funcs::template HAS_MEMBER_preTransform##member<FUNC>()) {                             \
-        if constexpr (Kind == TreeMapKind::Map) {                                                        \
-            v = Funcs::template CALL_MEMBER_preTransform##member<FUNC>::call(func, ctx, Funcs::pass(v)); \
-        } else if (Kind == TreeMapKind::Walk) {                                                          \
-            Funcs::template CALL_MEMBER_preTransform##member<FUNC>::call(func, ctx, Funcs::pass(v));     \
-        }                                                                                                \
+#define CALL_PRE(member)                                                                                           \
+    if constexpr (Funcs::template HAS_MEMBER_preTransform##member<FUNC>()) {                                       \
+        if constexpr (Kind == TreeMapKind::Map) {                                                                  \
+            v = Funcs::template CALL_MEMBER_preTransform##member<FUNC>::call(func, ctx, Funcs::pass(v));           \
+        } else if constexpr (Kind == TreeMapKind::Walk) {                                                          \
+            Funcs::template CALL_MEMBER_preTransform##member<FUNC>::call(func, ctx, Funcs::pass(v));               \
+        } else if constexpr (Kind == TreeMapKind::ConstWalk) {                                                     \
+            Funcs::template CALL_MEMBER_preTransform##member<FUNC>::call(func, ctx, cast_tree_nonnull<member>(v)); \
+        }                                                                                                          \
     }
 
-#define CALL_POST(member)                                                                                    \
-    if constexpr (Kind == TreeMapKind::Map) {                                                                \
-        if constexpr (Funcs::template HAS_MEMBER_postTransform##member<FUNC>()) {                            \
-            return Funcs::template CALL_MEMBER_postTransform##member<FUNC>::call(func, ctx, Funcs::pass(v)); \
-        }                                                                                                    \
-        return v;                                                                                            \
-    } else if constexpr (Kind == TreeMapKind::Walk) {                                                        \
-        if constexpr (Funcs::template HAS_MEMBER_postTransform##member<FUNC>()) {                            \
-            Funcs::template CALL_MEMBER_postTransform##member<FUNC>::call(func, ctx, Funcs::pass(v));        \
-        }                                                                                                    \
+#define CALL_POST(member)                                                                                           \
+    if constexpr (Kind == TreeMapKind::Map) {                                                                       \
+        if constexpr (Funcs::template HAS_MEMBER_postTransform##member<FUNC>()) {                                   \
+            return Funcs::template CALL_MEMBER_postTransform##member<FUNC>::call(func, ctx, Funcs::pass(v));        \
+        }                                                                                                           \
+        return v;                                                                                                   \
+    } else if constexpr (Kind == TreeMapKind::Walk) {                                                               \
+        if constexpr (Funcs::template HAS_MEMBER_postTransform##member<FUNC>()) {                                   \
+            Funcs::template CALL_MEMBER_postTransform##member<FUNC>::call(func, ctx, Funcs::pass(v));               \
+        }                                                                                                           \
+    } else if constexpr (Kind == TreeMapKind::ConstWalk) {                                                          \
+        if constexpr (Funcs::template HAS_MEMBER_postTransform##member<FUNC>()) {                                   \
+            Funcs::template CALL_MEMBER_postTransform##member<FUNC>::call(func, ctx, cast_tree_nonnull<member>(v)); \
+        }                                                                                                           \
     }
 
-#define CALL_MAP(tree, ctx)                           \
-    if constexpr (Kind == TreeMapKind::Map) {         \
-        tree = mapIt(Funcs::pass(tree), ctx);         \
-    } else if constexpr (Kind == TreeMapKind::Walk) { \
-        mapIt(Funcs::pass(tree), ctx);                \
+#define CALL_MAP(tree, ctx)                                \
+    if constexpr (Kind == TreeMapKind::Map) {              \
+        tree = mapIt(Funcs::pass(tree), ctx);              \
+    } else if constexpr (Kind == TreeMapKind::Walk) {      \
+        mapIt(Funcs::pass(tree), ctx);                     \
+    } else if constexpr (Kind == TreeMapKind::ConstWalk) { \
+        mapIt(Funcs::pass(tree), ctx);                     \
     }
 
     return_type mapClassDef(arg_type v, CTX ctx) {
@@ -339,6 +369,8 @@ private:
             if constexpr (Kind == TreeMapKind::Map) {
                 el = mapRescueCase(Funcs::pass(el), ctx);
             } else if constexpr (Kind == TreeMapKind::Walk) {
+                mapRescueCase(Funcs::pass(el), ctx);
+            } else if constexpr (Kind == TreeMapKind::ConstWalk) {
                 mapRescueCase(Funcs::pass(el), ctx);
             }
             ENFORCE(isa_tree<RescueCase>(el), "rescue case was mapped into non-rescue case");
@@ -466,16 +498,21 @@ private:
                 return what;
             } else if constexpr (Kind == TreeMapKind::Walk) {
                 return;
+            } else if constexpr (Kind == TreeMapKind::ConstWalk) {
+                return;
             }
         }
 
         try {
             // TODO: reorder by frequency
-            if constexpr (Funcs::template HAS_MEMBER_preTransformExpression<FUNC>()) {
+            if constexpr (Funcs::template HAS_MEMBER_preTransformExpressionPtr<FUNC>()) {
                 if constexpr (Kind == TreeMapKind::Map) {
-                    what = Funcs::template CALL_MEMBER_preTransformExpression<FUNC>::call(func, ctx, Funcs::pass(what));
+                    what =
+                        Funcs::template CALL_MEMBER_preTransformExpressionPtr<FUNC>::call(func, ctx, Funcs::pass(what));
                 } else if constexpr (Kind == TreeMapKind::Walk) {
-                    Funcs::template CALL_MEMBER_preTransformExpression<FUNC>::call(func, ctx, Funcs::pass(what));
+                    Funcs::template CALL_MEMBER_preTransformExpressionPtr<FUNC>::call(func, ctx, Funcs::pass(what));
+                } else if constexpr (Kind == TreeMapKind::ConstWalk) {
+                    Funcs::template CALL_MEMBER_preTransformExpressionPtr<FUNC>::call(func, ctx, Funcs::pass(what));
                 }
             }
 
@@ -484,6 +521,8 @@ private:
                     if constexpr (Kind == TreeMapKind::Map) {
                         return what;
                     } else if constexpr (Kind == TreeMapKind::Walk) {
+                        return;
+                    } else if constexpr (Kind == TreeMapKind::ConstWalk) {
                         return;
                     }
 
@@ -573,6 +612,8 @@ private:
                         return what;
                     } else if constexpr (Kind == TreeMapKind::Walk) {
                         return;
+                    } else if constexpr (Kind == TreeMapKind::ConstWalk) {
+                        return;
                     }
 
                 case Tag::Block:
@@ -630,6 +671,22 @@ public:
     }
 };
 
+class ConstTreeWalk {
+public:
+    template <typename CTX, typename FUNC> static void apply(CTX ctx, FUNC &func, const ExpressionPtr &to) {
+        TreeMapper<FUNC, CTX, TreeMapKind::ConstWalk, TreeMapDepthKind::Full> walker(func);
+        try {
+            walker.mapIt(to, ctx);
+        } catch (ReportedRubyException &exception) {
+            Exception::failInFuzzer();
+            if (auto e = ctx.beginError(exception.onLoc, core::errors::Internal::InternalError)) {
+                e.setHeader("Failed to process tree (backtrace is above)");
+            }
+            throw exception.reported;
+        }
+    }
+};
+
 class ShallowMap {
 public:
     template <typename CTX, typename FUNC> static ExpressionPtr apply(CTX ctx, FUNC &func, ExpressionPtr to) {
@@ -650,6 +707,22 @@ class ShallowWalk {
 public:
     template <typename CTX, typename FUNC> static void apply(CTX ctx, FUNC &func, ExpressionPtr &to) {
         TreeMapper<FUNC, CTX, TreeMapKind::Walk, TreeMapDepthKind::Shallow> walker(func);
+        try {
+            walker.mapIt(to, ctx);
+        } catch (ReportedRubyException &exception) {
+            Exception::failInFuzzer();
+            if (auto e = ctx.beginError(exception.onLoc, core::errors::Internal::InternalError)) {
+                e.setHeader("Failed to process tree (backtrace is above)");
+            }
+            throw exception.reported;
+        }
+    }
+};
+
+class ConstShallowWalk {
+public:
+    template <typename CTX, typename FUNC> static void apply(CTX ctx, FUNC &func, const ExpressionPtr &to) {
+        TreeMapper<FUNC, CTX, TreeMapKind::ConstWalk, TreeMapDepthKind::Shallow> walker(func);
         try {
             walker.mapIt(to, ctx);
         } catch (ReportedRubyException &exception) {

@@ -52,15 +52,14 @@ end
 
 # it fails if a concrete module doesn't implement abstract methods
   module M2
-# ^^^^^^^^^ error: Missing definition for abstract method `AbstractMixin#bar`
-# ^^^^^^^^^ error: Missing definition for abstract method `AbstractMixin#foo`
+# ^^^^^^^^^ error: Missing definitions for abstract methods in `M2`
   extend T::Helpers
   include AbstractMixin
 end
 
 # it fails if a class method is unimplemented
   class C3 < AbstractClass
-# ^^^^^^^^^^^^^^^^^^^^^^^^ error: Missing definition for abstract method `AbstractClass.foo`
+# ^^^^^^^^^^^^^^^^^^^^^^^^ error: Missing definition for abstract method `AbstractClass.foo` in `T.class_of(C3)`
   extend T::Sig
   extend T::Helpers
   sig { override.returns(Object) }
@@ -69,7 +68,7 @@ end
 
 # it fails if an instance method is unimplemented
   class C4 < AbstractClass
-# ^^^^^^^^^^^^^^^^^^^^^^^^ error: Missing definition for abstract method `AbstractClass#bar`
+# ^^^^^^^^^^^^^^^^^^^^^^^^ error: Missing definition for abstract method `AbstractClass#bar` in `C4`
   extend T::Sig
   extend T::Helpers
   sig {override.returns(Object)}
@@ -164,5 +163,5 @@ module BadTypedImpl
   include GoodInterface
 
   sig {override.returns(Integer)}
-  def foo; 1; end # error: Return type `Integer` does not match return type of abstract method `GoodInterface#foo`
+  def foo; 1; end
 end

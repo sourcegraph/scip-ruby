@@ -31,6 +31,7 @@ cc_library(
     ],
     hdrs = [
         "ConvertToSingletonClassMethod.h",
+        "ExtractVariable.h",
         "LSPConfiguration.h",
         "LSPInput.h",
         "LSPLoop.h",
@@ -38,6 +39,7 @@ cc_library(
         "LSPOutput.h",
         "LSPPreprocessor.h",
         "LSPQuery.h",
+        "MessageQueueState.h",
         "MoveMethod.h",
         "json_types.h",
         "wrapper.h",

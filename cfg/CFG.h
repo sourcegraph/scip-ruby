@@ -68,7 +68,13 @@ public:
     int id = 0;
     int fwdId = -1;
     int bwdId = -1;
-    int flags = 0;
+    struct Flags {
+        bool isLoopHeader : 1;
+        bool wasJumpDestination : 1;
+        // In C++20 we can replace this with bit field initializers
+        Flags() : isLoopHeader(false), wasJumpDestination(false) {}
+    };
+    Flags flags;
     int outerLoops = 0;
     // Tracks which Ruby block (do ... end) or Ruby exception-handling region
     // (in begin ... rescue ... else ... ensure ... end, each `...` is its own
@@ -97,7 +103,7 @@ public:
     // updateKnowledge is aware of, return information about the receiver of that `Send`.
     //
     // Should only be used to *improve* existing error messages, not as a reliable source of truth,
-    // because the implemention is only a heuristic, and may fail to find a receiver even when it
+    // because the implementation is only a heuristic, and may fail to find a receiver even when it
     // might be otherwise expected to.
     //
     // More specifically, Sorbet's CFG is not SSA, so finding the `Send` that computes the variable
@@ -172,10 +178,6 @@ public:
     // Verbose debug output
     std::string showRaw(core::Context ctx) const;
 
-    // Flags
-    static constexpr int LOOP_HEADER = 1 << 0;
-    static constexpr int WAS_JUMP_DESTINATION = 1 << 1;
-
     // special minLoops
     static constexpr int MIN_LOOP_FIELD = -1;
     // static constexpr int MIN_LOOP_GLOBAL = -2;
@@ -207,7 +209,8 @@ public:
 
 private:
     CFG();
-    BasicBlock *freshBlock(int outerLoops, int rubyBlockid);
+    BasicBlock *freshBlock(int outerLoops, BasicBlock *current);
+    BasicBlock *freshBlockWithRegion(int outerLoops, int rubyRegionId);
     void enterLocalInternal(core::LocalVariable variable, LocalRef &ref);
     std::vector<int> minLoops;
     std::vector<int> maxLoopWrite;

@@ -51,11 +51,11 @@ NameDef names[] = {
     {"tripleEq", "==="},
     {"orOp", "|"},
     {"backtick", "`"},
-    {"slice"},
     {"defined_p", "defined?"},
     {"undef"},
     {"each"},
     {"subclasses"},
+    {"transpose"},
 
     // Used in parser for error recovery
     {"methodNameMissing", "<method-name-missing>"},
@@ -131,6 +131,7 @@ NameDef names[] = {
     {"enum_", "enum"},
     {"deprecatedEnum", "deprecated_enum"},
     {"enums"},
+    {"serialize"},
     {"nilable"},
     {"proc"},
     {"untyped"},
@@ -206,6 +207,7 @@ NameDef names[] = {
     {"updatedProp", "updated_prop"},
     {"merchantProp", "merchant_prop"},
     {"merchantTokenProp", "merchant_token_prop"},
+    {"name"},
     {"encryptedProp", "encrypted_prop"},
     {"array"},
     {"defDelegator", "def_delegator"},
@@ -259,6 +261,7 @@ NameDef names[] = {
     {"describe"},
     {"it"},
     {"before"},
+    {"beforeAngles", "<before>"},
     {"after"},
     {"afterAngles", "<after>"},
     {"testEach", "test_each"},
@@ -271,8 +274,6 @@ NameDef names[] = {
     {"implied"},
     {"skipGetter", "skip_getter"},
     {"skipSetter", "skip_setter"},
-
-    {"wrapInstance", "wrap_instance"},
 
     {"registered"},
     {"instanceRegistered", "<instance_registered>"},
@@ -355,11 +356,13 @@ NameDef names[] = {
     {"destructureArg", "<destructure>"},
 
     {"lambda"},
+    {"lambdaTLet", "<lambda T.let>"},
     {"nil_p", "nil?"},
     {"blank_p", "blank?"},
     {"present_p", "present?"},
     {"nil"},
     {"super", "<super>"},
+    {"untypedSuper", "<untypedSuper>"},
     {"empty", ""},
 
     {"buildHash", "<build-hash>"},
@@ -448,7 +451,6 @@ NameDef names[] = {
     {"testImport", "test_import"},
     {"export_", "export"},
     {"restrictToService", "restrict_to_service"},
-    {"autoloaderCompatibility", "autoloader_compatibility"},
     {"legacy"},
     {"strict"},
     {"visibleTo", "visible_to"},
@@ -456,10 +458,6 @@ NameDef names[] = {
     {"exportAll", "export_all!"},
     {"PackageSpec", "PackageSpec", true},
     {"PackageSpecRegistry", "<PackageSpecRegistry>", true},
-
-    // Compiler
-    {"runningCompiled_p", "running_compiled?"},
-    {"compilerVersion", "compiler_version"},
 
     // GlobalState initEmpty()
     {"Top", "T.anything", true},
@@ -516,7 +514,7 @@ NameDef names[] = {
     {"BindToAttachedClass", "<BindToAttachedClass>", true},
     // A magic non user-creatable class for binding procs to self_type
     {"BindToSelfType", "<BindToSelfType>", true},
-    // A magic non user-creatable class for mimicing the decl builder during cfg
+    // A magic non user-creatable class for mimicking the decl builder during cfg
     // construction
     {"DeclBuilderForProcs", "<DeclBuilderForProcs>", true},
     {"Enumerable", "Enumerable", true},
@@ -530,10 +528,10 @@ NameDef names[] = {
     {"Encoding", "Encoding", true},
     {"getEncoding", "<get-encoding>"},
     {"Static", "Static", true},
-    {"StubModule", "StubModule", true},
-    {"StubSuperClass", "StubSuperClass", true},
-    {"StubMixin", "StubMixin", true},
-    {"PlaceholderMixin", "PlaceholderMixin", true},
+    {"StubModule", "<StubModule>", true},
+    {"StubSuperClass", "<StubSuperClass>", true},
+    {"StubMixin", "<StubMixin>", true},
+    {"PlaceholderMixin", "<PlaceholderMixin>", true},
     {"Base", "Base", true},
     {"Void", "Void", true},
     {"TypeAlias", "<TypeAlias>", true},
@@ -564,7 +562,6 @@ NameDef names[] = {
     {"VERSION", "VERSION", true},
     {"Thread", "Thread", true},
     {"Configuration", "Configuration", true},
-    {"Compiler", "Compiler", true},
     {"Test", "Test", true},
     {"Autogen", "Autogen", true},
     {"Tokens", "Tokens", true},
@@ -577,9 +574,6 @@ NameDef names[] = {
     {"Int", "Int", true},
     {"Timestamp", "Timestamp", true},
     {"Bool", "Bool", true},
-
-    // used by the compiler
-    {"returnValue", "<returnValue>"},
 };
 
 void emit_name_header(ostream &out, NameDef &name) {

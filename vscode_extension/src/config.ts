@@ -7,77 +7,70 @@ import {
   FileSystemWatcher,
   Memento,
   workspace,
-  WorkspaceFolder,
 } from "vscode";
 import * as fs from "fs";
+import { Log } from "./log";
+import { SorbetLspConfig, SorbetLspConfigData } from "./sorbetLspConfig";
+import { deepEqual } from "./utils";
 
-/**
- * Compare two `string` arrays for deep, in-order equality.
- */
-function deepEqual(a: ReadonlyArray<string>, b: ReadonlyArray<string>) {
-  return a.length === b.length && a.every((itemA, index) => itemA === b[index]);
+export type TrackUntyped = "nowhere" | "everywhere-but-tests" | "everywhere";
+
+export const ALL_TRACK_UNTYPED: TrackUntyped[] = [
+  "nowhere",
+  "everywhere-but-tests",
+  "everywhere",
+];
+
+function coerceTrackUntypedSetting(value: boolean | string): TrackUntyped {
+  switch (value) {
+    case true:
+      return "everywhere";
+    case false:
+      return "nowhere";
+    case "nowhere":
+    case "everywhere-but-tests":
+    case "everywhere":
+      return value;
+    default:
+      return "nowhere";
+  }
 }
 
-interface ISorbetLspConfig {
-  readonly id: string;
-  /** Display name suitable for short-form fields like menu items or status fields. */
-  readonly name: string;
-  /** Human-readable long-form description suitable for hover text or help. */
-  readonly description: string;
-  readonly cwd: string;
-  readonly command: ReadonlyArray<string>;
+export function labelForTrackUntypedSetting(value: TrackUntyped): string {
+  switch (value) {
+    case "nowhere":
+      return "Nowhere";
+    case "everywhere-but-tests":
+      return "Everywhere but tests";
+    case "everywhere":
+      return "Everywhere";
+    default:
+      const unexpected: never = value;
+      throw new Error(`Unexpected value: ${unexpected}`);
+  }
 }
 
-export class SorbetLspConfig {
-  public readonly id: string;
-  public readonly name: string;
-  public readonly description: string;
-  public readonly cwd: string;
-  public readonly command: ReadonlyArray<string>;
-
-  constructor({ id, name, description, cwd, command }: ISorbetLspConfig) {
-    this.id = id;
-    this.name = name;
-    this.description = description;
-    this.cwd = cwd;
-    this.command = [...command];
-  }
-
-  public toString(): string {
-    return `${this.name}: ${this.description} [cmd: "${this.command.join(
-      " ",
-    )}"]`;
-  }
-
-  /** Deep equality. */
-  public isEqualTo(other: any): boolean {
-    if (
-      this !== other &&
-      (!(other instanceof SorbetLspConfig) ||
-        this.id !== other.id ||
-        this.name !== other.name ||
-        this.description !== other.description ||
-        this.cwd !== other.cwd ||
-        !deepEqual(this.command, other.command))
-    ) {
+export function backwardsCompatibleTrackUntyped(
+  log: Log,
+  trackWhere: TrackUntyped,
+): boolean | TrackUntyped {
+  switch (trackWhere) {
+    case "nowhere":
       return false;
-    }
-
-    return true;
-  }
-
-  /** Deep equality, suitable for use when left and/or right may be null or undefined. */
-  public static areEqual(
-    left: SorbetLspConfig | undefined | null,
-    right: SorbetLspConfig | undefined | null,
-  ) {
-    return left ? left.isEqualTo(right) : left === right;
+    case "everywhere":
+      return true;
+    case "everywhere-but-tests":
+      return trackWhere;
+    default:
+      const exhaustiveCheck: never = trackWhere;
+      log.warning(`Got unexpected state: ${exhaustiveCheck}`);
+      return false;
   }
 }
 
-export class SorbetLspConfigChangeEvent {
-  public readonly oldLspConfig: SorbetLspConfig | null | undefined;
-  public readonly newLspConfig: SorbetLspConfig | null | undefined;
+export interface SorbetLspConfigChangeEvent {
+  readonly oldLspConfig?: SorbetLspConfig;
+  readonly newLspConfig?: SorbetLspConfig;
 }
 
 /**
@@ -87,17 +80,28 @@ export class SorbetLspConfigChangeEvent {
  * to make it easier to stub out behavior in tests.
  */
 export interface ISorbetWorkspaceContext extends Disposable {
-  /** See `vscode.Memento.get`. */
-  get<T>(section: string, defaultValue: T): T;
+  /**
+   * Get value from {@link ExtensionContext.workspaceState}, if not defined
+   * fallback to {@link workspace.getConfiguration}, otherwise `defaultValue`.
+   * @param name Setting name (do not include 'sorbet' prefix).
+   * @param defaultValue Value to use if no datastore defines the value.
+   */
+  get<T>(name: string, defaultValue: T): T;
 
-  /** See `vscode.Memento.update`. */
-  update(section: string, value: any): Thenable<void>;
+  /**
+   * Set value. Value is saved to {@link extensionContext.workspaceState} unless it
+   * matches state in {@link workspace.getConfiguration} in which case it is removed
+   * (effectively setting `value` due to {@link get}'s fallback logic). One caveat is
+   * that using `undefined` only resets {@link extensionContext.workspaceState}.
+   * @param name Setting name (do not include 'sorbet' prefix).
+   * @param value Setting value.
+   */
+  update(name: string, value: any): Promise<void>;
 
-  /** See `vscode.workspace.onDidChangeConfiguration` */
+  /**
+   * An event emitted when configuration has changed.
+   */
   onDidChangeConfiguration: Event<ConfigurationChangeEvent>;
-
-  /** See `vscode.workspace.workspaceFolders` */
-  workspaceFolders(): ReadonlyArray<WorkspaceFolder> | undefined;
 
   initializeEnabled(enabled: boolean): void;
 }
@@ -113,12 +117,11 @@ export class DefaultSorbetWorkspaceContext implements ISorbetWorkspaceContext {
 
   constructor(extensionContext: ExtensionContext) {
     this.cachedSorbetConfiguration = workspace.getConfiguration("sorbet");
-    this.onDidChangeConfigurationEmitter = new EventEmitter<
-      ConfigurationChangeEvent
-    >();
+    this.onDidChangeConfigurationEmitter = new EventEmitter();
     this.workspaceState = extensionContext.workspaceState;
 
     this.disposables = [
+      this.onDidChangeConfigurationEmitter,
       workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration("sorbet")) {
           // update the cached configuration before firing
@@ -129,35 +132,38 @@ export class DefaultSorbetWorkspaceContext implements ISorbetWorkspaceContext {
     ];
   }
 
-  /**
-   * Dispose and free associated resources.
-   */
   public dispose() {
     Disposable.from(...this.disposables).dispose();
   }
 
   public get<T>(section: string, defaultValue: T): T {
-    const workspaceStateValue = this.workspaceState.get<T>(`sorbet.${section}`);
-    if (workspaceStateValue !== undefined) {
-      return workspaceStateValue;
-    }
-    return this.cachedSorbetConfiguration.get(section, defaultValue);
+    const stateKey = `sorbet.${section}`;
+    return (
+      this.workspaceState.get<T>(stateKey) ??
+      this.cachedSorbetConfiguration.get(section, defaultValue)
+    );
   }
 
   public async update(section: string, value: any): Promise<void> {
-    const key = `sorbet.${section}`;
-    await this.workspaceState.update(key, value);
+    const stateKey = `sorbet.${section}`;
+
+    const configValue = this.cachedSorbetConfiguration.get(section, value);
+    if (configValue === value) {
+      // Remove value from state since configuration's is enough.
+      await this.workspaceState.update(stateKey, undefined);
+    } else {
+      // Save to state since it is being customized.
+      await this.workspaceState.update(stateKey, value);
+    }
+
     this.onDidChangeConfigurationEmitter.fire({
-      affectsConfiguration: () => true,
+      affectsConfiguration: (section: string) =>
+        /"^sorbet($|\.)"/.test(section),
     });
   }
 
   public get onDidChangeConfiguration(): Event<ConfigurationChangeEvent> {
     return this.onDidChangeConfigurationEmitter.event;
-  }
-
-  public workspaceFolders(): readonly WorkspaceFolder[] | undefined {
-    return workspace.workspaceFolders;
   }
 
   /**
@@ -209,7 +215,8 @@ export class SorbetExtensionConfig implements Disposable {
   /** "Custom" LSP configs that override/supplement "standard" LSP configs. */
   private userLspConfigs: ReadonlyArray<SorbetLspConfig>;
   private wrappedEnabled: boolean;
-  private wrappedHighlightUntyped: boolean;
+  private wrappedHighlightUntyped: TrackUntyped;
+  private wrappedTypedFalseCompletionNudges: boolean;
   private wrappedRevealOutputOnError: boolean;
 
   constructor(sorbetWorkspaceContext: ISorbetWorkspaceContext) {
@@ -221,13 +228,17 @@ export class SorbetExtensionConfig implements Disposable {
     this.sorbetWorkspaceContext = sorbetWorkspaceContext;
     this.standardLspConfigs = [];
     this.userLspConfigs = [];
-    this.wrappedHighlightUntyped = false;
+    this.wrappedHighlightUntyped = "nowhere";
+    this.wrappedTypedFalseCompletionNudges = true;
     this.wrappedRevealOutputOnError = false;
 
-    const workspaceFolders = this.sorbetWorkspaceContext.workspaceFolders();
-    this.wrappedEnabled = workspaceFolders?.length
-      ? fs.existsSync(`${workspaceFolders[0].uri.fsPath}/sorbet/config`)
-      : false;
+    // Any workspace with a `…/sorbet/config` file is considered Sorbet-enabled
+    // by default. This implementation does not work in the general case with
+    // multi-root workspaces.
+    const { workspaceFolders } = workspace;
+    this.wrappedEnabled =
+      !!workspaceFolders?.length &&
+      fs.existsSync(`${workspaceFolders[0].uri.fsPath}/sorbet/config`);
 
     this.disposables = [
       this.onLspConfigChangeEmitter,
@@ -270,9 +281,16 @@ export class SorbetExtensionConfig implements Disposable {
       "revealOutputOnError",
       this.revealOutputOnError,
     );
-    this.wrappedHighlightUntyped = this.sorbetWorkspaceContext.get(
+    const highlightUntyped = this.sorbetWorkspaceContext.get(
       "highlightUntyped",
       this.highlightUntyped,
+    );
+    // Always store the setting as a TrackUntyped enum value internally.
+    // We'll convert it to legacy-style boolean options (potentially) at the call sites.
+    this.wrappedHighlightUntyped = coerceTrackUntypedSetting(highlightUntyped);
+    this.wrappedTypedFalseCompletionNudges = this.sorbetWorkspaceContext.get(
+      "typedFalseCompletionNudges",
+      this.typedFalseCompletionNudges,
     );
 
     Disposable.from(...this.configFileWatchers).dispose();
@@ -292,11 +310,11 @@ export class SorbetExtensionConfig implements Disposable {
     });
 
     this.standardLspConfigs = this.sorbetWorkspaceContext
-      .get<ISorbetLspConfig[]>("lspConfigs", [])
+      .get<SorbetLspConfigData[]>("lspConfigs", [])
       .map((c) => new SorbetLspConfig(c));
 
     this.userLspConfigs = this.sorbetWorkspaceContext
-      .get<ISorbetLspConfig[]>("userLspConfigs", [])
+      .get<SorbetLspConfigData[]>("userLspConfigs", [])
       .map((c) => new SorbetLspConfig(c));
 
     this.selectedLspConfigId = this.sorbetWorkspaceContext.get<
@@ -328,11 +346,31 @@ export class SorbetExtensionConfig implements Disposable {
   }
 
   /**
+   * Get the active {@link SorbetLspConfig LSP config}.
+   *
+   * A {@link selectedLspConfig selected} config is only active when {@link enabled}
+   * is `true`.
+   */
+  public get activeLspConfig(): SorbetLspConfig | undefined {
+    return this.enabled ? this.selectedLspConfig : undefined;
+  }
+
+  public get enabled(): boolean {
+    return this.wrappedEnabled;
+  }
+
+  public get highlightUntyped(): TrackUntyped {
+    return this.wrappedHighlightUntyped;
+  }
+
+  public oldHighlightUntyped: TrackUntyped | undefined = undefined;
+
+  /**
    * Returns a copy of the current SorbetLspConfig objects.
    */
   public get lspConfigs(): ReadonlyArray<SorbetLspConfig> {
     const results: Array<SorbetLspConfig> = [];
-    const resultIds = new Set<String>();
+    const resultIds = new Set<string>();
     [...this.userLspConfigs, ...this.standardLspConfigs].forEach((c) => {
       if (!resultIds.has(c.id)) {
         results.push(c);
@@ -342,70 +380,74 @@ export class SorbetExtensionConfig implements Disposable {
     return results;
   }
 
-  /**
-   * Returns the active `SorbetLspConfig`.
-   *
-   * If the Sorbet extension is disabled, returns `null`, otherwise
-   * returns a `SorbetLspConfig` or `undefined` as per `selectedLspConfig`.
-   */
-  public get activeLspConfig(): SorbetLspConfig | null | undefined {
-    return this.enabled ? this.selectedLspConfig : null;
+  public get revealOutputOnError(): boolean {
+    return this.wrappedRevealOutputOnError;
   }
 
   /**
-   * Returns the selected `SorbetLspConfig`, even if the extension is disabled.
+   * Get the currently selected {@link SorbetLspConfig LSP config}.
    *
-   * If the configuration does not specify a `selectedLspConfigId`, or if
-   * the `id` refers to a `SorbetLspConfig` that does not exist, return `undefined`.
+   * Returns `undefined` if {@link selectedLspConfigId} has not been set or if
+   * its value does not map to a config in {@link lspConfigs}.
    */
   public get selectedLspConfig(): SorbetLspConfig | undefined {
     return this.lspConfigs.find((c) => c.id === this.selectedLspConfigId);
   }
 
-  /**
-   * Select the given `SorbetLspConfig`.
-   *
-   * (Note that if the extension is disabled, this does not *enable* the
-   * configuration.)
-   */
-  public async setSelectedLspConfigId(id: string): Promise<void> {
-    await this.sorbetWorkspaceContext.update("selectedLspConfigId", id);
-    this.refresh();
+  public get typedFalseCompletionNudges(): boolean {
+    return this.wrappedTypedFalseCompletionNudges;
   }
 
   /**
-   * Select the given `SorbetLspConfig` and enable the extension, if
-   * the extension is disabled.
+   * Set active {@link SorbetLspConfig LSP config}.
    *
-   * This is equivalent to calling `selectedLspConfigId = id; enabled=true`.
+   * If {@link enabled} is `false`, this will change it to `true`.
    */
   public async setActiveLspConfigId(id: string): Promise<void> {
-    await Promise.all([
-      this.sorbetWorkspaceContext.update("selectedLspConfigId", id),
-      this.sorbetWorkspaceContext.update("enabled", true),
-    ]);
+    const updates: Array<Thenable<void>> = [];
+
+    if (this.activeLspConfig?.id !== id) {
+      updates.push(
+        this.sorbetWorkspaceContext.update("selectedLspConfigId", id),
+      );
+    }
+    if (!this.enabled) {
+      updates.push(this.sorbetWorkspaceContext.update("enabled", true));
+    }
+
+    if (updates.length) {
+      await Promise.all(updates);
+      this.refresh();
+    }
+  }
+
+  public async setEnabled(enabled: boolean): Promise<void> {
+    await this.sorbetWorkspaceContext.update("enabled", enabled);
     this.refresh();
   }
 
-  public get revealOutputOnError(): boolean {
-    return this.wrappedRevealOutputOnError;
-  }
-
-  public get highlightUntyped(): boolean {
-    return this.wrappedHighlightUntyped;
-  }
-
-  public get enabled(): boolean {
-    return this.wrappedEnabled;
-  }
-
-  public async setEnabled(b: boolean): Promise<void> {
-    await this.sorbetWorkspaceContext.update("enabled", b);
+  public async setHighlightUntyped(trackWhere: TrackUntyped): Promise<void> {
+    await this.sorbetWorkspaceContext.update("highlightUntyped", trackWhere);
     this.refresh();
   }
 
-  public async setHighlightUntyped(b: boolean): Promise<void> {
-    await this.sorbetWorkspaceContext.update("highlightUntyped", b);
+  /**
+   * Set selected {@link SorbetLspConfig LSP config}.
+   *
+   * This does not change {@link enabled} state.
+   */
+  public async setSelectedLspConfigId(id: string): Promise<void> {
+    if (this.selectedLspConfigId !== id) {
+      await this.sorbetWorkspaceContext.update("selectedLspConfigId", id);
+      this.refresh();
+    }
+  }
+
+  public async setTypedFalseCompletionNudges(enabled: boolean): Promise<void> {
+    await this.sorbetWorkspaceContext.update(
+      "typedFalseCompletionNudges",
+      enabled,
+    );
     this.refresh();
   }
 }

@@ -19,21 +19,21 @@ private:
     mutable absl::Mutex epochMutex;
     // Contains the current edit version (epoch) that the processing thread is typechecking or has
     // typechecked last. Is bumped by the typechecking thread.
-    std::atomic<uint32_t> currentlyProcessingLSPEpoch GUARDED_BY(epochMutex);
+    std::atomic<uint32_t> currentlyProcessingLSPEpoch ABSL_GUARDED_BY(epochMutex);
     // Should always be `>= currentlyProcessingLSPEpoch` (modulo overflows).
     // If value in `lspEpochInvalidator` is different from `currentlyProcessingLSPEpoch`, then LSP wants the current
     // request to be cancelled. Is bumped by the preprocessor thread (which determines cancellations).
-    std::atomic<uint32_t> lspEpochInvalidator GUARDED_BY(epochMutex);
+    std::atomic<uint32_t> lspEpochInvalidator ABSL_GUARDED_BY(epochMutex);
     // Should always be >= currentlyProcessingLSPEpoch. Is bumped by the typechecking thread.
     // Contains the epoch of the last committed slow path.
     // If lastCommittedLSPEpoch != currentlyProcessingLSPEpoch, then GlobalState is currently running a slow path.
-    std::atomic<uint32_t> lastCommittedLSPEpoch GUARDED_BY(epochMutex);
+    std::atomic<uint32_t> lastCommittedLSPEpoch ABSL_GUARDED_BY(epochMutex);
     // Thread ID of the typechecking thread. Lazily set.
     mutable std::optional<std::thread::id> typecheckingThreadId;
     // Thread ID of the preprocess thread. Lazily set.
     mutable std::optional<std::thread::id> messageProcessingThreadId;
 
-    TypecheckingStatus getStatusInternal() const EXCLUSIVE_LOCKS_REQUIRED(epochMutex);
+    TypecheckingStatus getStatusInternal() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(epochMutex);
 
 public:
     static void assertConsistentThread(std::optional<std::thread::id> &expectedThreadId, std::string_view method,
@@ -50,7 +50,7 @@ public:
     // Run only from processing thread.
     bool tryCancelSlowPath(uint32_t newEpoch);
     // Run only from the typechecking thread.
-    // Tries to commit the given epoch. Returns true if the commit succeeeded, or false if it was canceled.
+    // Tries to commit the given epoch. Returns true if the commit succeeded, or false if it was canceled.
     // The presence of PreemptionTaskManager determines if this commit is preemptible.
     bool tryCommitEpoch(core::GlobalState &gs, uint32_t epoch, bool isCancelable,
                         std::optional<std::shared_ptr<PreemptionTaskManager>> preemptionManager,

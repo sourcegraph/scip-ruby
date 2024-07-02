@@ -12,15 +12,6 @@ module Sorbet::Private::Static
   end
 
   sig do
-    params(
-        expr: T.untyped,
-    )
-    .void
-  end
-  def self.keep_for_ide(expr)
-  end
-
-  sig do
     type_parameters(:U)
       .params(this: T.untyped, fun: T.all(T.type_parameter(:U), Symbol), kind: Symbol)
       .returns(T.type_parameter(:U))
@@ -68,9 +59,6 @@ module Sorbet::Private::Static::ResolvedSig
   end
   def self.sig(original_recv, sig_arg, is_self_method, method_name=nil, &blk)
   end
-end
-
-module Sorbet::Private::Static::StubModule
 end
 
 class Sorbet::Private::Static::ImplicitModuleSuperclass < BasicObject
@@ -407,6 +395,7 @@ end
 ::Sorbet::Private::Static::IOLike = T.type_alias do
   T.any(
     IO,
-    StringIO
+    StringIO,
+    Tempfile
   )
 end

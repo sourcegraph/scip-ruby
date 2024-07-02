@@ -491,7 +491,7 @@ public:
     }
 
     bool inline exists() const {
-        // 0th index is reserved on all symbol vectors for the non existant symbol.
+        // 0th index is reserved on all symbol vectors for the nonexistent symbol.
         return unsafeTableIndex() != 0;
     }
 
@@ -542,7 +542,7 @@ public:
     core::Loc loc(const GlobalState &gs) const;
     bool isPrintable(const GlobalState &gs) const;
     using LOC_store = InlinedVector<Loc, 2>;
-    const LOC_store &locs(const GlobalState &gs) const;
+    absl::Span<const Loc> locs(const GlobalState &gs) const;
     void removeLocsForFile(GlobalState &gs, core::FileRef file) const;
     const TypePtr &resultType(const GlobalState &gs) const;
     void setResultType(GlobalState &gs, const TypePtr &typePtr) const;
@@ -588,6 +588,10 @@ public:
 
     static ClassOrModuleRef noClassOrModule() {
         return ClassOrModuleRef();
+    }
+
+    static MethodRef noMethod() {
+        return MethodRef();
     }
 
     static ClassOrModuleRef top() {
@@ -668,6 +672,10 @@ public:
 
     static ClassOrModuleRef BasicObject() {
         return ClassOrModuleRef::fromRaw(20);
+    }
+
+    static MethodRef BasicObject_initialize() {
+        return MethodRef::fromRaw(1);
     }
 
     static ClassOrModuleRef Kernel() {
@@ -831,10 +839,6 @@ public:
         return ClassOrModuleRef::fromRaw(58);
     }
 
-    static MethodRef noMethod() {
-        return MethodRef();
-    }
-
     static FieldRef noField() {
         return FieldRef::fromRaw(0);
     }
@@ -848,7 +852,7 @@ public:
     }
 
     static MethodRef Sorbet_Private_Static_ReturnTypeInference_guessed_type_type_parameter_holder() {
-        return MethodRef::fromRaw(1);
+        return MethodRef::fromRaw(2);
     }
 
     static TypeArgumentRef
@@ -874,7 +878,7 @@ public:
     }
 
     static MethodRef Sorbet_Private_Static_badAliasMethodStub() {
-        return MethodRef::fromRaw(2);
+        return MethodRef::fromRaw(3);
     }
 
     static ClassOrModuleRef T_Helpers() {
@@ -934,7 +938,7 @@ public:
     }
 
     static MethodRef sig() {
-        return MethodRef::fromRaw(3);
+        return MethodRef::fromRaw(4);
     }
 
     static ClassOrModuleRef Enumerator_Lazy() {
@@ -973,12 +977,24 @@ public:
         return ClassOrModuleRef::fromRaw(82);
     }
 
+    static MethodRef T_Private_Methods_DeclBuilder_abstract() {
+        return MethodRef::fromRaw(5);
+    }
+
+    static MethodRef T_Private_Methods_DeclBuilder_overridable() {
+        return MethodRef::fromRaw(6);
+    }
+
+    static MethodRef T_Private_Methods_DeclBuilder_override() {
+        return MethodRef::fromRaw(7);
+    }
+
     static ClassOrModuleRef T_Sig_WithoutRuntimeSingleton() {
         return ClassOrModuleRef::fromRaw(83);
     }
 
     static MethodRef sigWithoutRuntime() {
-        return MethodRef::fromRaw(4);
+        return MethodRef::fromRaw(8);
     }
 
     static ClassOrModuleRef T_NonForcingConstants() {
@@ -986,7 +1002,7 @@ public:
     }
 
     static MethodRef SorbetPrivateStaticSingleton_sig() {
-        return MethodRef::fromRaw(5);
+        return MethodRef::fromRaw(9);
     }
 
     static ClassOrModuleRef PackageSpecRegistry() {
@@ -1002,19 +1018,19 @@ public:
     }
 
     static MethodRef PackageSpec_import() {
-        return MethodRef::fromRaw(6);
+        return MethodRef::fromRaw(10);
     }
 
     static MethodRef PackageSpec_test_import() {
-        return MethodRef::fromRaw(7);
+        return MethodRef::fromRaw(11);
     }
 
     static MethodRef PackageSpec_export() {
-        return MethodRef::fromRaw(8);
+        return MethodRef::fromRaw(12);
     }
 
     static MethodRef PackageSpec_restrict_to_service() {
-        return MethodRef::fromRaw(9);
+        return MethodRef::fromRaw(13);
     }
 
     static ClassOrModuleRef Encoding() {
@@ -1026,27 +1042,23 @@ public:
     }
 
     static MethodRef Class_new() {
-        return MethodRef::fromRaw(10);
-    }
-
-    static MethodRef todoMethod() {
-        return MethodRef::fromRaw(11);
-    }
-
-    static MethodRef rootStaticInit() {
-        return MethodRef::fromRaw(12);
-    }
-
-    static MethodRef PackageSpec_autoloader_compatibility() {
-        return MethodRef::fromRaw(13);
-    }
-
-    static MethodRef PackageSpec_visible_to() {
         return MethodRef::fromRaw(14);
     }
 
-    static MethodRef PackageSpec_export_all() {
+    static MethodRef todoMethod() {
         return MethodRef::fromRaw(15);
+    }
+
+    static MethodRef rootStaticInit() {
+        return MethodRef::fromRaw(16);
+    }
+
+    static MethodRef PackageSpec_visible_to() {
+        return MethodRef::fromRaw(17);
+    }
+
+    static MethodRef PackageSpec_export_all() {
+        return MethodRef::fromRaw(18);
     }
 
     static ClassOrModuleRef Sorbet_Private_Static_ResolvedSig() {
@@ -1057,44 +1069,40 @@ public:
         return ClassOrModuleRef::fromRaw(91);
     }
 
-    static ClassOrModuleRef T_Private_Compiler() {
+    static ClassOrModuleRef MagicBindToAttachedClass() {
         return ClassOrModuleRef::fromRaw(92);
     }
 
-    static ClassOrModuleRef T_Private_CompilerSingleton() {
+    static ClassOrModuleRef MagicBindToSelfType() {
         return ClassOrModuleRef::fromRaw(93);
     }
 
-    static ClassOrModuleRef MagicBindToAttachedClass() {
+    static ClassOrModuleRef T_Types() {
         return ClassOrModuleRef::fromRaw(94);
     }
 
-    static ClassOrModuleRef MagicBindToSelfType() {
+    static ClassOrModuleRef T_Types_Base() {
         return ClassOrModuleRef::fromRaw(95);
     }
 
-    static ClassOrModuleRef T_Types() {
+    static ClassOrModuleRef Data() {
         return ClassOrModuleRef::fromRaw(96);
     }
 
-    static ClassOrModuleRef T_Types_Base() {
+    static ClassOrModuleRef T_Class() {
         return ClassOrModuleRef::fromRaw(97);
     }
 
-    static ClassOrModuleRef Data() {
-        return ClassOrModuleRef::fromRaw(98);
-    }
-
-    static ClassOrModuleRef T_Class() {
-        return ClassOrModuleRef::fromRaw(99);
-    }
-
     static MethodRef T_Generic_squareBrackets() {
-        return MethodRef::fromRaw(16);
+        return MethodRef::fromRaw(19);
+    }
+
+    static MethodRef Kernel_lambdaTLet() {
+        return MethodRef::fromRaw(20);
     }
 
     static ClassOrModuleRef Magic_UntypedSource() {
-        return ClassOrModuleRef::fromRaw(101);
+        return ClassOrModuleRef::fromRaw(99);
     }
 
     static FieldRef Magic_UntypedSource_super() {

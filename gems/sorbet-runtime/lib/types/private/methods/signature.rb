@@ -73,8 +73,7 @@ class T::Private::Methods::Signature
       param_names = parameters.map {|_, name| name}
       missing_names = param_names - raw_arg_types.keys
       raise "The declaration for `#{method.name}` is missing parameter(s): #{missing_names.join(', ')}"
-    elsif parameters.length == raw_arg_types.size
-    else
+    elsif parameters.length != raw_arg_types.size
       param_names = parameters.map {|_, name| name}
       has_extra_names = parameters.count {|_, name| raw_arg_types.key?(name)} < raw_arg_types.size
       if has_extra_names
@@ -243,6 +242,15 @@ class T::Private::Methods::Signature
       "<unknown location>"
     end
     "#{@method} at #{loc}"
+  end
+
+  def force_type_init
+    @arg_types.each {|_, type| type.build_type}
+    @kwarg_types.each {|_, type| type.build_type}
+    @block_type&.build_type
+    @rest_type&.build_type
+    @keyrest_type&.build_type
+    @return_type.build_type
   end
 
   EMPTY_LIST = [].freeze

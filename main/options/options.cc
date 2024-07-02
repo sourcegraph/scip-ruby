@@ -177,6 +177,21 @@ const vector<StopAfterOptions> stop_after_options({
     {"inferencer", Phase::INFERENCER},
 });
 
+core::TrackUntyped text2TrackUntyped(string_view key, spdlog::logger &logger) {
+    if (key == "") {
+        return core::TrackUntyped::Everywhere;
+    } else if (key == "nowhere") {
+        return core::TrackUntyped::Nowhere;
+    } else if (key == "everywhere-but-tests") {
+        return core::TrackUntyped::EverywhereButTests;
+    } else if (key == "everywhere") {
+        return core::TrackUntyped::Everywhere;
+    } else {
+        logger.error("Unknown --track-untyped option: `{}`", key);
+        throw EarlyReturnWithCode(1);
+    }
+}
+
 core::StrictLevel text2StrictLevel(string_view key, shared_ptr<spdlog::logger> logger) {
     if (key == "ignore") {
         return core::StrictLevel::Ignore;
@@ -277,10 +292,10 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
 
     fmt::format_to(std::back_inserter(all_prints), "Print: [{}]",
                    fmt::map_join(
-                       print_options, ", ", [](const auto &pr) -> auto { return pr.option; }));
+                       print_options, ", ", [](const auto &pr) -> auto{ return pr.option; }));
     fmt::format_to(std::back_inserter(all_stop_after), "Stop After: [{}]",
                    fmt::map_join(
-                       stop_after_options, ", ", [](const auto &pr) -> auto { return pr.option; }));
+                       stop_after_options, ", ", [](const auto &pr) -> auto{ return pr.option; }));
 
     // Advanced options
     options.add_options("advanced")("dir", "Input directory", cxxopts::value<vector<string>>());
@@ -354,6 +369,9 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
     options.add_options("advanced")("enable-experimental-requires-ancestor",
                                     "Enable experimental `requires_ancestor` annotation");
 
+    options.add_options("advanced")("enable-experimental-lsp-extract-to-variable",
+                                    "Enable experimental LSP feature: Extract To Variable");
+
     options.add_options("advanced")(
         "enable-all-experimental-lsp-features",
         "Enable every experimental LSP feature. (WARNING: can be crashy; for developer use only. "
@@ -368,7 +386,7 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
         "ignore",
         "Ignores input files that contain the given string in their paths (relative to the input path passed to "
         "Sorbet). Strings beginning with / match against the prefix of these relative paths; others are substring "
-        "matchs. Matches must be against whole folder and file names, so `foo` matches `/foo/bar.rb` and "
+        "matches. Matches must be against whole folder and file names, so `foo` matches `/foo/bar.rb` and "
         "`/bar/foo/baz.rb` but not `/foo.rb` or `/foo2/bar.rb`.",
         cxxopts::value<vector<string>>(), "string");
     options.add_options("advanced")(
@@ -394,14 +412,9 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
                                "package-munging convention, i.e. 'project/foo'."
                                "This option must be used in conjunction with --stripe-packages",
                                cxxopts::value<vector<string>>(), "string");
-    options.add_options("dev")(
-        "secondary-test-package-namespaces",
-        "Secondary top-level namespaces which contain test code (in addition to Test, which is primary). "
-        "This option must be used in conjunction with --stripe-packages",
-        cxxopts::value<vector<string>>(), "string");
-    options.add_options("dev")("skip-package-import-visibility-check-for",
-                               "Packages for which the visible_to check does not apply. They can import any package "
-                               "regardless of visible_to annotations."
+    options.add_options("dev")("allow-relaxed-packager-checks-for",
+                               "Packages which are allowed to ignore the restrictions set by `visible_to` "
+                               "and `export` directives."
                                "This option must be used in conjunction with --stripe-packages",
                                cxxopts::value<vector<string>>(), "string");
     buildAutogenCacheOptions(options);
@@ -412,9 +425,17 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
                                     cxxopts::value<string>()->default_value(empty.errorUrlBase), "url-base");
     options.add_options("advanced")("experimental-ruby3-keyword-args",
                                     "Enforce use of new (Ruby 3.0-style) keyword arguments", cxxopts::value<bool>());
+    options.add_options("advanced")("typed-super", "Enable typechecking of `super` calls when possible",
+                                    cxxopts::value<bool>()->default_value("true"));
     options.add_options("advanced")("check-out-of-order-constant-references",
                                     "Enable out-of-order constant reference checks (error 5027)");
-    options.add_options("advanced")("track-untyped", "Track untyped usage statistics in the file-table output");
+    options.add_options("advanced")("track-untyped", "Track untyped usage statistics in the file-table output",
+                                    cxxopts::value<string>()->implicit_value("everywhere"),
+                                    "{[nowhere],everywhere,everywhere-but-tests}");
+    options.add_options("advanced")("suppress-payload-superclass-redefinition-for",
+                                    "Explicitly suppress the superclass redefinition error for the specified class "
+                                    "defined in Sorbet's payload. May be repeated.",
+                                    cxxopts::value<vector<string>>(), "Fully::Qualified::ClassName");
 
     // Developer options
     options.add_options("dev")("p,print", to_string(all_prints), cxxopts::value<vector<string>>(), "type");
@@ -431,11 +452,14 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
     options.add_options("dev")("autogen-behavior-allowed-in-rbi-files-paths",
                                "RBI files defined in these paths can be considered by autogen as behavior-defining.",
                                cxxopts::value<vector<string>>(), "string");
+    options.add_options("dev")("autogen-msgpack-skip-reference-metadata",
+                               "Skip serializing extra metadata on references when printing msgpack in autogen",
+                               cxxopts::value<bool>());
     options.add_options("dev")("stop-after", to_string(all_stop_after),
                                cxxopts::value<string>()->default_value("inferencer"), "phase");
     options.add_options("dev")("no-stdlib", "Do not load included rbi files for stdlib");
     options.add_options("dev")("minimize-to-rbi",
-                               "[experimental] Output a minimal RBI contining the diff between Sorbet's view of a "
+                               "[experimental] Output a minimal RBI containing the diff between Sorbet's view of a "
                                "codebase and the definitions present in this file",
                                cxxopts::value<std::string>()->default_value(""), "<file.rbi>");
     options.add_options("dev")("wait-for-dbg", "Wait for debugger on start");
@@ -502,15 +526,12 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
     options.add_options("dev")("statsd-host", "StatsD sever hostname",
                                cxxopts::value<string>()->default_value(empty.statsdHost), "host");
     options.add_options("dev")("counters", "Print all internal counters");
-    if (sorbet::debug_mode) {
-        options.add_options("dev")("suggest-sig", "Report typing candidates. Only supported in debug builds");
-    }
 
     options.add_options("dev")("suggest-typed", "Suggest which typed: sigils to add or upgrade");
     options.add_options("dev")("suggest-unsafe",
                                "In as many errors as possible, suggest autocorrects to wrap problem code with "
                                "<method>. Omit the =<method> to default to wrapping with T.unsafe. "
-                               "This supercedes certain autocorrects, especially T.must.",
+                               "This supersedes certain autocorrects, especially T.must.",
                                cxxopts::value<std::string>()->implicit_value("T.unsafe"), "<method>");
     options.add_options("dev")("statsd-prefix", "StatsD prefix",
                                cxxopts::value<string>()->default_value(empty.statsdPrefix), "prefix");
@@ -670,6 +691,10 @@ void readOptions(Options &opts,
         if (raw["simulate-crash"].as<bool>()) {
             Exception::raise("simulated crash");
         }
+        opts.waitForDebugger = raw["wait-for-dbg"].as<bool>();
+        while (opts.waitForDebugger && !stopInDebugger()) {
+            // spin
+        }
 
         if (raw.count("allowed-extension") > 0) {
             auto exts = raw["allowed-extension"].as<vector<string>>();
@@ -728,17 +753,23 @@ void readOptions(Options &opts,
 
         bool enableAllLSPFeatures = raw["enable-all-experimental-lsp-features"].as<bool>();
         opts.lspAllBetaFeaturesEnabled = enableAllLSPFeatures || raw["enable-all-beta-lsp-features"].as<bool>();
-        opts.lspDocumentSymbolEnabled =
-            opts.lspAllBetaFeaturesEnabled || raw["enable-experimental-lsp-document-symbol"].as<bool>();
         opts.lspDocumentHighlightEnabled =
             enableAllLSPFeatures || raw["enable-experimental-lsp-document-highlight"].as<bool>();
         opts.lspSignatureHelpEnabled = enableAllLSPFeatures || raw["enable-experimental-lsp-signature-help"].as<bool>();
+        opts.lspExtractToVariableEnabled =
+            enableAllLSPFeatures || raw["enable-experimental-lsp-extract-to-variable"].as<bool>();
         opts.rubyfmtPath = raw["rubyfmt-path"].as<string>();
-        opts.lspDocumentFormatRubyfmtEnabled =
-            FileOps::exists(opts.rubyfmtPath) &&
-            (enableAllLSPFeatures || raw["enable-experimental-lsp-document-formatting-rubyfmt"].as<bool>());
+        if (enableAllLSPFeatures || raw["enable-experimental-lsp-document-formatting-rubyfmt"].as<bool>()) {
+            if (!FileOps::exists(opts.rubyfmtPath)) {
+                logger->error("`{}` does not exist, LSP rubyfmt integration will not be enabled", opts.rubyfmtPath);
+            } else {
+                opts.lspDocumentFormatRubyfmtEnabled = true;
+            }
+        }
         opts.outOfOrderReferenceChecksEnabled = raw["check-out-of-order-constant-references"].as<bool>();
-        opts.trackUntyped = raw["track-untyped"].as<bool>();
+        if (raw.count("track-untyped") > 0) {
+            opts.trackUntyped = text2TrackUntyped(raw["track-untyped"].as<string>(), *logger);
+        }
 
         if (raw.count("lsp-directories-missing-from-client") > 0) {
             auto lspDirsMissingFromClient = raw["lsp-directories-missing-from-client"].as<vector<string>>();
@@ -795,6 +826,14 @@ void readOptions(Options &opts,
             throw EarlyReturnWithCode(1);
         }
 
+        if (raw.count("autogen-version") > 0) {
+            if (!opts.print.AutogenMsgPack.enabled) {
+                logger->error("`{}` must also include `{}`", "--autogen-version", "-p autogen-msgpack");
+                throw EarlyReturnWithCode(1);
+            }
+            opts.autogenVersion = raw["autogen-version"].as<int>();
+        }
+
         if (raw.count("autogen-subclasses-parent")) {
             if (!opts.print.AutogenSubclasses.enabled) {
                 logger->error("autogen-subclasses-parent must be used with -p autogen-subclasses");
@@ -827,7 +866,21 @@ void readOptions(Options &opts,
                 raw["autogen-behavior-allowed-in-rbi-files-paths"].as<vector<string>>();
         }
 
-        if (opts.print.UntypedBlame.enabled && !opts.trackUntyped) {
+        opts.autogenMsgpackSkipReferenceMetadata = raw["autogen-msgpack-skip-reference-metadata"].as<bool>();
+        if (opts.autogenMsgpackSkipReferenceMetadata) {
+            if (!opts.print.AutogenMsgPack.enabled) {
+                logger->error("autogen-skip-reference-metadata can only be used with -p autogen-msgpack");
+                throw EarlyReturnWithCode(1);
+            }
+
+            if (opts.autogenVersion < 6) {
+                logger->error(
+                    "autogen-skip-reference-metadata can only be used with autogen msgpack version 6 or above");
+                throw EarlyReturnWithCode(1);
+            }
+        }
+
+        if (opts.print.UntypedBlame.enabled && opts.trackUntyped == core::TrackUntyped::Nowhere) {
             logger->error("-p untyped-blame:<output-path> must also include --track-untyped");
             throw EarlyReturnWithCode(1);
         }
@@ -879,7 +932,6 @@ void readOptions(Options &opts,
         if (raw.count("suggest-unsafe") > 0) {
             opts.suggestUnsafe = raw["suggest-unsafe"].as<string>();
         }
-        opts.waitForDebugger = raw["wait-for-dbg"].as<bool>();
         opts.traceLexer = raw["trace-lexer"].as<bool>();
         opts.traceParser = raw["trace-parser"].as<bool>();
         opts.stressIncrementalResolver = raw["stress-incremental-resolver"].as<bool>();
@@ -916,13 +968,6 @@ void readOptions(Options &opts,
         opts.reserveFieldTableCapacity = raw["reserve-field-table-capacity"].as<uint32_t>();
         opts.reserveTypeArgumentTableCapacity = raw["reserve-type-argument-table-capacity"].as<uint32_t>();
         opts.reserveTypeMemberTableCapacity = raw["reserve-type-member-table-capacity"].as<uint32_t>();
-        if (raw.count("autogen-version") > 0) {
-            if (!opts.print.AutogenMsgPack.enabled) {
-                logger->error("`{}` must also include `{}`", "--autogen-version", "-p autogen-msgpack");
-                throw EarlyReturnWithCode(1);
-            }
-            opts.autogenVersion = raw["autogen-version"].as<int>();
-        }
         opts.stripeMode = raw["stripe-mode"].as<bool>();
         opts.stripePackages = raw["stripe-packages"].as<bool>();
 
@@ -948,37 +993,19 @@ void readOptions(Options &opts,
             }
         }
 
-        if (raw.count("secondary-test-package-namespaces")) {
+        if (raw.count("allow-relaxed-packager-checks-for")) {
             if (!opts.stripePackages) {
-                logger->error("--secondary-test-package-namespaces can only be specified in --stripe-packages mode");
-                throw EarlyReturnWithCode(1);
-            }
-            std::regex nsValid("[A-Z][a-zA-Z0-9]+");
-            for (const string &ns : raw["secondary-test-package-namespaces"].as<vector<string>>()) {
-                if (!std::regex_match(ns, nsValid)) {
-                    logger->error("--secondary-test-package-namespaces must contain items that start with a capital "
-                                  "letter and are alphanumeric.");
-                    throw EarlyReturnWithCode(1);
-                }
-                opts.secondaryTestPackageNamespaces.emplace_back(ns);
-            }
-        }
-
-        if (raw.count("skip-package-import-visibility-check-for")) {
-            if (!opts.stripePackages) {
-                logger->error(
-                    "--skip-package-import-visibility-check-for can only be specified in --stripe-packages mode");
+                logger->error("--allow-relaxed-packager-checks-for can only be specified in --stripe-packages mode");
                 throw EarlyReturnWithCode(1);
             }
             std::regex nsValid("[A-Z][a-zA-Z0-9:]+");
-            for (const string &ns : raw["skip-package-import-visibility-check-for"].as<vector<string>>()) {
+            for (const string &ns : raw["allow-relaxed-packager-checks-for"].as<vector<string>>()) {
                 if (!std::regex_match(ns, nsValid)) {
-                    logger->error(
-                        "--skip-package-import-visibility-check-for must contain items that start with a capital "
-                        "letter and are alphanumeric.");
+                    logger->error("--allow-relaxed-packager-checks-for must contain items that start with a capital "
+                                  "letter and are alphanumeric.");
                     throw EarlyReturnWithCode(1);
                 }
-                opts.skipPackageImportVisibilityCheckFor.emplace_back(ns);
+                opts.allowRelaxedPackagerChecksFor.emplace_back(ns);
             }
         }
 
@@ -1039,6 +1066,14 @@ void readOptions(Options &opts,
         opts.errorUrlBase = raw["error-url-base"].as<string>();
         opts.noErrorSections = raw["no-error-sections"].as<bool>();
         opts.ruby3KeywordArgs = raw["experimental-ruby3-keyword-args"].as<bool>();
+        opts.typedSuper = raw["typed-super"].as<bool>();
+
+        if (raw.count("suppress-payload-superclass-redefinition-for") > 0) {
+            for (auto childClassName : raw["suppress-payload-superclass-redefinition-for"].as<vector<string>>()) {
+                opts.suppressPayloadSuperclassRedefinitionFor.emplace_back(childClassName);
+            }
+        }
+
         if (raw.count("error-white-list") > 0) {
             logger->error("`{}` is deprecated; please use `{}` instead", "--error-white-list", "--isolate-error-code");
             auto rawList = raw["error-white-list"].as<vector<int>>();
@@ -1062,10 +1097,6 @@ void readOptions(Options &opts,
         if (!opts.isolateErrorCode.empty() && !opts.suppressErrorCode.empty()) {
             logger->error("You can't pass both `{}` and `{}`", "--isolate-error-code", "--suppress-error-code");
             throw EarlyReturnWithCode(1);
-        }
-
-        if (sorbet::debug_mode) {
-            opts.suggestSig = raw["suggest-sig"].as<bool>();
         }
 
         if (raw.count("e") == 0 && opts.inputFileNames.empty() && !raw["version"].as<bool>() && !opts.runLSP &&

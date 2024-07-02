@@ -71,7 +71,7 @@ public:
     /** Greater lower bound: the widest type that is subtype of both t1 and t2 */
     static TypePtr all(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2);
 
-    /** Lower upper bound: the narrowest type that is supper type of both t1 and t2 */
+    /** Lower upper bound: the narrowest type that is super type of both t1 and t2 */
     static TypePtr any(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2);
 
     /**
@@ -79,20 +79,40 @@ public:
      *
      * The parameter `mode` controls whether or not `T.untyped` is
      * considered to be a super type or subtype of all other types */
+
+    /**
+     * The `errorDetailsCollector` parameter is used to pass additional details out of isSubType
+     * about why subtyping failed, which can then be shown to the user. See ErrorSection::Collector
+     * in core/Error.h for the API.
+     *
+     * If this call is going to be used to determine if an error should be shown, you should pass in
+     * an instance of ErrorSection::Collector. Otherwise, you should pass in
+     * ErrorSection::Collector::NO_OP, as passing an ErrorSection::Collector will slow down subtype
+     * checking to collect the additional information.
+     */
+    template <class T>
     static bool isSubTypeUnderConstraint(const GlobalState &gs, TypeConstraint &constr, const TypePtr &t1,
-                                         const TypePtr &t2, UntypedMode mode);
+                                         const TypePtr &t2, UntypedMode mode, T &errorDetailsCollector);
 
     /** is every instance of  t1 an  instance of t2 when not allowed to modify constraint */
-    static bool isSubType(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2);
+    template <class T>
+    static bool isSubType(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2, T &errorDetailsCollector);
+    /** is every instance of  t1 an  instance of t2 when not allowed to modify constraint */
+    static bool isSubType(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) {
+        return isSubType(gs, t1, t2, ErrorSection::Collector::NO_OP);
+    };
     static bool equiv(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2);
+    template <class T>
     static bool equivUnderConstraint(const GlobalState &gs, TypeConstraint &constr, const TypePtr &t1,
-                                     const TypePtr &t2);
+                                     const TypePtr &t2, T &errorDetailsCollector);
 
     /** check that t1 <: t2, but do not consider `T.untyped` as super type or a subtype of all other types */
     static bool isAsSpecificAs(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2);
     static bool equivNoUntyped(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2);
+
+    template <class T>
     static bool equivNoUntypedUnderConstraint(const GlobalState &gs, TypeConstraint &constr, const TypePtr &t1,
-                                              const TypePtr &t2);
+                                              const TypePtr &t2, T &errorDetailsCollector);
 
     static TypePtr top();
     static TypePtr bottom();
@@ -116,9 +136,11 @@ public:
     static TypePtr nilableProcClass();
     static TypePtr declBuilderForProcsSingletonClass();
     static TypePtr falsyTypes();
+    static absl::Span<const ClassOrModuleRef> falsySymbols();
     static TypePtr todo();
 
-    static TypePtr dropSubtypesOf(const GlobalState &gs, const TypePtr &from, ClassOrModuleRef klass);
+    static TypePtr dropSubtypesOf(const GlobalState &gs, const TypePtr &from,
+                                  absl::Span<const ClassOrModuleRef> klasses);
     static TypePtr approximateSubtract(const GlobalState &gs, const TypePtr &from, const TypePtr &what);
     static bool canBeTruthy(const GlobalState &gs, const TypePtr &what);
     static bool canBeFalsy(const GlobalState &gs, const TypePtr &what);
@@ -141,7 +163,7 @@ public:
     static TypePtr replaceSelfType(const GlobalState &gs, const TypePtr &what, const TypePtr &receiver);
     /** Get rid of type variables in `what` and return a type that we deem close enough to continue
      * typechecking. We should be careful to only used this type when we are trying to guess a type.
-     * We should do proper instatiation and subtype test after we have guessed type variables with
+     * We should do proper instantiation and subtype test after we have guessed type variables with
      * tc.solve(). If the constraint has already been solved, use `instantiate` instead.
      */
     static TypePtr approximate(const GlobalState &gs, const TypePtr &what, const TypeConstraint &tc);
@@ -334,16 +356,22 @@ template <> inline bool TypePtr::isa<TypePtr>(const TypePtr &what) {
 }
 
 // Required to support cast<TypePtr> specialization.
-template <> struct TypePtr::TypeToIsInlined<TypePtr> { static constexpr bool value = false; };
+template <> struct TypePtr::TypeToIsInlined<TypePtr> {
+    static constexpr bool value = false;
+};
 
 template <> inline TypePtr const &TypePtr::cast<TypePtr>(const TypePtr &what) {
     return what;
 }
 
-#define TYPE_IMPL(name, isInlined)                                                                             \
-    class name;                                                                                                \
-    template <> struct TypePtr::TypeToTag<name> { static constexpr TypePtr::Tag value = TypePtr::Tag::name; }; \
-    template <> struct TypePtr::TypeToIsInlined<name> { static constexpr bool value = isInlined; };            \
+#define TYPE_IMPL(name, isInlined)                                \
+    class name;                                                   \
+    template <> struct TypePtr::TypeToTag<name> {                 \
+        static constexpr TypePtr::Tag value = TypePtr::Tag::name; \
+    };                                                            \
+    template <> struct TypePtr::TypeToIsInlined<name> {           \
+        static constexpr bool value = isInlined;                  \
+    };                                                            \
     class __attribute__((aligned(8))) name
 
 #define TYPE(name) TYPE_IMPL(name, false)
@@ -707,17 +735,19 @@ private:
     friend TypePtr Types::Boolean();
     friend class NameSubstitution;
     friend class serialize::SerializerImpl;
+    template <class T>
     friend bool Types::isSubTypeUnderConstraint(const GlobalState &gs, TypeConstraint &constr, const TypePtr &t1,
-                                                const TypePtr &t2, UntypedMode mode);
+                                                const TypePtr &t2, UntypedMode mode, T &errorDetailsCollector);
     friend TypePtr lubDistributeOr(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2);
     friend TypePtr lubGround(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2);
     friend TypePtr Types::lub(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2);
     friend TypePtr Types::glb(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2);
     friend TypePtr filterOrComponents(const TypePtr &originalType, const InlinedVector<TypePtr, 4> &typeFilter);
-    friend TypePtr Types::dropSubtypesOf(const GlobalState &gs, const TypePtr &from, ClassOrModuleRef klass);
+    friend TypePtr Types::dropSubtypesOf(const GlobalState &gs, const TypePtr &from,
+                                         absl::Span<const ClassOrModuleRef> klasses);
     friend TypePtr Types::unwrapSelfTypeParam(Context ctx, const TypePtr &t1);
     friend class ClassOrModule; // the actual method is `recordSealedSubclass(Mutableconst GlobalState &gs, SymbolRef
-                                // subclass)`, but refering to it introduces a cycle
+                                // subclass)`, but referring to it introduces a cycle
 
     static TypePtr make_shared(const TypePtr &left, const TypePtr &right);
 };
@@ -757,8 +787,9 @@ private:
     friend class serialize::SerializerImpl;
     friend class TypeConstraint;
 
+    template <class T>
     friend bool Types::isSubTypeUnderConstraint(const GlobalState &gs, TypeConstraint &constr, const TypePtr &t1,
-                                                const TypePtr &t2, UntypedMode mode);
+                                                const TypePtr &t2, UntypedMode mode, T &errorDetailsCollector);
     friend TypePtr lubGround(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2);
     friend TypePtr glbDistributeAnd(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2);
     friend TypePtr glbGround(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2);
@@ -970,6 +1001,7 @@ struct DispatchArgs {
     // are cases where we call dispatchCall with no intention of showing the errors to the user. Producing those
     // unreported errors is expensive!
     bool suppressErrors;
+    NameRef enclosingMethodForSuper;
 
     DispatchArgs(const DispatchArgs &) = delete;
     DispatchArgs &operator=(const DispatchArgs &) = delete;
@@ -1006,6 +1038,18 @@ struct DispatchArgs {
     }
     Loc blockLoc(const GlobalState &gs) const;
 
+    Loc errLoc() const {
+        auto funLoc = this->funLoc();
+        auto recvLoc = this->receiverLoc();
+        if (funLoc.exists() && !funLoc.empty()) {
+            return funLoc;
+        } else if (this->name == Names::squareBrackets() && recvLoc.exists() && !recvLoc.empty()) {
+            return core::Loc(this->locs.file, recvLoc.endPos(), this->callLoc().endPos());
+        } else {
+            return this->callLoc();
+        }
+    }
+
     DispatchArgs withSelfAndThisRef(const TypePtr &newSelfRef) const;
     DispatchArgs withThisRef(const TypePtr &newThisRef) const;
     DispatchArgs withErrorsSuppressed() const;
@@ -1018,7 +1062,8 @@ struct DispatchComponent {
     TypePtr sendTp;
     TypePtr blockReturnType;
     TypePtr blockPreType;
-    ArgInfo blockSpec; // used only by LoadSelf to change type of self inside method.
+    ClassOrModuleRef rebind;
+    Loc rebindLoc;
     std::unique_ptr<TypeConstraint> constr;
 };
 
@@ -1033,7 +1078,7 @@ struct DispatchResult {
     DispatchResult(TypePtr returnType, TypePtr receiverType, core::MethodRef method)
         : returnType(returnType),
           main(DispatchComponent{
-              std::move(receiverType), method, {}, std::move(returnType), nullptr, nullptr, ArgInfo{}, nullptr}){};
+              std::move(receiverType), method, {}, std::move(returnType), nullptr, nullptr, {}, {}, nullptr}){};
     DispatchResult(TypePtr returnType, DispatchComponent comp)
         : returnType(std::move(returnType)), main(std::move(comp)){};
     DispatchResult(TypePtr returnType, DispatchComponent comp, std::unique_ptr<DispatchResult> secondary,

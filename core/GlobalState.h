@@ -8,6 +8,7 @@
 #include "core/Loc.h"
 #include "core/Names.h"
 #include "core/Symbols.h"
+#include "core/TrackUntyped.h"
 #include "core/lsp/Query.h"
 #include "core/packages/PackageDB.h"
 #include "core/packages/PackageInfo.h"
@@ -161,8 +162,7 @@ public:
     FileRef findFileByPath(std::string_view path) const;
 
     const packages::PackageDB &packageDB() const;
-    void setPackagerOptions(const std::vector<std::string> &secondaryTestPackageNamespaces,
-                            const std::vector<std::string> &extraPackageFilesDirectoryUnderscorePrefixes,
+    void setPackagerOptions(const std::vector<std::string> &extraPackageFilesDirectoryUnderscorePrefixes,
                             const std::vector<std::string> &extraPackageFilesDirectorySlashPrefixes,
                             const std::vector<std::string> &packageSkipRBIExportEnforcementDirs,
                             const std::vector<std::string> &skipImportVisibilityCheckFor, std::string errorHint);
@@ -234,7 +234,7 @@ public:
     bool logRecordedFilepaths = false;
     bool autocorrect = false;
     bool didYouMean = true;
-    bool trackUntyped = false;
+    TrackUntyped trackUntyped = TrackUntyped::Nowhere;
     bool printingFileTable = false;
 
     // We have a lot of internal names of form `<something>` that's chosen with `<` and `>` as you can't make
@@ -300,6 +300,10 @@ public:
     // If 'true', enforce use of Ruby 3.0-style keyword args.
     bool ruby3KeywordArgs = false;
 
+    // If 'true', attempt to typecheck calls to `super` as often as possible.
+    // Some calls to `super` are not type checked due to incomplete/imperfect information.
+    bool typedSuper = true;
+
     // If 'true', we're running in scip-ruby mode.
     bool isSCIPRuby = true;
 
@@ -308,6 +312,8 @@ public:
     // marked as "unresolved" after name resolution is complete.
     UnorderedMap<core::ClassOrModuleRef, UnorderedSet<core::NameRef>> unresolvedFields;
     // --- end scip-ruby specific state
+
+    std::vector<std::string> suppressPayloadSuperclassRedefinitionFor;
 
     // When present, this indicates that single-package rbi generation is being performed, and contains metadata about
     // the packages that are imported by the one whose interface is being generated.

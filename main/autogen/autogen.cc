@@ -3,6 +3,7 @@
 #include "ast/Helpers.h"
 #include "ast/ast.h"
 #include "ast/treemap/treemap.h"
+#include "common/common.h"
 #include "common/strings/formatting.h"
 #include "main/autogen/crc_builder.h"
 
@@ -15,7 +16,20 @@ class AutogenWalk {
     vector<Definition> defs;
     vector<Reference> refs;
     vector<core::NameRef> requireStatements;
-    vector<DefinitionRef> nesting;
+    vector<vector<DefinitionRef>> nestings;
+
+    struct NestingStackEntry {
+        DefinitionRef ref;
+        optional<uint32_t> nestingEntry;
+
+        NestingStackEntry() = default;
+        NestingStackEntry(DefinitionRef ref) : ref(ref) {}
+
+        NestingStackEntry(NestingStackEntry &&) = default;
+        NestingStackEntry &operator=(NestingStackEntry &&) = default;
+    };
+
+    vector<NestingStackEntry> nestingStack;
     const AutogenConfig *autogenCfg;
 
     enum class ScopeType { Class, Block };
@@ -23,6 +37,8 @@ class AutogenWalk {
     vector<ScopeType> scopeTypes;
 
     UnorderedMap<void *, ReferenceRef> refMap;
+
+    UnorderedSet<pair<core::LocOffsets, core::SymbolRef>> seenRefsByLoc;
 
     // Convert a symbol name into a fully qualified name
     vector<core::NameRef> symbolName(core::Context ctx, core::SymbolRef sym) {
@@ -43,7 +59,25 @@ class AutogenWalk {
             auto &original = ast::cast_tree_nonnull<ast::UnresolvedConstantLit>(cnst->original);
             out.emplace_back(original.cnst);
             cnst = ast::cast_tree<ast::ConstantLit>(original.scope);
+
+            // If any part of the constant literal scope is a class alias, the final name should be scoped
+            // under the *dealiased* scope. This allows subconstants-of-aliases to be referenced
+            // correctly -- otherwise, we'd have missing edges in our static analysis dependency graphs, which
+            // drive pre-loading for our Ruby services at Stripe, and also have to jump hoops with complicated
+            // heuristics in our package generation tooling to determine whether something was resolved via an alias.
+            if (cnst != nullptr && cnst->original != nullptr) {
+                auto scopeSym = cnst->symbol;
+                if (scopeSym.isStaticField(ctx) && scopeSym.asFieldRef().data(ctx)->isClassAlias()) {
+                    auto resolvedScopeName = symbolName(ctx, scopeSym);
+
+                    // append the name in reverse order to the hitherto-built name vector,
+                    // then break out of the loop.
+                    out.insert(out.end(), std::move(resolvedScopeName).rbegin(), std::move(resolvedScopeName).rend());
+                    break;
+                }
+            }
         }
+
         reverse(out.begin(), out.end());
         return out;
     }
@@ -55,7 +89,7 @@ public:
         def.type = Definition::Type::Module;
         def.defines_behavior = false;
         def.is_empty = false;
-        nesting.emplace_back(def.id);
+        nestingStack.emplace_back(def.id);
         autogenCfg = &autogenConfig;
     }
 
@@ -102,6 +136,8 @@ public:
         ENFORCE(it != refMap.end());
         // ...so we can use that reference as the 'defining reference'
         def.defining_ref = it->second;
+        // ...we also grab the symbol reference of the defining reference
+        def.sym = refs[it->second.id()].sym;
         // update that reference with the relevant metadata so we know 1. it's the defining ref and 2. it encompasses
         // the entire class, not just the constant name
         refs[it->second.id()].is_defining_ref = true;
@@ -118,7 +154,7 @@ public:
 
         // The rest of the ancestors are all references inside the class body (i.e. uses of `include` or `extend`) so
         // add the current class to the scoping
-        nesting.emplace_back(def.id);
+        nestingStack.emplace_back(def.id);
 
         // ...and then run the treemap over all the includes and extends
         for (; ait != original.ancestors.end(); ++ait) {
@@ -162,7 +198,7 @@ public:
         }
 
         // remove the stuff added to handle the class scope here
-        nesting.pop_back();
+        nestingStack.pop_back();
         scopeTypes.pop_back();
     }
 
@@ -175,7 +211,7 @@ public:
     }
 
     // `true` if the constant is fully qualified and can be traced back to the root scope, `false` otherwise
-    bool isCBaseConstant(ast::ConstantLit &cnstRef) {
+    bool isCBaseConstant(const ast::ConstantLit &cnstRef) {
         auto *cnst = &cnstRef;
         while (cnst != nullptr && cnst->original != nullptr) {
             auto &original = ast::cast_tree_nonnull<ast::UnresolvedConstantLit>(cnst->original);
@@ -187,12 +223,50 @@ public:
         return false;
     }
 
+    void setNestingAndScope(Reference &ref, const ast::ConstantLit &cnstRef) {
+        // if it's a constant we can resolve from the root...
+        if (isCBaseConstant(cnstRef)) {
+            // then its scope is easy
+            auto &entry = nestingStack.front();
+            if (!entry.nestingEntry.has_value()) {
+                vector<DefinitionRef> refs;
+                auto nestingId = nestings.size();
+                nestings.emplace_back(move(refs));
+                entry.nestingEntry.emplace(nestingId);
+            }
+            ref.nestingId = *entry.nestingEntry;
+            ref.scope = entry.ref;
+        } else {
+            // otherwise we need to figure out how it's nested in the current scope and mark that
+            auto &entry = nestingStack.back();
+
+            if (!entry.nestingEntry.has_value()) {
+                vector<DefinitionRef> refs;
+                refs.reserve(nestingStack.size());
+                // This is effectively trying to do:
+                //
+                // transform(nestingStack.begin(), nestingStack.end() ...);
+                // reverse(refs.begin(), refs.end());
+                // refs.pop_back();
+                //
+                // in a single call.
+                transform(nestingStack.rbegin(), nestingStack.rend() - 1, back_inserter(refs),
+                          [](auto &entry) { return entry.ref; });
+                auto nestingId = nestings.size();
+                nestings.emplace_back(move(refs));
+                entry.nestingEntry.emplace(nestingId);
+            }
+            ref.nestingId = *entry.nestingEntry;
+            ref.scope = entry.ref;
+        }
+    }
+
     void postTransformConstantLit(core::Context ctx, ast::ExpressionPtr &tree) {
         auto &original = ast::cast_tree_nonnull<ast::ConstantLit>(tree);
 
         if (!ignoring.empty()) {
-            // this is either a constant in a `keepForIde` node (in which case we don't care) or it was an `include` or
-            // an `extend` which already got handled in `preTransformClassDef` (in which case don't handle it again)
+            // this is an `include` or an `extend` which already got handled in `preTransformClassDef`
+            // (in which case don't handle it again)
             return;
         }
         if (original.original == nullptr) {
@@ -204,21 +278,16 @@ public:
             return;
         }
 
+        auto entry = make_pair(tree.loc(), original.symbol);
+        if (seenRefsByLoc.contains(entry)) {
+            return;
+        }
+        seenRefsByLoc.emplace(move(entry));
+
         // Create a new `Reference`
         auto &ref = refs.emplace_back();
         ref.id = refs.size() - 1;
-
-        // if it's a constant we can resolve from the root...
-        if (isCBaseConstant(original)) {
-            // then its scope is easy
-            ref.scope = nesting.front();
-        } else {
-            // otherwise we need to figure out how it's nested in the current scope and mark that
-            ref.nesting = nesting;
-            reverse(ref.nesting.begin(), ref.nesting.end());
-            ref.nesting.pop_back();
-            ref.scope = nesting.back();
-        }
+        setNestingAndScope(ref, original);
         ref.loc = original.loc;
 
         // the reference location is the location of constant, but this might get updated if the reference corresponds
@@ -227,15 +296,15 @@ public:
         ref.definitionLoc = original.loc;
         ref.name = QualifiedName::fromFullName(constantName(ctx, original));
         auto sym = original.symbol;
+        ref.sym = sym;
         if (!sym.isClassOrModule() || sym != core::Symbols::StubModule()) {
             ref.resolved = QualifiedName::fromFullName(symbolName(ctx, sym));
         }
-        ref.is_resolved_statically = true;
         ref.is_defining_ref = false;
         // if we're already in the scope of the class (which will be the newest-created one) then we're looking at the
         // `ancestors` or `singletonAncestors` values. Otherwise, (at least for the parent relationships we care about)
         // we're looking at the first `class Child < Parent` relationship, so we change `is_subclassing` to true.
-        if (!defs.empty() && !nesting.empty() && defs.back().id._id != nesting.back()._id) {
+        if (!defs.empty() && !nestingStack.empty() && defs.back().id._id != nestingStack.back().ref._id) {
             ref.parentKind = ClassKind::Class;
         }
         // now, add it to the refmap
@@ -258,9 +327,22 @@ public:
         }
 
         if (ctx.file.data(ctx).isRBI()) {
-            // We are only concerned with references in RBI files so that dependencies can be
+            std::string_view filePath = ctx.file.data(ctx).path();
+            // Mostly, we are only concerned with references in RBI files so that dependencies can be
             // accurately tracked. Definitions of casgns are not needed.
-            return;
+            //
+            // The exception to this case is RBIs generated by special plugins like the coinbase protoc plugin,
+            // which can define net-new casgns for proto messages that aren't present in the corresponding
+            // generated Ruby code itself.
+            //
+            // Hence, we capture RBI files specified in the behaviorAllowedInRBIsPaths list (also used in the classDef
+            // logic above) as allowed sources of casgn definitions.
+            bool ignoreRBI = !absl::c_any_of(autogenCfg->behaviorAllowedInRBIsPaths, [&](auto &allowedPath) {
+                return absl::StartsWith(filePath, allowedPath);
+            });
+            if (ignoreRBI) {
+                return;
+            }
         }
 
         // Create the Definition for it
@@ -290,6 +372,8 @@ public:
         auto &ref = refs[refMap[original.lhs.get()].id()];
         // ...and mark that this is the defining ref for that one
         def.defining_ref = ref.id;
+        // ...we also store the new symbol reference
+        def.sym = ref.sym;
         ref.is_defining_ref = true;
         ref.definitionLoc = original.loc;
 
@@ -302,12 +386,11 @@ public:
         auto *original = ast::cast_tree<ast::Send>(tree);
 
         bool inBlock = !scopeTypes.empty() && scopeTypes.back() == ScopeType::Block;
-        // Ignore keepForIde nodes. Also ignore include/extend sends iff they are directly at the
-        // class/module level. These cases are handled in `preTransformClassDef`. Do not ignore in
-        // block scope so that we a ref to the included module is still rendered.
-        if (original->fun == core::Names::keepForIde() ||
-            (!inBlock && original->recv.isSelfReference() &&
-             (original->fun == core::Names::include() || original->fun == core::Names::extend()))) {
+        // Ignore include/extend sends iff they are directly at the class/module level.
+        // These cases are handled in `preTransformClassDef`.
+        // Do not ignore in block scope so that we a ref to the included module is still rendered.
+        if (!inBlock && original->recv.isSelfReference() &&
+            (original->fun == core::Names::include() || original->fun == core::Names::extend())) {
             ignoring.emplace_back(original);
         }
         // This means it's a `require`; mark it as such
@@ -321,7 +404,7 @@ public:
 
     void postTransformSend(core::Context ctx, ast::ExpressionPtr &tree) {
         auto *original = ast::cast_tree<ast::Send>(tree);
-        // if this send was something we were ignoring (i.e. a `keepForIde` or an `include` or `require`) then pop this
+        // if this send was something we were ignoring (i.e. an `include` or `require`) then pop this
         if (!ignoring.empty() && ignoring.back() == original) {
             ignoring.pop_back();
         }
@@ -331,6 +414,7 @@ public:
         ENFORCE(scopeTypes.empty());
 
         ParsedFile out;
+        out.nestings = move(nestings);
         out.refs = move(refs);
         out.defs = move(defs);
         out.requireStatements = move(requireStatements);

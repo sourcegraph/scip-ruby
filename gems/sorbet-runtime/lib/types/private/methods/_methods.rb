@@ -3,12 +3,17 @@
 
 module T::Private::Methods
   @installed_hooks = {}
-  @signatures_by_method = {}
-  @sig_wrappers = {}
+  if defined?(Concurrent::Hash)
+    @signatures_by_method = Concurrent::Hash.new
+    @sig_wrappers = Concurrent::Hash.new
+  else
+    @signatures_by_method = {}
+    @sig_wrappers = {}
+  end
   @sigs_that_raised = {}
   # stores method names that were declared final without regard for where.
   # enables early rejection of names that we know can't induce final method violations.
-  @was_ever_final_names = {}
+  @was_ever_final_names = {}.compare_by_identity
   # maps from a module's object_id to the set of final methods declared in that module.
   # we also overload entries slightly: if the value is nil, that means that the
   # module has final methods somewhere along its ancestor chain, but does not itself
@@ -20,7 +25,7 @@ module T::Private::Methods
   # twice is permitted).  we could do this with two tables, but it seems slightly
   # cleaner with a single table.
   # Effectively T::Hash[Module, T.nilable(Set))]
-  @modules_with_final = Hash.new {|hash, key| hash[key] = nil}
+  @modules_with_final = Hash.new {|hash, key| hash[key] = nil}.compare_by_identity
   # this stores the old [included, extended] hooks for Module and inherited hook for Class that we override when
   # enabling final checks for when those hooks are called. the 'hooks' here don't have anything to do with the 'hooks'
   # in installed_hooks.
@@ -132,7 +137,7 @@ module T::Private::Methods
     source_ancestors = nil
     # use reverse_each to check farther-up ancestors first, for better error messages.
     target_ancestors.reverse_each do |ancestor|
-      final_methods = @modules_with_final.fetch(ancestor.object_id, nil)
+      final_methods = @modules_with_final.fetch(ancestor, nil)
       # In this case, either ancestor didn't have any final methods anywhere in its
       # ancestor chain, or ancestor did have final methods somewhere in its ancestor
       # chain, but no final methods defined in ancestor itself.  Either way, there
@@ -150,20 +155,20 @@ module T::Private::Methods
             # filter out things without actual final methods just to make sure that
             # the below checks (which should be uncommon) go as quickly as possible.
             source_ancestors.select! do |a|
-              @modules_with_final.fetch(a.object_id, nil)
+              @modules_with_final.fetch(a, nil)
             end
           end
           # final-ness means that there should be no more than one index for which
           # the below block returns true.
           defining_ancestor_idx = source_ancestors.index do |a|
-            @modules_with_final.fetch(a.object_id).include?(method_name)
+            @modules_with_final.fetch(a).include?(method_name)
           end
           next if defining_ancestor_idx && source_ancestors[defining_ancestor_idx] == ancestor
         end
 
         definition_file, definition_line = T::Private::Methods.signature_for_method(ancestor.instance_method(method_name)).method.source_location
         is_redefined = target == ancestor
-        caller_loc = caller_locations&.find {|l| !l.to_s.start_with?(SORBET_RUNTIME_LIB_PATH)}
+        caller_loc = T::Private::CallerUtils.find_caller {|loc| !loc.path.to_s.start_with?(SORBET_RUNTIME_LIB_PATH)}
         extra_info = "\n"
         if caller_loc
           extra_info = (is_redefined ? "Redefined" : "Overridden") + " here: #{caller_loc.path}:#{caller_loc.lineno}\n"
@@ -191,13 +196,11 @@ module T::Private::Methods
     end
   end
 
-  def self.add_module_with_final_method(mod, method_name, is_singleton_method)
-    m = is_singleton_method ? mod.singleton_class : mod
-    mid = m.object_id
-    methods = @modules_with_final[mid]
+  def self.add_module_with_final_method(mod, method_name)
+    methods = @modules_with_final[mod]
     if methods.nil?
       methods = {}
-      @modules_with_final[mid] = methods
+      @modules_with_final[mod] = methods
     end
     methods[method_name] = true
     nil
@@ -205,24 +208,23 @@ module T::Private::Methods
 
   def self.note_module_deals_with_final(mod)
     # Side-effectfully initialize the value if it's not already there
-    @modules_with_final[mod.object_id]
-    @modules_with_final[mod.singleton_class.object_id]
+    @modules_with_final[mod]
+    @modules_with_final[mod.singleton_class]
   end
 
   # Only public because it needs to get called below inside the replace_method blocks below.
-  def self._on_method_added(hook_mod, method_name, is_singleton_method: false)
+  def self._on_method_added(hook_mod, mod, method_name)
     if T::Private::DeclState.current.skip_on_method_added
       return
     end
 
     current_declaration = T::Private::DeclState.current.active_declaration
-    mod = is_singleton_method ? hook_mod.singleton_class : hook_mod
 
     if T::Private::Final.final_module?(mod) && (current_declaration.nil? || !current_declaration.final)
       raise "#{mod} was declared as final but its method `#{method_name}` was not declared as final"
     end
     # Don't compute mod.ancestors if we don't need to bother checking final-ness.
-    if @was_ever_final_names.include?(method_name) && @modules_with_final.include?(mod.object_id)
+    if @was_ever_final_names.include?(method_name) && @modules_with_final.include?(mod)
       _check_final_ancestors(mod, mod.ancestors, [method_name], nil)
       # We need to fetch the active declaration again, as _check_final_ancestors
       # may have reset it (see the comment in that method for details).
@@ -276,7 +278,7 @@ module T::Private::Methods
         elsif T::Configuration::AT_LEAST_RUBY_2_7
           original_method.bind_call(self, *args, &blk)
         else
-          original_method.bind(self).call(*args, &blk)
+          original_method.bind(self).call(*args, &blk) # rubocop:disable Performance/BindCall
         end
       end
     end
@@ -287,7 +289,7 @@ module T::Private::Methods
       # use hook_mod, not mod, because for example, we want class C to be marked as having final if we def C.foo as
       # final. change this to mod to see some final_method tests fail.
       note_module_deals_with_final(hook_mod)
-      add_module_with_final_method(hook_mod, method_name, is_singleton_method)
+      add_module_with_final_method(mod, method_name)
     end
   end
 
@@ -431,7 +433,7 @@ module T::Private::Methods
     run_sig_block_for_key(method_to_key(method))
   end
 
-  private_class_method def self.run_sig_block_for_key(key)
+  private_class_method def self.run_sig_block_for_key(key, force_type_init: false)
     blk = @sig_wrappers[key]
     if !blk
       sig = @signatures_by_method[key]
@@ -454,14 +456,17 @@ module T::Private::Methods
     end
 
     @sig_wrappers.delete(key)
+
+    sig.force_type_init if force_type_init
+
     sig
   end
 
-  def self.run_all_sig_blocks
+  def self.run_all_sig_blocks(force_type_init: true)
     loop do
       break if @sig_wrappers.empty?
       key, = @sig_wrappers.first
-      run_sig_block_for_key(key)
+      run_sig_block_for_key(key, force_type_init: force_type_init)
     end
   end
 
@@ -474,8 +479,8 @@ module T::Private::Methods
   def self._hook_impl(target, singleton_class, source)
     # we do not need to call add_was_ever_final here, because we have already marked
     # any such methods when source was originally defined.
-    if !@modules_with_final.include?(target.object_id)
-      if !@modules_with_final.include?(source.object_id)
+    if !@modules_with_final.include?(target)
+      if !@modules_with_final.include?(source)
         return
       end
       note_module_deals_with_final(target)
@@ -514,7 +519,7 @@ module T::Private::Methods
         if T::Configuration::AT_LEAST_RUBY_2_7
           old_included.bind_call(self, arg)
         else
-          old_included.bind(self).call(arg)
+          old_included.bind(self).call(arg) # rubocop:disable Performance/BindCall
         end
         ::T::Private::Methods._hook_impl(arg, false, self)
       end
@@ -522,7 +527,7 @@ module T::Private::Methods
         if T::Configuration::AT_LEAST_RUBY_2_7
           old_extended.bind_call(self, arg)
         else
-          old_extended.bind(self).call(arg)
+          old_extended.bind(self).call(arg) # rubocop:disable Performance/BindCall
         end
         ::T::Private::Methods._hook_impl(arg, true, self)
       end
@@ -530,7 +535,7 @@ module T::Private::Methods
         if T::Configuration::AT_LEAST_RUBY_2_7
           old_inherited.bind_call(self, arg)
         else
-          old_inherited.bind(self).call(arg)
+          old_inherited.bind(self).call(arg) # rubocop:disable Performance/BindCall
         end
         ::T::Private::Methods._hook_impl(arg, false, self)
       end
@@ -541,14 +546,14 @@ module T::Private::Methods
   module MethodHooks
     def method_added(name)
       super(name)
-      ::T::Private::Methods._on_method_added(self, name, is_singleton_method: false)
+      ::T::Private::Methods._on_method_added(self, self, name)
     end
   end
 
   module SingletonMethodHooks
     def singleton_method_added(name)
       super(name)
-      ::T::Private::Methods._on_method_added(self, name, is_singleton_method: true)
+      ::T::Private::Methods._on_method_added(self, singleton_class, name)
     end
   end
 

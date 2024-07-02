@@ -37,6 +37,11 @@ const users = [
     infoLink: 'https://flexport.com/',
   },
   {
+    caption: 'GitHub',
+    image: 'img/github-logo.svg',
+    infoLink: 'https://github.com/',
+  },
+  {
     caption: 'Grailed',
     image: 'img/grailed-logo.png',
     infoLink: 'https://www.grailed.com/',
@@ -70,11 +75,6 @@ const users = [
     caption: 'Marketplacer',
     image: 'img/marketplacer-logo.png',
     infoLink: 'https://marketplacer.com/',
-  },
-  {
-    caption: 'PhishSafety',
-    image: 'img/phishsafety-logo.png',
-    infoLink: 'https://phishsafety.com',
   },
   {
     caption: 'TaskRabbit',

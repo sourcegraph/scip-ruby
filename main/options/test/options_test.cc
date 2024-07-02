@@ -28,7 +28,6 @@ TEST_CASE("DefaultConstructorMatchesReadOptions") {
     CHECK_EQ(empty.unsilenceErrors, opts.unsilenceErrors);
     CHECK_EQ(empty.logRecordedFilepaths, opts.logRecordedFilepaths);
     CHECK_EQ(empty.silenceDevMessage, opts.silenceDevMessage);
-    CHECK_EQ(empty.suggestSig, opts.suggestSig);
     CHECK_EQ(empty.suppressNonCriticalErrors, opts.suppressNonCriticalErrors);
     CHECK_EQ(empty.runLSP, opts.runLSP);
     CHECK_EQ(empty.disableWatchman, opts.disableWatchman);
@@ -70,7 +69,6 @@ TEST_CASE("DefaultConstructorMatchesReadOptions") {
     CHECK_EQ(empty.absoluteIgnorePatterns.size(), opts.absoluteIgnorePatterns.size());
     CHECK_EQ(empty.relativeIgnorePatterns.size(), opts.relativeIgnorePatterns.size());
     CHECK_EQ(empty.inputFileNames.size(), opts.inputFileNames.size());
-    CHECK_EQ(empty.lspDocumentSymbolEnabled, opts.lspDocumentSymbolEnabled);
     CHECK_EQ(empty.lspDocumentHighlightEnabled, opts.lspDocumentHighlightEnabled);
     CHECK_EQ(empty.lspSignatureHelpEnabled, opts.lspSignatureHelpEnabled);
     CHECK_EQ(empty.lspDocumentFormatRubyfmtEnabled, opts.lspDocumentFormatRubyfmtEnabled);

@@ -110,6 +110,7 @@ struct PropInfo {
     ast::ExpressionPtr default_;
     core::NameRef computedByMethodName;
     core::LocOffsets computedByMethodNameLoc;
+    ast::ExpressionPtr foreignKwLit;
     ast::ExpressionPtr foreign;
     ast::ExpressionPtr enum_;
     ast::ExpressionPtr ifunset;
@@ -312,6 +313,7 @@ optional<PropInfo> parseProp(core::MutableContext ctx, const ast::Send *send) {
         auto [fk, foreignTree] = ASTUtil::extractHashValue(ctx, *rules, core::Names::foreign());
         if (foreignTree != nullptr) {
             ret.foreign = move(foreignTree);
+            ret.foreignKwLit = move(fk);
             if (auto body = ASTUtil::thunkBody(ctx, ret.foreign)) {
                 ret.foreign = std::move(body);
             } else {
@@ -333,6 +335,18 @@ optional<PropInfo> parseProp(core::MutableContext ctx, const ast::Send *send) {
         auto [ifunsetKey, ifunset] = ASTUtil::extractHashValue(ctx, *rules, core::Names::ifunset());
         if (ifunset != nullptr) {
             ret.ifunset = std::move(ifunset);
+        }
+
+        if (send->fun == core::Names::merchantTokenProp()) {
+            auto [_nameKey, nameValue] = ASTUtil::extractHashValue(ctx, *rules, core::Names::name());
+            if (nameValue != nullptr) {
+                if (auto lit = ast::cast_tree<ast::Literal>(nameValue)) {
+                    if (lit->isSymbol()) {
+                        ret.name = lit->asSymbol();
+                        ret.nameLoc = nameValue.loc();
+                    }
+                }
+            }
         }
     }
 
@@ -493,7 +507,15 @@ vector<ast::ExpressionPtr> processProp(core::MutableContext ctx, PropInfo &ret, 
         auto arg = ast::MK::KeywordArgWithDefault(nameLoc, core::Names::allowDirectMutation(), ast::MK::Nil(loc));
         ast::MethodDef::Flags fkFlags;
         fkFlags.discardDef = true;
-        auto fkMethodDef = ast::MK::SyntheticMethod1(loc, loc, nameLoc, fkMethod, std::move(arg),
+
+        core::LocOffsets methodLoc;
+        if (ret.foreignKwLit != nullptr) {
+            methodLoc = ret.foreignKwLit.loc();
+        } else {
+            methodLoc = loc;
+        }
+
+        auto fkMethodDef = ast::MK::SyntheticMethod1(loc, methodLoc, nameLoc, fkMethod, std::move(arg),
                                                      ast::MK::RaiseTypedUnimplemented(loc), fkFlags);
         nodes.emplace_back(std::move(fkMethodDef));
 
@@ -588,7 +610,7 @@ vector<ast::ExpressionPtr> mkTypedInitialize(core::MutableContext ctx, core::Loc
     // to get the correct handling.
     ast::ExpressionPtr maybeSuper;
     if (absl::c_any_of(props, [](const auto &prop) { return prop.enum_ != nullptr; })) {
-        maybeSuper = ast::MK::ZSuper(klassDeclLoc);
+        maybeSuper = ast::MK::ZSuper(klassDeclLoc, core::Names::untypedSuper());
     } else {
         maybeSuper = ast::MK::Nil(klassDeclLoc);
     }

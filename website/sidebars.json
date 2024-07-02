@@ -20,7 +20,8 @@
       "troubleshooting",
       "why-type-annotations",
       "faq",
-      "error-reference"
+      "error-reference",
+      "unsupported"
     ],
     "Type System": [
       "sigs",
@@ -52,12 +53,21 @@
       "strong"
     ],
     "Editor Features": [
+      "lsp",
+      "server-status",
+      "lsp-typed-level",
+      "go-to-def",
+      "autocompletion",
+      "code-actions",
+      "outline",
       "sig-suggestion",
-      "highlight-untyped"
+      "highlight-untyped",
+      "sorbet-uris"
     ],
     "Experimental Features": [
       "tuples",
       "shapes",
+      "overloads",
       "requires-ancestor"
     ]
   },

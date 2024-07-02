@@ -8,6 +8,7 @@
 #include "common/strings/formatting.h"
 #include "common/typecase.h"
 #include "core/lsp/QueryResponse.h"
+#include "core/source_generator/source_generator.h"
 #include "main/lsp/FieldFinder.h"
 #include "main/lsp/LSPLoop.h"
 #include "main/lsp/LSPQuery.h"
@@ -297,11 +298,12 @@ vector<core::NameRef> allSimilarLocalNames(const core::GlobalState &gs, const ve
     return result;
 }
 
-string methodSnippet(const core::GlobalState &gs, core::DispatchResult &dispatchResult, core::MethodRef method,
-                     const core::TypePtr &receiverType, const core::TypeConstraint *constraint, uint16_t totalArgs) {
+string methodSnippet(const core::GlobalState &gs, core::DispatchResult &dispatchResult, core::MethodRef maybeAlias,
+                     const core::TypePtr &receiverType, const core::TypeConstraint *constraint, uint16_t totalArgs,
+                     core::Loc queryLoc) {
     fmt::memory_buffer result;
-    auto shortName = method.data(gs)->name.shortName(gs);
-    auto isSetter = method.data(gs)->name.isSetter(gs);
+    auto shortName = maybeAlias.data(gs)->name.shortName(gs);
+    auto isSetter = maybeAlias.data(gs)->name.isSetter(gs);
     if (isSetter) {
         fmt::format_to(std::back_inserter(result), "{}", string_view(shortName.data(), shortName.size() - 1));
     } else {
@@ -314,8 +316,18 @@ string methodSnippet(const core::GlobalState &gs, core::DispatchResult &dispatch
      * since the rest is likely useless
      */
     if (totalArgs > 0 || dispatchResult.main.blockReturnType != nullptr) {
-        fmt::format_to(std::back_inserter(result), "${{0}}");
-        return to_string(result);
+        auto maybeNewline = queryLoc.adjustLen(gs, 0, 1);
+        // ... but carve out an exception if the query location is at the end of the line, because
+        // then likely it only looks like there are "arguments" to this method call because of how
+        // Ruby allows the `x.` being split from the method name on the next line
+        //
+        // (This isn't a great solution, but I think that we're likely going to revisit generating
+        // snippets here in the future with a bit of an overhaul of how completion works, so I'm
+        // fine with it in the mean time.)
+        if (!maybeNewline.exists() || maybeNewline.source(gs) != "\n") {
+            fmt::format_to(std::back_inserter(result), "${{0}}");
+            return to_string(result);
+        }
     }
 
     if (isSetter) {
@@ -323,6 +335,7 @@ string methodSnippet(const core::GlobalState &gs, core::DispatchResult &dispatch
         return to_string(result);
     }
 
+    auto method = maybeAlias.data(gs)->dealiasMethod(gs);
     vector<string> typeAndArgNames;
     for (auto &argSym : method.data(gs)->arguments) {
         fmt::memory_buffer argBuf;
@@ -340,7 +353,8 @@ string methodSnippet(const core::GlobalState &gs, core::DispatchResult &dispatch
             fmt::format_to(std::back_inserter(argBuf), "{}: ", argSym.name.shortName(gs));
         }
         if (argSym.type) {
-            auto resultType = getResultType(gs, argSym.type, method, receiverType, constraint).show(gs);
+            auto resultType =
+                core::source_generator::getResultType(gs, argSym.type, method, receiverType, constraint).show(gs);
             fmt::format_to(std::back_inserter(argBuf), "${{{}:{}}}", nextTabstop++, resultType);
         } else {
             fmt::format_to(std::back_inserter(argBuf), "${{{}}}", nextTabstop++);
@@ -365,7 +379,8 @@ string methodSnippet(const core::GlobalState &gs, core::DispatchResult &dispatch
                 auto targs_it = appliedType->targs.begin();
                 targs_it++;
                 blkArgs = fmt::format(" |{}|", fmt::map_join(targs_it, appliedType->targs.end(), ", ", [&](auto targ) {
-                                          auto resultType = getResultType(gs, targ, method, receiverType, constraint);
+                                          auto resultType = core::source_generator::getResultType(
+                                              gs, targ, method, receiverType, constraint);
                                           return fmt::format("${{{}:{}}}", nextTabstop++, resultType.show(gs));
                                       }));
             }
@@ -595,7 +610,7 @@ vector<core::NameRef> allSimilarFieldsForClass(LSPTypecheckerDelegate &typecheck
         FieldFinder fieldFinder(klass, kind);
         for (auto &t : resolved) {
             auto ctx = core::Context(gs, core::Symbols::root(), t.file);
-            ast::TreeWalk::apply(ctx, fieldFinder, t.tree);
+            ast::ConstTreeWalk::apply(ctx, fieldFinder, t.tree);
         }
         auto fields = fieldFinder.result();
 
@@ -634,7 +649,7 @@ vector<core::NameRef> localNamesForMethod(LSPTypecheckerDelegate &typechecker, c
     LocalVarFinder localVarFinder(method, queryLoc);
     for (auto &t : resolved) {
         auto ctx = core::Context(gs, core::Symbols::root(), t.file);
-        ast::TreeWalk::apply(ctx, localVarFinder, t.tree);
+        ast::ConstTreeWalk::apply(ctx, localVarFinder, t.tree);
     }
 
     auto result = localVarFinder.result();
@@ -661,7 +676,7 @@ core::MethodRef firstMethodAfterQuery(LSPTypecheckerDelegate &typechecker, const
     NextMethodFinder nextMethodFinder(queryLoc);
     for (auto &t : resolved) {
         auto ctx = core::Context(gs, core::Symbols::root(), t.file);
-        ast::TreeWalk::apply(ctx, nextMethodFinder, t.tree);
+        ast::ConstTreeWalk::apply(ctx, nextMethodFinder, t.tree);
     }
 
     return nextMethodFinder.result();
@@ -883,7 +898,7 @@ vector<unique_ptr<CompletionItem>> allSimilarConstantItems(const core::GlobalSta
     vector<unique_ptr<CompletionItem>> items;
 
     if (scopes.size() == 1 && !scopes[0].exists()) {
-        // This happens when there was a contant literal like C::D but `C` itself was stubbed,
+        // This happens when there was a constant literal like C::D but `C` itself was stubbed,
         // so we have no idea what `D` is or what its resolution scope is.
         return items;
     }
@@ -1040,7 +1055,7 @@ CompletionTask::getCompletionItemForMethod(LSPTypecheckerDelegate &typechecker, 
     string replacementText;
     if (supportsSnippets) {
         item->insertTextFormat = InsertTextFormat::Snippet;
-        replacementText = methodSnippet(gs, dispatchResult, what, receiverType, constraint, totalArgs);
+        replacementText = methodSnippet(gs, dispatchResult, maybeAlias, receiverType, constraint, totalArgs, queryLoc);
     } else {
         item->insertTextFormat = InsertTextFormat::PlainText;
         replacementText = label;
@@ -1058,7 +1073,8 @@ CompletionTask::getCompletionItemForMethod(LSPTypecheckerDelegate &typechecker, 
         documentation = findDocumentation(whatFile.data(gs).source(), what.data(gs)->loc().beginPos());
     }
 
-    auto prettyType = prettyTypeForMethod(gs, maybeAlias, receiverType, nullptr, constraint);
+    auto prettyType = core::source_generator::prettyTypeForMethod(gs, maybeAlias, receiverType, nullptr, constraint,
+                                                                  core::ShowOptions().withUseValidSyntax());
     item->documentation = formatRubyMarkup(markupKind, prettyType, documentation);
 
     if (documentation != nullopt && documentation->find("@deprecated") != documentation->npos) {
@@ -1235,7 +1251,7 @@ unique_ptr<ResponseMessage> CompletionTask::runRequest(LSPTypecheckerDelegate &t
     }
     auto queryLoc = maybeQueryLoc.value();
 
-    auto result = LSPQuery::byLoc(config, typechecker, uri, pos, LSPMethod::TextDocumentCompletion);
+    auto result = LSPQuery::byLoc(config, typechecker, uri, pos, LSPMethod::TextDocumentCompletion, false);
 
     if (result.error) {
         // An error happened while setting up the query.
@@ -1256,12 +1272,16 @@ unique_ptr<ResponseMessage> CompletionTask::runRequest(LSPTypecheckerDelegate &t
             }
         }
 
-        ENFORCE(fref.exists());
-        auto level = fref.data(gs).strictLevel;
-        if (!fref.data(gs).hasParseErrors() && level < core::StrictLevel::True) {
-            items.emplace_back(getCompletionItemForUntyped(gs, queryLoc, 0, "(file is not `# typed: true` or higher)"));
-            response->result = make_unique<CompletionList>(false, move(items));
-            return response;
+        auto enableTypedFalseCompletionNudges = config.getClientConfig().enableTypedFalseCompletionNudges;
+        if (enableTypedFalseCompletionNudges) {
+            ENFORCE(fref.exists());
+            auto level = fref.data(gs).strictLevel;
+            if (!fref.data(gs).hasParseErrors() && level < core::StrictLevel::True) {
+                items.emplace_back(
+                    getCompletionItemForUntyped(gs, queryLoc, 0, "(file is not `# typed: true` or higher)"));
+                response->result = make_unique<CompletionList>(false, move(items));
+                return response;
+            }
         }
 
         response->result = std::move(emptyResult);

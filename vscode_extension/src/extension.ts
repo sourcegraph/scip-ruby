@@ -1,12 +1,15 @@
 import { commands, ExtensionContext, workspace } from "vscode";
-import { TextDocumentPositionParams } from "vscode-languageclient";
 import * as cmdIds from "./commandIds";
 import { copySymbolToClipboard } from "./commands/copySymbolToClipboard";
-import { renameSymbol } from "./commands/renameSymbol";
+import { savePackageFiles } from "./commands/savePackageFiles";
 import { setLogLevel } from "./commands/setLogLevel";
 import { showSorbetActions } from "./commands/showSorbetActions";
 import { showSorbetConfigurationPicker } from "./commands/showSorbetConfigurationPicker";
-import { toggleUntypedCodeHighlighting } from "./commands/toggleUntypedCodeHighlighting";
+import {
+  toggleUntypedCodeHighlighting,
+  configureUntypedCodeHighlighting,
+} from "./commands/toggleUntypedCodeHighlighting";
+import { toggleTypedFalseCompletionNudges } from "./commands/toggleTypedFalseCompletionNudges";
 import { getLogLevelFromEnvironment, LogLevel } from "./log";
 import { SorbetContentProvider, SORBET_SCHEME } from "./sorbetContentProvider";
 import { SorbetExtensionContext } from "./sorbetExtensionContext";
@@ -54,11 +57,6 @@ export function activate(context: ExtensionContext) {
       copySymbolToClipboard(sorbetExtensionContext),
     ),
     commands.registerCommand(
-      cmdIds.RENAME_SYMBOL_COMMAND_ID,
-      (params: TextDocumentPositionParams) =>
-        renameSymbol(sorbetExtensionContext, params),
-    ),
-    commands.registerCommand(
       cmdIds.SET_LOGLEVEL_COMMAND_ID,
       (level?: LogLevel) => setLogLevel(sorbetExtensionContext, level),
     ),
@@ -82,8 +80,19 @@ export function activate(context: ExtensionContext) {
       (reason: RestartReason = RestartReason.COMMAND) =>
         sorbetExtensionContext.statusProvider.restartSorbet(reason),
     ),
+    commands.registerCommand(cmdIds.SORBET_SAVE_PACKAGE_FILES, () =>
+      savePackageFiles(sorbetExtensionContext),
+    ),
     commands.registerCommand(cmdIds.TOGGLE_HIGHLIGHT_UNTYPED_COMMAND_ID, () =>
       toggleUntypedCodeHighlighting(sorbetExtensionContext),
+    ),
+    commands.registerCommand(
+      cmdIds.CONFIGURE_HIGHLIGHT_UNTYPED_COMMAND_ID,
+      () => configureUntypedCodeHighlighting(sorbetExtensionContext),
+    ),
+    commands.registerCommand(
+      cmdIds.TOGGLE_TYPED_FALSE_COMPLETION_NUDGES_COMMAND_ID,
+      () => toggleTypedFalseCompletionNudges(sorbetExtensionContext),
     ),
   );
 

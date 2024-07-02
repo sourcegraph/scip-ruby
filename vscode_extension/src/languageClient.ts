@@ -1,11 +1,5 @@
 import { ChildProcess, spawn } from "child_process";
-import {
-  CancellationToken,
-  Disposable,
-  Event,
-  EventEmitter,
-  workspace,
-} from "vscode";
+import { Disposable, Event, EventEmitter, workspace } from "vscode";
 import {
   CloseAction,
   ErrorAction,
@@ -21,6 +15,7 @@ import { stopProcess } from "./connections";
 import { Tags } from "./metricsClient";
 import { SorbetExtensionContext } from "./sorbetExtensionContext";
 import { ServerStatus, RestartReason } from "./types";
+import { backwardsCompatibleTrackUntyped } from "./config";
 
 const VALID_STATE_TRANSITIONS: ReadonlyMap<
   ServerStatus,
@@ -52,6 +47,25 @@ function createClient(
   serverOptions: ServerOptions,
   errorHandler: ErrorHandler,
 ) {
+  const initializationOptions = {
+    // Opt in to sorbet/showOperation notifications.
+    supportsOperationNotifications: true,
+    // Let Sorbet know that we can handle sorbet:// URIs for generated files.
+    supportsSorbetURIs: true,
+    highlightUntyped: backwardsCompatibleTrackUntyped(
+      context.log,
+      context.configuration.highlightUntyped,
+    ),
+    enableTypedFalseCompletionNudges:
+      context.configuration.typedFalseCompletionNudges,
+  };
+
+  context.log.debug(
+    `Initializing with initializationOptions=${JSON.stringify(
+      initializationOptions,
+    )}`,
+  );
+
   const client = new LanguageClient("ruby", "Sorbet", serverOptions, {
     documentSelector: [
       { language: "ruby", scheme: "file" },
@@ -59,13 +73,7 @@ function createClient(
       { language: "ruby", scheme: "sorbet" },
     ],
     outputChannel: context.logOutputChannel,
-    initializationOptions: {
-      // Opt in to sorbet/showOperation notifications.
-      supportsOperationNotifications: true,
-      // Let Sorbet know that we can handle sorbet:// URIs for generated files.
-      supportsSorbetURIs: true,
-      highlightUntyped: context.configuration.highlightUntyped,
-    },
+    initializationOptions,
     errorHandler,
     revealOutputChannelOn: context.configuration.revealOutputOnError
       ? RevealOutputChannelOn.Error
@@ -239,13 +247,15 @@ export class SorbetLanguageClient implements Disposable, ErrorHandler {
   public sendRequest<TResponse>(
     method: string,
     param: any,
-    token?: CancellationToken,
   ): Promise<TResponse> {
-    // Do not pass `token` if undefined, otherwise `param` ends up being passed
-    // as `[...param, undefined]` instead of `param`.
-    return token
-      ? this.languageClient.sendRequest<TResponse>(method, param, token)
-      : this.languageClient.sendRequest<TResponse>(method, param);
+    return this.languageClient.sendRequest<TResponse>(method, param);
+  }
+
+  /**
+   * Send a notification to language server. See {@link LanguageClient.sendNotification}.
+   */
+  public sendNotification(method: string, param: any): void {
+    this.languageClient.sendNotification(method, param);
   }
 
   /**
@@ -277,8 +287,8 @@ export class SorbetLanguageClient implements Disposable, ErrorHandler {
   private startSorbetProcess(): Promise<ChildProcess> {
     this.status = ServerStatus.INITIALIZING;
     this.context.log.info("Running Sorbet LSP.");
-    const [command, ...args] =
-      this.context.configuration.activeLspConfig?.command ?? [];
+    const activeConfig = this.context.configuration.activeLspConfig;
+    const [command, ...args] = activeConfig?.command ?? [];
     if (!command) {
       const msg = `Missing command-line data to start Sorbet. ConfigId:${this.context.configuration.activeLspConfig?.id}`;
       this.context.log.error(msg);
@@ -288,6 +298,7 @@ export class SorbetLanguageClient implements Disposable, ErrorHandler {
     this.context.log.debug(` > ${command} ${args.join(" ")}`);
     this.sorbetProcess = spawn(command, args, {
       cwd: workspace.rootPath,
+      env: { ...process.env, ...activeConfig?.env },
     });
     // N.B.: 'exit' is sometimes not invoked if the process exits with an error/fails to start, as per the Node.js docs.
     // So, we need to handle both events. ¯\_(ツ)_/¯

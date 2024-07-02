@@ -3,6 +3,7 @@
 #include "absl/strings/str_join.h"
 #include "common/sort/sort.h"
 #include "core/lsp/QueryResponse.h"
+#include "core/source_generator/source_generator.h"
 #include "main/lsp/LSPLoop.h"
 #include "main/lsp/LSPQuery.h"
 #include "main/lsp/json_types.h"
@@ -12,8 +13,8 @@ using namespace std;
 namespace sorbet::realmain::lsp {
 
 string methodInfoString(const core::GlobalState &gs, const core::TypePtr &retType,
-                        const core::DispatchResult &dispatchResult,
-                        const unique_ptr<core::TypeConstraint> &constraint) {
+                        const core::DispatchResult &dispatchResult, const unique_ptr<core::TypeConstraint> &constraint,
+                        const core::ShowOptions options) {
     string contents;
     auto start = &dispatchResult;
     ;
@@ -23,8 +24,9 @@ string methodInfoString(const core::GlobalState &gs, const core::TypePtr &retTyp
             if (!contents.empty()) {
                 contents += "\n";
             }
-            contents = absl::StrCat(
-                contents, prettyTypeForMethod(gs, component.method, component.receiver, retType, constraint.get()));
+            contents = absl::StrCat(contents, core::source_generator::prettyTypeForMethod(gs, component.method,
+                                                                                          component.receiver, retType,
+                                                                                          constraint.get(), options));
         }
         start = start->secondary.get();
     }
@@ -40,7 +42,7 @@ unique_ptr<ResponseMessage> HoverTask::runRequest(LSPTypecheckerDelegate &typech
 
     const core::GlobalState &gs = typechecker.state();
     auto result = LSPQuery::byLoc(config, typechecker, params->textDocument->uri, *params->position,
-                                  LSPMethod::TextDocumentHover);
+                                  LSPMethod::TextDocumentHover, false);
     if (result.error) {
         // An error happened while setting up the query.
         response->error = move(result.error);
@@ -54,9 +56,11 @@ unique_ptr<ResponseMessage> HoverTask::runRequest(LSPTypecheckerDelegate &typech
         ENFORCE(fref.exists());
         auto level = fref.data(gs).strictLevel;
         if (level < core::StrictLevel::True) {
-            auto text = fmt::format("This file is `# typed: {}`.\n"
-                                    "Hover, Go To Definition, and other features are disabled in this file.",
-                                    level == core::StrictLevel::Ignore ? "ignore" : "false");
+            auto text = level == core::StrictLevel::Ignore
+                            ? "This file is `# typed: ignore`.\n"
+                              "No Sorbet IDE features will work in this file."
+                            : "This file is `# typed: false`.\n"
+                              "Most Hover results will not appear until the file is `# typed: true` or higher.";
             response->result = make_unique<Hover>(make_unique<MarkupContent>(clientHoverMarkupKind, text));
         } else {
             // Note: Need to specifically specify the variant type here so the null gets placed into the proper slot.
@@ -66,6 +70,7 @@ unique_ptr<ResponseMessage> HoverTask::runRequest(LSPTypecheckerDelegate &typech
     }
 
     auto resp = move(queryResponses[0]);
+    auto options = core::ShowOptions();
     vector<core::Loc> documentationLocations;
     string typeString;
 
@@ -78,9 +83,17 @@ unique_ptr<ResponseMessage> HoverTask::runRequest(LSPTypecheckerDelegate &typech
             }
         }
     } else if (auto c = resp->isConstant()) {
-        for (auto loc : c->symbol.locs(gs)) {
+        for (auto loc : c->symbolBeforeDealias.locs(gs)) {
             if (loc.exists()) {
                 documentationLocations.emplace_back(loc);
+            }
+        }
+        auto dealiased = c->symbolBeforeDealias.dealias(gs);
+        if (dealiased != c->symbolBeforeDealias) {
+            for (auto loc : dealiased.locs(gs)) {
+                if (loc.exists()) {
+                    documentationLocations.emplace_back(loc);
+                }
             }
         }
     } else if (auto d = resp->isMethodDef()) {
@@ -110,12 +123,13 @@ unique_ptr<ResponseMessage> HoverTask::runRequest(LSPTypecheckerDelegate &typech
             // the result type.
             typeString = retType.showWithMoreInfo(gs);
         } else {
-            typeString = methodInfoString(gs, retType, *sendResp->dispatchResult, constraint);
+            typeString = methodInfoString(gs, retType, *sendResp->dispatchResult, constraint, options);
         }
     } else if (auto defResp = resp->isMethodDef()) {
-        typeString = prettyTypeForMethod(gs, defResp->symbol, nullptr, defResp->retType.type, nullptr);
+        typeString = core::source_generator::prettyTypeForMethod(gs, defResp->symbol, nullptr, defResp->retType.type,
+                                                                 nullptr, options);
     } else if (auto constResp = resp->isConstant()) {
-        typeString = prettyTypeForConstant(gs, constResp->symbol);
+        typeString = prettyTypeForConstant(gs, constResp->symbolBeforeDealias);
     } else {
         core::TypePtr retType = resp->getRetType();
         // Some untyped arguments have null types.

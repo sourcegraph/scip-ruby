@@ -1,14 +1,11 @@
 #ifndef RUBY_TYPER_LSPTASK_H
 #define RUBY_TYPER_LSPTASK_H
 
+#include "absl/synchronization/notification.h"
 #include "main/lsp/AbstractRewriter.h"
 #include "main/lsp/LSPMessage.h"
 #include "main/lsp/LSPTypechecker.h"
 #include "main/lsp/json_types.h"
-
-namespace absl {
-class Notification;
-}
 
 namespace sorbet::realmain::lsp {
 class LSPIndexer;
@@ -41,7 +38,7 @@ protected:
                           std::vector<std::unique_ptr<core::lsp::QueryResponse>> &&priorRefs = {}) const;
 
     std::vector<std::unique_ptr<core::lsp::QueryResponse>>
-    getReferencesToSymbolInPackage(LSPTypecheckerDelegate &typechecker, core::NameRef packageName,
+    getReferencesToSymbolInPackage(LSPTypecheckerDelegate &typechecker, core::packages::MangledName packageName,
                                    core::SymbolRef symbol,
                                    std::vector<std::unique_ptr<core::lsp::QueryResponse>> &&priorRefs = {}) const;
 
@@ -111,7 +108,7 @@ public:
     // indexer. The default implementation returns RUN.
     virtual Phase finalPhase() const;
 
-    // Some tasks, like request cancelations, need to interface with the preprocessor. The default implementation is
+    // Some tasks, like request cancellations, need to interface with the preprocessor. The default implementation is
     // a no-op. Is only ever invoked from the preprocessor thread.
     virtual void preprocess(LSPPreprocessor &preprocessor);
 

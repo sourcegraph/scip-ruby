@@ -19,7 +19,7 @@ ruby(
         "//conditions:default": [],
     }) + select({
         # Do not enable the JIT unless opted in.
-        "@com_stripe_ruby_typer//tools/config:jit_enabled": [],
+        "@com_stripe_ruby_typer//tools/config:jit_enabled": ["--enable-yjit=stats"],
         "//conditions:default": ["--disable-jit-support"],
     }),
     copts = [
@@ -60,12 +60,12 @@ ruby(
     rubygems = "@rubygems_update_stripe//file",
     deps = select({
         "@platforms//os:osx": [
-            "@system_ssl_darwin//:ssl",
             "@system_ssl_darwin//:crypto",
+            "@system_ssl_darwin//:ssl",
         ],
         "@platforms//os:linux": [
-            "@system_ssl_linux//:ssl",
             "@system_ssl_linux//:crypto",
+            "@system_ssl_linux//:ssl",
         ],
     }),
 )

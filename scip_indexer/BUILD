@@ -53,6 +53,7 @@ cc_library(
         "//cfg",
         "//common",
         "//core",
+        "//core/source_generator",
         "//main/lsp",
         "//proto",
         "//sorbet_version",

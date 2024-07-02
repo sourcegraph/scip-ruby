@@ -495,6 +495,25 @@ class Thread < Object
   sig {params(name: T.untyped).returns(T.untyped)}
   def name=(name); end
 
+  # Return the native thread ID which is used by the Ruby thread.
+  #
+  # The ID depends on the OS. (not POSIX thread ID returned by pthread_self(3))
+  # * On Linux it is TID returned by gettid(2).
+  # * On macOS it is the system-wide unique integral ID of thread returned
+  #   by pthread_threadid_np(3).
+  # * On FreeBSD it is the unique integral ID of the thread returned by
+  #   pthread_getthreadid_np(3).
+  # * On Windows it is the thread identifier returned by GetThreadId().
+  # * On other platforms, it raises NotImplementedError.
+  #
+  # NOTE:
+  # If the thread is not associated yet or already deassociated with a native
+  # thread, it returns _nil_.
+  # If the Ruby implementation uses M:N thread model, the ID may change
+  # depending on the timing.
+  sig { returns(Integer) }
+  def native_thread_id; end;
+
   # Returns whether or not the asynchronous queue is empty for the target
   # thread.
   #
@@ -1208,6 +1227,11 @@ class Thread < Object
   # ```
   sig {returns(T.untyped)}
   def self.stop; end
+
+  # Yields each frame of the current execution stack as a
+  # backtrace location object.
+  sig {params(blk: T.proc.params(location: Thread::Backtrace::Location).void).returns(T.untyped)}
+  def self.each_caller_location(&blk); end
 end
 
 class Thread::Backtrace < Object
@@ -1423,7 +1447,7 @@ class Thread::Mutex < Object
 
   # Obtains a lock, runs the block, and releases the lock when the block
   # completes. See the example under `Mutex`.
-  sig {params(blk: T.proc.void).returns(T.untyped)}
+  sig {type_parameters(:T).params(blk: T.proc.returns(T.type_parameter(:T))).returns(T.type_parameter(:T))}
   def synchronize(&blk); end
 
   # Attempts to obtain the lock and returns immediately. Returns `true` if the
@@ -1525,8 +1549,8 @@ class Thread::Queue < Object
 
   # Alias for:
   # [`pop`](https://docs.ruby-lang.org/en/2.7.0/Queue.html#method-i-pop)
-  sig {params(args: T.untyped).returns(T.untyped)}
-  def deq(*args); end
+  sig {params(non_block: T::Boolean, timeout: T.nilable(Integer)).returns(T.untyped)}
+  def deq(non_block=false, timeout: nil); end
 
   # Returns `true` if the queue is empty.
   sig {returns(T::Boolean)}
@@ -1548,7 +1572,7 @@ class Thread::Queue < Object
   def marshal_dump; end
 
   # Returns the number of threads waiting on the queue.
-  sig {returns(T.untyped)}
+  sig {returns(Integer)}
   def num_waiting; end
 
   # Retrieves data from the queue.
@@ -1560,8 +1584,8 @@ class Thread::Queue < Object
   # Also aliased as:
   # [`deq`](https://docs.ruby-lang.org/en/2.7.0/Queue.html#method-i-deq),
   # [`shift`](https://docs.ruby-lang.org/en/2.7.0/Queue.html#method-i-shift)
-  sig {params(args: T.untyped).returns(T.untyped)}
-  def pop(*args); end
+  sig {params(non_block: T::Boolean, timeout: T.nilable(Integer)).returns(T.untyped)}
+  def pop(non_block=false, timeout: nil); end
 
   # Pushes the given `object` to the queue.
   #
@@ -1573,8 +1597,8 @@ class Thread::Queue < Object
 
   # Alias for:
   # [`pop`](https://docs.ruby-lang.org/en/2.7.0/Queue.html#method-i-pop)
-  sig {params(args: T.untyped).returns(T.untyped)}
-  def shift(*args); end
+  sig {params(non_block: T::Boolean, timeout: T.nilable(Integer)).returns(T.untyped)}
+  def shift(non_block=false, timeout: nil); end
 
   # Alias for:
   # [`length`](https://docs.ruby-lang.org/en/2.7.0/Queue.html#method-i-length)

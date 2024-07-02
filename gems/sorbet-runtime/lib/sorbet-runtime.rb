@@ -19,6 +19,7 @@ module T::Private::Types; end
 require_relative 'types/configuration'
 require_relative 'types/_types'
 require_relative 'types/private/decl_state'
+require_relative 'types/private/caller_utils'
 require_relative 'types/private/class_utils'
 require_relative 'types/private/runtime_levels'
 require_relative 'types/private/methods/_methods'
@@ -73,7 +74,6 @@ require_relative 'types/private/abstract/validate'
 
 # Catch all. Sort of built by `cd extn; find types -type f | grep -v test | sort`
 require_relative 'types/generic'
-require_relative 'types/interface_wrapper'
 require_relative 'types/private/abstract/declare'
 require_relative 'types/private/abstract/hooks'
 require_relative 'types/private/casts'
@@ -117,6 +117,3 @@ require_relative 'types/struct'
 require_relative 'types/non_forcing_constants'
 
 require_relative 'types/compatibility_patches'
-
-# Sorbet Compiler support module
-require_relative 'types/private/compiler'

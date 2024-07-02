@@ -166,6 +166,11 @@ module SorbetBenchmarks
         application_class_param(example)
       end
 
+      time_block("sig {params(x: Example).returns(T.anything)}") do
+        application_class_param_returns_anything(example)
+        application_class_param_returns_anything(example)
+      end
+
       time_block("T.let(..., T.nilable(Example))") do
         T.let(nil, T.nilable(Example))
         T.let(example, T.nilable(Example))
@@ -174,6 +179,11 @@ module SorbetBenchmarks
       time_block("sig {params(x: T.nilable(Example)).void}") do
         nilable_application_class_param(nil)
         nilable_application_class_param(example)
+      end
+
+      time_block("sig {params(x: T.nilable(Example)).returns(T.anything)}") do
+        nilable_application_class_param_returns_anything(nil)
+        nilable_application_class_param_returns_anything(example)
       end
 
       time_block("sig {params(s: Symbol, x: Integer, y: Integer).void} (with kwargs)") do
@@ -188,8 +198,10 @@ module SorbetBenchmarks
 
       class_method = Object.instance_method(:class)
       time_block(".bind(example).call Object#class") do
+        # rubocop:disable Performance/BindCall
         class_method.bind(example).call
         class_method.bind(example).call
+        # rubocop:enable Performance/BindCall
       end
 
       if T::Configuration::AT_LEAST_RUBY_2_7
@@ -220,8 +232,14 @@ module SorbetBenchmarks
     sig {params(x: Example).void}
     def self.application_class_param(x); end
 
+    sig {params(x: Example).returns(T.anything)}
+    def self.application_class_param_returns_anything(x); end
+
     sig {params(x: T.nilable(Example)).void}
     def self.nilable_application_class_param(x); end
+
+    sig {params(x: T.nilable(Example)).returns(T.anything)}
+    def self.nilable_application_class_param_returns_anything(x); end
 
     sig {params(s: Symbol, x: Integer, y: Integer).void}
     def self.arg_plus_kwargs(s, x:, y: 0); end

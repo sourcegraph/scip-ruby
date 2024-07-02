@@ -63,11 +63,9 @@ There was a Ruby syntax error. Sorbet was unable to parse the source code. If
 you encounter this error but your code is accepted by Ruby itself, this is a bug
 in our parser; please [report an issue] to us so we can address it.
 
-The only intentional break with Ruby compatibility is that method names that are
-keywords have some limitations with multi-line code, as explained in [#1993],
-and should not be reported.
-
-[#1993]: https://github.com/sorbet/sorbet/pull/1993
+The only intentional break with the Ruby grammar is that method names that are
+keywords have some limitations with multi-line code, as explained in
+[Unsupported Ruby Features](unsupported.md#multi-line-calls-to-to-keyword-named-methods-with-trailing-).
 
 ## 2002
 
@@ -441,17 +439,20 @@ end
 ```
 
 For more examples of valid syntax,
-[see the tests](https://github.com/sorbet/sorbet/blob/master/test/testdata/rewriter/minitest_tables.rb).
+[see the tests](https://github.com/sorbet/sorbet/blob/master/test/testdata/rewriter/minitest_tables.rb),
+and
+[another test, with describe](https://github.com/sorbet/sorbet/blob/master/test/testdata/rewriter/test_each_describe.rb).
 
 There are some limitations on how `test_each` can be used:
 
 The block given to `test_each` must accept at least one argument (except when
 using `test_each_hash`, it must be able to take exactly two arguments).
 
-The body of the `test_each`'s block must contain only `it` blocks, because of
-limitations in Sorbet. Sorbet models `it` blocks by translating them to method
-definitions under the hood, and method definitions do not have access to
-variables outside of their scope.
+The body of the `test_each`'s block must contain only `it`, `before`, `after`,
+and `describe` blocks, because of limitations in Sorbet. Sorbet models `it`,
+`before`, and `after` blocks by translating them to method definitions under the
+hood, and method definitions do not have access to variables outside of their
+scope.
 
 Usually this comes up with variable destructuring:
 
@@ -584,23 +585,12 @@ not exist.
 > This error is specific to Stripe's custom `--stripe-packages` mode. If you are
 > at Stripe, please see [go/modularity](http://go/modularity) for more.
 
-### Import/export statements
-
 All `import` and `export` lines in a `__package.rb` file must have constant
 literals as their argument. Doing arbitrary computation of imports and exports
 is not allowed in `__package.rb` files.
 
 Also note that all `import` declarations must be unique, with no duplicated
 imports.
-
-### autoloader_compatibility declarations
-
-> See [go/pbal](http://go/pbal) for more details.
-
-`autoloader_compatibility` declarations must take a single String argument. The
-only allowed value is `legacy`, otherwise the declaration cannot be present.
-These declarations annotate a package as incompatible for path-based autoloading
-and are used by our Ruby code loading pipeline.
 
 ## 3707
 
@@ -881,6 +871,9 @@ that all constants in a Sorbet codebase must resolve, even at `# typed: false`.
 Parsing `include` blocks is required for this, so incorrect usages of `include`
 are reported when encountered.
 
+To fix, ensure that the `include` or `extend` line is given at least one
+argument.
+
 ## 4002
 
 Sorbet requires seeing the complete inheritance hierarchy in a codebase. To do
@@ -952,6 +945,8 @@ Sorbet parses the syntax of `include` and `extend` declarations, even in
 that all constants in a Sorbet codebase must resolve, even at `# typed: false`.
 Parsing `include` blocks is required for this, so incorrect usages of `include`
 are reported when encountered.
+
+To fix, ensure that the `include` or `extend` line is not given a block.
 
 ## 4006
 
@@ -1459,9 +1454,68 @@ A class was changed to inherit from a different superclass.
 class A; end
 class B; end
 
+if RUBY_VERSION < "3.0"
+  class C < A; end
+else
+  class C < B; end # error: Parent of class C redefined from A to B
+end
+```
+
+Sorbet requires that a project have a single, unified inheritance hierarchy. A
+class cannot sometimes inherit from one class and sometimes inherit from another
+class depending on code at runtime.
+
+If it's simply not possible to refactor the codebase so that the given class
+always descends from one superclass, the next path forward is to hide all but
+one of the superclasses of this class. For example, using a trick like this with
+`# typed: ignore` files:
+
+```ruby
+# -- main.rb --
+class A; end
+class B; end
+
+if RUBY_VERSION < "3.0"
+  require_relative './c_a.rb'
+else
+  require_relative './c_b.rb'
+end
+
+class C
+  # ...
+end
+
+# -- c_a.rb --
+# typed: ignore
 class C < A; end
+
+# -- c_b.rb --
 class C < B; end
 ```
+
+In this example, Sorbet will think that `C` always descends from `B` statically,
+even though sometimes it may descend from `A`.
+
+Another trick to hide the superclass involves using `Class.new` to hide the
+definition of `C` from Sorbet entirely.
+
+Neither of these tricks work when one of the class definitions with a
+conflicting superclass definition comes from Sorbet's definitions for standard
+library classes. For example, this happens when generating an RBI for a newer
+version of a gem which is also include in Sorbet's stdlib RBI payload.
+
+In these cases, Sorbet provides the
+`--suppress-payload-superclass-redefinition-for` command line flag, which
+suppresses the superclass redefinition error for that class. For example, if the
+class `C` above were a class defined in Sorbet's payload, this would silence the
+errors:
+
+```
+srb tc --suppress-payload-superclass-redefinition-for=C
+```
+
+This flag can be repeated once per payload class with a superclass redefinition
+error.
 
 ## 5013
 
@@ -1541,6 +1595,21 @@ implementing its abstract methods as singleton class methods (`def self.foo`)
 instead of instance methods (`def foo`).
 
 For more information, see the docs for [Generics](generics.md).
+
+<a class="anchor" aria-hidden="true" id="redeclare-fixed"></a>
+
+**Why does this apply even to `fixed` types?** Sorbet requires redeclaring even
+`fixed` type members and templates. This differs from many other typed,
+object-oriented languages that support generic classes. This choice is an
+implementation detail which simplifies some logic inside Sorbet, specifically
+around responding incrementally to file edits in an editor. It's _not_
+fundamental to Ruby or the type system semantics Sorbet chooses to implement,
+which means that one day we could consider changing Sorbet to support this
+(which would require adjusting Sorbet's algorithm for handling incremental
+updates).
+
+For a more technical explanation, see
+[the Sorbet source code](https://github.com/sorbet/sorbet/blob/233b47bb46fcedb60982fd7f70148f07a147468f/resolver/GlobalPass.cc#L54-L63).
 
 ## 5015
 
@@ -1713,7 +1782,7 @@ end
 ## 5020
 
 There are a few constraints around how methods like `include`, `extend`,
-`mixes_in_class_methods` [(docs)](abstract.mdd), and `requires_ancestor`
+`mixes_in_class_methods` [(docs)](abstract.md), and `requires_ancestor`
 [(docs)](requires-ancestor.md) work.
 
 - `include` and `extend` must be given a constant that Sorbet can _statically_
@@ -1790,15 +1859,15 @@ recursively-defined data structure, see
 
 ## 5025
 
+> **Note**: This error has been relaxed in newer Sorbet versions. It has been
+> replaced by [5075](#5075).
+
 Sorbet does not currently support type aliases in generic classes.
 
 This limitation was crafted early in the development of Sorbet to entirely
 sidestep problems that can arise in the design of a type system leading to
 unsoundness. (Sorbet users curious about type system design may wish to read
 [What is Type Projection in Scala, and Why is it Unsound?](https://lptk.github.io/programming/2019/09/13/type-projection.html).)
-
-We are likely to reconsider lifting this limitation in the future, but have no
-immediate plans yet.
 
 As a workaround, define type aliases somewhere else. Unfortunately this does
 mean it is not currently possible to define type aliases that reference type
@@ -1990,18 +2059,27 @@ intent to create a new type alias.)
 
 ## 5035
 
-A method was marked `override`, but sorbet was unable to find a method in the
-class's ancestors that would be overridden. Ensure that the method being
-overridden exists in the ancestors of the class defining the `override` method,
-or remove `override` from the signature that's raising the error. See
-[Override Checking](override-checking.md) for more information about `override`.
+There are two cases when Sorbet might produce this error code:
 
-If the parent method definitely exists at runtime, it might be hidden in a
-[`# typed: ignore`](static#file-level-granularity-strictness-levels) file.
-Sorbet will not see it and this error will be raised. In that case you will need
-to either raise the `typed` sigil of that file above `ignore`, or generate an
-[RBI file](rbi) that contains signatures for the classes and methods that file
-defines.
+1.  A method was marked `override`, but sorbet was unable to find a method in
+    the class's ancestors that would be overridden. Ensure that the method being
+    overridden exists in the ancestors of the class defining the `override`
+    method, or remove `override` from the signature that's raising the error.
+
+    If the parent method definitely exists at runtime, it might be hidden in a
+    [`# typed: ignore`](static#file-level-granularity-strictness-levels) file,
+    or defined via metaprogramming. To fix, either raise the `typed` sigil of
+    that file above `ignore`, or generate an [RBI file](rbi) that contains
+    signatures for the classes and methods that file defines.
+
+1.  Sorbet found the method that this method overrides, but the override method
+    is not valid. An override method must accept at least as many arguments as
+    the parent method, with types at least as wide as the parent's types, and
+    return a value that is at most as wide as the parent's return type. This is
+    in keeping with the
+    [Liskov substitution principle](https://en.wikipedia.org/wiki/Liskov_substitution_principle).
+
+See [Override Checking](override-checking.md) for more.
 
 ## 5036
 
@@ -2193,32 +2271,7 @@ If this workaround will not work in your case, the final alternative is to
 either omit a signature for the method in question (or define an explicit
 signature where all parameters that cannot be typed accurately use `T.untyped`).
 
-**Why are overloads not well-supported in Sorbet?**
-
-Consider how overloading works in typed, compiled languages like C++ or Java;
-each overload is a separate method. They actually have separate implementations,
-are type checked separately, compile (with link-time name mangling) to separate
-symbols in the compiled object, and the compiler knows how to resolve each call
-site to a specific overload ahead of time, either statically or dynamically via
-virtual dispatch.
-
-Meanwhile, Ruby itself doesn't have overloading—there's only ever one method
-registered with a given name in the VM, regardless of what arguments it accepts.
-That complicates things. It becomes unclear how Sorbet should typecheck the body
-of the method (against all sigs? against one sig? against the component-wise
-union of their arguments?). There's no clear answer, and anything we choose will
-be bound to confuse or surprise someone.
-
-Also because Sorbet doesn't control whether the method can be dispatched to,
-even if it were going to make a static claim about whether the code type checks,
-it doesn't get to control which (fake) overload will get dispatched to at the
-call site (again: there's only one version of the method in the VM).
-
-Finally this choice is somewhat philosophical: codebases that make heavy use of
-overloading (even in typed languages where overloading is supported) tend to be
-harder for readers to understand at a glance. The above workaround of defining
-multiple methods with unique names solves this readability problem, because now
-each overload has a descriptive name.
+For more, see [Methods with Overloaded Signatures](overloads.md).
 
 ## 5041
 
@@ -2775,6 +2828,17 @@ typechecked.
 See [`type_member` & `type_template`](generics.md#type_member--type_template) in
 the generics docs for more.
 
+There are two main cases where this error is reported:
+
+1.  Using a `type_member` in a scope where only a `type_template` is allowed
+    (and vice versa), but within the correct class.
+2.  Using either a `type_member` or `type_template` in a completely unrelated
+    class.
+
+Neither is allowed, but in each case the solution is different.
+
+### `type_member` / `type_template` mismatch
+
 A `type_member` is limited in scope to only appear in instance methods of the
 given class. A `type_template` is limited in scope to only appear in singleton
 class methods of the given class. For example:
@@ -2849,6 +2913,91 @@ class MyClass < AbstractSerializable
 end
 ```
 
+### In an unrelated class
+
+In this case, the error usually indicates a more fundamental problem with the
+design, which means that the way forward is more nuanced.
+
+Consider a class like this:
+
+```ruby
+class Box
+  extend T::Generic
+  Elem = type_member
+
+  sig { params(val: Elem).void }
+  def initialize(val); @val = val; end
+
+  sig { returns(Elem) }
+  def val; @val; end
+end
+```
+
+We might want to write a function which gets the element out of an arbitrary
+`Box`:
+
+```ruby
+sig do
+  type_parameters(:Elem)
+    .params(box: Box[T.type_parameter(:Elem)])
+    .returns(Box[T.type_parameter(:Elem)]::Elem)
+    #                                    ^^^^^^ ❌
+end
+def example_bad1(box)
+  box.val
+end
+```
+
+This code does not work, because we can't access arbitrary type members inside a
+class. In this case, the fix is easy enough: just
+`returns(T.type_parameter(:Elem))`:
+
+```ruby
+sig do
+  type_parameters(:Elem)
+    .params(box: Box[T.type_parameter(:Elem)])
+    .returns(T.type_parameter(:Elem)) # ✅
+end
+def example_good1(box)
+  box.val
+end
+```
+
+Another thing that might cause problems: we want to make the `type_member`
+fixed, and then access it like a type alias:
+
+```ruby
+class ComplicatedBox < Box
+  Elem = type_member { {fixed:  T.any(Integer, String, Float, Symbol)} }
+end
+
+sig { params(box: ComplicatedBox).returns(ComplicatedBox::Elem) }
+#                                         ^^^^^^^^^^^^^^^^^^^^ ❌
+def example_bad2(box)
+  box.val
+end
+```
+
+Type members are not type aliases. If you want something that works like a type
+alias, make a type alias, and then use that both in the `fixed` annotation of
+the type member, and in any signature where you'd like to use that type:
+
+```ruby
+class ComplicatedBox < Box
+  Type = T.type_alias { T.any(Integer, String, Float, Symbol) }
+  Elem = type_member { {fixed: Type} } # ✅
+end
+
+sig { params(box: ComplicatedBox).returns(ComplicatedBox::Type) }
+#                                         ^^^^^^^^^^^^^^^^^^^^ # ✅
+def example_good2(box)
+  box.val
+end
+```
+
+For more information on why type members are not type aliases and vice versa,
+see [5075](#5075).
+
 ## 5073
 
 Abstract classes cannot be instantiated by definition. See
@@ -2885,6 +3034,108 @@ A module marked `has_attached_class!` can only be mixed into a class with
 into another module, both modules must declare `has_attached_class!`.
 
 For more information, see the docs for [`T.attached_class`](attached-class.md).
+
+## 5075
+
+Sorbet does not support type aliases that alias to generic type members (or type
+templates, which are just
+[type members owned by the singleton class](generics.md#type_member--type_template)).
+At the moment, there is no perfect workaround, though in the future Sorbet will
+support this by allowing generic type members to be bounded by other generic
+type members. The current best option is simply to copy the contents of the type
+alias into all the places where you would like to use that type alias.
+
+Here's why Sorbet does not allow type _aliases_ to alias to generic type
+members. Consider this motivating example, of a generic box type which can be
+possibly empty:
+
+```ruby
+class PossiblyEmptyBox
+  extend T::Generic
+
+  class IsEmpty; end
+
+  Elem = type_member
+  MaybeElem = T.type_alias { T.any(IsEmpty, Elem) } # ❌ NOT allowed
+
+  # ...
+
+  sig { returns(Elem) }
+  def val!; end
+
+  sig { returns(MaybeElem) }
+  def val; end
+end
+```
+
+Our class is generic in `Elem`, so that this container can hold an arbitrary
+type. But we have a lot of methods that will return [either](union-types.md) the
+`Elem` that this box contains, or an instance of some `IsEmpty` class if there
+is nothing currently in the box. (Presumably: there are a lot of methods where
+`MaybeElem` is used, and we don't want to have to repeat ourselves by writing
+`T.any(IsEmpty, Elem)` all over the place.)
+
+This is not allowed, because the restrictions on where type aliases can be used
+from are not the same as those that apply to type members:
+
+- Type aliases can be used anywhere, regardless of where the type alias is
+  defined.
+
+- Type members can only be used **inside** the enclosing class where they were
+  defined (as if they were declared with `private_constant`) **and** can only be
+  used inside methods and instance variables of the instance class (or for type
+  templates: methods and instance variables of the singleton class).
+
+If Sorbet were to allow type members to appear in type aliases, that type alias
+would have to essentially copy all the rules of where that type alias is allowed
+to be used from the type members inside it.
+
+But at that point, the type alias would be no different from defining a second,
+[`fixed`](generics.md#bounds-on-type_members-and-type_templates-fixed-upper-lower)
+type member on the same class:
+
+```ruby
+class PossiblyEmptyBox
+  # ...
+  Elem = type_member
+  MaybeElem = type_member {
+    {fixed: T.any(IsEmpty, Elem)}
+    # ^ should be allowed in the future
+  }
+
+  sig { returns(Elem) }
+  def val!; end
+
+  sig { returns(MaybeElem) }
+  def val; end
+end
+```
+
+The `fixed` annotation makes `MaybeElem` exactly like a type alias with the same
+scope as `Elem`. This solution avoids having to solve the problem of "copying
+all the scoping rules of a type member onto a type alias."
+
+There is only one gotcha: at the moment Sorbet does not support using type
+members in `fixed`, `upper`, or `lower` bounds of a type member. We expect to
+relax this constraint in the future, which means that at the moment there is no
+way to define something that acts like a type alias to a generic type member.
+
+The only way forward is to copy the contents of the type alias into all the
+places where you'd like to use that type alias, like this:
+
+```ruby
+class PossiblyEmptyBox
+  # ...
+  Elem = type_member
+
+  sig { returns(Elem) }
+  def val!; end
+
+  # Use `T.any` instead of `MaybeElem`
+  sig { returns(T.any(IsEmpty, Elem)) }
+  def val; end
+end
+```
 
 ## 6001
 
@@ -3260,7 +3511,7 @@ x = T.let(1, String) # error: Argument does not have asserted type `String`
 ```
 
 Because of the way default values are desugared by Sorbet, this error also
-occurs when Sorbet finds a mistmatch between the type specified for a parameter
+occurs when Sorbet finds a mismatch between the type specified for a parameter
 in the signature and the default value provided in the method.
 
 In this case, the signature states that `category` type is a `Category`, yet we
@@ -3536,7 +3787,7 @@ sig {params(xs: Integer).void}
 def foo(*xs); end
 
 xs = Array.new(3) {|i| i}
-T.unsafe(self).foo(xs)
+T.unsafe(self).foo(*xs)
 # ---------------------------------------------
 ```
 
@@ -3904,7 +4155,7 @@ sig do
     .void
 end
 def example(x)
-  x.foo # error!
+  x.foo # ❌ error!
 end
 ```
 
@@ -3935,7 +4186,7 @@ sig do
     .void
 end
 def example(x)
-  x.foo # error!
+  x.foo # ✅ no error
 end
 ```
 
@@ -4138,6 +4389,105 @@ the guarantees of the type system.
 
 This feature is opt-in. See [VS Code](vscode.md) for instructions on how to turn
 it on.
+
+## 7048
+
+This error is like [7003](#7003), but for calls using `super`.
+
+That is, the difference is that Sorbet checks whether a method with the same
+name as the enclosing method exists on any ancestor of the current method.
+
+This error is caused by most of the same reasons that cause [7003](#7003), so
+it's best to read the docs for that code as well.
+
+See also:
+
+- [Why is `super` untyped, even when the parent method has a `sig`?]
+- [How can I fix type errors that arise from `super`?]
+
+[Why is `super` untyped, even when the parent method has a `sig`?]:
+  /docs/faq#why-is-super-untyped-even-when-the-parent-method-has-a-sig
+[How can I fix type errors that arise from `super`?]:
+  /docs/faq#how-can-i-fix-type-errors-that-arise-from-super
+
+## 7049
+
+See [Methods with Overloaded Signatures](overloads.md) for complete docs on how
+to declare overloaded methods correctly.
+
+## 7050
+
+Calling `T.must` with an untyped object is an indication that code that was
+considered typed (and `T.must` was ensuring that the value was not `nil`) is not
+typed anymore.
+
+This was separated from [7015](#7015) to maintain this error in
+`# typed: strict` and above, but allow for [7015](#7015) to be enforced at lower
+strictness levels.
+
+## 7051
+
+When a method's signature is marked `.void`, Sorbet replaces the result value of
+the method with a special singleton value, so that callers downstream of the
+method cannot depend on whatever value the method happens to return.
+
+(See
+[`returns` & `void`: Annotating return types](sigs.md#returns--void-annotating-return-types))
+
+One thing to be aware of is that this special singleton value is truthy (because
+the only two values that are falsy in the Ruby VM are `nil` and `false`).
+
+Thus, branching on this special void singleton value is virtually always a bug.
+
+If a method **must be able to return anything** in its body, while still
+branching on the resulting value, use `.returns(T.anything)` instead:
+
+```ruby
+sig { returns(T.anything) }
+def example
+  if [true, false].sample
+    ''
+  else
+    false
+  end
+end
+```
+
+See the docs for [T.anything](anything.md) for more.
+
+This error happens if _any_ component of the type includes `void`. For example:
+
+```ruby
+result =
+  if [true, false].sample
+    returns_void
+  else
+    false
+  end
+
+T.reveal_type(result) # => T.any(Sorbet::Private::Static::Void, FalseClass)
+
+if result
+#  ^^^^^^ error
+  puts
+end
+```
+
+This is expected, and the way to fix it is again either to change `returns_void`
+to `returns(T.anything)`, or update the `if` branch to explicitly produce a
+value:
+
+```ruby
+result =
+  if [true, false].sample
+    returns_void
+    true
+  else
+    false
+  end
+
+T.reveal_type(result) # => T::Boolean
+```
 
 <!-- -->
 
