@@ -12,6 +12,7 @@
 
 #include "common/FileSystem.h"
 #include "common/sort/sort.h"
+#include "core/source_generator/source_generator.h"
 #include "core/Loc.h"
 #include "main/lsp/LSPLoop.h"
 
@@ -225,9 +226,9 @@ void GenericSymbolRef::saveDocStrings(const core::GlobalState &gs, core::TypePtr
         }
         case Kind::Method: {
             auto ref = this->selfOrOwner.asMethodRef();
-            auto resultType = ref.data(gs)->owner.data(gs)->resultType;
-            checkType(resultType, fmt::format("result type for {}", ref.showFullName(gs)));
-            markdown = realmain::lsp::prettyTypeForMethod(gs, ref, resultType, nullptr, nullptr);
+            auto recvType = ref.data(gs)->owner.data(gs)->resultType;
+            checkType(recvType, fmt::format("receiver type for {}", ref.showFullName(gs)));
+            markdown = core::source_generator::prettyTypeForMethod(gs, ref, recvType, nullptr, nullptr, core::ShowOptions());
             // FIXME(varun): For some reason, it looks like a bunch of public methods
             // get marked as private here. Avoid printing misleading info until we fix that.
             // https://github.com/sourcegraph/scip-ruby/issues/33

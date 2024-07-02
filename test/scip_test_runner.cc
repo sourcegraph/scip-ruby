@@ -16,6 +16,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
+#include "absl/types/span.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 
 #include "ast/ast.h"
@@ -568,7 +569,8 @@ void test_one_gem(Expectations &test, const TestSettings &settings) {
         auto workers = WorkerPool::create(0, gs.tracer());
         sorbet::core::UnfreezeSymbolTable st(gs);
 
-        trees = move(namer::Namer::run(gs, move(trees), *workers, nullptr).result());
+        bool wasTypecheckingCanceled = namer::Namer::run(gs, absl::MakeSpan(trees), *workers, nullptr);
+        ENFORCE(!wasTypecheckingCanceled);
         trees = move(resolver::Resolver::run(gs, move(trees), *workers).result());
 
         for (auto &extension : gs.semanticExtensions) {
