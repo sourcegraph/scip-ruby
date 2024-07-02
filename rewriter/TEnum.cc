@@ -243,7 +243,7 @@ void TEnum::run(core::MutableContext ctx, ast::ClassDef *klass) {
         auto serializeReturnTypeClass = core::cast_type_nonnull<core::ClassType>(serializeReturnType);
         ast::ExpressionPtr return_type_ast = ast::MK::Constant(klass->declLoc, serializeReturnTypeClass.symbol);
         auto sig = ast::MK::Sig0(klass->declLoc, std::move(return_type_ast));
-        auto method = ast::MK::SyntheticMethod0(klass->loc, klass->declLoc, core::Names::serialize(),
+        auto method = ast::MK::SyntheticMethod0(klass->loc, klass->declLoc, klass->loc, core::Names::serialize(),
                                                 ast::MK::RaiseTypedUnimplemented(klass->declLoc));
         ast::Send::ARGS_store nargs;
         ast::Send::Flags flags;

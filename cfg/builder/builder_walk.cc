@@ -904,7 +904,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                         auto zloc = rescueCase->var.loc().copyWithZeroLength();
                         auto unsafe = ast::MK::Unsafe(
                             zloc, ast::make_expression<ast::Local>(zloc, exceptionValue.data(cctx.inWhat)));
-                        ensureBody = walk(cctx.withTarget(localVar), unsafe, ensureBody);
+                        ensureBody = walk(cctx.withTarget(LocalOccurrence{localVar, local->loc}), unsafe, ensureBody);
                         //CHECK:VARUN - ^Need LocalOccurrence above?
                     }
 

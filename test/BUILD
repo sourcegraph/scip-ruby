@@ -97,6 +97,7 @@ cc_binary(
         "//scip_indexer",
         "//test/helpers",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
         "@cxxopts",
         "@doctest//doctest",
         "@doctest//doctest:custom_main",

@@ -211,7 +211,7 @@ ast::ExpressionPtr runUnderEach(core::MutableContext ctx, core::NameRef eachName
             ((send->fun == core::Names::before() || send->fun == core::Names::after()) && send->numPosArgs() == 0 &&
              send->hasBlock() && send->block()->args.size() == 0)) {
             core::NameRef name;
-            core::Loc arg0Loc = core::Loc::none();
+            auto arg0Loc = core::LocOffsets::none();
             if (send->fun == core::Names::before()) {
                 name = core::Names::beforeAngles();
             } else if (send->fun == core::Names::after()) {
