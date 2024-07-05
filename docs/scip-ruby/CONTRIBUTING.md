@@ -262,7 +262,7 @@ Typically, I'll copy over the minimized code
 to the root and run:
 
 ```bash
-./bazel build //main:scip-ruby --config=dbg && ./bazel-out/darwin-dbg/bin/main/scip-ruby tmp.rb -p cfg-text-loc --index-file /dev/null
+./bazel build //main:scip-ruby --config=dbg && ./bazel-out/darwin_arm64-dbg/bin/main/scip-ruby tmp.rb -p cfg-text-loc --index-file /dev/null
 ```
 
 Alternately, it may be useful to create a `tmp.rb`
@@ -286,7 +286,7 @@ but the following works:
 
 ```bash
 export TEST_DIR="$PWD/test/scip/testdata"
-pushd bazel-out/darwin-dbg/bin
+pushd bazel-out/darwin_arm64-dbg/bin
 lldb -- ./test/scip_test_runner "$TEST_DIR/my_test.rb" --output="$TEST_DIR/my_test.snapshot.rb"
 popd
 unset TEST_DIR
