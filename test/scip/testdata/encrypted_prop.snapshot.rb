@@ -15,13 +15,15 @@
 #                                            ^^^^^^^^^^^^^^ definition [..] Opus#DB#Model#Mixins#Encryptable#EncryptedValue#
 #                                                             ^^^^^ reference [..] Chalk#
 #                                                                    ^^^ reference [..] Chalk#ODM#
-#                                                                         ^^^^^^^^ definition [..] Chalk#ODM#Document#
+#                                                                         ^^^^^^^^ reference [..] Chalk#ODM#Document#
  end
  
  class EncryptedProp
 #      ^^^^^^^^^^^^^ definition [..] EncryptedProp#
    include T::Props
 #  ^^^^^^^ reference [..] Module#include().
+#          ^ reference [..] T#
+#             ^^^^^ reference [..] T#Props#
    def self.encrypted_prop(opts={}); end
 #           ^^^^^^^^^^^^^^ definition [..] `<Class:EncryptedProp>`#encrypted_prop().
    encrypted_prop :foo

@@ -5,17 +5,19 @@
    include Singleton
 #  ^^^^^^^ reference [..] Module#include().
 #          ^^^^^^^^^ reference [..] Singleton#
+#          ^^^^^^^^^ reference [..] Singleton#
  end
  
  # Singleton supports inheritance, turning the sub-class into a singleton as well.
  class B < A; end
 #      ^ definition [..] B#
-#          ^ definition [..] A#
+#          ^ reference [..] A#
  
  class C
 #      ^ definition [..] C#
    include Singleton
 #  ^^^^^^^ reference [..] Module#include().
+#          ^^^^^^^^^ reference [..] Singleton#
 #          ^^^^^^^^^ reference [..] Singleton#
    extend T::Helpers
 #  ^^^^^^ reference [..] Kernel#extend().

@@ -14,7 +14,7 @@
  
  class Flatfile < Record
 #      ^^^^^^^^ definition [..] Flatfile#
-#                 ^^^^^^ definition [..] Record#
+#                 ^^^^^^ reference [..] Record#
    flatfile do
 #  ^^^^^^^^ reference [..] `<Class:Record>`#flatfile().
      from   1..2, :foo

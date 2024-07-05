@@ -52,7 +52,7 @@
  
  class Z3 < Z1
 #      ^^ definition [..] Z3#
-#           ^^ definition [..] Z1#
+#           ^^ reference [..] Z1#
    extend T::Sig
 #  ^^^^^^ reference [..] Kernel#extend().
  
@@ -68,7 +68,7 @@
  
  class Z4 < Z3
 #      ^^ definition [..] Z4#
-#           ^^ definition [..] Z3#
+#           ^^ reference [..] Z3#
    extend T::Sig
 #  ^^^^^^ reference [..] Kernel#extend().
  

@@ -6,6 +6,8 @@
 #    ^^^^^^ reference [..] Kernel#extend().
      include T::Props
 #    ^^^^^^^ reference [..] Module#include().
+#            ^ reference [..] T#
+#               ^^^^^ reference [..] T#Props#
  
      prop :foo, String
 #          ^^^ definition [..] SomeODM#`foo=`().
@@ -39,6 +41,8 @@
 #      ^^^^^^^^^^^ definition [..] AdvancedODM#
      include T::Props
 #    ^^^^^^^ reference [..] Module#include().
+#            ^ reference [..] T#
+#               ^^^^^ reference [..] T#Props#
      prop :default, String, default: ""
 #          ^^^^^^^ definition [..] AdvancedODM#`default=`().
 #          ^^^^^^^ definition [..] AdvancedODM#default().
@@ -125,6 +129,8 @@
 #      ^^^^^^^^^^^ definition [..] PropHelpers#
    include T::Props
 #  ^^^^^^^ reference [..] Module#include().
+#          ^ reference [..] T#
+#             ^^^^^ reference [..] T#Props#
    def self.token_prop(opts={}); end
 #           ^^^^^^^^^^ definition [..] `<Class:PropHelpers>`#token_prop().
    def self.created_prop(opts={}); end
@@ -145,6 +151,8 @@
 #      ^^^^^^^^^^^^ definition [..] PropHelpers2#
    include T::Props
 #  ^^^^^^^ reference [..] Module#include().
+#          ^ reference [..] T#
+#             ^^^^^ reference [..] T#Props#
    def self.timestamped_token_prop(opts={}); end
 #           ^^^^^^^^^^^^^^^^^^^^^^ definition [..] `<Class:PropHelpers2>`#timestamped_token_prop().
    def self.created_prop(opts={}); end

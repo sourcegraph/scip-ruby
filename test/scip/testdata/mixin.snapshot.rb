@@ -11,6 +11,7 @@
    include M
 #  ^^^^^^^ reference [..] Module#include().
 #          ^ reference [..] M#
+#          ^ reference [..] M#
    def f; puts 'C1.f'; end
 #      ^ definition [..] C1#f().
 #         ^^^^ reference [..] Kernel#puts().
@@ -19,15 +20,16 @@
  # f refers to C1.f
  class C2 < C1
 #      ^^ definition [..] C2#
-#           ^^ definition [..] C1#
+#           ^^ reference [..] C1#
  end
  
  # f refers to C1.f
  class C3 < C1
 #      ^^ definition [..] C3#
-#           ^^ definition [..] C1#
+#           ^^ reference [..] C1#
    include M
 #  ^^^^^^^ reference [..] Module#include().
+#          ^ reference [..] M#
 #          ^ reference [..] M#
  end
  
@@ -42,6 +44,7 @@
 #      ^^ definition [..] D2#
    include M
 #  ^^^^^^^ reference [..] Module#include().
+#          ^ reference [..] M#
 #          ^ reference [..] M#
  end
  
@@ -84,6 +87,7 @@
      include M
 #    ^^^^^^^ reference [..] Module#include().
 #            ^ reference [..] T0#M#
+#            ^ reference [..] T0#M#
      def set_f_1; @f = 1; end
 #        ^^^^^^^ definition [..] T0#C#set_f_1().
 #                 ^^ definition [..] T0#C#`@f`.
@@ -112,12 +116,14 @@
      include M0
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] T1#M0#
+#            ^^ reference [..] T1#M0#
    end
  
    class C
 #        ^ definition [..] T1#C#
      include M1
 #    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T1#M1#
 #            ^^ reference [..] T1#M1#
      def set_f_1; @f = 1; end
 #        ^^^^^^^ definition [..] T1#C#set_f_1().
@@ -147,6 +153,7 @@
      include M
 #    ^^^^^^^ reference [..] Module#include().
 #            ^ reference [..] T2#M#
+#            ^ reference [..] T2#M#
      def get_f; @f; end
 #        ^^^^^ definition [..] T2#C#get_f().
 #               ^^ reference [..] T2#C#`@f`.
@@ -170,12 +177,14 @@
      include M0
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] T3#M0#
+#            ^^ reference [..] T3#M0#
    end
  
    class C
 #        ^ definition [..] T3#C#
      include M1
 #    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T3#M1#
 #            ^^ reference [..] T3#M1#
      def get_f; @f; end
 #        ^^^^^ definition [..] T3#C#get_f().
@@ -205,9 +214,10 @@
  
    class C1 < C0
 #        ^^ definition [..] T4#C1#
-#             ^^ definition [..] T4#C0#
+#             ^^ reference [..] T4#C0#
      include M
 #    ^^^^^^^ reference [..] Module#include().
+#            ^ reference [..] T4#M#
 #            ^ reference [..] T4#M#
      def set_f_1; @f = 1; end
 #        ^^^^^^^ definition [..] T4#C1#set_f_1().
@@ -239,6 +249,7 @@
      include M0
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] T5#M0#
+#            ^^ reference [..] T5#M0#
    end
  
    class C0
@@ -251,9 +262,10 @@
  
    class C1 < C0
 #        ^^ definition [..] T5#C1#
-#             ^^ definition [..] T5#C0#
+#             ^^ reference [..] T5#C0#
      include M
 #    ^^^^^^^ reference [..] Module#include().
+#            ^ reference [..] M#
 #            ^ reference [..] M#
      def set_f_1; @f = 1; end
 #        ^^^^^^^ definition [..] T5#C1#set_f_1().
@@ -290,7 +302,7 @@
  
    class C1 < C0
 #        ^^ definition [..] T6#C1#
-#             ^^ definition [..] T6#C0#
+#             ^^ reference [..] T6#C0#
      def get_f; @f; end
 #        ^^^^^ definition [..] T6#C1#get_f().
 #               ^^ reference [..] T6#C1#`@f`.
@@ -315,6 +327,7 @@
      include M0
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] T7#M0#
+#            ^^ reference [..] T7#M0#
    end
  
    class C0
@@ -327,7 +340,7 @@
  
    class C1 < C0
 #        ^^ definition [..] T7#C1#
-#             ^^ definition [..] T7#C0#
+#             ^^ reference [..] T7#C0#
      def get_f; @f; end
 #        ^^^^^ definition [..] T7#C1#get_f().
 #               ^^ reference [..] T7#C1#`@f`.
@@ -352,6 +365,7 @@
      include M
 #    ^^^^^^^ reference [..] Module#include().
 #            ^ reference [..] T8#M#
+#            ^ reference [..] T8#M#
      def set_f_1; @f = 1; end
 #        ^^^^^^^ definition [..] T8#C0#set_f_1().
 #                 ^^ definition [..] T8#C0#`@f`.
@@ -361,7 +375,7 @@
  
    class C1 < C0
 #        ^^ definition [..] T8#C1#
-#             ^^ definition [..] T8#C0#
+#             ^^ reference [..] T8#C0#
      def set_f_2; @f = 2; end
 #        ^^^^^^^ definition [..] T8#C1#set_f_2().
 #                 ^^ definition [..] T8#C1#`@f`.
@@ -392,6 +406,7 @@
      include M
 #    ^^^^^^^ reference [..] Module#include().
 #            ^ reference [..] T9#M#
+#            ^ reference [..] T9#M#
      def set_f_1; @f = 1; end
 #        ^^^^^^^ definition [..] T9#C0#set_f_1().
 #                 ^^ definition [..] T9#C0#`@f`.
@@ -401,7 +416,7 @@
  
    class C1 < C0
 #        ^^ definition [..] T9#C1#
-#             ^^ definition [..] T9#C0#
+#             ^^ reference [..] T9#C0#
      def get_f; @f; end
 #        ^^^^^ definition [..] T9#C1#get_f().
 #               ^^ reference [..] T9#C1#`@f`.
@@ -426,11 +441,12 @@
      include M
 #    ^^^^^^^ reference [..] Module#include().
 #            ^ reference [..] T10#M#
+#            ^ reference [..] T10#M#
    end
  
    class C1 < C0
 #        ^^ definition [..] T10#C1#
-#             ^^ definition [..] T10#C0#
+#             ^^ reference [..] T10#C0#
      def set_f_2; @f = 2; end
 #        ^^^^^^^ definition [..] T10#C1#set_f_2().
 #                 ^^ definition [..] T10#C1#`@f`.
@@ -458,11 +474,12 @@
      include M
 #    ^^^^^^^ reference [..] Module#include().
 #            ^ reference [..] T11#M#
+#            ^ reference [..] T11#M#
    end
  
    class C1 < C0
 #        ^^ definition [..] T11#C1#
-#             ^^ definition [..] T11#C0#
+#             ^^ reference [..] T11#C0#
      def get_f; @f; end
 #        ^^^^^ definition [..] T11#C1#get_f().
 #               ^^ reference [..] T11#C1#`@f`.
@@ -494,8 +511,10 @@
      include M0
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] T12#M0#
+#            ^^ reference [..] T12#M0#
      include M1
 #    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T12#M1#
 #            ^^ reference [..] T12#M1#
      def set_f_2; @f = 2; end
 #        ^^^^^^^ definition [..] T12#M2#set_f_2().
@@ -508,6 +527,7 @@
 #        ^ definition [..] T12#C#
      include M2
 #    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T12#M2#
 #            ^^ reference [..] T12#M2#
      def set_f_3; @f = 3; end
 #        ^^^^^^^ definition [..] T12#C#set_f_3().
@@ -545,8 +565,10 @@
      include M0
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] T13#M0#
+#            ^^ reference [..] T13#M0#
      include M1
 #    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T13#M1#
 #            ^^ reference [..] T13#M1#
      def set_f_2; @f = 2; end
 #        ^^^^^^^ definition [..] T13#M2#set_f_2().
@@ -559,6 +581,7 @@
 #        ^ definition [..] T13#C#
      include M2
 #    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T13#M2#
 #            ^^ reference [..] T13#M2#
      def get_f; @f; end
 #        ^^^^^ definition [..] T13#C#get_f().
@@ -591,8 +614,10 @@
      include M0
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] T14#M0#
+#            ^^ reference [..] T14#M0#
      include M1
 #    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T14#M1#
 #            ^^ reference [..] T14#M1#
    end
  
@@ -600,6 +625,7 @@
 #        ^ definition [..] T14#C#
      include M2
 #    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T14#M2#
 #            ^^ reference [..] T14#M2#
      def set_f_3; @f = 3; end
 #        ^^^^^^^ definition [..] T14#C#set_f_3().
@@ -637,8 +663,10 @@
      include M0
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] T15#M0#
+#            ^^ reference [..] T15#M0#
      include M1
 #    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T15#M1#
 #            ^^ reference [..] T15#M1#
    end
  
@@ -646,6 +674,7 @@
 #        ^ definition [..] T15#C#
      include M2
 #    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T15#M2#
 #            ^^ reference [..] T15#M2#
      def get_f; @f; end
 #        ^^^^^ definition [..] T15#C#get_f().
@@ -678,8 +707,10 @@
      include M0
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] T16#M0#
+#            ^^ reference [..] T16#M0#
      include M1
 #    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T16#M1#
 #            ^^ reference [..] T16#M1#
      def set_f_2; @f = 2; end
 #        ^^^^^^^ definition [..] T16#C#set_f_2().
@@ -717,8 +748,10 @@
      include M0
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] T17#M0#
+#            ^^ reference [..] T17#M0#
      include M1
 #    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] T17#M1#
 #            ^^ reference [..] T17#M1#
      def get_f; @f; end
 #        ^^^^^ definition [..] T17#C#get_f().
@@ -746,6 +779,7 @@
      include M
 #    ^^^^^^^ reference [..] Module#include().
 #            ^ reference [..] W0#M#
+#            ^ reference [..] W0#M#
      def set_f; @f = 0; end
 #        ^^^^^ definition [..] W0#C#set_f().
 #               ^^ definition [..] W0#C#`@f`.
@@ -770,12 +804,14 @@
      include M0
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] W1#M0#
+#            ^^ reference [..] W1#M0#
    end
  
    class C
 #        ^ definition [..] W1#C#
      include M1
 #    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] W1#M1#
 #            ^^ reference [..] W1#M1#
      def set_f; @f = 0; end
 #        ^^^^^ definition [..] W1#C#set_f().
@@ -806,9 +842,10 @@
  
    class C1 < C0
 #        ^^ definition [..] W2#C1#
-#             ^^ definition [..] W2#C0#
+#             ^^ reference [..] W2#C0#
      include M
 #    ^^^^^^^ reference [..] Module#include().
+#            ^ reference [..] W2#M#
 #            ^ reference [..] W2#M#
      def get_fp1; @f + 1; end
 #        ^^^^^^^ definition [..] W2#C1#get_fp1().
@@ -838,9 +875,10 @@
  
    class C1 < C0
 #        ^^ definition [..] W3#C1#
-#             ^^ definition [..] W3#C0#
+#             ^^ reference [..] W3#C0#
      include M
 #    ^^^^^^^ reference [..] Module#include().
+#            ^ reference [..] W3#M#
 #            ^ reference [..] W3#M#
      def get_fp1; @f + 1; end
 #        ^^^^^^^ definition [..] W3#C1#get_fp1().
@@ -865,6 +903,7 @@
      include M0
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] W4#M0#
+#            ^^ reference [..] W4#M0#
      def set_f; @f = 0; end
 #        ^^^^^ definition [..] W4#M1#set_f().
 #               ^^ definition [..] W4#M1#`@f`.
@@ -876,6 +915,7 @@
 #        ^ definition [..] W4#C#
      include M1
 #    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] W4#M1#
 #            ^^ reference [..] W4#M1#
      def get_fp1; @f + 1; end
 #        ^^^^^^^ definition [..] W4#C#get_fp1().
@@ -906,8 +946,10 @@
      include M0
 #    ^^^^^^^ reference [..] Module#include().
 #            ^^ reference [..] W5#M0#
+#            ^^ reference [..] W5#M0#
      include M1
 #    ^^^^^^^ reference [..] Module#include().
+#            ^^ reference [..] W5#M1#
 #            ^^ reference [..] W5#M1#
      def get_fp1; @f + 1; end
 #        ^^^^^^^ definition [..] W5#C#get_fp1().

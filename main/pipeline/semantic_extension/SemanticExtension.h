@@ -30,7 +30,8 @@ public:
     virtual void prepareForTypechecking(const core::GlobalState &) = 0;
     virtual void finishTypecheckFile(const core::GlobalState &, const core::FileRef &) const = 0;
     virtual void finishTypecheck(const core::GlobalState &) const = 0;
-    virtual void typecheck(const core::GlobalState &, core::FileRef file, cfg::CFG &) const = 0;
+    virtual void typecheck(const core::GlobalState &, core::FileRef file, cfg::CFG &, const ast::MethodDef * = nullptr) const = 0;
+    virtual void typecheckClass(const core::GlobalState &, core::FileRef file, const ast::ClassDef &) const = 0;
     virtual void run(core::MutableContext &, ast::ClassDef *) const = 0;
     virtual ~SemanticExtension() = default;
     virtual std::unique_ptr<SemanticExtension> deepCopy(const core::GlobalState &from, core::GlobalState &to) = 0;

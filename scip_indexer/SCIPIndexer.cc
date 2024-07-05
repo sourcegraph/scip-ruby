@@ -451,6 +451,27 @@ public:
         return absl::OkStatus();
     }
 
+    absl::Status saveQualifierReferences(const core::GlobalState &gs, core::FileRef file,
+                                         const ast::ExpressionPtr &constantLitExpr) {
+        auto *expr = &constantLitExpr;
+        while (auto *constantLit = ast::cast_tree<ast::ConstantLit>(*expr)) {
+            if (constantLit->symbol.exists() && constantLit->symbol.asClassOrModuleRef().exists()) {
+                core::Context ctx(gs, constantLit->symbol, file);
+                auto status = this->saveReference(ctx, GenericSymbolRef::classOrModule(constantLit->symbol),
+                                                  /*overrideType*/ std::nullopt, constantLit->loc, 0);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+            if (auto *unresolved = ast::cast_tree<ast::UnresolvedConstantLit>(constantLit->original)) {
+                expr = &unresolved->scope;
+                continue;
+            }
+            break;
+        }
+        return absl::OkStatus();
+    }
+
     absl::Status saveReference(const core::Context &ctx, GenericSymbolRef symRef, optional<core::TypePtr> overrideType,
                                core::LocOffsets occLoc, int32_t symbol_roles) {
         // HACK: Reduce noise due to <static-init> in snapshots.
@@ -1326,19 +1347,42 @@ public:
         }
     };
 
+    virtual void typecheckClass(const core::GlobalState &gs, core::FileRef file, const ast::ClassDef &klass) const override {
+        if (this->doNothing() || ast::isa_tree<ast::EmptyTree>(klass.name)) {
+            return;
+        }
+        auto scipState = this->getSCIPState();
+
+        auto status = scipState->saveDefinition(gs, file, scip_indexer::GenericSymbolRef::classOrModule(klass.symbol),
+                                                klass.name.loc());
+        ENFORCE(status.ok());
+        auto *expr = &klass.name;
+        if (auto *constantLit = ast::cast_tree<ast::ConstantLit>(*expr)) {
+            if (auto *unresolved = ast::cast_tree<ast::UnresolvedConstantLit>(constantLit->original)) {
+                auto status = scipState->saveQualifierReferences(gs, file, unresolved->scope);
+                ENFORCE(status.ok());
+            }
+        }
+
+        for (auto &ancestorExpr : klass.ancestors) {
+            auto status = scipState->saveQualifierReferences(gs, file, ancestorExpr);
+            ENFORCE(status.ok());
+        }
+    }
+
     virtual void typecheck(const core::GlobalState &gs, core::FileRef file, cfg::CFG &cfg,
-                           ast::MethodDef &methodDef) const override {
+                           const ast::MethodDef *methodDef) const override {
         if (this->doNothing()) {
             return;
         }
         auto scipState = this->getSCIPState();
-        if (methodDef.name != core::Names::staticInit()) {
-            auto status = scipState->saveDefinition(gs, file, scip_indexer::GenericSymbolRef::method(methodDef.symbol));
+        if (methodDef != nullptr && methodDef->name != core::Names::staticInit()) {
+            auto status = scipState->saveDefinition(gs, file, scip_indexer::GenericSymbolRef::method(methodDef->symbol));
             ENFORCE(status.ok());
         }
 
         // It is not useful to emit occurrences for method bodies that are synthesized.
-        if (methodDef.flags.isRewriterSynthesized) {
+        if (methodDef != nullptr && methodDef->flags.isRewriterSynthesized) {
             return;
         }
 
@@ -1349,7 +1393,7 @@ public:
         // information repeatedly for each occurrence.
 
         auto &scipStateRef = *scipState.get();
-        sorbet::scip_indexer::CFGTraversal traversal(scipStateRef, core::Context(gs, methodDef.symbol, file));
+        sorbet::scip_indexer::CFGTraversal traversal(scipStateRef, core::Context(gs, cfg.symbol, file));
         traversal.traverse(cfg);
         scipStateRef.clearFunctionLocalCaches();
     }

@@ -22,7 +22,7 @@
  
  class C2 < C1
 #      ^^ definition [..] C2#
-#           ^^ definition [..] C1#
+#           ^^ reference [..] C1#
    def get_inherited_ivar
 #      ^^^^^^^^^^^^^^^^^^ definition [..] C2#get_inherited_ivar().
      return @f + @h
@@ -56,7 +56,7 @@
  
  class C3 < C2
 #      ^^ definition [..] C3#
-#           ^^ definition [..] C2#
+#           ^^ reference [..] C2#
    def refs
 #      ^^^^ definition [..] C3#refs().
      @f = @g + @i
@@ -136,7 +136,9 @@
      return
    end
  
+   # BUG: Emitting a definition for 'self' here seems wrong.
    class << self
+#           ^^^^ definition [..] `<Class:D1>`#
      def set_y
 #        ^^^^^ definition [..] `<Class:D1>`#set_y().
        @@d1_y = @@d1_v
@@ -149,7 +151,7 @@
  
  class D2 < D1
 #      ^^ definition [..] D2#
-#           ^^ definition [..] D1#
+#           ^^ reference [..] D1#
    def self.get
 #           ^^^ definition [..] `<Class:D2>`#get().
      @@d2_x = @@d1_v + @@d1_x
@@ -168,7 +170,7 @@
  
  class D3 < D2
 #      ^^ definition [..] D3#
-#           ^^ definition [..] D2#
+#           ^^ reference [..] D2#
    def self.get_2
 #           ^^^^^ definition [..] `<Class:D3>`#get_2().
      @@d1_v + @@d1_x
@@ -237,7 +239,7 @@
  
  class DD2 < DD1
 #      ^^^ definition [..] DD2#
-#            ^^^ definition [..] DD1#
+#            ^^^ reference [..] DD1#
    def self.get_x
 #           ^^^^^ definition [..] `<Class:DD2>`#get_x().
      @@x
@@ -271,7 +273,7 @@
  
  class E2 < E1
 #      ^^ definition [..] E2#
-#           ^^ definition [..] E1#
+#           ^^ reference [..] E1#
    @x = 0
 #  ^^ definition [..] `<Class:E2>`#`@x`.
  

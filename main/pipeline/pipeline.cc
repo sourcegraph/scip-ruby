@@ -1337,6 +1337,12 @@ class CFGCollectorAndTyper {
 public:
     CFGCollectorAndTyper(const options::Options &opts) : opts(opts){};
 
+    void postTransformClassDef(core::Context ctx, const ast::ClassDef &c) {
+        for (auto &extension : ctx.state.semanticExtensions) {
+            extension->typecheckClass(ctx, ctx.file, c);
+        }
+    }
+
     void preTransformMethodDef(core::Context ctx, const ast::MethodDef &m) {
         if (!infer::Inference::willRun(ctx, m.declLoc, m.symbol)) {
             return;
@@ -1349,7 +1355,7 @@ public:
             cfg = infer::Inference::run(ctx.withOwner(cfg->symbol), move(cfg));
             if (cfg) {
                 for (auto &extension : ctx.state.semanticExtensions) {
-                    extension->typecheck(ctx, ctx.file, *cfg);
+                    extension->typecheck(ctx, ctx.file, *cfg, &m);
                 }
             }
         }

@@ -6,5 +6,5 @@
  
  class C < ::D
 #      ^ definition [..] C#
-#            ^ definition [..] D#
+#            ^ reference [..] D#
  end

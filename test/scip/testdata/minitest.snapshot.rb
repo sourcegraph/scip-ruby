@@ -24,7 +24,7 @@
 #      ^^ definition [..] MyTest#C2.
 #      ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Kernel#
 #      ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Kernel#raise().
-#                     ^^^^^^^ definition local 9~#119448696
+#                     ^^^^^^^ definition local 3~#119448696
 #                     ^^^^^^^ reference [..] Integer#
      end
  
@@ -38,6 +38,7 @@
      end
  
      describe "some inner tests" do
+#             ^^^^^^^^^^^^^^^^^^ reference [..] MyTest#
 #             ^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'some inner tests'>`#
          def inside_method
 #            ^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'some inner tests'>`#inside_method().
@@ -54,7 +55,7 @@
 #        ^^^^^^^^^^^^^^^ definition [..] MyTest#instance_helper().
  
      before do
-#    ^^^^^^ definition [..] MyTest#initialize().
+#    ^^^^^^ definition [..] MyTest#`<before>`().
          @foo = T.let(3, Integer)
          instance_helper
      end
@@ -70,6 +71,7 @@
      end
  
      describe Object do
+#             ^^^^^^ reference [..] MyTest#
 #             ^^^^^^ definition [..] MyTest#`<describe 'Object'>`#
          it Object do
 #           ^^^^^^ definition [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
@@ -94,10 +96,12 @@
      end
  
      describe "a non-ideal situation" do
+#             ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] MyTest#
 #             ^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'a non-ideal situation'>`#
        it "contains nested describes" do
 #         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'a non-ideal situation'>`#`<it 'contains nested describes'>`().
          describe "nobody should write this but we should still parse it" do
+#                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] MyTest#`<describe 'a non-ideal situation'>`#
 #                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'a non-ideal situation'>`#`<describe 'nobody should write this but we should still parse it'>`#
          end
        end
