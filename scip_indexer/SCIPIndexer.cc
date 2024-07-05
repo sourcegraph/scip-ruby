@@ -451,6 +451,27 @@ public:
         return absl::OkStatus();
     }
 
+    absl::Status saveQualifierReferences(const core::GlobalState &gs, core::FileRef file,
+                                         ast::ExpressionPtr &constantLitExpr) {
+        auto *expr = &constantLitExpr;
+        while (auto *constantLit = ast::cast_tree<ast::ConstantLit>(*expr)) {
+            if (constantLit->symbol.exists() && constantLit->symbol.asClassOrModuleRef().exists()) {
+                core::Context ctx(gs, constantLit->symbol, file);
+                auto status = this->saveReference(ctx, GenericSymbolRef::classOrModule(constantLit->symbol),
+                                                  /*overrideType*/ std::nullopt, constantLit->loc, 0);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+            if (auto *unresolved = ast::cast_tree<ast::UnresolvedConstantLit>(constantLit->original)) {
+                expr = &unresolved->scope;
+                continue;
+            }
+            break;
+        }
+        return absl::OkStatus();
+    }
+
     absl::Status saveReference(const core::Context &ctx, GenericSymbolRef symRef, optional<core::TypePtr> overrideType,
                                core::LocOffsets occLoc, int32_t symbol_roles) {
         // HACK: Reduce noise due to <static-init> in snapshots.
@@ -1325,6 +1346,29 @@ public:
             writer.writeExternalSymbol(move(symbol));
         }
     };
+
+    virtual void typecheckClass(const core::GlobalState &gs, core::FileRef file, ast::ClassDef &klass) const override {
+        if (this->doNothing() || ast::isa_tree<ast::EmptyTree>(klass.name)) {
+            return;
+        }
+        auto scipState = this->getSCIPState();
+
+        auto status = scipState->saveDefinition(gs, file, scip_indexer::GenericSymbolRef::classOrModule(klass.symbol),
+                                                klass.name.loc());
+        ENFORCE(status.ok());
+        auto *expr = &klass.name;
+        if (auto *constantLit = ast::cast_tree<ast::ConstantLit>(*expr)) {
+            if (auto *unresolved = ast::cast_tree<ast::UnresolvedConstantLit>(constantLit->original)) {
+                auto status = scipState->saveQualifierReferences(gs, file, unresolved->scope);
+                ENFORCE(status.ok());
+            }
+        }
+
+        for (auto &ancestorExpr : klass.ancestors) {
+            auto status = scipState->saveQualifierReferences(gs, file, ancestorExpr);
+            ENFORCE(status.ok());
+        }
+    }
 
     virtual void typecheck(const core::GlobalState &gs, core::FileRef file, cfg::CFG &cfg,
                            ast::MethodDef &methodDef) const override {

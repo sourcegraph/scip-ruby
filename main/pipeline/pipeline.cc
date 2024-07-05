@@ -55,6 +55,13 @@ class CFGCollectorAndTyper {
 public:
     CFGCollectorAndTyper(const options::Options &opts) : opts(opts){};
 
+    void postTransformClassDef(core::Context ctx, ast::ExpressionPtr &tree) {
+        auto &c = ast::cast_tree_nonnull<ast::ClassDef>(tree);
+        for (auto &extension : ctx.state.semanticExtensions) {
+            extension->typecheckClass(ctx, ctx.file, c);
+        }
+    }
+
     void preTransformMethodDef(core::Context ctx, ast::ExpressionPtr &tree) {
         auto &m = ast::cast_tree_nonnull<ast::MethodDef>(tree);
         if (!infer::Inference::willRun(ctx, m.declLoc, m.symbol)) {

@@ -222,9 +222,16 @@ TEST_CASE("GemInference") {
     checkGem(notSorbetRBI, "mygem", "33");
 }
 
-// Copied from pipeline_test_runner.cc
-class CFGCollectorAndTyper { // TODO(varun): Copy this over to scip_test_runner.cc
+// Based on a mix of pipeline_test_runner.cc and pipeline.cc
+class CFGCollectorAndTyper {
 public:
+    void postTransformClassDef(core::Context ctx, ast::ExpressionPtr &tree) {
+        auto &c = ast::cast_tree_nonnull<ast::ClassDef>(tree);
+        for (auto &extension : ctx.state.semanticExtensions) {
+            extension->typecheckClass(ctx, ctx.file, c);
+        }
+    }
+
     vector<unique_ptr<cfg::CFG>> cfgs;
     void preTransformMethodDef(core::Context ctx, ast::ExpressionPtr &tree) {
         auto &m = ast::cast_tree_nonnull<ast::MethodDef>(tree);

@@ -5,7 +5,7 @@
 #    ^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] Object#assign_different_branches().
 #    documentation
 #    | ```ruby
-#    | sig {params(b: T.untyped).returns(T.untyped)}
+#    | sig { params(b: T.untyped).returns(T.untyped) }
 #    | def assign_different_branches(b)
 #    | ```
 #                              ^ definition local 1~#3317016627
@@ -35,7 +35,7 @@
 #    ^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] Object#change_different_branches().
 #    documentation
 #    | ```ruby
-#    | sig {params(b: T.untyped).returns(T.untyped)}
+#    | sig { params(b: T.untyped).returns(T.untyped) }
 #    | def change_different_branches(b)
 #    | ```
 #                              ^ definition local 1~#2122680152
@@ -71,7 +71,7 @@
 #    ^^^^^^^^^^^^^^^^ definition [..] Object#loop_type_change().
 #    documentation
 #    | ```ruby
-#    | sig {params(bs: T.untyped).returns(T.untyped)}
+#    | sig { params(bs: T.untyped).returns(T.untyped) }
 #    | def loop_type_change(bs)
 #    | ```
 #                     ^^ definition local 1~#4057334513
@@ -141,7 +141,7 @@
 #      ^^^^^^^^^^^ definition [..] C#change_type().
 #      documentation
 #      | ```ruby
-#      | sig {params(b: T.untyped).returns(T.untyped)}
+#      | sig { params(b: T.untyped).returns(T.untyped) }
 #      | def change_type(b)
 #      | ```
 #                  ^ definition local 1~#2066187318
@@ -213,16 +213,12 @@
 #      | ```ruby
 #      | class D < C
 #      | ```
-#          ^ definition [..] C#
-#          documentation
-#          | ```ruby
-#          | class C
-#          | ```
+#          ^ reference [..] C#
    def change_type(b)
 #      ^^^^^^^^^^^ definition [..] D#change_type().
 #      documentation
 #      | ```ruby
-#      | sig {params(b: T.untyped).returns(T.untyped)}
+#      | sig { params(b: T.untyped).returns(T.untyped) }
 #      | def change_type(b)
 #      | ```
 #                  ^ definition local 1~#2066187318
