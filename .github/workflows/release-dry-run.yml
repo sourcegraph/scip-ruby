@@ -46,8 +46,12 @@ jobs:
             bazel-repos-
       - name: "⚙️ Setup Bazel"
         run: 
+          echo "rbenv=$(which rbenv)"
           echo "version=${TAG/refs\/tags\/scip-ruby-v/}"
           VERSION="${TAG/refs\/tags\/scip-ruby-v/}" .github/workflows/setup-bazel.sh
+          echo "--- .bazelrc.local contents ---"
+          cat .bazelrc.local
+          echo "--- end of .bazelrc.local"
       - name: "🔎 Identify OS"
         run: echo "OS=$(uname -s | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
       - name: ${{ format('🏗 Build ({0})', matrix.config) }}
