@@ -50,9 +50,11 @@ public:
 /// for different parts of the RHS.
 class Binding final {
 public:
+    /// LHS for a single "assignment" in the CFG.
     VariableUseSite bind;
+    /// Location for the full "assignment" (use bind.loc if you need the location for the LHS only).
     core::LocOffsets loc;
-
+    /// RHS for a single "assignment" in the CFG.
     InstructionPtr value;
 
     Binding(LocalOccurrence bind, core::LocOffsets loc, InstructionPtr value);

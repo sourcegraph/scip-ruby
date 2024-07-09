@@ -31,6 +31,7 @@ class VariableUseSite final {
 public:
     LocalRef variable;
     core::TypePtr type;
+    /// Location for the LHS of an "assignment" in the CFG.
     core::LocOffsets loc;
     VariableUseSite() = default;
     VariableUseSite(LocalRef local) : variable(local){};
