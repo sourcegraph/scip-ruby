@@ -587,7 +587,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, const ast::ExpressionPtr &what, Ba
             },
             [&](const ast::Assign &a) {
                 if (auto lhsIdent = ast::cast_tree<ast::ConstantLit>(a.lhs)) {
-                    auto lhs = global2Local(cctx, lhsIdent->symbol(), a.loc);
+                    auto lhs = global2Local(cctx, lhsIdent->symbol(), a.lhs.loc());
                     ret = walkAssign(cctx, a.rhs, a.loc, LocalOccurrence{lhs, a.lhs.loc()}, current);
                 } else if (auto lhsLocal = ast::cast_tree<ast::Local>(a.lhs)) {
                     auto lhs = cctx.inWhat.enterLocal(lhsLocal->localVariable);

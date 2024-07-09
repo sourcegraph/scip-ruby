@@ -148,7 +148,10 @@ optional<ProcessStatResult> processStat(core::MutableContext ctx, ast::ClassDef 
 
     auto statLocZero = stat.loc().copyWithZeroLength();
     auto name = ctx.state.enterNameConstant(ctx.state.freshNameUnique(core::UniqueNameKind::TEnum, lhs->cnst, 1));
-    auto classCnst = ast::MK::UnresolvedConstant(statLocZero, ast::MK::EmptyTree(), name);
+    // For some reason, Sorbet uses a zero-length range here,
+    // but it seems like we need this for scip-ruby?
+    // https://github.com/sorbet/sorbet/pull/7092
+    auto classCnst = ast::MK::UnresolvedConstant(lhs->loc, ast::MK::EmptyTree(), name);
     ast::ClassDef::ANCESTORS_store parent;
     parent.emplace_back(klass->name.deepCopy());
     ast::ClassDef::RHS_store classRhs;
@@ -252,7 +255,7 @@ void TEnum::run(core::MutableContext ctx, ast::ClassDef *klass) {
         auto serializeReturnTypeClass = core::cast_type_nonnull<core::ClassType>(serializeReturnType);
         ast::ExpressionPtr return_type_ast = ast::MK::Constant(klass->declLoc, serializeReturnTypeClass.symbol);
         auto sig = ast::MK::Sig0(klass->declLoc, std::move(return_type_ast));
-        auto method = ast::MK::SyntheticMethod0(klass->loc, klass->declLoc, klass->loc, core::Names::serialize(),
+        auto method = ast::MK::SyntheticMethod0(klass->loc, klass->declLoc, klass->name.loc(), core::Names::serialize(),
                                                 ast::MK::RaiseTypedUnimplemented(klass->declLoc));
         ast::Send::Flags flags;
         flags.isPrivateOk = true;
