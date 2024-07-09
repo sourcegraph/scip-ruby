@@ -76,6 +76,7 @@ def scip_repos_test_suite(name, patch_paths):
                 gem_dep[os] = "//gems/scip-ruby/scip-ruby-debug-1993.5.16-x86_64-linux.gem"
             else:
                 candidates.append(patch_basename + "-darwin.patch")
+
                 # TODO: Change to arm64-darwin
                 # NOTE: Keep in sync with index_gem.sh.
                 gem_dep[os] = "//gems/scip-ruby/scip-ruby-debug-1993.5.16-universal-darwin-20.gem"
