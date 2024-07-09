@@ -290,14 +290,19 @@ private:
                                     core::Loc occLoc, const SmallVec<string> &docs,
                                     const SmallVec<scip::Relationship> &rels) {
         ENFORCE(!symbolString.empty());
-
-        auto emitted = this->saveSymbolInfo(file, symbolString, docs, rels);
-
         occLoc = trimColonColonPrefix(gs, occLoc);
+        auto range = sorbet::scip_indexer::fromSorbetLoc(gs, occLoc);
+        if (range.size() == 4) {
+            // Don't emit multiline occurrences; generally this indicates a bug in the indexer.
+            // FIXME: This causes us to miss the definition for the initialize method
+            // in the struct.rb test case.
+            return absl::OkStatus();
+        }
+        auto emitted = this->saveSymbolInfo(file, symbolString, docs, rels);
         scip::Occurrence occurrence;
         occurrence.set_symbol(symbolString);
         occurrence.set_symbol_roles(scip::SymbolRole::Definition);
-        for (auto val : sorbet::scip_indexer::fromSorbetLoc(gs, occLoc)) {
+        for (auto val : range) {
             occurrence.add_range(val);
         }
         switch (emitted) {
@@ -320,7 +325,12 @@ private:
         scip::Occurrence occurrence;
         occurrence.set_symbol(symbolString);
         occurrence.set_symbol_roles(symbol_roles);
-        for (auto val : sorbet::scip_indexer::fromSorbetLoc(gs, occLoc)) {
+        auto range = sorbet::scip_indexer::fromSorbetLoc(gs, occLoc);
+        if (range.size() == 4) {
+            // Don't emit multiline occurrences; generally this indicates a bug in the indexer.
+            return;
+        }
+        for (auto val : range) {
             occurrence.add_range(val);
         }
         for (auto &doc : overrideDocs) {

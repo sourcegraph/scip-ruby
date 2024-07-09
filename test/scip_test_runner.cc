@@ -311,6 +311,7 @@ struct SCIPRange final {
         auto &r = protoRange;
         if (r.size() == 4) {
             *this = SCIPRange(SCIPPosition{r[0] + 1, r[1] + 1}, SCIPPosition{r[2] + 1, r[3] + 1});
+            return;
         }
         *this = SCIPRange(SCIPPosition{r[0] + 1, r[1] + 1}, SCIPPosition{r[0] + 1, r[2] + 1});
     }
@@ -366,6 +367,7 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
             auto occ = occurrences[occ_i];
             auto range = SCIPRange(occ.range());
             if (range.isMultiline()) { // FIXME(varun): Handle multiline occurrences.
+                ENFORCE(false, "Got multiline occurrence which shouldn't have been emitted: {}", range.toString());
                 continue;
             }
             bool isDefinition = ((unsigned(occ.symbol_roles()) & unsigned(scip::SymbolRole::Definition)) > 0);
