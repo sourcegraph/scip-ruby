@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         platform: ['ubuntu-20.04', 'macos-12']
-        config: ['debug', 'release']
+        config: ['asserts', 'release']
     runs-on: ${{ matrix.platform }}
     env:
       TAG: ${{ github.event.ref }}
@@ -45,7 +45,7 @@ jobs:
         run: echo "OS=$(uname -s | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
       - name: ${{ format('🏗 Build ({0})', matrix.config) }}
         run: |
-          CONFIG="dbg"
+          CONFIG="dev"
           if [ "$CFG" == "release" ]; then
             CONFIG="release-${OS/darwin/mac}"
           fi
@@ -61,7 +61,7 @@ jobs:
           path: log
       - name: ${{ format('🪄 Rename binary ({0})', matrix.config) }}
         run: |
-          SUFFIX="-debug"
+          SUFFIX="-asserts"
           if [ "$CFG" == "release" ]; then
             SUFFIX=""
           fi

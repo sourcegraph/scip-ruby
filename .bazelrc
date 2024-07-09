@@ -68,6 +68,8 @@ build --cxxopt=-Wno-unqualified-std-cast-call --host_cxxopt=-Wno-unqualified-std
 ##
 ## debug configuration
 ##
+build:dev --config=dbg --copt=-O1
+
 build:dbg --copt=-O0
 build:dbg --compilation_mode=dbg
 build:dbg --config=debugsymbols
@@ -75,6 +77,7 @@ build:dbg --config=debugsymbols
 # We want to force files to be downloaded because otherwise clangd won't find them (and possibly lldb, though I haven't checked)
 # TODO(jez) Do newer compile commands generators suffer from this problem? The one we use is archived
 build:dbg --remote_download_outputs=all
+
 
 build:rubydbg --copt=-DRUBY_DEBUG --copt=-DVM_CHECK_MODE=1 --copt=-DTRANSIENT_HEAP_CHECK_MODE --copt=-DRGENGC_CHECK_MODE --copt=-DENC_DEBUG
 
@@ -142,7 +145,7 @@ build:release-linux-aarch64           --copt=-march=armv8.1a
 build:release-sanitized-linux         --copt=-march=sandybridge
 build:release-sanitized-linux-aarch64 --copt=-march=armv8.1a
 
-build:release-mac --config=release-common --config=shared-libs --platforms=@//tools/platforms:darwin_arm64
+build:release-mac --config=release-common --config=shared-libs --platforms=@//tools/platforms:darwin_x86_64
 
 build:cross-to-darwin-x86_64 --platforms=@//tools/platforms:darwin_x86_64
 build:cross-to-darwin-x86_64 --extra_toolchains=@llvm_toolchain_15_0_6//:cc-toolchain-x86_64-darwin
