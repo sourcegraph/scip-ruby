@@ -2,9 +2,10 @@ Download the binary for your platform using:
 
 ```bash
 TAG=TAG_PLACEHOLDER \
+ARCH="$(uname -m)" \
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')" \
 RELEASE_URL="https://github.com/sourcegraph/scip-ruby/releases/download/$TAG" \
-bash -c 'curl -L "$RELEASE_URL/scip-ruby-x86_64-$OS" -o scip-ruby' && \
+bash -c 'curl -L "$RELEASE_URL/scip-ruby-$ARCH-$OS" -o scip-ruby' && \
 chmod +x scip-ruby
 ```
 

@@ -1,0 +1,108 @@
+name: Release # This name is used by the publish-docker workflow
+on:
+  workflow_dispatch:
+    inputs:
+      fakeTag:
+        description: 'Fake tag to use'
+        required: true
+        default: 'scip-ruby-v0.0.0-testing'
+        type: string
+
+jobs:
+  build-and-upload-artifacts:
+    name: 'Build and upload artifacts'
+    strategy:
+      matrix:
+        # Use macos-14 as macos-13 runner is only offered for x86_64
+        platform: ['ubuntu-20.04', 'macos-14']
+        config: ['debug', 'release']
+    runs-on: ${{ matrix.platform }}
+    env:
+      TAG: ${{ inputs.fakeTag }}
+    steps:
+      - uses: actions/checkout@v4
+      # Keep in sync with ci.yml
+      - uses: ruby/setup-ruby@v1
+      - name: Manually evict cache entry if applicable
+        if: ${{ runner.os == 'Linux' }}
+        run: ACCESS_TOKEN='${{ secrets.GITHUB_TOKEN }}' python3 .github/workflows/evict.py
+      - name: "🚀 Mount Bazel build cache"
+        if: ${{ runner.os == 'Linux' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/bazelcache/build
+          key: bazel-build-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            bazel-build-${{ runner.os }}-
+            bazel-build-
+      - name: "🚀 Mount Bazel repo cache"
+        uses: actions/cache@v4
+        if: ${{ runner.os == 'Linux' }}
+        with:
+          path: ~/bazelcache/repos
+          key: bazel-repos-${{ runner.os }}-${{ hashFiles('WORKSPACE') }}
+          restore-keys: |
+            bazel-repos-${{ runner.os }}-
+            bazel-repos-
+      - name: "⚙️ Setup Bazel"
+        run: 
+          echo "version=${TAG/refs\/tags\/scip-ruby-v/}"
+          VERSION="${TAG/refs\/tags\/scip-ruby-v/}" .github/workflows/setup-bazel.sh
+      - name: "🔎 Identify OS"
+        run: echo "OS=$(uname -s | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+      - name: ${{ format('🏗 Build ({0})', matrix.config) }}
+        run: |
+          CONFIG="dbg"
+          if [ "$CFG" == "release" ]; then
+            CONFIG="release-${OS/darwin/mac}"
+          fi
+          ./bazel build //main:scip-ruby --config="$CONFIG" --execution_log_binary_file=log
+          echo "config=$CONFIG" >> "$GITHUB_ENV"
+        env:
+          OS: ${{ env.OS }}
+          CFG: ${{ matrix.config }}
+      - name: ${{ format('🪄 Rename binary ({0})', matrix.config) }}
+        run: |
+          SUFFIX="-debug"
+          if [ "$CFG" == "release" ]; then
+            SUFFIX=""
+          fi
+          outBinaryPath="scip-ruby${SUFFIX}-$(uname -m)-$OS"
+          cp bazel-bin/main/scip-ruby "$outBinaryPath"
+          echo "outBinaryPath=$outBinaryPath" >> "$GITHUB_ENV"
+          echo "suffix=$SUFFIX" >> "$GITHUB_ENV"
+        env:
+          OS: ${{ env.OS }}
+          CFG: ${{ matrix.config }}
+      - name: ${{ format('📦 Store binary ({0})', matrix.config) }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.platform }}-${{ matrix.config }}-release-artifacts
+          path: ${{ env.outBinaryPath }}
+          retention-days: 2
+      - name: ${{ format('💎 Build Gem(s) ({0})', matrix.config) }}
+        run: ./bazel build //gems/scip-ruby --config="${{ env.config }}"
+      - name: ${{ format('📦 Store Gem(s) to GitHub ({0})', matrix.config) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-${{ matrix.config }}-release-artifacts
+          path: bazel-bin/gems/scip-ruby/*.gem
+          retention-days: 2
+
+  create-release:
+    name: 'Create release (dry run)'
+    needs: build-and-upload-artifacts
+    runs-on: 'ubuntu-20.04'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Create Release
+        run: |
+          TAG="${GITHUB_REF/refs\/tags\//}"
+          TITLE="${TAG/-v/ v}"
+          TEMPLATE="$(< .github/workflows/release-template.md)"
+          echo "${TEMPLATE//TAG_PLACEHOLDER/$TAG}" > notes
+          echo "Create release: tag=$TAG, title=$TITLE"
+      - name: '📥 Download all artifacts'
+        uses: actions/download-artifact@v4
+      - name: '📤 List artifacts for release'
+        run: ls ./*-release-artifacts/**
