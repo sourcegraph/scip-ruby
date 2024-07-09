@@ -57,9 +57,4 @@ jobs:
           name: ${{ matrix.config }}-build-log
           path: log
       - name: ${{ format('💎 Build Gem(s) ({0})', matrix.config) }}
-        run: |
-          CONFIG="dev"
-          if [ "$CFG" == "release" ]; then
-            CONFIG="release-${OS/darwin/mac}"
-          fi
-          ./bazel build //gems/scip-ruby --config="$CONFIG"
+        run: ./bazel build //gems/scip-ruby --config="${{ env.config }}"
