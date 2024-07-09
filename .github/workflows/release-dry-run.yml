@@ -46,7 +46,7 @@ jobs:
             bazel-repos-
       - name: "⚙️ Setup Bazel"
         run: |
-          echo "rbenv=$(which rbenv)"
+          echo "rbenv=$(command -v rbenv)"
           echo "version=${FAKE_VERSION/v/}"
           VERSION="${FAKE_VERSION/v/}" .github/workflows/setup-bazel.sh
           echo "--- .bazelrc.local contents ---"
