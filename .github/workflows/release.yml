@@ -57,7 +57,7 @@ jobs:
       - name: "🪵 Upload log"
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.config }}-build-log
+          name: build-log-${{ matrix.platform }}-${{ matrix.config }}
           path: log
       - name: ${{ format('🪄 Rename binary ({0})', matrix.config) }}
         run: |
