@@ -1,4 +1,4 @@
-name: Release # This name is used by the publish-docker workflow
+name: 'Release (Dry Run)' # This name is used by the publish-docker workflow
 on:
   workflow_dispatch:
     inputs:
