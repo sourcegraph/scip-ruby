@@ -395,13 +395,7 @@ string BasicBlock::toTextualString(const core::GlobalState &gs, optional<core::F
         fmt::format_to(std::back_inserter(buf), "    # outerLoops: {}\n", this->outerLoops);
     }
     for (const Binding &exp : this->exprs) {
-        string positionText = "";
-        if (file) {
-            positionText = fmt::format(" @ {}", core::Loc(file.value(), exp.loc).showRawLineColumn(gs));
-        }
-
-        fmt::format_to(std::back_inserter(buf), "    {}{} = {}\n", exp.bind.toString(gs, cfg), positionText,
-                       exp.value.toString(gs, cfg));
+        fmt::format_to(std::back_inserter(buf), "    {}\n", exp.toTextualString(gs, file, cfg));
     }
 
     if (this->bexit.thenb == this->bexit.elseb) {
@@ -441,5 +435,17 @@ string BasicBlock::showRaw(const core::GlobalState &gs, const CFG &cfg) const {
 
 Binding::Binding(LocalOccurrence bind, core::LocOffsets loc, InstructionPtr value)
     : bind(bind.variable, bind.loc), loc(loc), value(std::move(value)) {}
+
+std::string Binding::toTextualString(const core::GlobalState &gs, std::optional<core::FileRef> file,
+                                     const CFG &cfg) const {
+    string lhsPositionText = "";
+    string rhsPositionText = "";
+    if (file) {
+        lhsPositionText = fmt::format(" @ {}", core::Loc(file.value(), this->bind.loc).showRawLineColumn(gs));
+        rhsPositionText = fmt::format(" (@ {})", core::Loc(file.value(), this->loc).showRawLineColumn(gs));
+    }
+    return fmt::format("{}{} = {}{}", this->bind.toString(gs, cfg), lhsPositionText, this->value.toString(gs, cfg),
+                       rhsPositionText);
+}
 
 } // namespace sorbet::cfg

@@ -7,6 +7,7 @@
 #include "core/Types.h"
 #include <climits>
 #include <memory>
+#include <optional>
 
 #include "cfg/Instructions.h"
 
@@ -60,6 +61,8 @@ public:
     Binding() = default;
 
     Binding &operator=(Binding &&) = default;
+
+    std::string toTextualString(const core::GlobalState &gs, std::optional<core::FileRef> file, const CFG &cfg) const;
 };
 
 class BasicBlock final {
