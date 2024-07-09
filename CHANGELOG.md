@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## v0.4.0
+
+Updated with changes from upstream Sorbet as of June 22 2024 (0a7b175bc0bb41e2672369554f74364e83711a84).
+
+Bug fixes:
+
+- Fixes a bug for a crash/assertion triggered when handling `T::Enum` definitions.
+  (https://github.com/sourcegraph/scip-ruby/pull/213)
+- Fixes a bug where multiline occurrences were emitted, which may have let to
+  incorrect code navigation. (https://github.com/sourcegraph/scip-ruby/pull/212)
+
+Platform support:
+
+- macOS binaries are now built for arm64 instead of x86_64.
+  (https://github.com/sourcegraph/scip-ruby/commit/523faea66c8995fe74a628b1c08fedd87de08b51)
+- Replaces `-debug` binaries with `-asserts` binaries which are
+  built with `-O1` to enable faster troubleshooting on large monorepos.
+
 ## v0.3.9
 
 - Updated with changes from upstream Sorbet as of July 28 2023. (05866f6cfc5339e1e7a6d7e399ff92af594e3f9b)
