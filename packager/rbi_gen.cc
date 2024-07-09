@@ -118,7 +118,7 @@ core::SymbolRef lookupFQN(const core::GlobalState &gs, const vector<core::NameRe
     core::SymbolRef scope = core::Symbols::root();
     for (auto name : fqn) {
         if (scope.isClassOrModule()) {
-            auto result = scope.asClassOrModuleRef().data(gs)->findMemberNoDealias(gs, name);
+            auto result = scope.asClassOrModuleRef().data(gs)->findMemberNoDealias(name);
             if (!result.exists()) {
                 return core::Symbols::noClassOrModule();
             }
@@ -218,7 +218,7 @@ private:
             return "";
         }
         enqueueSymbolsInType(type);
-        auto options = core::ShowOptions{}.withShowForRBI();
+        auto options = core::ShowOptions{}.withUseValidSyntax();
         return type.show(gs, options);
     }
 
@@ -243,7 +243,7 @@ private:
                               const core::TypeConstraint *constraint) {
         ENFORCE(method.exists());
         ENFORCE(method.data(gs)->dealiasMethod(gs) == method);
-        // handle this case anyways so that we don't crash in prod when this method is mis-used
+        // handle this case anyways so that we don't crash in prod when this method is misused
         if (!method.exists()) {
             return "";
         }
@@ -316,7 +316,7 @@ private:
 
     string prettyDefForMethod(core::MethodRef method) {
         ENFORCE(method.exists());
-        // handle this case anyways so that we don't crash in prod when this method is mis-used
+        // handle this case anyways so that we don't crash in prod when this method is misused
         if (!method.exists()) {
             return "";
         }
@@ -1208,7 +1208,7 @@ public:
 
     RBIGenerator::RBIOutput emit() {
         RBIGenerator::RBIOutput output;
-        output.baseFilePath = pkg.mangledName().show(gs);
+        output.baseFilePath = pkg.mangledName().mangledName.show(gs);
 
         vector<core::SymbolRef> exports;
         vector<core::SymbolRef> testExports;
@@ -1289,7 +1289,7 @@ UnorderedSet<core::ClassOrModuleRef> RBIGenerator::buildPackageNamespace(core::G
     return packageNamespaces;
 }
 
-RBIGenerator::RBIOutput RBIGenerator::runOnce(const core::GlobalState &gs, core::NameRef pkgName,
+RBIGenerator::RBIOutput RBIGenerator::runOnce(const core::GlobalState &gs, core::packages::MangledName pkgName,
                                               const UnorderedSet<core::ClassOrModuleRef> &packageNamespaces) {
     auto &pkg = gs.packageDB().getPackageInfo(pkgName);
     ENFORCE(pkg.exists());
@@ -1303,14 +1303,14 @@ void RBIGenerator::run(core::GlobalState &gs, const UnorderedSet<core::ClassOrMo
 
     const auto &packageDB = gs.packageDB();
     auto &packages = packageDB.packages();
-    auto inputq = make_shared<ConcurrentBoundedQueue<core::NameRef>>(packages.size());
+    auto inputq = make_shared<ConcurrentBoundedQueue<core::packages::MangledName>>(packages.size());
     for (auto package : packages) {
         inputq->push(move(package), 1);
     }
 
     workers.multiplexJob(
         "RBIGenerator", [inputq, outputDir, &threadBarrier, &rogs = std::as_const(gs), &packageNamespaces]() {
-            core::NameRef job;
+            core::packages::MangledName job;
             for (auto result = inputq->try_pop(job); !result.done(); result = inputq->try_pop(job)) {
                 if (result.gotItem()) {
                     auto output = runOnce(rogs, job, packageNamespaces);
@@ -1335,7 +1335,7 @@ void RBIGenerator::run(core::GlobalState &gs, const UnorderedSet<core::ClassOrMo
 
 void RBIGenerator::runSinglePackage(core::GlobalState &gs,
                                     const UnorderedSet<core::ClassOrModuleRef> &packageNamespaces,
-                                    core::NameRef package, string outputDir, WorkerPool &workers) {
+                                    core::packages::MangledName package, string outputDir, WorkerPool &workers) {
     auto output = runOnce(gs, package, packageNamespaces);
     if (!output.rbi.empty()) {
         FileOps::write(absl::StrCat(outputDir, "/", output.baseFilePath, ".package.rbi"), output.rbi);

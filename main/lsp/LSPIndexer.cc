@@ -75,6 +75,9 @@ void LSPIndexer::computeFileHashes(const vector<shared_ptr<core::File>> &files) 
     computeFileHashes(files, *emptyWorkers);
 }
 
+// This function was previously called canTakeFastPath, but we changed it in ancitipation of adding
+// incremental mode(s) that lied between the original fast and slow path. Leaving this comment here
+// because old habits die hard and I still can only remember the name "canTakeFastPath"
 TypecheckingPath
 LSPIndexer::getTypecheckingPathInternal(const vector<shared_ptr<core::File>> &changedFiles,
                                         const UnorderedMap<core::FileRef, shared_ptr<core::File>> &evictedFiles) const {
@@ -304,8 +307,8 @@ LSPFileUpdates LSPIndexer::commitEdit(SorbetWorkspaceEditParams &edit, WorkerPoo
         // which one it will be.
         initialGS->errorQueue = make_shared<core::ErrorQueue>(
             initialGS->errorQueue->logger, initialGS->errorQueue->tracer, make_shared<core::NullFlusher>());
-        auto trees = hashing::Hashing::indexAndComputeFileHashes(initialGS, config->opts, *config->logger, frefs,
-                                                                 workers, kvstore);
+        auto trees = hashing::Hashing::indexAndComputeFileHashes(initialGS, config->opts, *config->logger,
+                                                                 absl::Span<core::FileRef>(frefs), workers, kvstore);
         update.updatedFileIndexes.resize(trees.size());
         for (auto &ast : trees) {
             const int i = fileToPos[ast.file];
@@ -393,6 +396,11 @@ core::FileRef LSPIndexer::uri2FileRef(string_view uri) const {
 const core::File &LSPIndexer::getFile(core::FileRef fref) const {
     ENFORCE(fref.exists());
     return fref.data(*initialGS);
+}
+
+void LSPIndexer::updateGsFromOptions(const DidChangeConfigurationParams &options) const {
+    initialGS->trackUntyped =
+        LSPClientConfiguration::parseEnableHighlightUntyped(*options.settings, initialGS->trackUntyped);
 }
 
 } // namespace sorbet::realmain::lsp

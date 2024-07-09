@@ -57,6 +57,33 @@ sig {void}
 
 [→ Method Signatures](sigs.md)
 
+## What's the signature for a method that returns multiple values?
+
+Ruby's `return x, y` syntax is just shorthand for `return [x, y]`.
+
+For methods using this multiple return shorthand, the return type should be
+either:
+
+- an [Array](stdlib-generics.md)
+
+  ```ruby
+  sig {return(T::Array[Integer])}
+  def example
+    return 1, 2
+  end
+  ```
+
+- a [Tuple](tuples.md) (experimental)
+
+  ```ruby
+  sig {return([Integer, String])}
+  def example
+    return 1, ''
+  end
+  ```
+
+[→ Method Signatures](sigs.md)
+
 ## How should I add types to methods defined with `attr_reader`?
 
 Sorbet has special knowledge for `attr_reader`, `attr_writer`, and
@@ -127,27 +154,55 @@ to call `.new`, which is defined on every Ruby class. Typing the result as
 
 ## How do I override `==`? What signature should I use?
 
-Your method should accept `BasicObject` and return `T::Boolean`.
+The same suggestions also apply for overriding `eql?`. `==` is typically used
+for custom/structural equality operators. `eql?` is typically used for reference
+equality. But from the perspective of the type system, they both have the same
+signature.
 
-Unfortunately, not all `BasicObject`s have `is_a?`, so we have to do one extra
-step in our `==` function: check whether `Object === other`. (In Ruby, `==` and
-`===` are completely unrelated. The latter has to do with [case subsumption]).
-The idiomatic way to write `Object === other` in Ruby is to use `case`:
+Your method should accept `T.anything` and return `T::Boolean`. For more
+information, see the docs for [`T.anything`](anything.md) and the blog post
+[Problems typing equality in Ruby].
+
+[Problems typing equality in Ruby]:
+  https://blog.jez.io/problems-typing-ruby-equality/
+
+If you want the implementation to branch on the type of the argument, you'll
+want to use `case`/`when` (or `Module#===` directly) instead of `is_a?`.
+
+Example using `case`/`when`:
 
 ```ruby
-case other
-when Object
+class A
   # ...
+  attr_reader :foo
+
+  sig { params(other: T.anything).returns(T::Boolean) }
+  def ==(other)
+    case other
+    when A
+      self.foo == other.foo
+    else
+      false
+    end
+  end
+end
+```
+
+Example using [`===` directly][case subsumption]:
+
+```ruby
+class A
+  # ...
+  attr_reader :foo
+
+  sig { params(other: T.anything).returns(T::Boolean) }
+  def ==(other)
+    (A === other) && (self.foo == other.foo)
+  end
 end
 ```
 
 [case subsumption]: https://stackoverflow.com/questions/3422223/vs-in-ruby
-
-Here's a complete example that uses `case` to implement `==`:
-
-<a href="https://sorbet.run/#%23%20typed%3A%20true%0A%0Aclass%20IntBox%0A%20%20extend%20T%3A%3ASig%0A%0A%20%20sig%20%7Breturns(Integer)%7D%0A%20%20attr_reader%20%3Aval%0A%20%20%0A%20%20sig%20%7Bparams(val%3A%20Integer).void%7D%0A%20%20def%20initialize(val)%0A%20%20%20%20%40val%20%3D%20val%0A%20%20end%0A%20%20%0A%20%20sig%20%7Bparams(other%3A%20BasicObject).returns(T::Boolean)%7D%0A%20%20def%20%3D%3D(other)%0A%20%20%20%20case%20other%0A%20%20%20%20when%20IntBox%0A%20%20%20%20%20%20other.val%20%3D%3D%20val%0A%20%20%20%20else%0A%20%20%20%20%20%20false%0A%20%20%20%20end%0A%20%20end%0Aend">
-  → View on sorbet.run
-</a>
 
 ## I use `T.must` a lot with arrays and hashes. Is there a way around this?
 
@@ -246,21 +301,148 @@ end
 
 ## Why is `super` untyped, even when the parent method has a `sig`?
 
-Sorbet can't know what the "parent method" is 100% of the time. For example,
-when calling `super` from a method defined in a module, the `super` method will
-be determined only once we know which class or module this module has been mixed
-into. That's a lot of words, so here's an example:
+By default, Sorbet type checks all calls to `super` that it can, but there are
+still cases where it can't statically check calls to `super`.
 
-<a href="https://sorbet.run/#%23%20typed%3A%20true%0Amodule%20MyModule%0A%20%20sig%20%7Breturns(Integer)%7D%0A%20%20def%20foo%0A%20%20%20%20%23%20Can't%20know%20super%20until%20we%20know%20which%20module%20we're%20mixed%20into%0A%20%20%20%20res%20%3D%20super%0A%20%20%20%20T.reveal_type(res)%0A%20%20%20%20res%0A%20%20end%0Aend%0A%0Amodule%20ParentModule1%0A%20%20sig%20%7Breturns(Integer)%7D%0A%20%20def%20foo%0A%20%20%20%200%0A%20%20end%0Aend%0A%0Amodule%20ParentModule2%0A%20%20sig%20%7Breturns(String)%7D%0A%20%20def%20foo%0A%20%20%20%20''%0A%20%20end%0Aend%0A%0Aclass%20MyClass1%0A%20%20include%20ParentModule1%0A%20%20include%20MyModule%0Aend%0A%0Aclass%20MyClass2%0A%20%20include%20ParentModule2%0A%20%20include%20MyModule%0Aend%0A%0AMyClass1.new.foo%0AMyClass2.new.foo%0A">→
-View on sorbet.run</a>
+See below.
 
-To typecheck this example, Sorbet would have to typecheck `MyModule#foo`
-multiple times, once for each place that method might be used from, or place
-restrictions on how and where this module can be included.
+Note that like with most parts of Sorbet, support for typing `super` is expected
+to improve over time, which might introduce new type errors upon upgrading to a
+newer Sorbet version.
 
-Sorbet might adopt a more sophisticated approach in the future, but for now it
-falls back to treating `super` as a method call that accepts anything and
-returns anything.
+## When are calls to `super` typed, and when are they untyped?
+
+Over time, we have improved support for `super` in certain circumstances. In
+particular, if all of these things are true, Sorbet will type check the call to
+`super`:
+
+- The usage of `super` must be in a method defined in a `class`, not a module.
+
+  (Why? → Inside a module, the method that `super` dispatches to [is different
+  each time][module_super] the module is mixed into a different class. This
+  means there's not necessarily a single way to analyze a call to `super`
+  statically.)
+
+- The usage of `super` must not be inside a Ruby block (like `do ... end`)
+
+  (Why? → Sorbet doesn't always know whether the block is being passed to
+  `define_method`, or otherwise [executed in a context different from the
+  enclosing context][define_method_super].)
+
+[module_super]:
+  https://sorbet.run/#%23%20typed%3A%20true%0Amodule%20MyModule%0A%20%20extend%20T%3A%3ASig%0A%0A%20%20sig%20%7Breturns%28Integer%29%7D%0A%20%20def%20foo%0A%20%20%20%20%23%20Can't%20know%20super%20until%20we%20know%20which%20module%20we're%20mixed%20into%0A%20%20%20%20res%20%3D%20super%0A%20%20%20%20T.reveal_type%28res%29%0A%20%20%20%20res%0A%20%20end%0Aend%0A%0Amodule%20ParentModule1%0A%20%20extend%20T%3A%3ASig%0A%0A%20%20sig%20%7Breturns%28Integer%29%7D%0A%20%20def%20foo%0A%20%20%20%200%0A%20%20end%0Aend%0A%0Amodule%20ParentModule2%0A%20%20extend%20T%3A%3ASig%0A%20%20%0A%20%20sig%20%7Breturns%28String%29%7D%0A%20%20def%20foo%0A%20%20%20%20''%0A%20%20end%0Aend%0A%0Aclass%20MyClass1%0A%20%20include%20ParentModule1%0A%20%20include%20MyModule%0Aend%0A%0Aclass%20MyClass2%0A%20%20include%20ParentModule2%0A%20%20include%20MyModule%0Aend%0A%0AMyClass1.new.foo%0AMyClass2.new.foo%0A
+[define_method_super]:
+  https://sorbet.run/#%23%20typed%3A%20strict%0A%0Aclass%20Parent%0A%20%20extend%20T%3A%3ASig%0A%20%20sig%20%7Breturns%28Integer%29%7D%0A%20%20def%20self.foo%0A%20%20%20%200%0A%20%20end%0A%0A%20%20sig%20%7Breturns%28String%29%7D%0A%20%20def%20self.bar%0A%20%20%20%20''%0A%20%20end%0Aend%0A%0Aclass%20Child%20%3C%20Parent%0A%20%20sig%20%7Breturns%28Integer%29%7D%0A%20%20def%20self.foo%0A%20%20%20%20define_method%28%3Abar%29%20do%0A%20%20%20%20%20%20x%20%3D%20super%0A%20%20%20%20%20%20T.reveal_type%28x%29%0A%20%20%20%20%20%20%23%20-%3E%20should%20reveal%20String%2C%20but%20Sorbet%20doesn't%20know%20that%0A%20%20%20%20end%0A%0A%20%20%20%200%0A%20%20end%0Aend
+
+To opt out of type checking `super`, pass the `--typed-super=false` command line
+flag to Sorbet.
+
+## How can I fix type errors that arise from `super`?
+
+1.  "Method does not exist" type errors can happen when Sorbet does not see that
+    a method with the same name actually exists on an ancestor of the current
+    class. Double check whether such a method actually exist. If it does,
+    metaprogramming is likely hiding that definition from Sorbet. Use
+    [RBI files](rbi.md) to ensure that Sorbet sees the parent's definition.
+
+1.  Usually type errors from `super` arise because of incompatible overrides,
+    [like this][super_incompatible]. Sorbet only does
+    [Override Checking](override-checking.md) when the parent method is declared
+    with `overridable` or `abstract`, which means that incompatible overrides
+    can creep into a codebase.
+
+    To fix these errors, correct the signature so that the child signature is a
+    [valid override](override-checking.md#a-note-on-variance).
+
+1.  Sometimes the type errors happen even when the child is a valid override of
+    the parent, because the child either promises to accept a wider input or
+    return a narrower output. In these cases, before and/or after calling
+    `super`, the child method will need to handle the cases that the parent
+    method's type is unable to handle. (Or, if possible: adjust the parent's
+    signature to match the child's signature.)
+
+1.  All `initialize` calls in Sorbet are typed as returning `.void`, regardless
+    of what they actually return. Usually, calls to `initialize` simply return
+    `self`. So instead of doing this:
+
+    ```ruby
+    def initialize
+      super.foo
+    end
+    ```
+
+    do this:
+
+    ```ruby
+    def initialize
+      super
+      self.foo
+    end
+    ```
+
+1.  Unlike method calls, it's **not possible** to do something like
+    `T.unsafe(self).super` to silence errors from a single usage of `super`
+    (`super` is a keyword in Ruby, not a method call).
+
+    This means that there is not a way to silence errors from a single usage of
+    `super`. The best you can do is silence all errors inside a method using
+    `T.bind`:
+
+    ```ruby
+    def example
+      T.bind(self, T.untyped) # <------
+      super
+    end
+    ```
+
+    See the docs for [T.bind](procs.md#casting-the-self-type-with-tbind). Note:
+    not only does this opt out of typechecking calls to `super`, but it also
+    opts out of type checking for all method calls on `self` in that method
+    body.
+
+1.  To silence all type errors from super, use the `--typed-super=false` flag.
+    This opts out of all `super` type checking.
+
+[super_incompatible]:
+  https://sorbet.run/#%23%20typed%3A%20strict%0A%0Aclass%20Parent%0A%20%20extend%20T%3A%3ASig%0A%20%20sig%20%7Breturns%28Integer%29%7D%0A%20%20def%20self.foo%0A%20%20%20%200%0A%20%20end%0Aend%0A%0Aclass%20Child%20%3C%20Parent%0A%20%20sig%20%7Breturns%28String%29%7D%0A%20%20def%20self.foo%0A%20%20%20%20super%0A%20%20end%0Aend
+
+## Why does `T.untyped && T::Boolean` have type `T.nilable(T::Boolean)`?
+
+**The short answer**: because `T.untyped` includes `nil`, and `nil && false` is
+`nil`. Therefore, the whole expression's type is possibly nilable.
+
+**The long answer**: given a snippet like this
+
+```ruby
+sig { params(x: T.untyped, y: T::Boolean).void }
+def example(x, y)
+  res = x && y
+  T.reveal_type(res) # => T.nilable(T::Boolean)
+end
+```
+
+The revealed type is [`T.nilable`](nilable-types.md) despite neither `x` nor `y`
+being `T.nilable`. Ruby's `&&` operator is short-circuiting, and `nil` is falsy:
+
+```ruby
+x = nil && anything_else()
+p(x) # => nil
+```
+
+This `&&` expression evaluates to `nil` without evaluating `anything_else()`.
+
+So thinking about our `res = x && y` expression:
+
+1.  If `x` is `nil`, the whole expression is `nil` and the type must be at least
+    [`NilClass`](class-types.md#nil).
+1.  If `x` is `false`, the whole expression's type must be at least
+    [`FalseClass`](class-types.md#booleans).
+1.  Otherwise, `x` is truthy (only `nil` and `false` are falsy in Ruby), so the
+    expression evaluates to the value of `y`, assuming it's type. In this case,
+    `T::Boolean`.
+
+Therefore, the type is `T.any(NilClass, FalseClass, T::Boolean)` which
+simplifies to `T.nilable(T::Boolean)`.
 
 ## Does Sorbet work with Rake and Rakefiles?
 
@@ -322,10 +504,7 @@ To upgrade a patch level (e.g., from 0.4.4314 to 0.4.4358):
 
 ```
 bundle update sorbet sorbet-runtime
-# also update plugins like sorbet-rails, if any
-
-# For plugins like sorbet-rails, see their docs, eg.
-https://github.com/chanzuckerberg/sorbet-rails#initial-setup
+# also update plugins, if any
 
 # Optional: Suggest new, stronger sigils (per-file strictness
 # levels) when possible. Currently, the suggestion process is
@@ -393,13 +572,8 @@ RUN wget -nv -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/
 Sorbet doesn't support Rails, but
 [Tapioca can generate RBI files for it](https://github.com/Shopify/tapioca#generating-rbi-files-for-rails-and-other-dsls).
 
-If you're not using Tapioca, you could use [sorbet-rails], a
-community-maintained project which can help generate RBI files for certain Rails
-constructs.
-
 Also see the [Community] page for more community-maintained projects!
 
-[sorbet-rails]: https://github.com/chanzuckerberg/sorbet-rails
 [community]: /en/community
 
 ## Can I convert from YARD docs to Sorbet signatures?

@@ -84,7 +84,7 @@ private:
 
 public:
     // The value `0` implies that there is no NameKind tag present (NameKind begin at 1) and is a special-value used to
-    // indicate a non-existant NameRef.
+    // indicate a non-existent NameRef.
     constexpr NameRef() : _id(0){};
 
     // WellKnown is a tag to statically indicate that the caller is deliberately
@@ -189,6 +189,8 @@ public:
     // Returns true if the name is `<static-init>` (class-level static init) or `<static-init>$...`
     // (file-level static init).
     bool isAnyStaticInitName(const GlobalState &gs) const;
+
+    bool isUniqueNameOf(const GlobalState &gs, NameRef name) const;
 
     // All the names that Environment::updateKnowledge treats as special for the purposes of
     // updating control flow-sensitive type knowledge.

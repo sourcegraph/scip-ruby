@@ -1,5 +1,6 @@
 #include "main/lsp/requests/references.h"
 #include "core/lsp/QueryResponse.h"
+#include "main/lsp/LSPLoop.h"
 #include "main/lsp/LSPOutput.h"
 #include "main/lsp/LSPQuery.h"
 #include "main/lsp/ShowOperation.h"
@@ -19,7 +20,7 @@ bool ReferencesTask::needsMultithreading(const LSPIndexer &indexer) const {
 
 vector<core::SymbolRef> ReferencesTask::getSymsToCheckWithinPackage(const core::GlobalState &gs,
                                                                     core::SymbolRef symInPackage,
-                                                                    core::NameRef packageName) {
+                                                                    core::packages::MangledName packageName) {
     std::vector<core::NameRef> fullName;
 
     auto sym = symInPackage;
@@ -30,8 +31,10 @@ vector<core::SymbolRef> ReferencesTask::getSymsToCheckWithinPackage(const core::
     reverse(fullName.begin(), fullName.end());
 
     vector<core::SymbolRef> result;
-    vector<core::SymbolRef> namespacesToCheck = {core::Symbols::root(),
-                                                 core::Symbols::root().data(gs)->findMember(gs, packager::TEST_NAME)};
+    vector<core::SymbolRef> namespacesToCheck = {
+        core::Symbols::root(),
+        core::Symbols::root().data(gs)->findMember(gs, core::packages::PackageDB::TEST_NAMESPACE),
+    };
 
     for (auto &namespaceToCheck : namespacesToCheck) {
         if (!namespaceToCheck.exists()) {
@@ -86,8 +89,8 @@ unique_ptr<ResponseMessage> ReferencesTask::runRequest(LSPTypecheckerDelegate &t
         fileIsTyped = fref.data(gs).strictLevel >= core::StrictLevel::True;
     }
     if (!queryResponses.empty()) {
-        auto resp = move(queryResponses[0]);
-        // N.B.: Ignores literals.
+        auto resp = getQueryResponseForFindAllReferences(queryResponses);
+
         // If file is untyped, only supports find reference requests from constants and class definitions.
         if (auto constResp = resp->isConstant()) {
             if (fref.data(gs).isPackage()) {
@@ -117,7 +120,7 @@ unique_ptr<ResponseMessage> ReferencesTask::runRequest(LSPTypecheckerDelegate &t
                 //  Returns all global usages of Foo::A
 
                 auto packageName = gs.packageDB().getPackageNameForFile(fref);
-                auto symsToCheck = getSymsToCheckWithinPackage(gs, constResp->symbol, packageName);
+                auto symsToCheck = getSymsToCheckWithinPackage(gs, constResp->symbolBeforeDealias, packageName);
 
                 if (!symsToCheck.empty()) {
                     std::vector<std::unique_ptr<Location>> locations;
@@ -134,13 +137,13 @@ unique_ptr<ResponseMessage> ReferencesTask::runRequest(LSPTypecheckerDelegate &t
                 } else {
                     // Fall back to normal case when we are not querying for an external symbol, e.g. class Foo <
                     // PackageSpec declarations, or export statements.
-                    response->result =
-                        extractLocations(typechecker.state(), getReferencesToSymbol(typechecker, constResp->symbol));
+                    response->result = extractLocations(
+                        typechecker.state(), getReferencesToSymbol(typechecker, constResp->symbolBeforeDealias));
                 }
             } else {
                 // Normal handling for non-package files
-                response->result =
-                    extractLocations(typechecker.state(), getReferencesToSymbol(typechecker, constResp->symbol));
+                response->result = extractLocations(typechecker.state(),
+                                                    getReferencesToSymbol(typechecker, constResp->symbolBeforeDealias));
             }
         } else if (auto fieldResp = resp->isField()) {
             // This could be a `prop` or `attr_*`, which have multiple associated symbols.

@@ -4,6 +4,7 @@
 #include "absl/synchronization/mutex.h"
 #include "main/lsp/LSPConfiguration.h"
 #include "main/lsp/LSPMessage.h"
+#include "main/lsp/MessageQueueState.h"
 #include <deque>
 
 namespace sorbet::realmain::lsp {
@@ -16,36 +17,16 @@ class DidOpenTextDocumentParams;
 class WatchmanQueryResponse;
 class CancelParams;
 
-struct MessageQueueState {
-    std::deque<std::unique_ptr<LSPMessage>> pendingRequests;
-    bool terminate = false;
-    int errorCode = 0;
-    // Counters collected from other threads.
-    CounterState counters;
-
-    class NotifyOnDestruction {
-        absl::Mutex &mutex;
-        bool &flag;
-
-    public:
-        NotifyOnDestruction(MessageQueueState &state, absl::Mutex &mutex) : mutex(mutex), flag(state.terminate){};
-        ~NotifyOnDestruction() {
-            absl::MutexLock lck(&mutex);
-            flag = true;
-        }
-    };
-};
-
 class TaskQueue final {
     absl::Mutex stateMutex;
 
-    std::deque<std::unique_ptr<LSPTask>> pendingTasks GUARDED_BY(stateMutex);
-    bool terminated GUARDED_BY(stateMutex) = false;
-    bool paused GUARDED_BY(stateMutex) = false;
-    int errorCode GUARDED_BY(stateMutex) = 0;
+    std::deque<std::unique_ptr<LSPTask>> pendingTasks ABSL_GUARDED_BY(stateMutex);
+    bool terminated ABSL_GUARDED_BY(stateMutex) = false;
+    bool paused ABSL_GUARDED_BY(stateMutex) = false;
+    int errorCode ABSL_GUARDED_BY(stateMutex) = 0;
 
     // Counters collected from preprocessor thread
-    CounterState counters GUARDED_BY(stateMutex);
+    CounterState counters ABSL_GUARDED_BY(stateMutex);
 
 public:
     TaskQueue() = default;
@@ -105,7 +86,7 @@ class LSPPreprocessor final {
      * Example: (E = edit, D = delayable non-edit, M = arbitrary non-edit)
      * {[M1][E1][E2][D1][E3]} => {[M1][E1-3][D1]}
      */
-    void mergeFileChanges() EXCLUSIVE_LOCKS_REQUIRED(taskQueue->getMutex());
+    void mergeFileChanges() ABSL_EXCLUSIVE_LOCKS_REQUIRED(taskQueue->getMutex());
 
     /* The following methods convert edits into SorbetWorkspaceEditParams. */
 
@@ -127,6 +108,8 @@ class LSPPreprocessor final {
     bool ensureInitialized(const LSPMethod forMethod, const LSPMessage &msg) const;
 
     std::unique_ptr<LSPTask> getTaskForMessage(LSPMessage &msg);
+
+    std::vector<std::string_view> openFilePaths() const;
 
 public:
     LSPPreprocessor(std::shared_ptr<LSPConfiguration> config, std::shared_ptr<TaskQueue> taskQueue,

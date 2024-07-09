@@ -42,6 +42,8 @@ struct LocOffsets {
         return LocOffsets{endPos(), endPos()};
     }
 
+    bool contains(const LocOffsets &other) const;
+
     std::string showRaw(const Context ctx) const;
     std::string showRaw(const MutableContext ctx) const;
     std::string showRaw(const GlobalState &gs, const FileRef file) const;
@@ -56,6 +58,7 @@ CheckSize(LocOffsets, 8, 4);
 template <typename H> H AbslHashValue(H h, const LocOffsets &m) {
     return H::combine(std::move(h), m.beginLoc, m.endLoc);
 }
+
 } // namespace sorbet::core
 
 #endif // SORBET_CORE_LOCOFFSETS_H

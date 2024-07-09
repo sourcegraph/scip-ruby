@@ -460,7 +460,7 @@ class OptionParser
   sig {params(args: T.untyped).returns(T.untyped)}
   def inc(*args); end
 
-  sig {params(banner: T.untyped, width: T.untyped, indent: T.untyped, blk: T.untyped).void}
+  sig {params(banner: T.untyped, width: T.untyped, indent: T.untyped, blk: T.nilable(T.proc.params(opts: OptionParser).void)).void}
   def initialize(banner = nil, width = 32, indent = ' ' * 4, &blk); end
 
   sig {returns(T.untyped)}
@@ -794,8 +794,33 @@ class OptionParser
   # Add option switch and handler. See
   # [`make_switch`](https://docs.ruby-lang.org/en/2.7.0/OptionParser.html#method-i-make_switch)
   # for an explanation of parameters.
+  sig do
+    params(
+      type: T.any(T.class_of(TrueClass), T.class_of(FalseClass)),
+      opts: T.untyped,
+      block: T.nilable(T.proc.params(arg0: T::Boolean).void)
+    )
+      .returns(T.untyped)
+  end
+  sig do
+    params(
+      type: T.any(T.class_of(Shellwords), T.class_of(Array)),
+      opts: T.untyped,
+      block: T.nilable(T.proc.params(arg0: T::Array[String]).void)
+    )
+      .returns(T.untyped)
+  end
+  sig do
+    type_parameters(:Type)
+      .params(
+        type: T::Class[T.type_parameter(:Type)],
+        opts: T.untyped,
+        block: T.nilable(T.proc.params(arg0: T.type_parameter(:Type)).void)
+      )
+      .returns(T.untyped)
+  end
   sig {params(opts: T.untyped, block: T.untyped).returns(T.untyped)}
-  def on(*opts, &block); end
+  def on(type=T.unsafe(nil), *opts, &block); end
 
   # Also aliased as:
   # [`def_head_option`](https://docs.ruby-lang.org/en/2.7.0/OptionParser.html#method-i-def_head_option)

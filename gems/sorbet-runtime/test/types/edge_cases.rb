@@ -637,6 +637,19 @@ class Opus::Types::Test::EdgeCasesTest < Critic::Unit::UnitTest
     assert_instance_of(String, klass.new(type: String))
   end
 
+  it 'allows abstract classes to redclare tap' do
+    superclass = Class.new do
+      extend T::Helpers
+      abstract!
+
+      attr_reader :tap
+    end
+
+    klass = Class.new(superclass)
+
+    assert_instance_of(klass, klass.new)
+  end
+
   it 'handles class scope change when already hooked' do
     klass = Class.new do
       extend T::Sig
@@ -868,7 +881,7 @@ class Opus::Types::Test::EdgeCasesTest < Critic::Unit::UnitTest
       mutex = Mutex.new
       replaced = T::Private::ClassUtils.replace_method(T::Private::Methods.singleton_class, :run_sig_block_for_method) do |*args|
         barrier.wait
-        mutex.synchronize {replaced.bind(T::Private::Methods).call(*args)}
+        mutex.synchronize {replaced.bind_call(T::Private::Methods, *args)}
       end
 
       klass = Class.new do

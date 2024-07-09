@@ -67,7 +67,7 @@ export class SorbetStatusBarEntry implements Disposable {
 
   private render() {
     const { operations } = this.context.statusProvider;
-    const { activeLspConfig, highlightUntyped } = this.context.configuration;
+    const { activeLspConfig } = this.context.configuration;
     const sorbetName = activeLspConfig?.name ?? "Sorbet";
 
     let text: string;
@@ -80,7 +80,7 @@ export class SorbetStatusBarEntry implements Disposable {
     ) {
       const latestOp = operations[operations.length - 1];
       text = `${sorbetName}: ${latestOp.description} ${this.getSpinner()}`;
-      tooltip = getRunningTooltip();
+      tooltip = "The Sorbet server is currently running.";
     } else {
       switch (this.serverStatus) {
         case ServerStatus.DISABLED:
@@ -105,7 +105,7 @@ export class SorbetStatusBarEntry implements Disposable {
           break;
         case ServerStatus.RUNNING:
           text = `${sorbetName}: Idle`;
-          tooltip = getRunningTooltip();
+          tooltip = "The Sorbet server is currently running.";
           break;
         default:
           this.context.log.error(`Invalid ServerStatus: ${this.serverStatus}`);
@@ -117,13 +117,5 @@ export class SorbetStatusBarEntry implements Disposable {
 
     this.statusBarItem.text = text;
     this.statusBarItem.tooltip = tooltip;
-
-    function getRunningTooltip() {
-      let txt = "The Sorbet server is currently running.";
-      if (highlightUntyped) {
-        txt += "\n  - Highlight untyped code";
-      }
-      return txt;
-    }
   }
 }

@@ -59,10 +59,9 @@ module T::Private::Methods::SignatureValidation
     # `{ new(): AbstractClass }`. We may want to consider building some
     # analogue to `T.class_of` in the future that works like this `{new():
     # ...}` type.
-    if signature.method_name == :initialize && signature.method.owner.is_a?(Class)
-      if signature.mode == Modes.standard
-        return
-      end
+    if signature.method_name == :initialize && signature.method.owner.is_a?(Class) &&
+        signature.mode == Modes.standard
+      return
     end
 
     super_method = signature.method.super_method
@@ -151,7 +150,7 @@ module T::Private::Methods::SignatureValidation
         # This is a one-off hack, and we should think carefully before adding more methods here.
         nil
       else
-        raise "You marked `#{signature.method_name}` as #{pretty_mode(signature)}, but that method doesn't already exist in this class/module to be overriden.\n" \
+        raise "You marked `#{signature.method_name}` as #{pretty_mode(signature)}, but that method doesn't already exist in this class/module to be overridden.\n" \
           "  Either check for typos and for missing includes or super classes to make the parent method shows up\n" \
           "  ... or remove #{pretty_mode(signature)} here: #{method_loc_str(signature.method)}\n"
       end
@@ -235,7 +234,7 @@ module T::Private::Methods::SignatureValidation
     return if signature.override_allow_incompatible
     return if super_signature.mode == Modes.untyped
     return unless [signature, super_signature].all? do |sig|
-      sig.check_level == :always || sig.check_level == :compiled || (sig.check_level == :tests && T::Private::RuntimeLevels.check_tests?)
+      sig.check_level == :always || (sig.check_level == :tests && T::Private::RuntimeLevels.check_tests?)
     end
     mode_noun = super_signature.mode == Modes.abstract ? 'implementation' : 'override'
 
@@ -262,7 +261,14 @@ module T::Private::Methods::SignatureValidation
     end
 
     # return types must be covariant
-    if !signature.return_type.subtype_of?(super_signature.return_type)
+    super_signature_return_type = super_signature.return_type
+
+    if super_signature_return_type == T::Private::Types::Void::Private::INSTANCE
+      # Treat `.void` as `T.anything` (see corresponding comment in definition_valitor for more)
+      super_signature_return_type = T::Types::Anything::Private::INSTANCE
+    end
+
+    if !signature.return_type.subtype_of?(super_signature_return_type)
       raise "Incompatible return type in signature for #{mode_noun} of method `#{signature.method_name}`:\n" \
             "* Base: `#{super_signature.return_type}` (in #{method_loc_str(super_signature.method)})\n" \
             "* #{mode_noun.capitalize}: `#{signature.return_type}` (in #{method_loc_str(signature.method)})\n" \

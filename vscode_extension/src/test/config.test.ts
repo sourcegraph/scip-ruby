@@ -2,39 +2,36 @@ import * as assert from "assert";
 import * as sinon from "sinon";
 import {
   EventEmitter,
+  extensions,
   ConfigurationTarget,
   ConfigurationChangeEvent,
   Uri,
-  WorkspaceFolder,
-  extensions,
+  workspace,
 } from "vscode";
 
 import * as fs from "fs";
-import {
-  SorbetExtensionConfig,
-  SorbetLspConfig,
-  ISorbetWorkspaceContext,
-} from "../config";
+import { SorbetExtensionConfig, ISorbetWorkspaceContext } from "../config";
+import { SorbetLspConfig } from "../sorbetLspConfig";
 
 // Helpers
 
 /** Imitate the WorkspaceConfiguration. */
 class FakeWorkspaceConfiguration implements ISorbetWorkspaceContext {
-  public readonly backingStore: Map<String, any>;
-  public readonly defaults: Map<String, any>;
+  public readonly backingStore: Map<string, any>;
+  public readonly defaults: Map<string, any>;
   private readonly configurationChangeEmitter: EventEmitter<
     ConfigurationChangeEvent
   >;
 
-  constructor(properties: Iterable<[String, any]> = []) {
-    this.backingStore = new Map<String, any>(properties);
+  constructor(properties: Iterable<[string, any]> = []) {
+    this.backingStore = new Map<string, any>(properties);
     this.configurationChangeEmitter = new EventEmitter<
       ConfigurationChangeEvent
     >();
     const defaultProperties = extensions.getExtension(
       "sorbet.sorbet-vscode-extension",
     )!.packageJSON.contributes.configuration.properties;
-    const defaultValues: Iterable<[String, any]> = Object.keys(
+    const defaultValues: Iterable<[string, any]> = Object.keys(
       defaultProperties,
     ).map((settingName) => {
       let value = defaultProperties[settingName].default;
@@ -48,7 +45,7 @@ class FakeWorkspaceConfiguration implements ISorbetWorkspaceContext {
 
       return [settingName.replace("sorbet.", ""), value];
     });
-    this.defaults = new Map<String, any>(defaultValues);
+    this.defaults = new Map<string, any>(defaultValues);
   }
 
   dispose() {}
@@ -67,7 +64,7 @@ class FakeWorkspaceConfiguration implements ISorbetWorkspaceContext {
     section: string,
     value: any,
     configurationTarget?: boolean | ConfigurationTarget | undefined,
-  ): Thenable<void> {
+  ): Promise<void> {
     if (configurationTarget) {
       assert.fail(
         `fake does not (yet) support ConfigurationTarget, given: ${configurationTarget}`,
@@ -87,10 +84,6 @@ class FakeWorkspaceConfiguration implements ISorbetWorkspaceContext {
     return this.configurationChangeEmitter.event;
   }
 
-  workspaceFolders() {
-    return [{ uri: { fsPath: "/fake/path/to/project" } }] as WorkspaceFolder[];
-  }
-
   initializeEnabled(enabled: boolean): void {
     const stateEnabled = this.backingStore.get("enabled");
 
@@ -105,6 +98,7 @@ const fooLspConfig = new SorbetLspConfig({
   name: "FooFoo",
   description: "The foo config",
   cwd: "${workspaceFolder}", // eslint-disable-line no-template-curly-in-string
+  env: {},
   command: ["foo", "on", "you"],
 });
 
@@ -113,6 +107,7 @@ const barLspConfig = new SorbetLspConfig({
   name: "BarBar",
   description: "The bar config",
   cwd: "${workspaceFolder}/bar", // eslint-disable-line no-template-curly-in-string
+  env: {},
   command: ["I", "heart", "bar", "bee", "que"],
 });
 
@@ -123,6 +118,7 @@ suite("SorbetLspConfig", () => {
       name: "two",
       description: "three",
       cwd: "four",
+      env: {},
       command: ["five", "six"],
     };
     const lspConfig = new SorbetLspConfig(ctorArg);
@@ -164,6 +160,7 @@ suite("SorbetLspConfig", () => {
       name: "two",
       description: "three",
       cwd: "four",
+      env: {},
       command: ["five", "six"],
     };
     const config1 = new SorbetLspConfig(json);
@@ -174,8 +171,8 @@ suite("SorbetLspConfig", () => {
       new SorbetLspConfig({ ...json, description: "different description" }),
       new SorbetLspConfig({ ...json, cwd: "different cwd" }),
       new SorbetLspConfig({ ...json, command: ["different", "command"] }),
+      new SorbetLspConfig({ ...json, env: { different: "value" } }),
       undefined,
-      null,
     ];
 
     test(".isEqualTo(other)", () => {
@@ -226,7 +223,7 @@ suite("SorbetExtensionConfig", async () => {
         );
         assert.strictEqual(
           sorbetConfig.activeLspConfig,
-          null,
+          undefined,
           "should not have an active LSP config",
         );
       });
@@ -234,15 +231,21 @@ suite("SorbetExtensionConfig", async () => {
 
     suite("when a sorbet/config file exists", async () => {
       test("sorbet is enabled", async () => {
-        sinon
+        const expectedWorkspacePath = "/fake/path/to/project";
+        const existsSyncStub = sinon
           .stub(fs, "existsSync")
-          .withArgs("/fake/path/to/project/sorbet/config")
+          .withArgs(`${expectedWorkspacePath}/sorbet/config`)
           .returns(true);
+        sinon
+          .stub(workspace, "workspaceFolders")
+          .value([{ uri: { fsPath: expectedWorkspacePath } }]);
 
         const workspaceConfig = new FakeWorkspaceConfiguration();
         const sorbetConfig = new SorbetExtensionConfig(workspaceConfig);
 
         assert.strictEqual(sorbetConfig.enabled, true, "should be enabled");
+
+        sinon.assert.calledOnce(existsSyncStub);
         sinon.restore();
       });
     });
@@ -281,10 +284,14 @@ suite("SorbetExtensionConfig", async () => {
 
     suite("when workspace has *some* sorbet settings", async () => {
       test("when `sorbet.enabled` is missing", async () => {
-        sinon
+        const expectedWorkspacePath = "/fake/path/to/project";
+        const existsSyncStub = sinon
           .stub(fs, "existsSync")
-          .withArgs("/fake/path/to/project/sorbet/config")
+          .withArgs(`${expectedWorkspacePath}/sorbet/config`)
           .returns(false);
+        sinon
+          .stub(workspace, "workspaceFolders")
+          .value([{ uri: { fsPath: expectedWorkspacePath } }]);
 
         const workspaceConfig = new FakeWorkspaceConfiguration([
           ["lspConfigs", [fooLspConfig, barLspConfig]],
@@ -304,10 +311,11 @@ suite("SorbetExtensionConfig", async () => {
         );
         assert.strictEqual(
           sorbetConfig.activeLspConfig,
-          null,
+          undefined,
           "but should not have an active LSP config",
         );
 
+        sinon.assert.calledOnce(existsSyncStub);
         sinon.restore();
       });
 
@@ -371,6 +379,30 @@ suite("SorbetExtensionConfig", async () => {
           undefined,
           "activeLspConfig should be undefined",
         );
+      });
+
+      suite("sorbet.highlightUntyped", async () => {
+        test("true instead of a string", async () => {
+          const workspaceConfig = new FakeWorkspaceConfiguration([
+            ["highlightUntyped", true],
+          ]);
+          const sorbetConfig = new SorbetExtensionConfig(workspaceConfig);
+          assert.strictEqual(sorbetConfig.highlightUntyped, "everywhere");
+        });
+        test("false instead of a string", async () => {
+          const workspaceConfig = new FakeWorkspaceConfiguration([
+            ["highlightUntyped", false],
+          ]);
+          const sorbetConfig = new SorbetExtensionConfig(workspaceConfig);
+          assert.strictEqual(sorbetConfig.highlightUntyped, "nowhere");
+        });
+        test("unrecognized string", async () => {
+          const workspaceConfig = new FakeWorkspaceConfiguration([
+            ["highlightUntyped", "nope"],
+          ]);
+          const sorbetConfig = new SorbetExtensionConfig(workspaceConfig);
+          assert.strictEqual(sorbetConfig.highlightUntyped, "nowhere");
+        });
       });
 
       test("multiple instances of SorbetExtensionConfig stay in sync with each other", async () => {
@@ -470,7 +502,7 @@ suite("SorbetExtensionConfig", async () => {
         assert.deepStrictEqual(
           listener.getCall(0).args[0],
           {
-            oldLspConfig: null,
+            oldLspConfig: undefined,
             newLspConfig: barLspConfig,
           },
           "should have transitioned from no config to bar config",
@@ -497,7 +529,7 @@ suite("SorbetExtensionConfig", async () => {
           listener.getCall(0).args[0],
           {
             oldLspConfig: barLspConfig,
-            newLspConfig: null,
+            newLspConfig: undefined,
           },
           "should have transitioned from bar config to no config",
         );

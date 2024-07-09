@@ -134,7 +134,7 @@ DispatchResult ShapeType::dispatchCall(const GlobalState &gs, const DispatchArgs
     if (method.exists()) {
         auto *intrinsic = method.data(gs)->getIntrinsic();
         if (intrinsic != nullptr) {
-            DispatchComponent comp{args.selfType, method, {}, nullptr, nullptr, nullptr, ArgInfo{}, nullptr};
+            DispatchComponent comp{args.selfType, method, {}, nullptr, nullptr, nullptr, {}, {}, nullptr};
             DispatchResult res{nullptr, std::move(comp)};
             intrinsic->apply(gs, args, res);
             if (res.returnType != nullptr) {
@@ -151,7 +151,7 @@ DispatchResult TupleType::dispatchCall(const GlobalState &gs, const DispatchArgs
     if (method.exists()) {
         auto *intrinsic = method.data(gs)->getIntrinsic();
         if (intrinsic != nullptr) {
-            DispatchComponent comp{args.selfType, method, {}, nullptr, nullptr, nullptr, ArgInfo{}, nullptr};
+            DispatchComponent comp{args.selfType, method, {}, nullptr, nullptr, nullptr, {}, {}, nullptr};
             DispatchResult res{nullptr, std::move(comp)};
             intrinsic->apply(gs, args, res);
             if (res.returnType != nullptr) {
@@ -200,7 +200,7 @@ void addUnconstrainedIsaGenericNote(const GlobalState &gs, ErrorBuilder &e, Symb
             {{definition.loc(gs), ""}}));
 
     } else {
-        auto showOptions = ShowOptions().withShowForRBI();
+        auto showOptions = ShowOptions().withUseValidSyntax();
         auto wrapped = fmt::format("T.all({}, Constraint)", definition.show(gs, showOptions));
         e.addErrorNote("Consider using `{}` to place a constraint on this type", wrapped);
     }
@@ -214,9 +214,7 @@ DispatchResult SelfTypeParam::dispatchCall(const GlobalState &gs, const Dispatch
             // Short circuit here to avoid constructing an expensive error message.
             return emptyResult;
         }
-        auto funLoc = args.funLoc();
-        auto errLoc = (funLoc.exists() && !funLoc.empty()) ? funLoc : args.callLoc();
-        auto e = gs.beginError(errLoc, errors::Infer::CallOnTypeArgument);
+        auto e = gs.beginError(args.errLoc(), errors::Infer::CallOnTypeArgument);
         if (e) {
             auto thisStr = args.thisType.show(gs);
             if (args.fullType.type != args.thisType) {
@@ -241,9 +239,7 @@ DispatchResult SelfTypeParam::dispatchCall(const GlobalState &gs, const Dispatch
                 return emptyResult;
             }
 
-            auto funLoc = args.funLoc();
-            auto errLoc = (funLoc.exists() && !funLoc.empty()) ? funLoc : args.callLoc();
-            auto e = gs.beginError(errLoc, errors::Infer::CallOnUnboundedTypeMember);
+            auto e = gs.beginError(args.errLoc(), errors::Infer::CallOnUnboundedTypeMember);
             if (e) {
                 auto member = typeMember.data(gs)->owner.asClassOrModuleRef().data(gs)->attachedClass(gs).exists()
                                   ? "template"
@@ -280,7 +276,9 @@ unique_ptr<Error> matchArgType(const GlobalState &gs, TypeConstraint &constr, Lo
 
     expectedType = Types::replaceSelfType(gs, expectedType, selfType);
 
-    if (Types::isSubTypeUnderConstraint(gs, constr, argTpe.type, expectedType, UntypedMode::AlwaysCompatible)) {
+    core::ErrorSection::Collector errorDetailsCollector;
+    if (Types::isSubTypeUnderConstraint(gs, constr, argTpe.type, expectedType, UntypedMode::AlwaysCompatible,
+                                        errorDetailsCollector)) {
         if (expectedType.isUntyped()) {
             // TODO(jez) We should have code like this, but currently there are too many places that
             // are fine "accepting anything" that are typed as `T.untyped`.
@@ -294,7 +292,7 @@ unique_ptr<Error> matchArgType(const GlobalState &gs, TypeConstraint &constr, Lo
             //     TypeErrorDiagnostics::explainUntyped(gs, e, what, expectedType, argSym.loc, originForUninitialized);
             //     return e.build();
             // }
-        } else if (argTpe.type.isUntyped()) {
+        } else if (argTpe.type.isUntyped() && expectedType != Types::top()) {
             auto what = core::errors::Infer::errorClassForUntyped(gs, argLoc.file(), argTpe.type);
             if (auto e = gs.beginError(argLoc, what)) {
                 e.setHeader("Argument passed to parameter `{}` is `{}`", argSym.argumentName(gs), "T.untyped");
@@ -319,7 +317,7 @@ unique_ptr<Error> matchArgType(const GlobalState &gs, TypeConstraint &constr, Lo
             e.addErrorSection(TypeAndOrigins::explainExpected(gs, expectedType, argSym.loc, for_));
         }
         e.addErrorSection(argTpe.explainGot(gs, originForUninitialized));
-        core::TypeErrorDiagnostics::explainTypeMismatch(gs, e, expectedType, argTpe.type);
+        core::TypeErrorDiagnostics::explainTypeMismatch(gs, e, errorDetailsCollector, expectedType, argTpe.type);
         TypeErrorDiagnostics::maybeAutocorrect(gs, e, argLoc, constr, expectedType, argTpe.type);
         return e.build();
     }
@@ -342,27 +340,35 @@ unique_ptr<Error> missingArg(const GlobalState &gs, Loc argsLoc, Loc receiverLoc
     return nullptr;
 }
 
-int getArity(const GlobalState &gs, MethodRef method) {
+size_t getArity(const GlobalState &gs, MethodRef method) {
     ENFORCE(!method.data(gs)->arguments.empty(), "Every method should have at least a block arg.");
     ENFORCE(method.data(gs)->arguments.back().flags.isBlock, "Last arg should be the block arg.");
+
+    const auto &arguments = method.data(gs)->arguments;
+    if (absl::c_any_of(arguments, [&](const auto &arg) { return arg.flags.isRepeated && !arg.flags.isKeyword; })) {
+        return SIZE_MAX;
+    };
 
     // Don't count the block arg in the arity
     return method.data(gs)->arguments.size() - 1;
 }
+
+struct GuessOverloadCandidate {
+    MethodRef candidate;
+    shared_ptr<TypeConstraint> constr;
+};
 
 // Guess overload. The way we guess is only arity based - we will return the overload that has the smallest number of
 // arguments that is >= args.size()
 MethodRef guessOverload(const GlobalState &gs, ClassOrModuleRef inClass, MethodRef primary, uint16_t numPosArgs,
                         InlinedVector<const TypeAndOrigins *, 2> &args, const vector<TypePtr> &targs, bool hasBlock) {
     counterInc("calls.overloaded_invocations");
-    ENFORCE(Context::permitOverloadDefinitions(gs, primary.data(gs)->loc().file(), primary),
-            "overload not permitted here");
     MethodRef fallback = primary;
     vector<MethodRef> allCandidates;
 
     allCandidates.emplace_back(primary);
     { // create candidates and sort them by number of arguments(stable by symbol id)
-        int i = 0;
+        size_t i = 0;
         MethodRef current = primary;
         while (current.data(gs)->flags.isOverloaded) {
             i++;
@@ -376,33 +382,77 @@ MethodRef guessOverload(const GlobalState &gs, ClassOrModuleRef inClass, MethodR
             }
         }
 
-        fast_sort(allCandidates, [&](MethodRef s1, MethodRef s2) -> bool {
-            if (getArity(gs, s1) < getArity(gs, s2)) {
+        fast_sort(allCandidates, [&](const auto &s1, const auto &s2) -> bool {
+            auto s1Arity = getArity(gs, s1);
+            auto s2Arity = getArity(gs, s2);
+            if (s1Arity < s2Arity) {
                 return true;
             }
-            if (getArity(gs, s1) == getArity(gs, s2)) {
+            if (s1Arity == s2Arity) {
                 return s1.id() < s2.id();
             }
             return false;
         });
     }
 
-    vector<MethodRef> leftCandidates = allCandidates;
+    vector<GuessOverloadCandidate> allCandidatesWithConstraints;
+
+    for (const auto &candidate : allCandidates) {
+        if (!candidate.data(gs)->flags.isGenericMethod) {
+            allCandidatesWithConstraints.emplace_back(GuessOverloadCandidate{candidate, nullptr});
+            continue;
+        }
+
+        // Make a new TypeConstraint with everything in the domain solving to `T.untyped`.
+        //
+        // This allows Sorbet to consider or reject an overload with a parameter like
+        // `T::Array[T.type_parameter(:U)]` based on whether the argument is `String`--in that case,
+        // it doesn't matter what the `T.type_parameter(:U)` is, because `String` is not an `Array`.
+        auto constr = make_unique<TypeConstraint>();
+        for (auto typeArgument : candidate.data(gs)->typeArguments()) {
+            constr->rememberIsSubtype(gs, typeArgument.data(gs)->resultType, Types::untypedUntracked());
+        }
+        if (!constr->solve(gs)) {
+            Exception::raise("Constraint should always solve after creating TypeConstraint with only untyped bounds");
+        }
+
+        allCandidatesWithConstraints.emplace_back(GuessOverloadCandidate{candidate, move(constr)});
+    }
+
+    // Copy the vector
+    auto leftCandidates = allCandidatesWithConstraints;
 
     {
         auto checkArg = [&](auto i, const TypePtr &arg) {
             for (auto it = leftCandidates.begin(); it != leftCandidates.end(); /* nothing*/) {
-                MethodRef candidate = *it;
-                if (i >= getArity(gs, candidate)) {
+                const auto &[candidate, constr] = *it;
+                const auto &arguments = candidate.data(gs)->arguments;
+                TypePtr argTypeRaw;
+                auto arity = getArity(gs, candidate);
+                if (i < arguments.size() - 1) {
+                    argTypeRaw = arguments[i].type;
+                } else if (arity == SIZE_MAX) {
+                    auto restArg = absl::c_find_if(
+                        arguments, [&](const auto &arg) { return arg.flags.isRepeated && !arg.flags.isKeyword; });
+                    ENFORCE(restArg != arguments.end())
+                    argTypeRaw = restArg->type;
+                } else {
                     it = leftCandidates.erase(it);
                     continue;
                 }
 
-                auto argType = Types::resultTypeAsSeenFrom(gs, candidate.data(gs)->arguments[i].type,
-                                                           candidate.data(gs)->owner, inClass, targs);
-                if (argType.isFullyDefined() && !Types::isSubType(gs, arg, argType)) {
-                    it = leftCandidates.erase(it);
-                    continue;
+                auto argType = Types::resultTypeAsSeenFrom(gs, argTypeRaw, candidate.data(gs)->owner, inClass, targs);
+                if (constr == nullptr) {
+                    if (!Types::isSubType(gs, arg, argType)) {
+                        it = leftCandidates.erase(it);
+                        continue;
+                    }
+                } else {
+                    if (!Types::isSubTypeUnderConstraint(gs, *constr, arg, argType, UntypedMode::AlwaysCompatible,
+                                                         ErrorSection::Collector::NO_OP)) {
+                        it = leftCandidates.erase(it);
+                        continue;
+                    }
                 }
                 ++it;
             }
@@ -419,20 +469,29 @@ MethodRef guessOverload(const GlobalState &gs, ClassOrModuleRef inClass, MethodR
         }
     }
     if (leftCandidates.empty()) {
-        leftCandidates = allCandidates;
+        leftCandidates = allCandidatesWithConstraints;
     } else {
-        fallback = leftCandidates[0];
+        fallback = leftCandidates[0].candidate;
     }
 
     { // keep only candidates that have a block iff we are passing one
         for (auto it = leftCandidates.begin(); it != leftCandidates.end(); /* nothing*/) {
-            MethodRef candidate = *it;
+            const auto &[candidate, constr] = *it;
             const auto &args = candidate.data(gs)->arguments;
             ENFORCE(!args.empty(), "Should at least have a block argument.");
-            auto mentionsBlockArg = !args.back().isSyntheticBlockArgument();
-            if (mentionsBlockArg != hasBlock) {
-                it = leftCandidates.erase(it);
-                continue;
+            const auto &lastArg = args.back();
+            auto mentionsBlockArg = !lastArg.isSyntheticBlockArgument();
+            if (hasBlock) {
+                if (!mentionsBlockArg || lastArg.type == Types::nilClass()) {
+                    it = leftCandidates.erase(it);
+                    continue;
+                }
+            } else {
+                if (mentionsBlockArg && lastArg.type != nullptr &&
+                    (!lastArg.type.isFullyDefined() || !Types::isSubType(gs, Types::nilClass(), lastArg.type))) {
+                    it = leftCandidates.erase(it);
+                    continue;
+                }
             }
             ++it;
         }
@@ -442,12 +501,12 @@ MethodRef guessOverload(const GlobalState &gs, ClassOrModuleRef inClass, MethodR
         struct Comp {
             const GlobalState &gs;
 
-            bool operator()(MethodRef s, int i) const {
-                return getArity(gs, s) < i;
+            bool operator()(GuessOverloadCandidate &s, int i) const {
+                return getArity(gs, s.candidate) < i;
             }
 
-            bool operator()(int i, MethodRef s) const {
-                return i < getArity(gs, s);
+            bool operator()(int i, GuessOverloadCandidate &s) const {
+                return i < getArity(gs, s.candidate);
             }
 
             Comp(const GlobalState &gs) : gs(gs){};
@@ -460,7 +519,7 @@ MethodRef guessOverload(const GlobalState &gs, ClassOrModuleRef inClass, MethodR
     }
 
     if (!leftCandidates.empty()) {
-        return leftCandidates[0];
+        return leftCandidates[0].candidate;
     }
     return fallback;
 }
@@ -500,7 +559,7 @@ string prettyArity(const GlobalState &gs, MethodRef method) {
 }
 
 void maybeSuggestUnsafeKwsplat(const core::GlobalState &gs, core::ErrorBuilder &e, core::Loc kwSplatArgLoc) {
-    if (!kwSplatArgLoc.exists()) {
+    if (!kwSplatArgLoc.exists() || kwSplatArgLoc.empty()) {
         return;
     }
 
@@ -549,6 +608,32 @@ const ShapeType *fromKwargsHash(const GlobalState &gs, const TypePtr &ty) {
     return hash;
 }
 
+// Heuristic to try to find leading commas. Not actually required for correctness
+// (will still parse even if we delete something but don't find the comma) which is
+// why we're fine with this just hard-coding two common cases (easiest to implement).
+Loc expandToLeadingComma(const GlobalState &gs, Loc loc) {
+    if (loc.adjustLen(gs, -1, 1).source(gs) == ",") {
+        return loc.adjust(gs, -1, 0);
+    } else if (loc.adjustLen(gs, -2, 2).source(gs) == ", ") {
+        return loc.adjust(gs, -2, 0);
+    } else if (loc.adjustLen(gs, -1, 1).source(gs) == " ") {
+        return loc.adjust(gs, -1, 0);
+    } else {
+        return loc;
+    }
+}
+
+void handleBlockType(const GlobalState &gs, DispatchComponent &component, TypePtr blockType) {
+    if (!blockType) {
+        blockType = Types::untyped(component.method);
+    }
+
+    component.blockReturnType = Types::getProcReturnType(gs, Types::dropNil(gs, blockType));
+    blockType = component.constr->isSolved() ? Types::instantiate(gs, blockType, *component.constr)
+                                             : Types::approximate(gs, blockType, *component.constr);
+    component.blockPreType = blockType;
+}
+
 // This implements Ruby's argument matching logic (assigning values passed to a
 // method call to formal parameters of the method).
 //
@@ -559,8 +644,7 @@ const ShapeType *fromKwargsHash(const GlobalState &gs, const TypePtr &ty) {
 //    (with a subtype check on the key type, once we have generics)
 DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &args, core::ClassOrModuleRef symbol,
                                   const vector<TypePtr> &targs) {
-    auto funLoc = args.funLoc();
-    auto errLoc = (funLoc.exists() && !funLoc.empty()) ? funLoc : args.callLoc();
+    auto errLoc = args.errLoc();
     if (symbol == core::Symbols::untyped()) {
         auto what = core::errors::Infer::errorClassForUntyped(gs, args.locs.file, args.thisType);
         if (auto e = gs.beginError(errLoc, what)) {
@@ -588,20 +672,31 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
     } else if (args.name == Names::methodNameMissing()) {
         // We already reported a parse error earlier in the pipeline
         return DispatchResult(Types::untypedUntracked(), std::move(args.selfType), Symbols::noMethod());
+    } else if (args.name == Names::untypedSuper()) {
+        // Currently, `super` is only checked for the following cases:
+        // - The receiver is a class
+        // - The super call is not inside a block
+        // No point in paying a full findMethodTransitive just to discover that.
+        return DispatchResult(Types::untyped(Symbols::Magic_UntypedSource_super()), std::move(args.selfType),
+                              Symbols::noMethod());
     }
 
-    // TODO(jez) It would be nice to make `core::Symbols::top()` not have `Object` as its ancestor,
-    // in which case we could simply let the findMethodTransitive run and fail to find any methods
+    auto targetName = args.name;
     MethodRef mayBeOverloaded;
-    if (symbol != core::Symbols::top()) {
-        mayBeOverloaded = symbol.data(gs)->findMethodTransitive(gs, args.name);
+    if (targetName == Names::super()) {
+        targetName = args.enclosingMethodForSuper;
+        mayBeOverloaded = symbol.data(gs)->findParentMethodTransitive(gs, targetName);
+    } else if (symbol != core::Symbols::top()) {
+        // TODO(jez) It would be nice to make `core::Symbols::top()` not have `Object` as its ancestor,
+        // in which case we could simply let the findMethodTransitive run and fail to find any methods
+        mayBeOverloaded = symbol.data(gs)->findMethodTransitive(gs, targetName);
     }
 
     if (!mayBeOverloaded.exists() && gs.requiresAncestorEnabled) {
         // Before raising any error, we look if the method exists in all required ancestors by this symbol
         auto ancestors = symbol.data(gs)->requiredAncestorsTransitive(gs);
         for (auto ancst : ancestors) {
-            mayBeOverloaded = ancst.symbol.data(gs)->findMethodTransitive(gs, args.name);
+            mayBeOverloaded = ancst.symbol.data(gs)->findMethodTransitive(gs, targetName);
             if (mayBeOverloaded.exists()) {
                 break;
             }
@@ -609,43 +704,34 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
     }
 
     if (!mayBeOverloaded.exists()) {
-        if (args.name == Names::initialize()) {
-            // Special-case initialize(). We should define this on
-            // `BasicObject`, but our method-resolution order is wrong, and
-            // putting it there will inadvertently shadow real definitions in
-            // some cases, so we special-case it here as a last resort.
-            auto result = DispatchResult(Types::untypedUntracked(), std::move(args.selfType), Symbols::noMethod());
-            if (!args.args.empty() && !args.suppressErrors) {
-                if (auto e = gs.beginError(args.argsLoc(), errors::Infer::MethodArgumentCountMismatch)) {
-                    e.setHeader("Wrong number of arguments for constructor. Expected: `{}`, got: `{}`", 0,
-                                args.args.size());
-                    e.replaceWith("Delete args", args.argsLoc(), "");
-                    result.main.errors.emplace_back(e.build());
-                }
-            }
-            return result;
-        } else if (args.name == core::Names::super()) {
-            return DispatchResult(Types::untyped(Symbols::Magic_UntypedSource_super()), std::move(args.selfType),
-                                  Symbols::noMethod());
-        }
         auto result = DispatchResult(Types::untypedUntracked(), std::move(args.selfType), Symbols::noMethod());
         if (args.suppressErrors) {
             // Short circuit here to avoid constructing an expensive error message.
             return result;
         }
+
+        auto unknownMethodCode = args.name == Names::super()
+                                     // So we can attach super-specific autocorrects at some point in the future
+                                     ? errors::Infer::UnknownSuperMethod
+                                     : errors::Infer::UnknownMethod;
+
         // This is a hack. We want to always be able to build the error object
         // so that it is not immediately sent to GlobalState::_error
         // and recorded.
         // Instead, the error always should get queued up in the
         // errors list of the result so that the caller can deal with the error.
-        auto e = gs.beginError(errLoc, errors::Infer::UnknownMethod);
+        auto e = gs.beginError(errLoc, unknownMethodCode);
         if (e) {
             string thisStr = args.thisType.show(gs);
+            auto ancestorsOf = args.name == Names::super() ? "ancestors of " : "";
+            auto isSetter = targetName.isSetter(gs);
+            auto methodPrefix = isSetter ? "Setter method" : "Method";
             if (args.fullType.type != args.thisType) {
-                e.setHeader("Method `{}` does not exist on `{}` component of `{}`", args.name.show(gs), thisStr,
-                            args.fullType.type.show(gs));
+                e.setHeader("{} `{}` does not exist on {}`{}` component of `{}`", methodPrefix, targetName.show(gs),
+                            ancestorsOf, thisStr, args.fullType.type.show(gs));
             } else {
-                e.setHeader("Method `{}` does not exist on `{}`", args.name.show(gs), thisStr);
+                e.setHeader("{} `{}` does not exist on {}`{}`", methodPrefix, targetName.show(gs), ancestorsOf,
+                            thisStr);
             }
             e.addErrorSection(args.fullType.explainGot(gs, args.originForUninitialized));
 
@@ -662,6 +748,16 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                 auto attachedClass = symbol.data(gs)->attachedClass(gs);
                 TypeErrorDiagnostics::maybeInsertDSLMethod(gs, e, args.locs.file, args.callLoc(), attachedClass,
                                                            Symbols::T_Sig(), "");
+            } else if (args.name == Names::super()) {
+                // TODO(jez) Special error for super.
+                // - If identical name exists as self/instance method in parent but we're currently
+                //   an instance/self method, suggest changing enclosing method definition.
+                // - If similar name exists in parent suggest renaming enclosing method definition
+                //   (intialize -> initialize, etc.)
+                // - Otherwise, suggest `T.bind`
+                // Note: super is not a method call, and so all the logic in the case below to
+                // compute autocorrects to potentially fix up the method call's receiver can't apply.
+                e.addErrorNote("For help fixing `{}` errors: {}", "super", "https://sorbet.org/docs/typed-super");
             } else if (args.receiverLoc().exists() &&
                        (gs.suggestUnsafe.has_value() ||
                         (args.fullType.type != args.thisType && symbol == Symbols::NilClass()))) {
@@ -687,70 +783,125 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                                   args.receiverLoc().source(gs).value());
                 }
             } else {
+                auto canSkipFuzzyMatch = false;
                 if (symbol.data(gs)->isModule()) {
                     auto objMeth = core::Symbols::Object().data(gs)->findMethodTransitive(gs, args.name);
                     if (objMeth.exists() && objMeth.data(gs)->owner.data(gs)->isModule()) {
-                        e.addErrorNote("Did you mean to `{}` in this module?",
-                                       fmt::format("include {}", objMeth.data(gs)->owner.data(gs)->name.show(gs)));
-                    }
-                }
-                auto alternatives = symbol.data(gs)->findMemberFuzzyMatch(gs, args.name);
-                for (auto alternative : alternatives) {
-                    auto possibleSymbol = alternative.symbol;
-                    if (!possibleSymbol.isClassOrModule() &&
-                        (!possibleSymbol.isMethod() ||
-                         (possibleSymbol.asMethodRef().data(gs)->flags.isPrivate && !args.isPrivateOk))) {
-                        continue;
-                    }
-
-                    const auto toReplace = args.name.toString(gs);
-                    if (args.funLoc().source(gs) != toReplace) {
-                        auto suggestedName = possibleSymbol.isClassOrModule() ? possibleSymbol.show(gs) + ".new"
-                                                                              : possibleSymbol.show(gs);
-                        e.addErrorLine(possibleSymbol.loc(gs), "Did you mean: `{}`", suggestedName);
-                        continue;
-                    }
-
-                    if (possibleSymbol.isClassOrModule()) {
-                        if (possibleSymbol.asClassOrModuleRef().data(gs)->typeArity(gs) > 0) {
-                            // If this call was in type sytnax, we might have already have built an
-                            // autocorrect to turn this from `MyClass(...)` to `MyClass[...]`.
-                            continue;
+                        auto objData = objMeth.data(gs);
+                        auto ownerName = objData->owner.data(gs)->name.show(gs);
+                        e.addErrorNote("`{}` is actually defined as a method on `{}`. To call it, either\n"
+                                       "    `{}` in this module to ensure the method is always there, or\n"
+                                       "    call the method using `{}` instead.",
+                                       args.name.show(gs), ownerName, fmt::format("include {}", ownerName),
+                                       fmt::format("{}.{}", ownerName, args.name.show(gs)));
+                        if (args.receiverLoc().exists() && args.receiverLoc().empty()) {
+                            e.replaceWith("Prefix with `Kernel.`", args.receiverLoc(), "Kernel.");
                         }
-                        e.addErrorNote("Ruby uses `.new` to invoke a class's constructor");
-                        e.replaceWith("Insert `.new`", args.funLoc().copyEndWithZeroLength(), ".new");
-                        continue;
                     }
+                } else if (!symbol.data(gs)->attachedClass(gs).exists() &&
+                           symbol.data(gs)->lookupSingletonClass(gs).exists()) {
+                    auto singleton = symbol.data(gs)->lookupSingletonClass(gs);
+                    auto methodOnSingleton = singleton.data(gs)->findMethodTransitive(gs, args.name);
+                    if (methodOnSingleton.exists()) {
+                        // isPrivateOk implies that the singleton class of the receiver is also the
+                        // singleton class of the enclosing method, because the receiver is not a
+                        // module and is syntactically `self`.
+                        auto eitherLine =
+                            args.isPrivateOk
+                                ? ErrorLine::fromWithoutLoc(
+                                      "Either:\n"
+                                      "    - use `{}` to call it,\n"
+                                      "    - remove `{}` from its definition to make it an instance method, or\n"
+                                      "    - define the current method as a singleton class method using `{}`",
+                                      ".class", "self.", "def self.")
+                                : ErrorLine::fromWithoutLoc(
+                                      "Either:\n"
+                                      "    - use `{}` to call it, or\n"
+                                      "    - remove `{}` from its definition to make it an instance method",
+                                      ".class", "self.");
 
-                    const auto replacement = possibleSymbol.name(gs).toString(gs);
-                    if (replacement != toReplace) {
-                        e.didYouMean(replacement, args.funLoc());
-                        e.addErrorLine(possibleSymbol.loc(gs), "Defined here");
-                        continue;
-                    }
+                        e.addErrorSection(
+                            ErrorSection("There is a singleton class method with the same name:",
+                                         {
+                                             ErrorLine::from(methodOnSingleton.data(gs)->loc(), "Defined here"),
+                                             move(eitherLine),
+                                         }));
 
-                    auto possibleSymbolOwner = possibleSymbol.asMethodRef().data(gs)->owner;
-                    if (possibleSymbolOwner.data(gs)->lookupSingletonClass(gs) == symbol) {
-                        auto defKeyword = "def ";
-                        auto defKeywordLen = char_traits<char>::length(defKeyword);
-                        auto prefixLen = defKeywordLen + toReplace.size();
-                        auto declLocPrefix = possibleSymbol.loc(gs).adjustLen(gs, 0, prefixLen);
-                        e.addErrorNote("Did you mean to define `{}` as a singleton class method?", toReplace);
-                        if (declLocPrefix.source(gs) == fmt::format("{}{}", defKeyword, toReplace)) {
-                            e.replaceWith("Define method with `self.`",
-                                          possibleSymbol.loc(gs).adjustLen(gs, defKeywordLen, 0), "self.");
-                        } else {
-                            e.addErrorLine(possibleSymbol.loc(gs), "`{}` defined here", toReplace);
-                        }
-                    } else if (symbol.data(gs)->lookupSingletonClass(gs) == possibleSymbolOwner) {
-                        e.addErrorNote("Did you mean to call `{}` which is a singleton class method?",
-                                       possibleSymbol.show(gs));
-                        if (args.receiverLoc().empty()) {
+                        if (args.receiverLoc().exists() && args.receiverLoc().empty()) {
                             e.replaceWith("Insert `self.class.`", args.funLoc().copyWithZeroLength(), "self.class.");
-                        } else {
+                        } else if (args.receiverLoc().exists()) {
                             e.replaceWith("Insert `.class`", args.receiverLoc().copyEndWithZeroLength(), ".class");
                         }
-                        e.addErrorLine(possibleSymbol.loc(gs), "`{}` defined here", toReplace);
+                        canSkipFuzzyMatch = true;
+                    }
+                }
+
+                if (!canSkipFuzzyMatch) {
+                    auto alternatives = symbol.data(gs)->findMemberFuzzyMatch(gs, targetName);
+                    for (auto alternative : alternatives) {
+                        auto possibleSymbol = alternative.symbol;
+                        if (!possibleSymbol.isClassOrModule() && !possibleSymbol.isMethod()) {
+                            continue;
+                        }
+
+                        if (possibleSymbol.isMethod()) {
+                            auto possibleMethod = possibleSymbol.asMethodRef().data(gs);
+                            if ((possibleMethod->flags.isPrivate || possibleMethod->owner == Symbols::Kernel()) &&
+                                !args.isPrivateOk) {
+                                // Special-case Kernel methods, which should be treated as private, but aren't due to
+                                // this bug: https://github.com/sorbet/sorbet/issues/4434
+                                // (If we fix that bug, we can delete the `Kernel` reference above.)
+                                continue;
+                            }
+                        }
+
+                        if (isSetter && possibleSymbol.name(gs).lookupWithEq(gs) == args.name) {
+                            e.addErrorLine(possibleSymbol.loc(gs),
+                                           "Method `{}` defined here without a corresponding setter",
+                                           possibleSymbol.name(gs).show(gs));
+                            continue;
+                        }
+
+                        const auto toReplace = args.name.toString(gs);
+                        if (args.funLoc().source(gs) != toReplace) {
+                            auto suggestedName = possibleSymbol.isClassOrModule() ? possibleSymbol.show(gs) + ".new"
+                                                                                  : possibleSymbol.show(gs);
+                            e.addErrorLine(possibleSymbol.loc(gs), "Did you mean: `{}`", suggestedName);
+                            continue;
+                        }
+
+                        if (possibleSymbol.isClassOrModule()) {
+                            if (possibleSymbol.asClassOrModuleRef().data(gs)->typeArity(gs) > 0) {
+                                // If this call was in type syntax, we might have already have built an
+                                // autocorrect to turn this from `MyClass(...)` to `MyClass[...]`.
+                                continue;
+                            }
+                            e.addErrorNote("Ruby uses `.new` to invoke a class's constructor");
+                            e.replaceWith("Insert `.new`", args.funLoc().copyEndWithZeroLength(), ".new");
+                            continue;
+                        }
+
+                        const auto replacement = possibleSymbol.name(gs).toString(gs);
+                        if (replacement != toReplace) {
+                            e.didYouMean(replacement, args.funLoc());
+                            e.addErrorLine(possibleSymbol.loc(gs), "Defined here");
+                            continue;
+                        }
+
+                        auto possibleSymbolOwner = possibleSymbol.asMethodRef().data(gs)->owner;
+                        if (possibleSymbolOwner.data(gs)->lookupSingletonClass(gs) == symbol) {
+                            auto defKeyword = "def ";
+                            auto defKeywordLen = char_traits<char>::length(defKeyword);
+                            auto prefixLen = defKeywordLen + toReplace.size();
+                            auto declLocPrefix = possibleSymbol.loc(gs).adjustLen(gs, 0, prefixLen);
+                            e.addErrorNote("Did you mean to define `{}` as a singleton class method?", toReplace);
+                            if (declLocPrefix.source(gs) == fmt::format("{}{}", defKeyword, toReplace)) {
+                                e.replaceWith("Define method with `self.`",
+                                              possibleSymbol.loc(gs).adjustLen(gs, defKeywordLen, 0), "self.");
+                            } else {
+                                e.addErrorLine(possibleSymbol.loc(gs), "`{}` defined here", toReplace);
+                            }
+                        }
                     }
                 }
             }
@@ -801,7 +952,7 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
     bool hasKwsplat = nonPosArgs & 0x1;
     auto numKwargs = hasKwsplat ? nonPosArgs - 1 : nonPosArgs;
 
-    // p -> params, i.e., what was mentioned in the defintiion
+    // p -> params, i.e., what was mentioned in the definition
     auto pit = data->arguments.begin();
     auto pend = data->arguments.end();
 
@@ -862,6 +1013,7 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
 
     // Extract the kwargs hash if there are keyword args present in the send
     TypePtr kwargs;
+    UnorderedMap<NameRef, Loc> kwargLocs;
     Loc kwargsLoc;
     if (numKwargs > 0 || hasKwsplat) {
         // for cases where the method accepts keyword arguments, none were given, but more positional arguments were
@@ -879,10 +1031,13 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
 
         // process inlined keyword arguments
         {
-            auto kwit = args.args.begin() + args.numPosArgs;
-            auto kwend = args.args.begin() + args.numPosArgs + numKwargs;
-
+            auto kwbegin = args.args.begin() + args.numPosArgs;
+            auto kwit = kwbegin;
+            auto kwend = kwbegin + numKwargs;
             while (kwit != kwend) {
+                auto kwArgIdx = distance(kwbegin, kwit);
+                auto kwArgLoc =
+                    args.argLoc(args.numPosArgs + kwArgIdx).join(args.argLoc(args.numPosArgs + kwArgIdx + 1));
                 // if the key isn't a symbol literal, break out as this is not a valid keyword
                 auto &key = *kwit++;
                 if (!isa_type<NamedLiteralType>(key->type) ||
@@ -899,6 +1054,7 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                 auto &val = *kwit++;
                 keys.emplace_back(key->type);
                 values.emplace_back(val->type);
+                kwargLocs[cast_type_nonnull<NamedLiteralType>(key->type).asName()] = kwArgLoc;
             }
         }
 
@@ -1030,7 +1186,10 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                         result.main.errors.emplace_back(e.build());
                     }
                 } else if (!Types::isSubTypeUnderConstraint(gs, *constr, kwSplatKeyType, Types::Symbol(),
-                                                            UntypedMode::AlwaysCompatible)) {
+                                                            UntypedMode::AlwaysCompatible,
+                                                            ErrorSection::Collector::NO_OP)) {
+                    // ^ Passing in a noOp collector even though this call is used for error reporting,
+                    // because it's unlikely we'll add more details to a subtype check for Symbol
                     // TODO(jez) Highlight untyped code for this error
                     if (auto e = gs.beginError(kwSplatArgLoc, errors::Infer::MethodArgumentMismatch)) {
                         e.setHeader("Expected `{}` but found `{}` for keyword splat keys type", "Symbol",
@@ -1049,8 +1208,9 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                             kwParamType = Types::untyped(method);
                         }
                         // TODO(jez) Highlight untyped code for this error
+                        core::ErrorSection::Collector errorDetailsCollector;
                         if (Types::isSubTypeUnderConstraint(gs, *constr, kwSplatValueType, kwParamType,
-                                                            UntypedMode::AlwaysCompatible)) {
+                                                            UntypedMode::AlwaysCompatible, errorDetailsCollector)) {
                             continue;
                         }
 
@@ -1061,6 +1221,8 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                                                             method.show(gs));
                             e.addErrorSection(TypeAndOrigins::explainExpected(gs, kwParamType, kwParam->loc, for_));
                             e.addErrorSection(kwSplatTPO.explainGot(gs, args.originForUninitialized));
+                            core::TypeErrorDiagnostics::explainTypeMismatch(gs, e, errorDetailsCollector, kwParamType,
+                                                                            kwSplatValueType);
                             e.addErrorNote(
                                 "A `{}` passed as a keyword splat must match the type of all keyword parameters\n"
                                 "    because Sorbet cannot see what specific keys exist in the `{}`.",
@@ -1092,7 +1254,7 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                                 method.show(gs), prettyArity(gs, method), posArgs);
                 }
                 e.addErrorLine(method.data(gs)->loc(), "`{}` defined here", method.show(gs));
-                if (args.name == core::Names::any() &&
+                if (targetName == core::Names::any() &&
                     symbol == core::Symbols::T().data(gs)->lookupSingletonClass(gs)) {
                     e.addErrorNote("If you want to allow any type as an argument, use `{}`", "T.untyped");
                 }
@@ -1216,9 +1378,20 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                 }
                 NameRef arg = key.asName();
 
-                if (auto e = gs.beginError(args.callLoc(), errors::Infer::MethodArgumentCountMismatch)) {
+                auto kwargErrLoc = kwargsLoc;
+                auto it = kwargLocs.find(key.asName());
+                // TODO(jez) This papers over some stuff around kwsplats which might get in our way
+                // of getting a loc for known keyword args. In those cases, we simply give up right now.
+                if (it != kwargLocs.end()) {
+                    kwargErrLoc = it->second;
+                }
+                if (auto e = gs.beginError(kwargErrLoc, errors::Infer::MethodArgumentCountMismatch)) {
                     e.setHeader("Unrecognized keyword argument `{}` passed for method `{}`", arg.show(gs),
                                 method.show(gs));
+                    if (kwargErrLoc.exists() && kwargErrLoc != kwargsLoc) {
+                        auto deleteLoc = expandToLeadingComma(gs, kwargErrLoc);
+                        e.replaceWith("Delete unrecognized keyword argument", deleteLoc, "");
+                    }
                     result.main.errors.emplace_back(e.build());
                 }
             }
@@ -1261,23 +1434,19 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
 
         auto extraArgsLoc = args.argLoc(maxPossiblePositional).join(lastPositionalArg);
         if (auto e = gs.beginError(extraArgsLoc, errors::Infer::MethodArgumentCountMismatch)) {
-            auto deleteLoc = extraArgsLoc;
-            // Heuristic to try to find leading commas. Not actually required for correctness
-            // (will still parse even if we delete something but don't find the comma) which is
-            // why we're fine with this just hard-coding two common cases (easiest to implement).
-            if (extraArgsLoc.adjustLen(gs, -1, 1).source(gs) == ",") {
-                deleteLoc = extraArgsLoc.adjust(gs, -1, 0);
-            } else if (extraArgsLoc.adjustLen(gs, -2, 2).source(gs) == ", ") {
-                deleteLoc = extraArgsLoc.adjust(gs, -2, 0);
-            } else if (extraArgsLoc.adjustLen(gs, -1, 1).source(gs) == " ") {
-                deleteLoc = extraArgsLoc.adjust(gs, -1, 0);
-            }
+            auto deleteLoc = expandToLeadingComma(gs, extraArgsLoc);
 
-            if (!hasKwargs) {
+            if (method == Symbols::BasicObject_initialize()) {
+                e.setHeader("Wrong number of arguments for constructor. Expected: `{}`, got: `{}`", 0, numArgsGiven);
+                e.addErrorLine(method.data(gs)->loc(), "`{}` defined here", targetName.show(gs));
+                e.replaceWith("Delete extra args", deleteLoc, "");
+            } else if (!hasKwargs) {
                 e.setHeader("Too many arguments provided for method `{}`. Expected: `{}`, got: `{}`", method.show(gs),
                             prettyArity(gs, method), numArgsGiven);
-                e.addErrorLine(method.data(gs)->loc(), "`{}` defined here", args.name.show(gs));
-                e.replaceWith("Delete extra args", deleteLoc, "");
+                e.addErrorLine(method.data(gs)->loc(), "`{}` defined here", targetName.show(gs));
+                if (!deleteLoc.empty()) {
+                    e.replaceWith("Delete extra args", deleteLoc, "");
+                }
             } else {
                 // if we have keyword arguments, we should print a more informative message: otherwise, we might give
                 // people some slightly confusing error messages.
@@ -1285,7 +1454,7 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                 // print a helpful error message
                 e.setHeader("Too many positional arguments provided for method `{}`. Expected: `{}`, got: `{}`",
                             method.show(gs), prettyArity(gs, method), posArgs);
-                e.addErrorLine(method.data(gs)->loc(), "`{}` defined here", args.name.show(gs));
+                e.addErrorLine(method.data(gs)->loc(), "`{}` defined here", targetName.show(gs));
 
                 // if there's an obvious first keyword argument that the user hasn't supplied, we can mention it
                 // explicitly
@@ -1302,7 +1471,7 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                         e.replaceWith(fmt::format("Prefix with `{}:`", possibleArg), extraArgsLoc.copyWithZeroLength(),
                                       "{}: ", possibleArg);
                     }
-                } else {
+                } else if (!deleteLoc.empty()) {
                     e.replaceWith("Delete extra args", deleteLoc, "");
                 }
             }
@@ -1320,11 +1489,14 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
         // block parameter" error, so we can use the heuristic about isSyntheticBlockArgument.
         // (Some RBI-only strictness levels are technically higher than strict but don't require
         // having written a sig. This usually manifests as `def foo(*_); end` with no sig in an RBI.)
+        //
+        // We also have to check whether the blockLoc exists and is not empty. (Sometimes the block
+        // can be imaginary, like from a bare `super` call).
         if (data->hasSig() && data->loc().exists()) {
             auto file = data->loc().file();
+            auto blockLoc = args.blockLoc(gs);
             if (file.exists() && file.data(gs).strictLevel >= core::StrictLevel::Strict &&
-                bspec.isSyntheticBlockArgument()) {
-                auto blockLoc = args.blockLoc(gs);
+                bspec.isSyntheticBlockArgument() && blockLoc.exists() && !blockLoc.empty()) {
                 if (auto e = gs.beginError(blockLoc, core::errors::Infer::TakesNoBlock)) {
                     e.setHeader("Method `{}` does not take a block", method.show(gs));
                     for (const auto loc : method.data(gs)->locs()) {
@@ -1339,15 +1511,9 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
         }
 
         TypePtr blockType = Types::resultTypeAsSeenFrom(gs, bspec.type, data->owner, symbol, targs);
-        if (!blockType) {
-            blockType = Types::untyped(method);
-        }
-
-        component.blockReturnType = Types::getProcReturnType(gs, Types::dropNil(gs, blockType));
-        blockType = constr->isSolved() ? Types::instantiate(gs, blockType, *constr)
-                                       : Types::approximate(gs, blockType, *constr);
-        component.blockPreType = blockType;
-        component.blockSpec = bspec.deepCopy();
+        handleBlockType(gs, component, blockType);
+        component.rebind = bspec.rebind;
+        component.rebindLoc = bspec.loc;
     }
 
     TypePtr &resultType = result.returnType;
@@ -1355,7 +1521,7 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
     auto *intrinsic = method.data(gs)->getIntrinsic();
     if (intrinsic != nullptr) {
         intrinsic->apply(gs, args, result);
-        // the call could have overriden constraint
+        // the call could have overridden constraint
         if (result.main.constr || constr != &core::TypeConstraint::EmptyFrozenConstraint) {
             constr = result.main.constr.get();
         }
@@ -1376,7 +1542,7 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
         }
     }
     if (args.block == nullptr) {
-        // if block is there we do not attempt to solve the constaint. CFG adds an explicit solve
+        // if block is there we do not attempt to solve the constraint. CFG adds an explicit solve
         // node that triggers constraint solving
         if (!constr->solve(gs)) {
             if (auto e = gs.beginError(errLoc, errors::Infer::GenericMethodConstraintUnsolved)) {
@@ -1394,7 +1560,7 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
         // TODO(jez) Highlight untyped code for this error
         if (blockType && !core::Types::isSubType(gs, core::Types::nilClass(), blockType)) {
             if (auto e = gs.beginError(args.callLoc().copyEndWithZeroLength(), errors::Infer::BlockNotPassed)) {
-                e.setHeader("`{}` requires a block parameter, but no block was passed", args.name.show(gs));
+                e.setHeader("`{}` requires a block parameter, but no block was passed", targetName.show(gs));
                 e.addErrorLine(method.data(gs)->loc(), "defined here");
                 result.main.errors.emplace_back(e.build());
             }
@@ -1547,8 +1713,7 @@ DispatchResult badMetaTypeCall(const GlobalState &gs, const DispatchArgs &args, 
 } // namespace
 
 DispatchResult MetaType::dispatchCall(const GlobalState &gs, const DispatchArgs &args) const {
-    auto funLoc = args.funLoc();
-    auto errLoc = (funLoc.exists() && !funLoc.empty()) ? funLoc : args.callLoc();
+    auto errLoc = args.errLoc();
     switch (args.name.rawId()) {
         case Names::new_().rawId(): {
             if (!canCallNew(gs, wrapped)) {
@@ -1567,7 +1732,8 @@ DispatchResult MetaType::dispatchCall(const GlobalState &gs, const DispatchArgs 
                                           args.block,
                                           args.originForUninitialized,
                                           /* isPrivateOk */ true,
-                                          args.suppressErrors};
+                                          args.suppressErrors,
+                                          args.enclosingMethodForSuper};
             auto original = wrapped.dispatchCall(gs, innerArgs);
             original.returnType = wrapped;
             original.main.sendTp = wrapped;
@@ -1740,7 +1906,7 @@ class T_attached_class : public IntrinsicMethod {
 public:
     void apply(const GlobalState &gs, const DispatchArgs &args, DispatchResult &res) const override {
         // Most syntactically visible calls to `T.attached_class` should be handled by the
-        // `<Magic>.attached_class` intrisnic.
+        // `<Magic>.attached_class` intrinsic.
         //
         // This intrinsic remains just on the off chance that people misuse `T.attached_class` as a
         // value some other way (e.g., t = T; t.attached_class).
@@ -1775,8 +1941,9 @@ public:
         }
         auto ret = Types::dropNil(gs, args.args[0]->type);
         if (ret == args.args[0]->type) {
-            if (auto e = gs.beginError(args.argLoc(0), errors::Infer::InvalidCast)) {
-                if (args.args[0]->type.isUntyped()) {
+            auto code = args.args[0]->type.isUntyped() ? errors::Infer::MustOnUntyped : errors::Infer::InvalidCast;
+            if (auto e = gs.beginError(args.argLoc(0), code)) {
+                if (code == errors::Infer::MustOnUntyped) {
                     e.setHeader("`{}` called on `{}`, which is redundant", methodName, args.args[0]->type.show(gs));
                 } else {
                     e.setHeader("`{}` called on `{}`, which is never `{}`", methodName, args.args[0]->type.show(gs),
@@ -1786,7 +1953,7 @@ public:
                 auto replaceLoc = args.callLoc();
                 const auto locWithoutTMust = args.argLoc(0);
                 if (replaceLoc.exists() && locWithoutTMust.exists()) {
-                    e.replaceWith(fmt::format("Remove `{}`", methodName), replaceLoc, "{}",
+                    e.replaceWith(fmt::format("Remove redundant `{}`", methodName), replaceLoc, "{}",
                                   locWithoutTMust.source(gs).value());
                 }
             }
@@ -1976,22 +2143,27 @@ public:
     }
 
     void apply(const GlobalState &gs, const DispatchArgs &args, DispatchResult &res) const override {
-        auto mustExist = true;
-        ClassOrModuleRef self = unwrapSymbol(gs, args.thisType, mustExist);
-
-        auto attachedClass = self.data(gs)->attachedClass(gs);
-        if (!attachedClass.exists()) {
-            // If someone takes `klass: T::Class[T.anything]` and calls `klass.new`, the call is
-            // actually going to be on an "instance" not a singleton (Class.new, the one on the
-            // singleton, is the one that defines a new class at runtime).
-            //
-            // In that case, there's no attachedClass to look for an `initialize` method on.
-            // We could _maybe_ imagine trying to dispatch to `initialize` on the `<AttachedClass>`
-            // type argument? But I haven't thought about what the consequences of that would be.
-            ENFORCE(self == Symbols::Class());
+        auto *selfApp = cast_type<AppliedType>(args.thisType);
+        if (selfApp == nullptr) {
             return;
         }
-        auto instanceTy = attachedClass.data(gs)->externalType();
+
+        // If someone takes `klass: T::Class[T.anything]` and calls `klass.new`, the call is
+        // actually going to be on an "instance" not a singleton (Class.new, the one on the
+        // singleton, is the one that defines a new class at runtime).
+        //
+        // In that case, `Class` is an instance class (there's no `->attachedClass(gs)` to look for
+        // an `initialize` method on). So let's extract out the type applied to the
+        // `<AttachedClass>` type member and forward the dispatch to `initialize` on that type.
+        //
+        // Note that this subsumes cases like calls to new on `T.class_of(MyClass)` because class
+        // singleton classes ARE applied types, obviating the need to call `->attachedClass(gs)` at all.
+        auto currentAlignment = Types::alignBaseTypeArgs(gs, selfApp->klass, selfApp->targs, Symbols::Class());
+        auto it = absl::c_find_if(
+            currentAlignment, [&](auto tmRef) { return tmRef.data(gs)->name == Names::Constants::AttachedClass(); });
+        ENFORCE(it != currentAlignment.end());
+        auto instanceTy = selfApp->targs[distance(currentAlignment.begin(), it)];
+
         // The Ruby VM treats `initialize` as private by default, but allows calling it directly within `new`.
         DispatchArgs innerArgs{Names::initialize(),
                                args.locs,
@@ -2003,23 +2175,44 @@ public:
                                args.block,
                                args.originForUninitialized,
                                /* isPrivateOk */ true,
-                               args.suppressErrors};
+                               args.suppressErrors,
+                               args.enclosingMethodForSuper};
         auto dispatched = instanceTy.dispatchCall(gs, innerArgs);
 
-        for (auto &err : res.main.errors) {
-            dispatched.main.errors.emplace_back(std::move(err));
-        }
-        res.main.errors.clear();
-        res.main = move(dispatched.main);
-        if (!res.main.method.exists()) {
+        // Sorbet *should* treat a missing `initialize` here as a bug, because it can't know the
+        // arity/types of the constructor. The most common way `initialize` might be missing is if
+        // the user has written `Class`, which is treated like `T::Class[T.anything]`. In that case,
+        // the type means "this could be literally any class," and so the right thing to do would be
+        // to request a better constructor from the user.
+        //
+        // But there's an unknown amount of code relying on this right now (from before `T::Class`
+        // was built), which in combination with some other bugs, would mean that treating a missing
+        // `initialize` as an error would introduce low-value friction until we fix two other bugs:
+        //
+        // - https://github.com/sorbet/sorbet/issues/1317
+        // - https://github.com/sorbet/sorbet/issues/7309
+        //
+        // More information here:
+        // https://github.com/sorbet/sorbet/pull/7285#issuecomment-1718167511
+        //
+        // There's also the state of things at runtime, described in this comment:
+        // https://github.com/sorbet/sorbet/pull/6888/files#diff-b565686f17b8592d5c1e544cd639aaac3244869ac059f2db416a2ac24aa94675R9
+        //
+        // So for now, simply swallow "missing `initialize`" errors.
+        if (dispatched.main.method.exists()) {
             // If we actually dispatched to some `initialize` method, use that method as the result,
             // because it will be more interesting to people downstream who want to look at the
             // result.
             //
             // But if this class hasn't defined a custom `initialize` method, still record that we
             // dispatched to *something*, namely `Class#new`.
-            res.main.method = core::Symbols::Class_new();
+
+            for (auto &err : res.main.errors) {
+                dispatched.main.errors.emplace_back(std::move(err));
+            }
+            res.main = move(dispatched.main);
         }
+
         res.main.sendTp = instanceTy;
     }
 } Class_new;
@@ -2071,7 +2264,7 @@ void applySig(const GlobalState &gs, const DispatchArgs &args, DispatchResult &r
     auto recv = *args.args[0];
     res = recv.type.dispatchCall(gs, {core::Names::sig(), callLocs, numPosArgs, dispatchArgsArgs, recv.type, recv,
                                       recv.type, args.block, args.originForUninitialized, args.isPrivateOk,
-                                      args.suppressErrors});
+                                      args.suppressErrors, args.enclosingMethodForSuper});
 }
 
 class SorbetPrivateStatic_sig : public IntrinsicMethod {
@@ -2316,7 +2509,8 @@ public:
                                args.block,
                                args.originForUninitialized,
                                args.isPrivateOk,
-                               args.suppressErrors};
+                               args.suppressErrors,
+                               args.enclosingMethodForSuper};
         auto dispatched = receiver->type.dispatchCall(gs, innerArgs);
         for (auto &err : dispatched.main.errors) {
             res.main.errors.emplace_back(std::move(err));
@@ -2372,7 +2566,8 @@ private:
                                nullptr,
                                originForUninitialized,
                                IMPLICIT_CONVERSION_ALLOWS_PRIVATE,
-                               suppressErrors};
+                               suppressErrors,
+                               core::NameRef::noName()};
         auto dispatched = nonNilBlockType.type.dispatchCall(gs, innerArgs);
         for (auto &err : dispatched.main.errors) {
             gs._error(std::move(err));
@@ -2415,7 +2610,7 @@ private:
         ENFORCE(!methodArgs.empty());
         const auto &bspec = methodArgs.back();
         ENFORCE(bspec.flags.isBlock);
-        auto for_ = ErrorColors::format("for block argument `{}` of method `{}`", bspec.argumentName(gs),
+        auto for_ = ErrorColors::format("block argument `{}` of method `{}`", bspec.argumentName(gs),
                                         dispatchComp.method.show(gs));
         e.addErrorSection(TypeAndOrigins::explainExpected(gs, blockType, bspec.loc, for_));
     }
@@ -2429,8 +2624,9 @@ private:
         auto &constr = dispatched.main.constr;
         auto &blockPreType = dispatched.main.blockPreType;
         // TODO(jez) How should this interact with highlight untyped?
+        core::ErrorSection::Collector errorDetailsCollector;
         if (blockPreType && !Types::isSubTypeUnderConstraint(gs, *constr, passedInBlockType, blockPreType,
-                                                             UntypedMode::AlwaysCompatible)) {
+                                                             UntypedMode::AlwaysCompatible, errorDetailsCollector)) {
             auto nonNilableBlockType = Types::dropNil(gs, blockPreType);
             if (isa_type<ClassType>(passedInBlockType) &&
                 cast_type_nonnull<ClassType>(passedInBlockType).symbol == Symbols::Proc() &&
@@ -2459,6 +2655,8 @@ private:
                 if (!dispatched.secondary) {
                     Magic_callWithBlock::showLocationOfArgDefn(gs, e, blockPreType, dispatched.main);
                 }
+                core::TypeErrorDiagnostics::explainTypeMismatch(gs, e, errorDetailsCollector, blockPreType,
+                                                                passedInBlockType);
             }
         }
 
@@ -2476,7 +2674,7 @@ private:
                         // TODO(jez) How should this interact with highlight untyped?
                         // This subtype check is here to discover the correct generic bounds.
                         Types::isSubTypeUnderConstraint(gs, *constr, passedInBlockType, bspecType,
-                                                        UntypedMode::AlwaysCompatible);
+                                                        UntypedMode::AlwaysCompatible, ErrorSection::Collector::NO_OP);
                     }
                 }
                 it = it->secondary.get();
@@ -2531,7 +2729,7 @@ public:
             auto what = core::errors::Infer::errorClassForUntyped(gs, args.locs.file, receiver->type);
             if (auto e = gs.beginError(args.argLoc(0), what)) {
                 e.setHeader("Call to method `{}` on `{}`", fn.show(gs), "T.untyped");
-                TypeErrorDiagnostics::explainUntyped(gs, e, what, args.fullType, args.originForUninitialized);
+                TypeErrorDiagnostics::explainUntyped(gs, e, what, *receiver, args.originForUninitialized);
             }
 
             res.returnType = receiver->type;
@@ -2580,7 +2778,8 @@ public:
                                link,
                                args.originForUninitialized,
                                args.isPrivateOk,
-                               args.suppressErrors};
+                               args.suppressErrors,
+                               args.enclosingMethodForSuper};
 
         Magic_callWithBlock::simulateCall(gs, receiver, innerArgs, link, finalBlockType, args.argLoc(2), args.callLoc(),
                                           res);
@@ -2694,7 +2893,8 @@ public:
                                link,
                                args.originForUninitialized,
                                args.isPrivateOk,
-                               args.suppressErrors};
+                               args.suppressErrors,
+                               args.enclosingMethodForSuper};
 
         Magic_callWithBlock::simulateCall(gs, receiver, innerArgs, link, finalBlockType, args.argLoc(4), args.callLoc(),
                                           res);
@@ -2747,7 +2947,8 @@ public:
             auto fieldName = fieldNameTy.asName().show(gs);
 
             auto suggestType = res.returnType;
-            if (definingMethodName != core::Names::initialize() && definingMethodName != core::Names::staticInit()) {
+            if (definingMethodName != core::Names::initialize() && definingMethodName != core::Names::staticInit() &&
+                definingMethodName != core::Names::beforeAngles()) {
                 suggestType = core::Types::any(gs, Types::nilClass(), suggestType);
             }
             e.setHeader("The {} variable `{}` must be declared using `{}` when specifying `{}`", fieldKind, fieldName,
@@ -2871,6 +3072,7 @@ public:
             args.originForUninitialized,
             args.isPrivateOk,
             args.suppressErrors,
+            args.enclosingMethodForSuper,
         };
         auto dispatched = selfTy.type.dispatchCall(gs, innerArgs);
 
@@ -2899,6 +3101,7 @@ public:
                     // We already reported one visibility error, if relevant
                     /* isPrivateOk */ true,
                     args.suppressErrors,
+                    args.enclosingMethodForSuper,
                 };
                 auto retried = selfTyAndAnd.type.dispatchCall(gs, newInnerArgs);
 
@@ -2927,14 +3130,18 @@ public:
                                         "&.");
 
                                     auto funLoc = core::Loc(args.locs.file, args.locs.fun);
-                                    if (funLoc.exists() && !funLoc.empty() &&
+                                    if (selfTyAndAnd.origins.size() == 2 && funLoc.exists() && !funLoc.empty() &&
                                         funLoc.adjustLen(gs, -1, 1).source(gs) == ".") {
-                                        auto andAndLoc = args.locs.args[2];
+                                        // Our checkAndAnd desugarer only fires if the LHS and RHS have matching Send
+                                        // nodes. In these cases, we know that there are two origins and that the first
+                                        // origin is the call on the LHS.
+                                        auto lhsLoc = selfTyAndAnd.origins[0];
+                                        ENFORCE(lhsLoc.beginPos() < selfTyAndAnd.origins[1].beginPos());
                                         newErr.addAutocorrect(AutocorrectSuggestion{
                                             "Refactor to use `&.`",
                                             {
                                                 AutocorrectSuggestion::Edit{
-                                                    core::Loc(args.locs.file, andAndLoc.beginPos(), recvLoc.beginPos()),
+                                                    core::Loc(args.locs.file, lhsLoc.beginPos(), recvLoc.beginPos()),
                                                     "",
                                                 },
                                                 AutocorrectSuggestion::Edit{funLoc.adjustLen(gs, -1, 1), "&."},
@@ -2982,7 +3189,8 @@ public:
                               nullptr,
                               args.originForUninitialized,
                               IMPLICIT_CONVERSION_ALLOWS_PRIVATE,
-                              args.suppressErrors};
+                              args.suppressErrors,
+                              args.enclosingMethodForSuper};
         auto dispatched = arg->type.dispatchCall(gs, dispatch);
 
         // The VM handles the case of an error when dispatching to_a, so the only
@@ -3252,9 +3460,11 @@ public:
             auto valueType = shape.values[*idx];
             auto expectedType = valueType;
             auto actualType = *args.args[1];
-            // This check (with the dropLiteral's) mimicks what we do for pinning errors in environment.cc
+            // This check (with the dropLiteral's) mimics what we do for pinning errors in environment.cc
             // TODO(jez) How should this interact with highlight untyped?
-            if (!Types::isSubType(gs, Types::dropLiteral(gs, actualType.type), Types::dropLiteral(gs, expectedType))) {
+            core::ErrorSection::Collector errorDetailsCollector;
+            if (!Types::isSubType(gs, Types::dropLiteral(gs, actualType.type), Types::dropLiteral(gs, expectedType),
+                                  errorDetailsCollector)) {
                 auto argLoc = args.argLoc(1);
 
                 if (auto e = gs.beginError(argLoc, errors::Infer::MethodArgumentMismatch)) {
@@ -3264,6 +3474,8 @@ public:
                         ErrorSection("Shape originates from here:",
                                      args.fullType.origins2Explanations(gs, args.originForUninitialized)));
                     e.addErrorSection(actualType.explainGot(gs, args.originForUninitialized));
+                    core::TypeErrorDiagnostics::explainTypeMismatch(gs, e, errorDetailsCollector, expectedType,
+                                                                    actualType.type);
 
                     if (args.fullType.origins.size() == 1 && isa_type<NamedLiteralType>(arg)) {
                         auto argLit = cast_type_nonnull<NamedLiteralType>(arg);
@@ -3393,7 +3605,8 @@ public:
                               nullptr,
                               args.originForUninitialized,
                               IMPLICIT_CONVERSION_ALLOWS_PRIVATE,
-                              args.suppressErrors};
+                              args.suppressErrors,
+                              args.enclosingMethodForSuper};
         res = arg->type.dispatchCall(gs, dispatch);
     }
 
@@ -3433,7 +3646,8 @@ class Magic_mergeHash : public IntrinsicMethod {
                                nullptr,
                                args.originForUninitialized,
                                args.isPrivateOk,
-                               args.suppressErrors};
+                               args.suppressErrors,
+                               args.enclosingMethodForSuper};
 
         res = accType.dispatchCall(gs, mergeArgs);
     }
@@ -3502,7 +3716,8 @@ class Magic_mergeHashValues : public IntrinsicMethod {
                                nullptr,
                                args.originForUninitialized,
                                args.isPrivateOk,
-                               args.suppressErrors};
+                               args.suppressErrors,
+                               args.enclosingMethodForSuper};
 
         res = accType.dispatchCall(gs, mergeArgs);
     }
@@ -3529,7 +3744,7 @@ void digImplementation(const GlobalState &gs, const DispatchArgs &args, Dispatch
         methodToDigWith,  baseCaseLocs,        1, /* numPosArgs */
         baseCaseArgTypes, args.selfType,       {args.selfType, args.fullType.origins},
         args.selfType,    args.block,          args.originForUninitialized,
-        args.isPrivateOk, args.suppressErrors,
+        args.isPrivateOk, args.suppressErrors, args.enclosingMethodForSuper,
     };
 
     auto dispatched = args.selfType.dispatchCall(gs, baseCaseArgs);
@@ -3542,7 +3757,7 @@ void digImplementation(const GlobalState &gs, const DispatchArgs &args, Dispatch
         return;
     }
 
-    auto newSelfType = Types::dropSubtypesOf(gs, dispatched.returnType, core::Symbols::NilClass());
+    auto newSelfType = Types::dropNil(gs, dispatched.returnType);
 
     if (newSelfType.isBottom()) {
         // The result was `nil` (or maybe `T.nilable(T.noreturn)` == `nil`, or maybe just plain `T.noreturn`)
@@ -3601,6 +3816,7 @@ void digImplementation(const GlobalState &gs, const DispatchArgs &args, Dispatch
         args.originForUninitialized,
         false, /* isPrivateOk */
         args.suppressErrors,
+        args.enclosingMethodForSuper,
     };
 
     auto recursiveDispatch = newSelfType.dispatchCall(gs, digArgs);
@@ -3653,7 +3869,8 @@ class Array_flatten : public IntrinsicMethod {
                                nullptr,
                                args.originForUninitialized,
                                IMPLICIT_CONVERSION_ALLOWS_PRIVATE,
-                               args.suppressErrors};
+                               args.suppressErrors,
+                               args.enclosingMethodForSuper};
 
         auto dispatched = type.dispatchCall(gs, innerArgs);
         if (dispatched.main.errors.empty()) {
@@ -3833,6 +4050,31 @@ public:
     }
 } Array_zip;
 
+class Array_transpose : public IntrinsicMethod {
+public:
+    void apply(const GlobalState &gs, const DispatchArgs &args, DispatchResult &res) const override {
+        auto *ap = cast_type<AppliedType>(args.thisType);
+        ENFORCE(ap->klass == Symbols::Array() || ap->klass.data(gs)->derivesFrom(gs, Symbols::Array()));
+        ENFORCE(!ap->targs.empty());
+        auto &elementType = ap->targs.front();
+
+        auto *tuple = cast_type<TupleType>(elementType);
+        if (tuple == nullptr) {
+            return;
+        }
+
+        // The transpose of an array of tuples is a tuple of arrays.
+        vector<TypePtr> transposed;
+        transposed.reserve(tuple->elems.size());
+
+        for (auto &elem : tuple->elems) {
+            transposed.emplace_back(Types::arrayOf(gs, elem));
+        }
+
+        res.returnType = make_type<TupleType>(move(transposed));
+    }
+} Array_transpose;
+
 class Symbol_eqeq : public IntrinsicMethod {
 public:
     void apply(const GlobalState &gs, const DispatchArgs &args, DispatchResult &res) const override {
@@ -3846,9 +4088,7 @@ public:
         auto isOnlySymbol =
             Types::isSubType(gs, args.fullType.type, Types::any(gs, Types::nilClass(), Types::Symbol()));
         if (isOnlySymbol && Types::all(gs, args.fullType.type, args.args[0]->type).isBottom()) {
-            auto funLoc = args.funLoc();
-            auto errLoc = (funLoc.exists() && !funLoc.empty()) ? funLoc : args.callLoc();
-            if (auto e = gs.beginError(errLoc, errors::Infer::NonOverlappingEqual)) {
+            if (auto e = gs.beginError(args.errLoc(), errors::Infer::NonOverlappingEqual)) {
                 e.setHeader("Comparison between `{}` and `{}` is always false", args.fullType.type.show(gs),
                             args.args[0]->type.show(gs));
                 e.addErrorSection(args.fullType.explainGot(gs, args.originForUninitialized));
@@ -3882,9 +4122,7 @@ public:
             // to because it would likely be a cause for surprise).
             Types::isSubType(gs, args.args[0]->type, Types::any(gs, Types::nilClass(), Types::Symbol())) &&
             Types::all(gs, args.fullType.type, args.args[0]->type).isBottom()) {
-            auto funLoc = args.funLoc();
-            auto errLoc = (funLoc.exists() && !funLoc.empty()) ? funLoc : args.callLoc();
-            if (auto e = gs.beginError(errLoc, errors::Infer::NonOverlappingEqual)) {
+            if (auto e = gs.beginError(args.errLoc(), errors::Infer::NonOverlappingEqual)) {
                 e.setHeader("Comparison between `{}` and `{}` is always false", args.fullType.type.show(gs),
                             args.args[0]->type.show(gs));
                 e.addErrorSection(args.fullType.explainGot(gs, args.originForUninitialized));
@@ -3915,6 +4153,31 @@ public:
         res.returnType = make_type<core::AppliedType>(procClass, move(targs));
     }
 } Kernel_proc;
+
+class Kernel_lambdaTLet : public IntrinsicMethod {
+public:
+    void apply(const GlobalState &gs, const DispatchArgs &args, DispatchResult &res) const override {
+        if (args.block == nullptr) {
+            return;
+        }
+
+        if (args.args.size() != 1) {
+            return;
+        }
+
+        auto procType = Types::unwrapType(gs, args.argLoc(0), args.args[0]->type);
+        if (!Types::isSubType(gs, procType, Types::nilableProcClass())) {
+            if (auto e = gs.beginError(args.argLoc(0), core::errors::Infer::CastTypeMismatch)) {
+                e.setHeader("Lambda type annotation must be either `{}` or a `{}` type (and possibly nilable)", "Proc",
+                            "T.proc");
+                e.addErrorLine(args.callLoc(), "For lambda here");
+            }
+            return;
+        }
+
+        handleBlockType(gs, res.main, procType);
+    }
+} Kernel_lambdaTLet;
 
 class Kernel_raise : public IntrinsicMethod {
 public:
@@ -3975,6 +4238,7 @@ public:
             args.originForUninitialized,
             IMPLICIT_CONVERSION_ALLOWS_PRIVATE,
             args.suppressErrors,
+            args.enclosingMethodForSuper,
         };
         auto dispatched = classArg->type.dispatchCall(gs, newArgs);
 
@@ -4018,7 +4282,8 @@ public:
                               nullptr,
                               args.originForUninitialized,
                               args.isPrivateOk,
-                              args.suppressErrors};
+                              args.suppressErrors,
+                              args.enclosingMethodForSuper};
         auto dispatched = hash.dispatchCall(gs, dispatch);
         for (auto &err : dispatched.main.errors) {
             res.main.errors.emplace_back(std::move(err));
@@ -4143,6 +4408,30 @@ public:
     }
 } T_Enum_tripleEq;
 
+class GenericForwarder_tripleEq : public IntrinsicMethod {
+public:
+    void apply(const GlobalState &gs, const DispatchArgs &args, DispatchResult &res) const override {
+        auto forwarderSingleton = Symbols::noClassOrModule();
+        if (auto *app = cast_type<AppliedType>(args.thisType)) {
+            forwarderSingleton = app->klass;
+        } else {
+            forwarderSingleton = cast_type_nonnull<ClassType>(args.thisType).symbol;
+        }
+        auto forwarderSym = forwarderSingleton.data(gs)->attachedClass(gs);
+
+        if (auto e = gs.beginError(args.errLoc(), core::errors::Infer::MetaTypeDispatchCall)) {
+            auto realSym = forwarderSym.maybeUnwrapBuiltinGenericForwarder();
+            ENFORCE(realSym.exists());
+            auto realStr = realSym.show(gs);
+            e.setHeader("Use `{}` without any `{}` prefix to match on a stdlib generic type", realStr, "T::");
+            auto receiverLoc = args.receiverLoc();
+            if (receiverLoc.exists()) {
+                e.replaceWith(fmt::format("Replace with {}", realStr), receiverLoc, "{}", realStr);
+            }
+        }
+    }
+} GenericForwarder_tripleEq;
+
 const vector<Intrinsic> intrinsics{
     {Symbols::T(), Intrinsic::Kind::Singleton, Names::untyped(), &T_untyped},
     {Symbols::T(), Intrinsic::Kind::Singleton, Names::must(), &T_must},
@@ -4225,12 +4514,14 @@ const vector<Intrinsic> intrinsics{
     {Symbols::Array(), Intrinsic::Kind::Instance, Names::product(), &Array_product},
     {Symbols::Array(), Intrinsic::Kind::Instance, Names::compact(), &Array_compact},
     {Symbols::Array(), Intrinsic::Kind::Instance, Names::zip(), &Array_zip},
+    {Symbols::Array(), Intrinsic::Kind::Instance, Names::transpose(), &Array_transpose},
 
     {Symbols::Symbol(), Intrinsic::Kind::Instance, Names::eqeq(), &Symbol_eqeq},
     {Symbols::String(), Intrinsic::Kind::Instance, Names::eqeq(), &String_eqeq},
 
     {Symbols::Kernel(), Intrinsic::Kind::Instance, Names::proc(), &Kernel_proc},
     {Symbols::Kernel(), Intrinsic::Kind::Instance, Names::lambda(), &Kernel_proc},
+    {Symbols::Kernel(), Intrinsic::Kind::Instance, Names::lambdaTLet(), &Kernel_lambdaTLet},
     {Symbols::Kernel(), Intrinsic::Kind::Instance, Names::raise(), &Kernel_raise},
     {Symbols::Kernel(), Intrinsic::Kind::Instance, Names::fail(), &Kernel_raise},
 
@@ -4238,6 +4529,16 @@ const vector<Intrinsic> intrinsics{
 
     {Symbols::Module(), Intrinsic::Kind::Instance, Names::tripleEq(), &Module_tripleEq},
     {Symbols::T_Enum(), Intrinsic::Kind::Instance, Names::tripleEq(), &T_Enum_tripleEq},
+
+    {Symbols::T_Array(), Intrinsic::Kind::Singleton, Names::tripleEq(), &GenericForwarder_tripleEq},
+    {Symbols::T_Hash(), Intrinsic::Kind::Singleton, Names::tripleEq(), &GenericForwarder_tripleEq},
+    {Symbols::T_Enumerable(), Intrinsic::Kind::Singleton, Names::tripleEq(), &GenericForwarder_tripleEq},
+    {Symbols::T_Enumerator(), Intrinsic::Kind::Singleton, Names::tripleEq(), &GenericForwarder_tripleEq},
+    {Symbols::T_Enumerator_Lazy(), Intrinsic::Kind::Singleton, Names::tripleEq(), &GenericForwarder_tripleEq},
+    {Symbols::T_Enumerator_Chain(), Intrinsic::Kind::Singleton, Names::tripleEq(), &GenericForwarder_tripleEq},
+    {Symbols::T_Range(), Intrinsic::Kind::Singleton, Names::tripleEq(), &GenericForwarder_tripleEq},
+    {Symbols::T_Set(), Intrinsic::Kind::Singleton, Names::tripleEq(), &GenericForwarder_tripleEq},
+    {Symbols::T_Class(), Intrinsic::Kind::Singleton, Names::tripleEq(), &GenericForwarder_tripleEq},
 };
 
 UnorderedMap<NameRef, const vector<NameRef>> computeIntrinsicsDispatchMap() {

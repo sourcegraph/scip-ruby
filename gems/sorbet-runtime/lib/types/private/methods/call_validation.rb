@@ -15,8 +15,6 @@ module T::Private::Methods::CallValidation
     original_visibility = visibility_method_name(mod, method_sig.method_name)
     if method_sig.mode == T::Private::Methods::Modes.abstract
       T::Private::ClassUtils.replace_method(mod, method_sig.method_name, true) do |*args, &blk|
-        # TODO: write a cop to ensure that abstract methods have an empty body
-        #
         # We allow abstract methods to be implemented by things further down the ancestor chain.
         # So, if a super method exists, call it.
         if defined?(super)
@@ -67,14 +65,30 @@ module T::Private::Methods::CallValidation
     simple_method = all_args_are_simple && method_sig.return_type.is_a?(T::Types::Simple)
     simple_procedure = all_args_are_simple && method_sig.return_type.is_a?(T::Private::Types::Void)
 
+    # All the types for which valid? unconditionally returns `true`
+    return_is_ignorable =
+      (method_sig.return_type.equal?(T::Types::Untyped::Private::INSTANCE) ||
+       method_sig.return_type.equal?(T::Types::Anything::Private::INSTANCE) ||
+       method_sig.return_type.equal?(T::Types::AttachedClassType::Private::INSTANCE) ||
+       method_sig.return_type.equal?(T::Types::SelfType::Private::INSTANCE) ||
+       method_sig.return_type.is_a?(T::Types::TypeParameter) ||
+       method_sig.return_type.is_a?(T::Types::TypeVariable) ||
+       (method_sig.return_type.is_a?(T::Types::Simple) && method_sig.return_type.raw_type.equal?(BasicObject)))
+
+    returns_anything_method = all_args_are_simple && return_is_ignorable
+
     T::Configuration.without_ruby_warnings do
       T::Private::DeclState.current.without_on_method_added do
         if simple_method
           create_validator_method_fast(mod, original_method, method_sig, original_visibility)
+        elsif returns_anything_method
+          create_validator_method_skip_return_fast(mod, original_method, method_sig, original_visibility)
         elsif simple_procedure
           create_validator_procedure_fast(mod, original_method, method_sig, original_visibility)
         elsif ok_for_fast_path && method_sig.return_type.is_a?(T::Private::Types::Void)
           create_validator_procedure_medium(mod, original_method, method_sig, original_visibility)
+        elsif ok_for_fast_path && return_is_ignorable
+          create_validator_method_skip_return_medium(mod, original_method, method_sig, original_visibility)
         elsif ok_for_fast_path
           create_validator_method_medium(mod, original_method, method_sig, original_visibility)
         elsif can_skip_block_type
@@ -277,11 +291,21 @@ module T::Private::Methods::CallValidation
 
   def self.report_error(method_sig, error_message, kind, name, type, value, caller_offset: 0)
     caller_loc = T.must(caller_locations(3 + caller_offset, 1))[0]
-    definition_file, definition_line = method_sig.method.source_location
+    method = method_sig.method
+    definition_file, definition_line = method.source_location
+
+    owner = method.owner
+    pretty_method_name =
+      if owner.singleton_class? && owner.respond_to?(:attached_object)
+        # attached_object is new in Ruby 3.2
+        "#{owner.attached_object}.#{method.name}"
+      else
+        "#{owner}##{method.name}"
+      end
 
     pretty_message = "#{kind}#{name ? " '#{name}'" : ''}: #{error_message}\n" \
       "Caller: #{caller_loc.path}:#{caller_loc.lineno}\n" \
-      "Definition: #{definition_file}:#{definition_line}"
+      "Definition: #{definition_file}:#{definition_line} (#{pretty_method_name})"
 
     T::Configuration.call_validation_error_handler(
       method_sig,
@@ -304,7 +328,7 @@ module T::Private::Methods::CallValidation
     elsif mod.private_method_defined?(name)
       :private
     else
-      raise NameError.new("undefined method `#{name}` for `#{mod}`")
+      mod.method(name) # Raises
     end
   end
 end

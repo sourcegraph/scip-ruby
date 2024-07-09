@@ -17,15 +17,15 @@ bb1[rubyRegionId=0, firstDead=-1]():
 # - bb13(rubyRegionId=2)
 # - bb15(rubyRegionId=2)
 bb2[rubyRegionId=0, firstDead=-1](<self>: Object, <returnMethodTemp>$2: NilClass, try: Integer(0), <magic>$25: T.class_of(<Magic>)):
-    <exceptionValue>$4: T.untyped = <get-current-exception>
-    <exceptionValue>$4 -> (T.untyped ? bb3 : bb4)
+    <exceptionValue>$4: T.nilable(Exception) = <get-current-exception>
+    <exceptionValue>$4 -> (T.nilable(Exception) ? bb3 : bb4)
 
 # backedges
 # - bb2(rubyRegionId=0)
 # - bb10(rubyRegionId=1)
-bb3[rubyRegionId=2, firstDead=-1](<self>: Object, <returnMethodTemp>$2: NilClass, try: Integer(0), <exceptionValue>$4: T.untyped, <magic>$25: T.class_of(<Magic>)):
+bb3[rubyRegionId=2, firstDead=-1](<self>: Object, <returnMethodTemp>$2: NilClass, try: Integer(0), <exceptionValue>$4: Exception, <magic>$25: T.class_of(<Magic>)):
     <cfgAlias>$28: T.class_of(A) = alias <C A>
-    <isaCheckTemp>$29: T::Boolean = <cfgAlias>$28: T.class_of(A).===(<exceptionValue>$4: T.untyped)
+    <isaCheckTemp>$29: T::Boolean = <cfgAlias>$28: T.class_of(A).===(<exceptionValue>$4: Exception)
     <isaCheckTemp>$29 -> (T::Boolean ? bb13 : bb14)
 
 # backedges
@@ -69,8 +69,8 @@ bb7[rubyRegionId=1, firstDead=6](<self>: Object, try: Integer(0), <magic>$25: T.
 # - bb6(rubyRegionId=1)
 # - bb7(rubyRegionId=1)
 bb10[rubyRegionId=1, firstDead=-1](<self>: Object, <returnMethodTemp>$2: NilClass, try: Integer(0), <magic>$25: T.class_of(<Magic>)):
-    <exceptionValue>$4: T.untyped = <get-current-exception>
-    <exceptionValue>$4 -> (T.untyped ? bb3 : bb11)
+    <exceptionValue>$4: T.nilable(Exception) = <get-current-exception>
+    <exceptionValue>$4 -> (T.nilable(Exception) ? bb3 : bb11)
 
 # backedges
 # - bb10(rubyRegionId=1)
@@ -85,7 +85,7 @@ bb12[rubyRegionId=3, firstDead=-1](<returnMethodTemp>$2: NilClass, <gotoDeadTemp
 
 # backedges
 # - bb3(rubyRegionId=2)
-bb13[rubyRegionId=2, firstDead=-1](<self>: Object, <returnMethodTemp>$2: NilClass, try: Integer(0), <magic>$25: T.class_of(<Magic>)):
+bb13[rubyRegionId=2, firstDead=-1](<self>: Object, <returnMethodTemp>$2: NilClass, try: Integer(0), <exceptionValue>$4: A, <magic>$25: T.class_of(<Magic>)):
     <exceptionValue>$4: NilClass = nil
     <keepForCfgTemp>$26: Sorbet::Private::Static::Void = <magic>$25: T.class_of(<Magic>).<keep-for-cfg>(<exceptionValue>$4: NilClass)
     <statTemp>$32: String("rescue A ") = "rescue A "
@@ -96,14 +96,14 @@ bb13[rubyRegionId=2, firstDead=-1](<self>: Object, <returnMethodTemp>$2: NilClas
 
 # backedges
 # - bb3(rubyRegionId=2)
-bb14[rubyRegionId=2, firstDead=-1](<self>: Object, <returnMethodTemp>$2: NilClass, try: Integer(0), <exceptionValue>$4: T.untyped, <magic>$25: T.class_of(<Magic>)):
+bb14[rubyRegionId=2, firstDead=-1](<self>: Object, <returnMethodTemp>$2: NilClass, try: Integer(0), <exceptionValue>$4: Exception, <magic>$25: T.class_of(<Magic>)):
     <cfgAlias>$38: T.class_of(B) = alias <C B>
-    <isaCheckTemp>$39: T::Boolean = <cfgAlias>$38: T.class_of(B).===(<exceptionValue>$4: T.untyped)
+    <isaCheckTemp>$39: T::Boolean = <cfgAlias>$38: T.class_of(B).===(<exceptionValue>$4: Exception)
     <isaCheckTemp>$39 -> (T::Boolean ? bb15 : bb16)
 
 # backedges
 # - bb14(rubyRegionId=2)
-bb15[rubyRegionId=2, firstDead=-1](<self>: Object, <returnMethodTemp>$2: NilClass, try: Integer(0), <magic>$25: T.class_of(<Magic>)):
+bb15[rubyRegionId=2, firstDead=-1](<self>: Object, <returnMethodTemp>$2: NilClass, try: Integer(0), <exceptionValue>$4: B, <magic>$25: T.class_of(<Magic>)):
     <exceptionValue>$4: NilClass = nil
     <keepForCfgTemp>$36: Sorbet::Private::Static::Void = <magic>$25: T.class_of(<Magic>).<keep-for-cfg>(<exceptionValue>$4: NilClass)
     <statTemp>$42: String("rescue B ") = "rescue B "
@@ -128,21 +128,9 @@ bb17[rubyRegionId=0, firstDead=1](<returnMethodTemp>$2: NilClass):
 
 method ::<Class:<root>>#<static-init> {
 
-bb0[rubyRegionId=0, firstDead=15]():
+bb0[rubyRegionId=0, firstDead=3]():
     <self>: T.class_of(<root>) = cast(<self>: NilClass, T.class_of(<root>));
-    <cfgAlias>$7: T.class_of(Sorbet::Private::Static) = alias <C Static>
-    <cfgAlias>$9: T.class_of(A) = alias <C A>
-    <statTemp>$5: Sorbet::Private::Static::Void = <cfgAlias>$7: T.class_of(Sorbet::Private::Static).keep_for_ide(<cfgAlias>$9: T.class_of(A))
-    <cfgAlias>$12: T.class_of(Sorbet::Private::Static) = alias <C Static>
-    <cfgAlias>$14: T.class_of(Exception) = alias <C Exception>
-    <statTemp>$10: Sorbet::Private::Static::Void = <cfgAlias>$12: T.class_of(Sorbet::Private::Static).keep_for_ide(<cfgAlias>$14: T.class_of(Exception))
-    <cfgAlias>$19: T.class_of(Sorbet::Private::Static) = alias <C Static>
-    <cfgAlias>$21: T.class_of(B) = alias <C B>
-    <statTemp>$17: Sorbet::Private::Static::Void = <cfgAlias>$19: T.class_of(Sorbet::Private::Static).keep_for_ide(<cfgAlias>$21: T.class_of(B))
-    <cfgAlias>$24: T.class_of(Sorbet::Private::Static) = alias <C Static>
-    <cfgAlias>$26: T.class_of(Exception) = alias <C Exception>
-    <statTemp>$22: Sorbet::Private::Static::Void = <cfgAlias>$24: T.class_of(Sorbet::Private::Static).keep_for_ide(<cfgAlias>$26: T.class_of(Exception))
-    <statTemp>$28: T.untyped = <self>: T.class_of(<root>).main()
+    <statTemp>$4: T.untyped = <self>: T.class_of(<root>).main()
     <finalReturn>: T.noreturn = return <returnMethodTemp>$2: NilClass
     <unconditional> -> bb1
 

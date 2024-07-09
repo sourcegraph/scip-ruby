@@ -971,7 +971,7 @@ class Pathname < Object
     )
     .returns(Integer)
   end
-  def mkdir(p1); end
+  def mkdir(p1=T.unsafe(nil)); end
 
   # Creates a full path, including any intermediate directories that don't yet
   # exist.
@@ -1181,9 +1181,15 @@ class Pathname < Object
   # Recursively deletes a directory, including all directories beneath it.
   #
   # See
-  # [`FileUtils.rm_r`](https://docs.ruby-lang.org/en/2.7.0/FileUtils.html#method-c-rm_r)
-  sig {returns(Integer)}
-  def rmtree(); end
+  # [`FileUtils.rm_rf`](https://docs.ruby-lang.org/en/2.7.0/FileUtils.html#method-c-rm_rf)
+  sig do
+    params(
+      noop: T.nilable(T::Boolean),
+      verbose: T.nilable(T::Boolean),
+      secure: T.nilable(T::Boolean)
+    ).void
+  end
+  def rmtree(noop: nil, verbose: nil, secure: nil); end
 
   # Predicate method for root directories. Returns `true` if the pathname
   # consists of consecutive slashes.
@@ -1383,13 +1389,20 @@ class Pathname < Object
   # [`File.write`](https://docs.ruby-lang.org/en/2.7.0/IO.html#method-c-write).
   sig do
     params(
-        arg0: String,
+        arg0: Object,
         offset: Integer,
-        open_args: Integer,
+        external_encoding: T.any(String, Encoding),
+        internal_encoding: T.any(String, Encoding),
+        encoding: T.any(String, Encoding),
+        textmode: BasicObject,
+        binmode: BasicObject,
+        autoclose: BasicObject,
+        mode: String,
+        perm: Integer
     )
     .returns(Integer)
   end
-  def write(arg0, offset=T.unsafe(nil), open_args=T.unsafe(nil)); end
+  def write(arg0, offset=T.unsafe(nil), external_encoding: T.unsafe(nil), internal_encoding: T.unsafe(nil), encoding: T.unsafe(nil), textmode: T.unsafe(nil), binmode: T.unsafe(nil), autoclose: T.unsafe(nil), mode: T.unsafe(nil), perm: T.unsafe(nil)); end
 
   # See
   # [`FileTest.zero?`](https://docs.ruby-lang.org/en/2.7.0/FileTest.html#method-i-zero-3F).

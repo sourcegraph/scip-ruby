@@ -8,7 +8,7 @@ set -o errexit
 echo "--- Dowloading artifacts"
 rm -rf release
 rm -rf _out_
-buildkite-agent artifact download "_out_/**/*" .
+buildkite-agent artifact download "_out_/**/*.gem" .
 
 # Based on the output of build-static-release.sh
 # _out_/gems/ should have the Linux & Mac sorbet-static gem
@@ -20,9 +20,7 @@ release_version="$prefix.${git_commit_count}"
 
 rbenv install --skip-existing
 
-# we pin to universal-darwin-18 but it shouldn't matter
-# the specific version; we just want one mac binary
-for platform in universal-darwin-18 x86_64-linux
+for platform in universal-darwin x86_64-linux
 do
   gem unpack _out_/gems/sorbet-static-"${release_version}"-${platform}*.gem
 
@@ -31,8 +29,8 @@ do
         mv sorbet-static-"${release_version}"-${platform}/libexec/sorbet  gems/sorbet-static/libexec/linux.sorbet
     ;;
 
-    universal-darwin-18)
-        mv sorbet-static-"${release_version}"-${platform}*/libexec/sorbet gems/sorbet-static/libexec/mac.sorbet
+    universal-darwin)
+        mv sorbet-static-"${release_version}"-${platform}/libexec/sorbet gems/sorbet-static/libexec/mac.sorbet
     ;;
   esac
 
@@ -48,4 +46,6 @@ gem build sorbet-static.gemspec
 
 popd
 
+rm -rf _out_
+mkdir -p _out_/gems
 mv gems/sorbet-static/sorbet-static-"${release_version}"-java.gem _out_/gems

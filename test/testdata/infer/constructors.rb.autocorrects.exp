@@ -21,17 +21,19 @@ class Bar
     Foo2.new(1)
     Foo3.new(1, 2)
 
-    Foo1.new() {}
+    Foo1.new()
     #        ^ error: Wrong number of arguments for constructor
-    Foo1.new  do end
+    #          ^^^ error: Method `BasicObject#initialize` does not take a block
+    Foo1.new
     #        ^ error: Wrong number of arguments for constructor
+    #         ^^^^^^^ error: Method `BasicObject#initialize` does not take a block
   end
 end
 
 class InstanceMethod
   def test_imethod_new
     o = Object.new
-    o.new # error: Method `new` does not exist
+    o.class.new # error: Method `new` does not exist
   end
 
   def _; end

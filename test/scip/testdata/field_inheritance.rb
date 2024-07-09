@@ -67,6 +67,7 @@ class D1
     return
   end
 
+  # BUG: Emitting a definition for 'self' here seems wrong.
   class << self
     def set_y
       @@d1_y = @@d1_v

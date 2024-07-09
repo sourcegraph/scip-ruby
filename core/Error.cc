@@ -106,7 +106,17 @@ string ErrorSection::toString(const GlobalState &gs) const {
     bool skipEOL = false;
     if (!this->header.empty()) {
         coloredLineHeaders = false;
-        buf << indent << DETAIL_COLOR << restoreColors(this->header, DETAIL_COLOR) << RESET_COLOR;
+        string formattedHeader;
+        if (this->isAutocorrectDescription) {
+            if (gs.autocorrect) {
+                formattedHeader = fmt::format("{} Done", this->header);
+            } else {
+                formattedHeader = ErrorColors::format("{} Use `{}` to autocorrect", this->header, "-a");
+            }
+        } else {
+            formattedHeader = this->header;
+        }
+        buf << indent << DETAIL_COLOR << restoreColors(formattedHeader, DETAIL_COLOR) << RESET_COLOR;
     } else {
         skipEOL = true;
     }
@@ -118,6 +128,30 @@ string ErrorSection::toString(const GlobalState &gs) const {
         buf << indent << line.toString(gs, coloredLineHeaders);
     }
     return buf.str();
+}
+
+void ErrorSection::Collector::addErrorDetails(ErrorSection::Collector &&e) {
+    children.push_back(std::move(e));
+}
+
+void toErrorSectionHelper(const ErrorSection::Collector &e, vector<ErrorLine> &result, int indentLevel) {
+    ENFORCE(e.message.length() > 0);
+    std::string message = fmt::format("{}{}", string(indentLevel * 2, ' '), e.message);
+    result.push_back(ErrorLine(core::Loc::none(), move(message), ErrorLine::LocDisplay::Hidden));
+    for (auto &c : e.children) {
+        toErrorSectionHelper(c, result, indentLevel + 1);
+    }
+}
+
+std::optional<ErrorSection> ErrorSection::Collector::toErrorSection() const {
+    if (children.size() == 0) {
+        return nullopt;
+    }
+    vector<ErrorLine> lines;
+    for (auto &c : children) {
+        toErrorSectionHelper(c, lines, 0);
+    }
+    return ErrorSection("Detailed explanation:", move(lines));
 }
 
 string Error::toString(const GlobalState &gs) const {
@@ -164,16 +198,21 @@ void ErrorBuilder::addErrorSection(optional<ErrorSection> &&section) {
     }
 }
 
+void ErrorBuilder::addErrorSections(const ErrorSection::Collector &&errorDetailsCollector) {
+    if (auto errorSection = errorDetailsCollector.toErrorSection()) {
+        addErrorSection(move(errorSection.value()));
+    }
+}
+
 void ErrorBuilder::addAutocorrect(AutocorrectSuggestion &&autocorrect) {
     ENFORCE(state == State::WillBuild);
     string sectionTitle;
     if (gs.autocorrect) {
-        sectionTitle = "Autocorrect: Done";
+        sectionTitle = "Autocorrect:";
     } else if (autocorrect.isDidYouMean && autocorrect.edits.size() == 1) {
-        sectionTitle =
-            ErrorColors::format("Did you mean `{}`? Use `{}` to autocorrect", autocorrect.edits[0].replacement, "-a");
+        sectionTitle = ErrorColors::format("Did you mean `{}`?", autocorrect.edits[0].replacement);
     } else {
-        sectionTitle = ErrorColors::format("Autocorrect: Use `{}` to autocorrect", "-a");
+        sectionTitle = "Autocorrect:";
     }
 
     std::vector<ErrorLine> messages;
@@ -194,7 +233,10 @@ void ErrorBuilder::addAutocorrect(AutocorrectSuggestion &&autocorrect) {
             messages.emplace_back(std::move(line));
         }
     }
-    addErrorSection(ErrorSection{sectionTitle, std::move(messages)});
+    auto errorSection = ErrorSection{sectionTitle, std::move(messages)};
+    errorSection.isAutocorrectDescription = true;
+    errorSection.isDidYouMean = autocorrect.isDidYouMean;
+    addErrorSection(move(errorSection));
     this->autocorrects.emplace_back(move(autocorrect));
 }
 

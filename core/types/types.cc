@@ -2,12 +2,14 @@
 #include "absl/base/casts.h"
 #include "absl/strings/match.h"
 #include "common/common.h"
+#include "common/strings/formatting.h"
 #include "common/typecase.h"
 #include "core/Context.h"
 #include "core/GlobalState.h"
 #include "core/Names.h"
 #include "core/Symbols.h"
 #include "core/TypeConstraint.h"
+#include "core/TypeErrorDiagnostics.h"
 #include "core/errors/infer.h"
 #include "core/errors/resolver.h"
 #include <utility>
@@ -77,15 +79,27 @@ TypePtr Types::Float() {
 }
 
 TypePtr Types::arrayOfUntyped(sorbet::core::SymbolRef blame) {
-    static vector<TypePtr> targs{Types::untyped(blame)};
-    static auto res = make_type<AppliedType>(Symbols::Array(), move(targs));
-    return res;
+    if constexpr (!sorbet::track_untyped_blame_mode && !sorbet::debug_mode) {
+        static vector<TypePtr> targs{Types::untypedUntracked()};
+        static auto res = make_type<AppliedType>(Symbols::Array(), move(targs));
+        return res;
+    } else {
+        vector<TypePtr> targs{Types::untyped(blame)};
+        auto res = make_type<AppliedType>(Symbols::Array(), move(targs));
+        return res;
+    }
 }
 
 TypePtr Types::rangeOfUntyped(sorbet::core::SymbolRef blame) {
-    static vector<TypePtr> targs{Types::untyped(blame)};
-    static auto res = make_type<AppliedType>(Symbols::Range(), move(targs));
-    return res;
+    if constexpr (!sorbet::track_untyped_blame_mode && !sorbet::debug_mode) {
+        static vector<TypePtr> targs{Types::untypedUntracked()};
+        static auto res = make_type<AppliedType>(Symbols::Range(), move(targs));
+        return res;
+    } else {
+        vector<TypePtr> targs{Types::untyped(blame)};
+        auto res = make_type<AppliedType>(Symbols::Range(), move(targs));
+        return res;
+    }
 }
 
 TypePtr Types::hashOfUntyped() {
@@ -95,10 +109,14 @@ TypePtr Types::hashOfUntyped() {
 }
 
 TypePtr Types::hashOfUntyped(sorbet::core::SymbolRef blame) {
-    auto untypedWithBlame = Types::untyped(blame);
-    static vector<TypePtr> targs{untypedWithBlame, untypedWithBlame, untypedWithBlame};
-    static auto res = make_type<AppliedType>(Symbols::Hash(), move(targs));
-    return res;
+    if constexpr (!sorbet::track_untyped_blame_mode && !sorbet::debug_mode) {
+        return Types::hashOfUntyped();
+    } else {
+        auto untypedWithBlame = Types::untyped(blame);
+        vector<TypePtr> targs{untypedWithBlame, untypedWithBlame, untypedWithBlame};
+        auto res = make_type<AppliedType>(Symbols::Hash(), move(targs));
+        return res;
+    }
 }
 
 TypePtr Types::procClass() {
@@ -131,11 +149,16 @@ TypePtr Types::falsyTypes() {
     return res;
 }
 
+absl::Span<const ClassOrModuleRef> Types::falsySymbols() {
+    static InlinedVector<ClassOrModuleRef, 2> res{Symbols::NilClass(), Symbols::FalseClass()};
+    return res;
+}
+
 TypePtr Types::todo() {
     return make_type<ClassType>(Symbols::todo());
 }
 
-TypePtr Types::dropSubtypesOf(const GlobalState &gs, const TypePtr &from, ClassOrModuleRef klass) {
+TypePtr Types::dropSubtypesOf(const GlobalState &gs, const TypePtr &from, absl::Span<const ClassOrModuleRef> klasses) {
     TypePtr result;
 
     if (from.isUntyped()) {
@@ -145,8 +168,8 @@ TypePtr Types::dropSubtypesOf(const GlobalState &gs, const TypePtr &from, ClassO
     typecase(
         from,
         [&](const OrType &o) {
-            auto lhs = dropSubtypesOf(gs, o.left, klass);
-            auto rhs = dropSubtypesOf(gs, o.right, klass);
+            auto lhs = dropSubtypesOf(gs, o.left, klasses);
+            auto rhs = dropSubtypesOf(gs, o.right, klasses);
             if (lhs == o.left && rhs == o.right) {
                 result = from;
             } else if (lhs.isBottom()) {
@@ -158,8 +181,8 @@ TypePtr Types::dropSubtypesOf(const GlobalState &gs, const TypePtr &from, ClassO
             }
         },
         [&](const AndType &a) {
-            auto lhs = dropSubtypesOf(gs, a.left, klass);
-            auto rhs = dropSubtypesOf(gs, a.right, klass);
+            auto lhs = dropSubtypesOf(gs, a.left, klasses);
+            auto rhs = dropSubtypesOf(gs, a.right, klasses);
             if (lhs != a.left || rhs != a.right) {
                 result = Types::all(gs, lhs, rhs);
             } else {
@@ -170,51 +193,52 @@ TypePtr Types::dropSubtypesOf(const GlobalState &gs, const TypePtr &from, ClassO
             auto cdata = c.symbol.data(gs);
             if (c.symbol == core::Symbols::untyped()) {
                 result = from;
-            } else if (c.symbol == klass || c.derivesFrom(gs, klass)) {
+            } else if (absl::c_any_of(klasses,
+                                      [&](auto klass) { return c.symbol == klass || c.derivesFrom(gs, klass); })) {
                 result = Types::bottom();
-            } else if (c.symbol.data(gs)->isClass() && klass.data(gs)->isClass() &&
-                       !klass.data(gs)->derivesFrom(gs, c.symbol)) {
-                // We have two classes (not modules), and if the class we're
-                // removing doesn't derive from `c`, there's nothing to do,
-                // because of ruby having single inheretance.
+            } else if (c.symbol.data(gs)->isClass() && absl::c_all_of(klasses, [&](auto klass) {
+                           return klass.data(gs)->isClass() && !klass.data(gs)->derivesFrom(gs, c.symbol);
+                       })) {
+                // We have two classes (not modules), and if all of the the classes we're removing
+                // don't derive from `c`, there's nothing to do because Ruby has single inheritance.
                 result = from;
             } else if (cdata->flags.isSealed && (cdata->flags.isAbstract || cdata->isModule())) {
                 auto subclasses = cdata->sealedSubclassesToUnion(gs);
-                ENFORCE(!Types::equiv(gs, subclasses, from), "sealedSubclassesToUnion about to cause infinte loop");
-                result = dropSubtypesOf(gs, subclasses, klass);
+                ENFORCE(!Types::equiv(gs, subclasses, from), "sealedSubclassesToUnion about to cause infinite loop");
+                result = dropSubtypesOf(gs, subclasses, klasses);
             } else {
                 result = from;
             }
         },
         [&](const AppliedType &a) {
             auto adata = a.klass.data(gs);
-            if (a.klass == klass || a.derivesFrom(gs, klass)) {
+            if (absl::c_any_of(klasses, [&](auto klass) { return a.klass == klass || a.derivesFrom(gs, klass); })) {
                 result = Types::bottom();
-            } else if (a.klass.data(gs)->isClass() && klass.data(gs)->isClass() &&
-                       !klass.data(gs)->derivesFrom(gs, a.klass)) {
-                // We have two classes (not modules), and if the class we're
-                // removing doesn't derive from `a`, there's nothing to do,
-                // because of ruby having single inheretance.
+            } else if (a.klass.data(gs)->isClass() && absl::c_all_of(klasses, [&](auto klass) {
+                           return klass.data(gs)->isClass() && !klass.data(gs)->derivesFrom(gs, a.klass);
+                       })) {
+                // We have two classes (not modules), and if all of the the classes we're removing
+                // don't derive from `c`, there's nothing to do because Ruby has single inheritance.
                 result = from;
             } else if (adata->flags.isSealed && (adata->flags.isAbstract || adata->isModule())) {
                 auto subclasses = adata->sealedSubclassesToUnion(gs);
-                ENFORCE(!Types::equiv(gs, subclasses, from), "sealedSubclassesToUnion about to cause infinte loop");
-                result = dropSubtypesOf(gs, subclasses, klass);
+                ENFORCE(!Types::equiv(gs, subclasses, from), "sealedSubclassesToUnion about to cause infinite loop");
+                result = dropSubtypesOf(gs, subclasses, klasses);
                 result = Types::all(gs, from, result);
             } else {
                 result = from;
             }
         },
         [&](const TypePtr &) {
-            if (is_proxy_type(from) && dropSubtypesOf(gs, from.underlying(gs), klass).isBottom()) {
+            if (is_proxy_type(from) && dropSubtypesOf(gs, from.underlying(gs), klasses).isBottom()) {
                 result = Types::bottom();
             } else {
                 result = from;
             }
         });
     SLOW_ENFORCE(Types::isSubType(gs, result, from),
-                 "dropSubtypesOf({}, {}) returned {}, which is not a subtype of the input", from.toString(gs),
-                 klass.showFullName(gs), result.toString(gs));
+                 "dropSubtypesOf({}, [{}]) returned {}, which is not a subtype of the input", from.toString(gs),
+                 fmt::map_join(klasses, ", ", [&](auto klass) { return klass.showFullName(gs); }), result.toString(gs));
     return result;
 }
 
@@ -249,15 +273,14 @@ bool Types::canBeFalsy(const GlobalState &gs, const TypePtr &what) {
         return true;
     }
     return Types::isSubType(gs, Types::falseClass(), what) ||
-           Types::isSubType(gs, Types::nilClass(),
-                            what); // check if inhabited by falsy values
+           Types::isSubType(gs, Types::nilClass(), what); // check if inhabited by falsy values
 }
 
 TypePtr Types::approximateSubtract(const GlobalState &gs, const TypePtr &from, const TypePtr &what) {
     TypePtr result;
     typecase(
-        what, [&](const ClassType &c) { result = Types::dropSubtypesOf(gs, from, c.symbol); },
-        [&](const AppliedType &c) { result = Types::dropSubtypesOf(gs, from, c.klass); },
+        what, [&](const ClassType &c) { result = Types::dropSubtypesOf(gs, from, absl::MakeSpan(&c.symbol, 1)); },
+        [&](const AppliedType &c) { result = Types::dropSubtypesOf(gs, from, absl::MakeSpan(&c.klass, 1)); },
         [&](const OrType &o) {
             result = Types::approximateSubtract(gs, Types::approximateSubtract(gs, from, o.left), o.right);
         },
@@ -317,7 +340,9 @@ TypePtr Types::tClass(const TypePtr &attachedClass) {
 }
 
 TypePtr Types::dropNil(const GlobalState &gs, const TypePtr &from) {
-    return Types::dropSubtypesOf(gs, from, Symbols::NilClass());
+    static auto nilClass = core::Symbols::NilClass();
+    static auto toDrop = absl::MakeSpan(&nilClass, 1);
+    return Types::dropSubtypesOf(gs, from, toDrop);
 }
 
 std::optional<int> Types::getProcArity(const AppliedType &type) {
@@ -604,14 +629,12 @@ InlinedVector<TypeMemberRef, 4> Types::alignBaseTypeArgs(const GlobalState &gs, 
         for (auto originalTp : asIf.data(gs)->typeMembers()) {
             auto name = originalTp.data(gs)->name;
             SymbolRef align;
-            int i = 0;
             for (auto x : what.data(gs)->typeMembers()) {
                 if (x.data(gs)->name == name) {
                     align = x;
                     currentAlignment.emplace_back(x);
                     break;
                 }
-                i++;
             }
             if (!align.exists()) {
                 currentAlignment.emplace_back(Symbols::noTypeMember());
@@ -957,13 +980,12 @@ TypePtr Types::unwrapType(const GlobalState &gs, Loc loc, const TypePtr &tp) {
             unwrappedElems.emplace_back(unwrapType(gs, loc, elem));
         }
         return make_type<TupleType>(move(unwrappedElems));
-    } else if (isa_type<NamedLiteralType>(tp) || isa_type<IntegerLiteralType>(tp) || isa_type<FloatLiteralType>(tp)) {
-        if (auto e = gs.beginError(loc, errors::Infer::BareTypeUsage)) {
-            e.setHeader("Unexpected bare `{}` value found in type position", tp.show(gs));
-        }
-        return Types::untypedUntracked();
     }
-    return tp;
+
+    if (auto e = gs.beginError(loc, errors::Infer::BareTypeUsage)) {
+        e.setHeader("Unexpected bare `{}` value found in type position", tp.show(gs));
+    }
+    return Types::untypedUntracked();
 }
 
 // This method is actually special: not only is it called from dispatchCall in calls.cc, it's
@@ -1057,7 +1079,8 @@ TypePtr Types::applyTypeArguments(const GlobalState &gs, const CallLocs &locs, u
             bool validBounds = true;
 
             // Validate type parameter bounds.
-            if (!Types::isSubType(gs, argType, memType->upperBound)) {
+            ErrorSection::Collector errorDetailsCollector;
+            if (!Types::isSubType(gs, argType, memType->upperBound, errorDetailsCollector)) {
                 validBounds = false;
                 if (auto e = gs.beginError(loc, errors::Resolver::GenericTypeParamBoundMismatch)) {
                     auto argStr = argType.show(gs);
@@ -1065,10 +1088,13 @@ TypePtr Types::applyTypeArguments(const GlobalState &gs, const CallLocs &locs, u
                                 mem.showFullName(gs));
                     e.addErrorLine(memData->loc(), "`{}` is `{}` bounded by `{}` here", mem.showFullName(gs), "upper",
                                    memType->upperBound.show(gs));
+                    TypeErrorDiagnostics::explainTypeMismatch(gs, e, errorDetailsCollector, memType->upperBound,
+                                                              argType);
                 }
             }
 
-            if (!Types::isSubType(gs, memType->lowerBound, argType)) {
+            ErrorSection::Collector errorDetailsCollector2;
+            if (!Types::isSubType(gs, memType->lowerBound, argType, errorDetailsCollector2)) {
                 validBounds = false;
 
                 if (auto e = gs.beginError(loc, errors::Resolver::GenericTypeParamBoundMismatch)) {
@@ -1077,6 +1103,8 @@ TypePtr Types::applyTypeArguments(const GlobalState &gs, const CallLocs &locs, u
                                 mem.showFullName(gs));
                     e.addErrorLine(memData->loc(), "`{}` is `{}` bounded by `{}` here", mem.showFullName(gs), "lower",
                                    memType->lowerBound.show(gs));
+                    TypeErrorDiagnostics::explainTypeMismatch(gs, e, errorDetailsCollector2, memType->lowerBound,
+                                                              argType);
                 }
             }
 
@@ -1116,20 +1144,24 @@ Loc DispatchArgs::blockLoc(const GlobalState &gs) const {
 }
 
 DispatchArgs DispatchArgs::withSelfAndThisRef(const TypePtr &newSelfRef) const {
-    return DispatchArgs{
-        name,        locs,          numPosArgs, args, newSelfRef, fullType, newSelfRef, block, originForUninitialized,
-        isPrivateOk, suppressErrors};
+    return DispatchArgs{name,        locs,           numPosArgs,
+                        args,        newSelfRef,     fullType,
+                        newSelfRef,  block,          originForUninitialized,
+                        isPrivateOk, suppressErrors, enclosingMethodForSuper};
 }
 
 DispatchArgs DispatchArgs::withThisRef(const TypePtr &newThisRef) const {
-    return DispatchArgs{
-        name,        locs,          numPosArgs, args, selfType, fullType, newThisRef, block, originForUninitialized,
-        isPrivateOk, suppressErrors};
+    return DispatchArgs{name,        locs,           numPosArgs,
+                        args,        selfType,       fullType,
+                        newThisRef,  block,          originForUninitialized,
+                        isPrivateOk, suppressErrors, enclosingMethodForSuper};
 }
 
 DispatchArgs DispatchArgs::withErrorsSuppressed() const {
-    return DispatchArgs{
-        name, locs, numPosArgs, args, selfType, fullType, thisType, block, originForUninitialized, isPrivateOk, true};
+    return DispatchArgs{name,        locs,     numPosArgs,
+                        args,        selfType, fullType,
+                        thisType,    block,    originForUninitialized,
+                        isPrivateOk, true,     enclosingMethodForSuper};
 }
 
 DispatchResult DispatchResult::merge(const GlobalState &gs, DispatchResult::Combinator kind, DispatchResult &&left,

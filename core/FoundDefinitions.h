@@ -36,7 +36,7 @@ public:
 private:
     struct Storage {
         Kind kind : 4;
-        // When kind != Symbol, `id` stores indices into the assorted vectors on `FoundDefitions`.
+        // When kind != Symbol, `id` stores indices into the assorted vectors on `FoundDefinitions`.
         // The 28-bit limit means that a single file cannot have more than 2^28 definitions in that file.
         //
         // When kind == Symbol, `id` stores ClassOrModule IDs. This means that a FoundDefinitionRef
@@ -230,22 +230,6 @@ class FoundDefinitions final {
     // Contains all class and instance variables defined in the file.
     std::vector<FoundField> _fields;
 
-    FoundDefinitionRef addNonClassConstant(FoundDefinitionRef ref) {
-        DEBUG_ONLY(switch (ref.kind()) {
-            case FoundDefinitionRef::Kind::StaticField:
-            case FoundDefinitionRef::Kind::TypeMember:
-                break;
-            case FoundDefinitionRef::Kind::Class:
-            case FoundDefinitionRef::Kind::Method:
-            case FoundDefinitionRef::Kind::Field:
-            case FoundDefinitionRef::Kind::Empty:
-            case FoundDefinitionRef::Kind::Symbol:
-                ENFORCE(false, "Attempted to give unexpected FoundDefinitionRef kind to addDefinition");
-        });
-        _nonClassConstants.emplace_back(ref);
-        return ref;
-    }
-
 public:
     FoundDefinitions() = default;
     FoundDefinitions(FoundDefinitions &&names) = default;
@@ -267,13 +251,17 @@ public:
     FoundDefinitionRef addStaticField(FoundStaticField &&staticField) {
         const uint32_t idx = _staticFields.size();
         _staticFields.emplace_back(std::move(staticField));
-        return addNonClassConstant(FoundDefinitionRef(FoundDefinitionRef::Kind::StaticField, idx));
+        auto ref = FoundDefinitionRef(FoundDefinitionRef::Kind::StaticField, idx);
+        _nonClassConstants.emplace_back(ref);
+        return ref;
     }
 
     FoundDefinitionRef addTypeMember(FoundTypeMember &&typeMember) {
         const uint32_t idx = _typeMembers.size();
         _typeMembers.emplace_back(std::move(typeMember));
-        return addNonClassConstant(FoundDefinitionRef(FoundDefinitionRef::Kind::TypeMember, idx));
+        auto ref = FoundDefinitionRef(FoundDefinitionRef::Kind::TypeMember, idx);
+        _nonClassConstants.emplace_back(ref);
+        return ref;
     }
 
     FoundDefinitionRef addField(FoundField &&field) {

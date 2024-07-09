@@ -69,9 +69,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         file.data(*gs).strictLevel = core::StrictLevel::True;
     }
 
-    indexed = realmain::pipeline::index(*gs, inputFiles, *opts, *workers, kvstore);
+    indexed = realmain::pipeline::index(*gs, absl::Span<core::FileRef>(inputFiles), *opts, *workers, kvstore);
+    // We don't run this fuzzer with any packager options, so we can skip pipeline::package()
     auto foundHashes = nullptr;
-    indexed = move(realmain::pipeline::resolve(gs, move(indexed), *opts, *workers, foundHashes).result());
+    indexed = move(realmain::pipeline::nameAndResolve(gs, move(indexed), *opts, *workers, foundHashes).result());
     realmain::pipeline::typecheck(*gs, move(indexed), *opts, *workers);
     return 0;
 }

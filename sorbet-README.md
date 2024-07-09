@@ -480,14 +480,14 @@ different version number, and also marked `default-arg-value`:
 This is due to the translation of defaults into the CFG: there is a synthetic conditional that chooses either to
 initialize the variable from the argument passed at the send, or to the default value when no value is present.
 
-Finding all references works differently in package specification (__package.rb) files. Consider the following:
+Finding all references works differently in package specification (`__package.rb`) files. Consider the following:
 
 ```ruby
 class Foo < PackageSpec
   import Bar
 ```
 
-Calling "find all references" on `Bar` in this file will return only references to `Bar` in the `Foo` package. LSP tests 
+Calling "find all references" on `Bar` in this file will return only references to `Bar` in the `Foo` package. LSP tests
 have access to `import` and `importusage` assertions that you can use to test this functionality.
 
 ```ruby
@@ -505,7 +505,7 @@ class Foo < PackageSpec
 
 With these annotations, the LSP test will check if "find all references" on `Bar` in `import Bar` statement returns the `Bar.new` usage.
 
-Note that an `import` assertion is dissimilar to a `def` assertion, in that it is in fact a subclass of a `usage` assertion. 
+Note that an `import` assertion is dissimilar to a `def` assertion, in that it is in fact a subclass of a `usage` assertion.
 In this case, the `def` corresponding to an `import` is the PackageSpec declaration of the imported package. Calling "find all references"
 on a PackageSpec declaration will return all imports of the package.
 
@@ -854,6 +854,9 @@ assertion replaces the spacer line, instead of being inserted into the file as a
 completely new line. Search for `spacer` in some of the `fast_path` tests to see
 an example.
 
+To craft an update to an RBI file, use `.rbiupdate` instead of `.rbupdate`,
+unless you mean to simulate the effect of converting an RBI file to an RB file.
+
 ### LSP recorded tests
 
 It is possible to record an LSP session and use it as a test. We are attempting to move away from this form of
@@ -1038,7 +1041,7 @@ You are encouraged to play around with various clang-based tools which use the
 
     After successfully compiling Sorbet, point your editor to use the
     `clangd` executable located in
-    `bazel-sorbet/external/llvm_toolchain_12_0_0/bin/clangd`.
+    `bazel-sorbet/external/llvm_toolchain_15_0_7/bin/clangd`.
 
 -   [clang-format] -- Clang-based source code formatter
 

@@ -168,6 +168,9 @@ module Kernel
     )
     .returns(T.nilable(T::Array[Thread::Backtrace::Location]))
   end
+  sig do
+    returns(T::Array[Thread::Backtrace::Location])
+  end
   def caller_locations(start_or_range=T.unsafe(nil), length=T.unsafe(nil)); end
 
   # `catch` executes its block. If `throw` is not called, the block executes
@@ -485,8 +488,12 @@ module Kernel
   sig {returns(Integer)}
   def hash(); end
 
+  private def initialize_clone(*args); end
+
   sig {params(object: T.self_type).returns(T.self_type)}
   def initialize_copy(object); end
+
+  private def initialize_dup(orig); end
 
   sig {returns(String)}
   def inspect(); end
@@ -545,7 +552,7 @@ module Kernel
 
   sig do
     params(
-        arg0: Symbol,
+        arg0: T.any(Symbol, String)
     )
     .returns(Method)
   end
@@ -621,6 +628,16 @@ module Kernel
   end
   def respond_to?(arg0,include_all=false); end
 
+  # DO NOT USE THIS DIRECTLY.
+  #
+  # Hook method to return whether the obj can respond to id method or not.
+  #
+  # When the method name parameter is given as a string, the string is converted to a symbol.
+  #
+  # See respond_to?, and the example of BasicObject.
+  sig {params(method_name: Symbol, include_private: T::Boolean).returns(T::Boolean)}
+  private def respond_to_missing?(method_name, include_private = false); end
+
   sig do
     params(
         arg0: T.any(String, Symbol),
@@ -675,6 +692,7 @@ module Kernel
   # ```
   sig do
     params(
+      # `x` should be `T.self_type`, but it's blocked by https://github.com/sorbet/sorbet/issues/5632
       blk: T.proc.params(x: T.untyped).void
     )
     .returns(T.self_type)
@@ -956,7 +974,7 @@ module Kernel
   # ```
   sig do
     params(
-        arg: T.any(Numeric, String),
+        arg: T.any(Numeric, String, NilClass),
         base: Integer,
         exception: T::Boolean
     )
@@ -3000,8 +3018,15 @@ module Kernel
   # exec "echo", "*"    # echoes an asterisk
   # # never get here
   # ```
-  sig { params(args: String).returns(T.noreturn) }
-  def exec(*args); end
+  sig do
+    params(
+      env: T.any(String, [String, String], T::Hash[String, T.nilable(String)]),
+      argv0: T.any(String, [String, String]),
+      args: String,
+      options: T.untyped,
+    ).returns(T.noreturn)
+  end
+  def exec(env, argv0 = T.unsafe(nil), *args, **options); end
 
   # Executes *command...* in a subshell. *command...* is one of following forms.
   #

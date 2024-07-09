@@ -17,7 +17,6 @@
 #include "rewriter/Flatten.h"
 #include "rewriter/HasAttachedClass.h"
 #include "rewriter/Initializer.h"
-#include "rewriter/InterfaceWrapper.h"
 #include "rewriter/Mattr.h"
 #include "rewriter/Minitest.h"
 #include "rewriter/MixinEncryptedProp.h"
@@ -25,7 +24,6 @@
 #include "rewriter/Private.h"
 #include "rewriter/Prop.h"
 #include "rewriter/Rails.h"
-#include "rewriter/Regexp.h"
 #include "rewriter/SigRewriter.h"
 #include "rewriter/Struct.h"
 #include "rewriter/TEnum.h"
@@ -80,12 +78,6 @@ public:
                     }
 
                     nodes = ClassNew::run(ctx, &assign);
-                    if (!nodes.empty()) {
-                        replaceNodes[stat.get()] = std::move(nodes);
-                        return;
-                    }
-
-                    nodes = Regexp::run(ctx, &assign);
                     if (!nodes.empty()) {
                         replaceNodes[stat.get()] = std::move(nodes);
                         return;
@@ -190,11 +182,6 @@ public:
         auto *send = ast::cast_tree<ast::Send>(tree);
 
         if (ClassNew::run(ctx, send)) {
-            return;
-        }
-
-        if (auto expr = InterfaceWrapper::run(ctx, send)) {
-            tree = std::move(expr);
             return;
         }
 

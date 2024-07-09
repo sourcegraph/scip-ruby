@@ -1,6 +1,6 @@
 # -- test/testdata/packager/invalid_imports_and_exports/__package.rb --
 class <emptyTree><<C <root>>> < (::<todo sym>)
-  class ::<PackageSpecRegistry>::<C A><<C <todo sym>>> < (<emptyTree>::<C PackageSpec>)
+  class ::<PackageSpecRegistry>::<C A><<C <todo sym>>> < (::PackageSpec)
     <self>.import(123)
 
     <self>.import("hello")
@@ -24,6 +24,16 @@ class <emptyTree><<C <root>>> < (::<todo sym>)
     <self>.export(::<root>::<C A>::<C AClass>)
 
     <self>.export(::<root>::<C A>::<C AModule>)
+  end
+end
+# -- test/testdata/packager/invalid_imports_and_exports/b/__package.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class ::<PackageSpecRegistry>::<C B><<C <todo sym>>> < (::PackageSpec)
+    <self>.import(::<PackageSpecRegistry>::<C A>)
+
+    <self>.export(::<root>::<C B>::<C BClass>)
+
+    <self>.export(::<root>::<C B>::<C BModule>)
   end
 end
 # -- test/testdata/packager/invalid_imports_and_exports/a.rb --
@@ -61,16 +71,6 @@ class <emptyTree><<C <root>>> < (::<todo sym>)
 
       <runtime method definition of self.one>
     end
-  end
-end
-# -- test/testdata/packager/invalid_imports_and_exports/b/__package.rb --
-class <emptyTree><<C <root>>> < (::<todo sym>)
-  class ::<PackageSpecRegistry>::<C B><<C <todo sym>>> < (<emptyTree>::<C PackageSpec>)
-    <self>.import(::<PackageSpecRegistry>::<C A>)
-
-    <self>.export(::<root>::<C B>::<C BClass>)
-
-    <self>.export(::<root>::<C B>::<C BModule>)
   end
 end
 # -- test/testdata/packager/invalid_imports_and_exports/b/b.rb --

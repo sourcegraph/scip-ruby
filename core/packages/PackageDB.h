@@ -22,26 +22,27 @@ class PackageDB final {
     friend class core::GlobalState;
 
 public:
-    NameRef enterPackage(std::unique_ptr<PackageInfo> pkg);
+    static constexpr NameRef TEST_NAMESPACE = core::Names::Constants::Test();
 
-    // Fetch the mangled package name for a file, returning a core::NameRef::noName() that doesn't exist if there is no
-    // associated packge for the file.
-    const NameRef getPackageNameForFile(FileRef file) const;
+    MangledName enterPackage(std::unique_ptr<PackageInfo> pkg);
+
+    // Fetch the mangled package name for a file, returning a MangledName that doesn't exist if there is no
+    // associated package for the file.
+    const MangledName getPackageNameForFile(FileRef file) const;
 
     // Set the associated package for the file.
-    void setPackageNameForFile(FileRef file, NameRef mangledName);
+    void setPackageNameForFile(FileRef file, MangledName mangledName);
 
     const PackageInfo &getPackageForFile(const core::GlobalState &gs, core::FileRef file) const;
-    const PackageInfo &getPackageInfo(core::NameRef mangledName) const;
+    const PackageInfo &getPackageInfo(MangledName mangledName) const;
 
     // Lookup `PackageInfo` from the string representation of the un-mangled package name.
     const PackageInfo &getPackageInfo(const core::GlobalState &gs, std::string_view str) const;
 
-    bool empty() const;
     // Get mangled names for all packages.
     // Packages are ordered lexicographically with respect to the NameRef's that make up their
     // namespaces.
-    const std::vector<core::NameRef> &packages() const;
+    const std::vector<MangledName> &packages() const;
 
     PackageDB deepCopy() const;
 
@@ -53,30 +54,34 @@ public:
     PackageDB &operator=(const PackageDB &) = delete;
     PackageDB &operator=(PackageDB &&) = default;
 
-    const std::vector<core::NameRef> &secondaryTestPackageNamespaceRefs() const;
+    // Whether the --stripe-packages mode is active.
+    bool enabled() const {
+        return this->enabled_;
+    }
+
     const std::vector<std::string> &extraPackageFilesDirectoryUnderscorePrefixes() const;
     const std::vector<std::string> &extraPackageFilesDirectorySlashPrefixes() const;
     const std::vector<std::string> &skipRBIExportEnforcementDirs() const;
 
     const std::string_view errorHint() const;
-    bool skipImportVisibilityCheckFor(const core::NameRef mangledName) const;
+    bool allowRelaxedPackagerChecksFor(const MangledName mangledName) const;
 
 private:
-    std::vector<NameRef> secondaryTestPackageNamespaceRefs_;
+    bool enabled_ = false;
     std::vector<std::string> extraPackageFilesDirectoryUnderscorePrefixes_;
     std::vector<std::string> extraPackageFilesDirectorySlashPrefixes_;
     std::string errorHint_;
     std::vector<std::string> skipRBIExportEnforcementDirs_;
-    std::vector<NameRef> skipImportVisibilityCheckFor_;
+    std::vector<MangledName> allowRelaxedPackagerChecksFor_;
 
     // This vector is kept in sync with the size of the file table in the global state by
     // `Packager::setPackageNameOnFiles`. A `FileRef` being out of bounds in this vector is treated as the file having
     // no associated package.
-    std::vector<NameRef> packageForFile_;
+    std::vector<MangledName> packageForFile_;
 
-    UnorderedMap<core::NameRef, std::unique_ptr<packages::PackageInfo>> packages_;
-    UnorderedMap<std::string, core::NameRef> packagesByPathPrefix;
-    std::vector<NameRef> mangledNames;
+    UnorderedMap<MangledName, std::unique_ptr<packages::PackageInfo>> packages_;
+    UnorderedMap<std::string, MangledName> packagesByPathPrefix;
+    std::vector<MangledName> mangledNames;
 
     bool frozen = true;
     std::thread::id writerThread;

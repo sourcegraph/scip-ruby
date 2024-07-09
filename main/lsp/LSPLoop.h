@@ -94,11 +94,7 @@ std::optional<std::string> findDocumentation(std::string_view sourceCode, int be
 bool hideSymbol(const core::GlobalState &gs, core::SymbolRef sym);
 std::unique_ptr<MarkupContent> formatRubyMarkup(MarkupKind markupKind, std::string_view rubyMarkup,
                                                 std::optional<std::string_view> explanation);
-std::string prettyTypeForMethod(const core::GlobalState &gs, core::MethodRef method, const core::TypePtr &receiver,
-                                const core::TypePtr &retType, const core::TypeConstraint *constraint);
 std::string prettyTypeForConstant(const core::GlobalState &gs, core::SymbolRef constant);
-core::TypePtr getResultType(const core::GlobalState &gs, const core::TypePtr &type, core::SymbolRef inWhat,
-                            core::TypePtr receiver, const core::TypeConstraint *constr);
 SymbolKind symbolRef2SymbolKind(const core::GlobalState &gs, core::SymbolRef sym, bool isAttrBestEffortUIOnly);
 
 // Returns all subclasses of ClassOrModuleRef (including itself)
@@ -114,6 +110,14 @@ SymbolKind symbolRef2SymbolKind(const core::GlobalState &gs, core::SymbolRef sym
 // @param includeSelf Whether to include `sym` in the list of subclasses or not.
 std::vector<core::ClassOrModuleRef> getSubclassesSlow(const core::GlobalState &gs, core::ClassOrModuleRef sym,
                                                       bool includeSelf);
+
+std::unique_ptr<core::lsp::QueryResponse>
+skipLiteralIfMethodDef(std::vector<std::unique_ptr<core::lsp::QueryResponse>> &queryResponses);
+
+// prop/const/attr setters are bogged down with a bunch of extra Ident and Literal query
+// responses, which don't make sense to use find all references on.
+std::unique_ptr<core::lsp::QueryResponse>
+getQueryResponseForFindAllReferences(std::vector<std::unique_ptr<core::lsp::QueryResponse>> &queryResponses);
 
 } // namespace sorbet::realmain::lsp
 #endif // RUBY_TYPER_LSPLOOP_H

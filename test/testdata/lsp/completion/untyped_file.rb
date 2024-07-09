@@ -8,8 +8,7 @@ class AnImportantClass
 end
 
 An # error: Unable to resolve constant
-# ^ completion: (file is not `# typed: true` or higher)
+# ^ completion: AnImportantClass
 
 AnImportantClass.n
 #                 ^ completion: (file is not `# typed: true` or higher)
-

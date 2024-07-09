@@ -84,12 +84,15 @@ struct ReferenceRef {
 
 // A constant definition---a class, module, constant definition, or constant alias---along with relevant metadata
 struct Definition {
-    enum class Type : uint64_t { Module, Class, Casgn, Alias, TypeAlias };
+    enum class Type : uint8_t { Module, Class, Casgn, Alias, TypeAlias };
 
     // the reference to this definition. Once `AutogenWalk` is completed and a full `ParsedFile` has been created, it
     // should always be the case that
     //   definition.id.data(pf) == definition
     DefinitionRef id;
+
+    // The symbol reference for this reference
+    core::SymbolRef sym;
 
     // is this a class, module, constant, or alias
     Type type;
@@ -110,20 +113,23 @@ struct Definition {
 };
 
 // A `Reference` corresponds to a simple use of a constant name in a file. After a `ParsedFile` has been created, every
-// constant use should have a `Reference` corresponding to it _unless_ it appears in a `keep_for_ide` call.
+// constant use should have a `Reference` corresponding to it
 struct Reference {
     // the reference to this reference. Once `AutogenWalk` is completed and a full `ParsedFile` has been created, it
     // should always be the case that
     //   reference.id.data(pf) == reference
     ReferenceRef id;
 
+    // The symbol reference for this reference
+    core::SymbolRef sym;
+
     // In which class or module was this reference used?
     DefinitionRef scope;
 
     // its full qualified name
     QualifiedName name;
-    // the full nesting of this constant. If it's a constant resolved from the root, this will be an empty vector
-    std::vector<DefinitionRef> nesting;
+    // the nesting ID of this constant
+    uint32_t nestingId;
     // the resolved name iff we have it from Sorbet
     QualifiedName resolved;
 
@@ -131,9 +137,6 @@ struct Reference {
     core::LocOffsets loc;
     core::LocOffsets definitionLoc;
 
-    // this is always true
-    // TODO(gdritter): delete this, of course
-    bool is_resolved_statically;
     // `true` if this is the appearance of the constant name associated with a definition: i.e. the name of a class or
     // module or the LHS of a casgn
     bool is_defining_ref;
@@ -148,6 +151,7 @@ struct Reference {
 
 struct AutogenConfig {
     const std::vector<std::string> behaviorAllowedInRBIsPaths;
+    const bool msgpackSkipReferenceMetadata = false;
 };
 
 // A `ParsedFile` contains all the `Definition`s and `References` used in a particular file
@@ -160,6 +164,8 @@ struct ParsedFile {
     uint32_t cksum;
     // the path on disk to this file
     std::string path;
+    // nesting for every ref in this file
+    std::vector<std::vector<DefinitionRef>> nestings;
     // every statically-known constant defined by this file
     std::vector<Definition> defs;
     // every static constant usage in this file
@@ -169,6 +175,8 @@ struct ParsedFile {
 
     std::string toString(const core::GlobalState &gs, int version) const;
     std::string toMsgpack(core::Context ctx, int version, const AutogenConfig &autogenCfg);
+    static std::string msgpackGlobalHeader(int version, size_t numFiles, const AutogenConfig &autogenCfg);
+
     std::vector<core::NameRef> showFullName(const core::GlobalState &gs, DefinitionRef id) const;
     QualifiedName showQualifiedName(const core::GlobalState &gs, DefinitionRef id) const;
     std::vector<std::string> listAllClasses(core::Context ctx);

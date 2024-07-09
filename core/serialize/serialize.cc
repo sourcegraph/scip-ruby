@@ -138,6 +138,13 @@ uint8_t UnPickler::getU1() {
     return res;
 }
 
+// Note that this does not necessarily write 4 bytes:
+// smaller numbers may take fewer bytes.
+//
+// NOTE(froydnj): SQLite has a different encoding for varints:
+//     https://sqlite.org/src4/doc/trunk/www/varint.wiki
+// Given that varint decoding is a signification fraction of cache reading time,
+// it may make sense to experiment using this in Sorbet.
 void Pickler::putU4(uint32_t u) {
     if (u == 0) {
         if (zeroCounter != 0) {
@@ -1042,7 +1049,8 @@ void SerializerImpl::unpickleGS(UnPickler &p, GlobalState &result) {
 
 void SerializerImpl::pickle(Pickler &p, LocOffsets loc) {
     p.putU4(loc.beginLoc);
-    p.putU4(loc.endLoc);
+    // The length of the loc likely encodes as a smaller varint.
+    p.putU4(loc.endLoc - loc.beginLoc);
 }
 
 void SerializerImpl::pickle(Pickler &p, Loc loc) {
@@ -1057,7 +1065,9 @@ Loc SerializerImpl::unpickleLoc(UnPickler &p) {
 }
 
 LocOffsets SerializerImpl::unpickleLocOffsets(UnPickler &p) {
-    return LocOffsets{p.getU4(), p.getU4()};
+    uint32_t start = p.getU4();
+    uint32_t length = p.getU4();
+    return LocOffsets{start, start + length};
 }
 
 vector<uint8_t> Serializer::store(const GlobalState &gs) {

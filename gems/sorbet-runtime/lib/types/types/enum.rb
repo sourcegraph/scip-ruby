@@ -12,6 +12,10 @@ module T::Types
       @values = values
     end
 
+    def build_type
+      nil
+    end
+
     # overrides Base
     def valid?(obj)
       @values.member?(obj)
@@ -29,7 +33,7 @@ module T::Types
 
     # overrides Base
     def name
-      @name ||= "T.deprecated_enum([#{@values.map(&:inspect).join(', ')}])"
+      @name ||= "T.deprecated_enum([#{@values.map(&:inspect).sort.join(', ')}])"
     end
 
     # overrides Base

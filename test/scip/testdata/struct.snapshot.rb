@@ -5,7 +5,7 @@
 #      ^ definition [..] S#
 #      ^ definition [..] S#initialize().
 #          ^ reference [..] T#
-#             ^^^^^^ definition [..] T#Struct#
+#             ^^^^^^ reference [..] T#Struct#
    prop :prop_i, Integer
 #        ^^^^^^ definition [..] S#`prop_i=`().
 #        ^^^^^^ definition [..] S#prop_i().
@@ -47,8 +47,11 @@
  end
  
  POINT = Struct.new(:x, :y) do
+#^^^^^ reference [..] POINT#
 #^^^^^ definition [..] POINT#
-#^^^^^^^^^^^^^^^^^^^^ definition [..] Struct#
+#^^^^^ definition [..] POINT#
+#^^^^^^^^^^^^^^^^^^^^ reference [..] Struct#
+#^^^^^^^^^^^^^^^^^^^^ definition local 2~#119448696
 #^^^^^^^^^^^^^^^^^^^^ definition local 5~#119448696
 #^^^^^^^^^^^^^^^^^^^^ definition [..] POINT#initialize().
 #                    ^ definition [..] POINT#`x=`().

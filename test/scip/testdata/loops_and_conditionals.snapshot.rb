@@ -81,8 +81,8 @@
        x = 2
 #      ^ reference (write) local 1~#2602907825
      when (3 == (x = 1))
+#               ^^^^^^^ reference local 1~#2602907825
 #                ^ reference (write) local 1~#2602907825
-#                ^^^^^ reference local 1~#2602907825
        x = 0
 #      ^ reference (write) local 1~#2602907825
      else

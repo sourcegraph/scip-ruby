@@ -2,7 +2,7 @@
  
  class MyError < StandardError
 #      ^^^^^^^ definition [..] MyError#
-#                ^^^^^^^^^^^^^ definition [..] StandardError#
+#                ^^^^^^^^^^^^^ reference [..] StandardError#
  end
  
  def handle(e)
@@ -22,15 +22,15 @@
 #    ^^^^^ reference [..] Kernel#raise().
    rescue MyError => e1
 #         ^^^^^^^ reference [..] MyError#
-#                    ^^ definition local 1~#3809224601
+#                    ^^ definition local 2~#3809224601
      handle(e1)
 #    ^^^^^^ reference [..] Object#handle().
-#           ^^ reference local 1~#3809224601
+#           ^^ reference local 2~#3809224601
    rescue StandardError => e2
 #         ^^^^^^^^^^^^^ reference [..] StandardError#
-#                          ^^ definition local 3~#3809224601
+#                          ^^ definition local 4~#3809224601
      handle(e2)
 #    ^^^^^^ reference [..] Object#handle().
-#           ^^ reference local 3~#3809224601
+#           ^^ reference local 4~#3809224601
    end
  end

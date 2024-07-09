@@ -52,7 +52,8 @@ core::TypePtr extractArgType(core::Context ctx, cfg::Send &send, core::DispatchC
 
 void extractSendArgumentKnowledge(core::Context ctx, core::LocOffsets bindLoc, cfg::Send *snd,
                                   const UnorderedMap<cfg::LocalRef, InlinedVector<core::NameRef, 1>> &blockLocals,
-                                  UnorderedMap<core::NameRef, core::TypePtr> &blockArgRequirements) {
+                                  UnorderedMap<core::NameRef, core::TypePtr> &blockArgRequirements,
+                                  const core::NameRef currentMethodName) {
     InlinedVector<unique_ptr<core::TypeAndOrigins>, 2> typeAndOriginsOwner;
     InlinedVector<const core::TypeAndOrigins *, 2> args;
 
@@ -87,7 +88,8 @@ void extractSendArgumentKnowledge(core::Context ctx, core::LocOffsets bindLoc, c
                                     snd->link,
                                     originForUninitialized,
                                     snd->isPrivateOk,
-                                    suppressErrors};
+                                    suppressErrors,
+                                    currentMethodName};
     auto dispatchInfo = snd->recv.type.dispatchCall(ctx, dispatchArgs);
 
     // See if we can learn what types should they have
@@ -206,7 +208,9 @@ UnorderedMap<core::NameRef, core::TypePtr> guessArgumentTypes(core::Context ctx,
                 }
 
                 if (shouldFindArgumentTypes) {
-                    extractSendArgumentKnowledge(ctx, bind.loc, snd, blockLocals, blockArgRequirements);
+                    auto currentMethodName = cfg->symbol.data(ctx)->name;
+                    extractSendArgumentKnowledge(ctx, bind.loc, snd, blockLocals, blockArgRequirements,
+                                                 currentMethodName);
                 }
             }
 
@@ -257,8 +261,8 @@ UnorderedMap<core::NameRef, core::TypePtr> guessArgumentTypes(core::Context ctx,
     return argTypesForBBToPass[cfg->deadBlock()->id];
 }
 
-core::MethodRef closestOverridenMethod(core::Context ctx, core::ClassOrModuleRef enclosingClassSymbol,
-                                       core::NameRef name) {
+core::MethodRef closestOverriddenMethod(core::Context ctx, core::ClassOrModuleRef enclosingClassSymbol,
+                                        core::NameRef name) {
     auto enclosingClass = enclosingClassSymbol.data(ctx);
     ENFORCE(enclosingClass->flags.isLinearizationComputed, "Should have been linearized by resolver");
 
@@ -278,7 +282,7 @@ core::MethodRef closestOverridenMethod(core::Context ctx, core::ClassOrModuleRef
     if (superMethod.exists()) {
         return superMethod;
     } else {
-        return closestOverridenMethod(ctx, superClass, name);
+        return closestOverriddenMethod(ctx, superClass, name);
     }
 }
 
@@ -292,7 +296,7 @@ bool childNeedsOverride(core::Context ctx, core::MethodRef childSymbol, core::Me
         !parentSymbol.data(ctx)->loc().file().data(ctx).isRBI() &&
         // that isn't the constructor...
         childSymbol.data(ctx)->name != core::Names::initialize() &&
-        // and wasn't Rewriter synthesized (beause we can't change DSL'd sigs).
+        // and wasn't Rewriter synthesized (because we can't change DSL'd sigs).
         !parentSymbol.data(ctx)->flags.isRewriterSynthesized &&
         // It has a sig...
         parentSymbol.data(ctx)->resultType != nullptr &&
@@ -318,7 +322,13 @@ optional<core::AutocorrectSuggestion> SigSuggestion::maybeSuggestSig(core::Conte
     }
 
     core::TypePtr guessedReturnType;
-    if (!constr.isEmpty()) {
+    if (ctx.file.data(ctx).isRBI()) {
+        // We will always infer a return type of `NilClass` in an RBI file, because all RBI files
+        // have empty bodies. That's not useful--we'd rather infer `T.untyped` so that LSP
+        // replaces it with a tabstop the user can cycle through.
+        guessedReturnType = core::Types::untypedUntracked();
+
+    } else if (!constr.isEmpty()) {
         if (!constr.solve(ctx)) {
             return nullopt;
         }
@@ -350,7 +360,7 @@ optional<core::AutocorrectSuggestion> SigSuggestion::maybeSuggestSig(core::Conte
     auto guessedArgumentTypes = guessArgumentTypes(ctx, methodSymbol, cfg);
 
     auto enclosingClass = methodSymbol.enclosingClass(ctx);
-    auto closestMethod = closestOverridenMethod(ctx, enclosingClass, methodSymbol.data(ctx)->name);
+    auto closestMethod = closestOverriddenMethod(ctx, enclosingClass, methodSymbol.data(ctx)->name);
 
     fmt::memory_buffer ss;
     if (closestMethod.exists()) {
@@ -425,7 +435,7 @@ optional<core::AutocorrectSuggestion> SigSuggestion::maybeSuggestSig(core::Conte
                 // TODO: maybe combine the old and new types in some way?
                 chosenType = oldType;
             }
-            auto options = core::ShowOptions().withShowForRBI();
+            auto options = core::ShowOptions().withUseValidSyntax();
             fmt::format_to(std::back_inserter(ss), "{}: {}", argSym.argumentName(ctx), chosenType.show(ctx, options));
         }
         fmt::format_to(std::back_inserter(ss), ").");
@@ -445,7 +455,7 @@ optional<core::AutocorrectSuggestion> SigSuggestion::maybeSuggestSig(core::Conte
     if (suggestsVoid) {
         fmt::format_to(std::back_inserter(ss), "void }}");
     } else {
-        auto options = core::ShowOptions().withShowForRBI();
+        auto options = core::ShowOptions().withUseValidSyntax();
         fmt::format_to(std::back_inserter(ss), "returns({}) }}", guessedReturnType.show(ctx, options));
     }
 

@@ -17,7 +17,7 @@
 #      ^^ definition [..] C1#m1().
 #      documentation
 #      | ```ruby
-#      | sig {returns(T.untyped)}
+#      | sig { returns(T.untyped) }
 #      | def m1
 #      | ```
    end
@@ -28,7 +28,7 @@
 #      ^^ definition [..] C1#m2().
 #      documentation
 #      | ```ruby
-#      | sig {returns(T::Boolean)}
+#      | sig { returns(T::Boolean) }
 #      | def m2
 #      | ```
      true
@@ -41,7 +41,7 @@
 #      ^^ definition [..] C1#m3().
 #      documentation
 #      | ```ruby
-#      | sig {params(c: T.untyped, b: T.untyped).returns(T::Boolean)}
+#      | sig { params(c: T.untyped, b: T.untyped).returns(T::Boolean) }
 #      | def m3(c, b)
 #      | ```
 #         ^ definition local 1~#2519626513
@@ -65,7 +65,7 @@
 #      ^^ definition [..] C1#m4().
 #      documentation
 #      | ```ruby
-#      | sig {params(xs: T.untyped).returns(T.untyped)}
+#      | sig { params(xs: T.untyped).returns(T.untyped) }
 #      | def m4(xs)
 #      | ```
 #      documentation
@@ -88,7 +88,7 @@
 #      ^^ definition [..] C1#m5().
 #      documentation
 #      | ```ruby
-#      | sig {returns(T::Boolean)}
+#      | sig { returns(T::Boolean) }
 #      | def m5
 #      | ```
 #      documentation
@@ -106,7 +106,7 @@
 #      ^^ definition [..] C1#m6().
 #      documentation
 #      | ```ruby
-#      | sig {params(c: T.untyped, b: T.untyped).returns(T::Boolean)}
+#      | sig { params(c: T.untyped, b: T.untyped).returns(T::Boolean) }
 #      | def m6(c, b)
 #      | ```
 #      documentation
@@ -179,7 +179,7 @@
 #        ^^ definition [..] M1#M2#n1().
 #        documentation
 #        | ```ruby
-#        | sig {returns(T::Boolean)}
+#        | sig { returns(T::Boolean) }
 #        | def n1
 #        | ```
 #        documentation
@@ -192,7 +192,7 @@
 #        ^^ definition [..] M1#M2#n2().
 #        documentation
 #        | ```ruby
-#        | sig {returns(T.untyped)}
+#        | sig { returns(T.untyped) }
 #        | def n2
 #        | ```
 #        documentation
@@ -206,7 +206,7 @@
 #    ^^ definition [..] Object#f1().
 #    documentation
 #    | ```ruby
-#    | sig {returns(T.untyped)}
+#    | sig { returns(T.untyped) }
 #    | def f1
 #    | ```
 #    documentation
@@ -228,7 +228,7 @@
 #    ^^ definition [..] Object#f2().
 #    documentation
 #    | ```ruby
-#    | sig {returns(T::Integer (unresolved))}
+#    | sig { returns(T::Integer (unresolved)) }
 #    | def f2
 #    | ```
 #    documentation
@@ -240,7 +240,7 @@
 #    ^^ definition [..] Object#f3().
 #    documentation
 #    | ```ruby
-#    | sig {returns(T.untyped)}
+#    | sig { returns(T.untyped) }
 #    | def f3
 #    | ```
  end
@@ -258,7 +258,7 @@
 #    ^^ definition [..] Object#f4().
 #    documentation
 #    | ```ruby
-#    | sig {returns(T::Integer (unresolved))}
+#    | sig { returns(T::Integer (unresolved)) }
 #    | def f4
 #    | ```
    return 10
@@ -278,7 +278,7 @@
 #      ^^ definition [..] K1#p1().
 #      documentation
 #      | ```ruby
-#      | sig {returns(T.untyped)}
+#      | sig { returns(T.untyped) }
 #      | def p1
 #      | ```
 #      documentation
@@ -303,7 +303,7 @@
 #           ^^ definition [..] `<Class:K1>`#p2().
 #           documentation
 #           | ```ruby
-#           | sig {returns(T.untyped)}
+#           | sig { returns(T.untyped) }
 #           | def self.p2
 #           | ```
 #           documentation
@@ -327,13 +327,7 @@
 #      | ```
 #      documentation
 #      | Subclass
-#           ^^ definition [..] K1#
-#           documentation
-#           | ```ruby
-#           | class K1
-#           | ```
-#           documentation
-#           | Parent class
+#           ^^ reference [..] K1#
    # doc comment on class var ooh
    @z = 9
 #  ^^ definition [..] `<Class:K2>`#`@z`.
@@ -349,7 +343,7 @@
 #      ^^ definition [..] K2#p1().
 #      documentation
 #      | ```ruby
-#      | sig {returns(T.untyped)}
+#      | sig { returns(T.untyped) }
 #      | def p1
 #      | ```
 #      documentation

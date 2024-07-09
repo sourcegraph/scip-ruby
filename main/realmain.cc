@@ -116,7 +116,7 @@ core::StrictLevel levelMinusOne(core::StrictLevel level) {
 core::StrictLevel levelToRecommendation(core::StrictLevel level) {
     switch (level) {
         case core::StrictLevel::Ignore:
-            // We don't suggest `# typed: ignore` because it is too common for some probem in a
+            // We don't suggest `# typed: ignore` because it is too common for some problems in a
             // generated RBI file to cause a problem that actually does need to be fixed, and not by
             // ignoring the RBI file. Ignoring the file has bad consequences, like introducing more
             // errors in other files, causing those files to be ignored, etc.
@@ -211,58 +211,59 @@ void runAutogen(const core::GlobalState &gs, options::Options &opts, const autog
         fileq->push(i, 1);
     }
     auto crcBuilder = autogen::CRCBuilder::create();
+    int autogenVersion = opts.autogenVersion == 0 ? autogen::AutogenVersion::MAX_VERSION : opts.autogenVersion;
 
-    workers.multiplexJob("runAutogen", [&gs, &opts, &indexed, &autogenCfg, crcBuilder, fileq, resultq]() {
-        AutogenResult out;
-        int n = 0;
-        int autogenVersion = opts.autogenVersion == 0 ? autogen::AutogenVersion::MAX_VERSION : opts.autogenVersion;
-        {
-            Timer timeit(logger, "autogenWorker");
-            int idx = 0;
+    workers.multiplexJob(
+        "runAutogen", [&gs, &autogenVersion, &opts, &indexed, &autogenCfg, crcBuilder, fileq, resultq]() {
+            AutogenResult out;
+            int n = 0;
+            {
+                Timer timeit(logger, "autogenWorker");
+                int idx = 0;
 
-            for (auto result = fileq->try_pop(idx); !result.done(); result = fileq->try_pop(idx)) {
-                ++n;
-                auto &tree = indexed[idx];
-                if (tree.file.data(gs).isPackage()) {
-                    continue;
-                }
-                if (autogenVersion < autogen::AutogenVersion::VERSION_INCLUDE_RBI && tree.file.data(gs).isRBI()) {
-                    continue;
-                }
-
-                core::Context ctx(gs, core::Symbols::root(), tree.file);
-                auto pf = autogen::Autogen::generate(ctx, move(tree), autogenCfg, *crcBuilder);
-                tree = move(pf.tree);
-
-                AutogenResult::Serialized serialized;
-
-                if (opts.print.Autogen.enabled) {
-                    Timer timeit(logger, "autogenToString");
-                    serialized.strval = pf.toString(ctx, autogenVersion);
-                }
-                if (opts.print.AutogenMsgPack.enabled) {
-                    Timer timeit(logger, "autogenToMsgpack");
-                    serialized.msgpack = pf.toMsgpack(ctx, autogenVersion, autogenCfg);
-                }
-
-                if (!tree.file.data(gs).isRBI()) {
-                    // Exclude RBI files because they are not loadable and should not appear in
-                    // auto-loader related output.
-                    if (opts.print.AutogenSubclasses.enabled) {
-                        Timer timeit(logger, "autogenSubclasses");
-                        serialized.subclasses = autogen::Subclasses::listAllSubclasses(
-                            ctx, pf, opts.autogenSubclassesAbsoluteIgnorePatterns,
-                            opts.autogenSubclassesRelativeIgnorePatterns);
+                for (auto result = fileq->try_pop(idx); !result.done(); result = fileq->try_pop(idx)) {
+                    ++n;
+                    auto &tree = indexed[idx];
+                    if (tree.file.data(gs).isPackage()) {
+                        continue;
                     }
+                    if (autogenVersion < autogen::AutogenVersion::VERSION_INCLUDE_RBI && tree.file.data(gs).isRBI()) {
+                        continue;
+                    }
+
+                    core::Context ctx(gs, core::Symbols::root(), tree.file);
+                    auto pf = autogen::Autogen::generate(ctx, move(tree), autogenCfg, *crcBuilder);
+                    tree = move(pf.tree);
+
+                    AutogenResult::Serialized serialized;
+
+                    if (opts.print.Autogen.enabled) {
+                        Timer timeit(logger, "autogenToString");
+                        serialized.strval = pf.toString(ctx, autogenVersion);
+                    }
+                    if (opts.print.AutogenMsgPack.enabled) {
+                        Timer timeit(logger, "autogenToMsgpack");
+                        serialized.msgpack = pf.toMsgpack(ctx, autogenVersion, autogenCfg);
+                    }
+
+                    if (!tree.file.data(gs).isRBI()) {
+                        // Exclude RBI files because they are not loadable and should not appear in
+                        // auto-loader related output.
+                        if (opts.print.AutogenSubclasses.enabled) {
+                            Timer timeit(logger, "autogenSubclasses");
+                            serialized.subclasses = autogen::Subclasses::listAllSubclasses(
+                                ctx, pf, opts.autogenSubclassesAbsoluteIgnorePatterns,
+                                opts.autogenSubclassesRelativeIgnorePatterns);
+                        }
+                    }
+
+                    out.prints.emplace_back(idx, move(serialized));
                 }
-
-                out.prints.emplace_back(idx, move(serialized));
             }
-        }
 
-        out.counters = getAndClearThreadCounters();
-        resultq->push(move(out), n);
-    });
+            out.counters = getAndClearThreadCounters();
+            resultq->push(move(out), n);
+        });
 
     AutogenResult out;
     for (auto res = resultq->wait_pop_timed(out, WorkerPool::BLOCK_INTERVAL(), *logger); !res.done();
@@ -279,6 +280,10 @@ void runAutogen(const core::GlobalState &gs, options::Options &opts, const autog
     if (opts.print.Autogen.enabled || opts.print.AutogenMsgPack.enabled) {
         {
             Timer timeit(logger, "autogenDependencyDBPrint");
+            if (opts.print.AutogenMsgPack.enabled) {
+                opts.print.AutogenMsgPack.print(
+                    autogen::ParsedFile::msgpackGlobalHeader(autogenVersion, merged.size(), autogenCfg));
+            }
             for (auto &elem : merged) {
                 if (opts.print.Autogen.enabled) {
                     opts.print.Autogen.print(elem.strval);
@@ -301,17 +306,23 @@ void runAutogen(const core::GlobalState &gs, options::Options &opts, const autog
                 continue;
             }
 
-            for (const auto &[parentName, children] : *el.subclasses) {
-                if (!parentName.empty()) {
-                    auto &childEntry = childMap[parentName];
-                    childEntry.entries.insert(children.entries.begin(), children.entries.end());
-                    childEntry.classKind = children.classKind;
-                }
+            for (const auto &[parentRef, children] : *el.subclasses) {
+                auto &childEntry = childMap[parentRef];
+                childEntry.entries.insert(children.entries.begin(), children.entries.end());
+                childEntry.classKind = children.classKind;
             }
         }
 
+        auto autogenSubclassesParentsRefs = vector<core::SymbolRef>();
+        for (auto &parent : opts.autogenSubclassesParents) {
+            auto parentRef = autogen::Subclasses::getConstantRef(gs, parent);
+            if (!parentRef.exists())
+                continue;
+            autogenSubclassesParentsRefs.emplace_back(parentRef);
+        }
+
         vector<string> serializedDescendantsMap =
-            autogen::Subclasses::genDescendantsMap(childMap, opts.autogenSubclassesParents);
+            autogen::Subclasses::genDescendantsMap(gs, childMap, autogenSubclassesParentsRefs);
 
         opts.print.AutogenSubclasses.fmt(
             "{}\n", fmt::join(serializedDescendantsMap.begin(), serializedDescendantsMap.end(), "\n"));
@@ -379,9 +390,6 @@ int realmain(int argc, char *argv[]) {
     vector<unique_ptr<sorbet::pipeline::semantic_extension::SemanticExtension>> extensions;
     options::Options opts;
     options::readOptions(opts, extensions, argc, argv, extensionProviders, logger);
-    while (opts.waitForDebugger && !stopInDebugger()) {
-        // spin
-    }
     if (opts.stdoutHUPHack) {
         startHUPMonitor();
     }
@@ -493,6 +501,8 @@ int realmain(int argc, char *argv[]) {
         gs->includeErrorSections = false;
     }
     gs->ruby3KeywordArgs = opts.ruby3KeywordArgs;
+    gs->typedSuper = opts.typedSuper;
+    gs->suppressPayloadSuperclassRedefinitionFor = opts.suppressPayloadSuperclassRedefinitionFor;
     if (!opts.stripeMode) {
         // Definitions in multiple locations interact poorly with autoloader this error is enforced in Stripe code.
         if (opts.isolateErrorCode.empty()) {
@@ -519,6 +529,14 @@ int realmain(int argc, char *argv[]) {
         }
     }
     gs->suggestUnsafe = opts.suggestUnsafe;
+
+    if (gs->runningUnderAutogen) {
+        gs->suppressErrorClass(core::errors::Namer::RedefinitionOfMethod.code);
+        gs->suppressErrorClass(core::errors::Namer::ModuleKindRedefinition.code);
+        gs->suppressErrorClass(core::errors::Namer::ConstantKindRedefinition.code);
+        gs->suppressErrorClass(core::errors::Resolver::StubConstant.code);
+        gs->suppressErrorClass(core::errors::Resolver::RecursiveTypeAlias.code);
+    }
 
     logger->trace("done building initial global state");
 
@@ -573,7 +591,7 @@ int realmain(int argc, char *argv[]) {
                       "Talk ‘\\r\\n’-separated JSON-RPC to me. "
                       "More details at https://microsoft.github.io/language-server-protocol/specification."
                       "If you're developing an LSP extension to some editor, make sure to run sorbet with `-v` flag,"
-                      "it will enable outputing the LSP session to stderr(`Write: ` and `Read: ` log lines)",
+                      "it will enable outputting the LSP session to stderr(`Write: ` and `Read: ` log lines)",
                       sorbet_full_version_string);
 
         auto output = make_shared<lsp::LSPStdout>(logger);
@@ -591,7 +609,7 @@ int realmain(int argc, char *argv[]) {
             hashing::Hashing::computeFileHashes(gs->getFiles(), *logger, *workers, opts);
         }
 
-        { inputFiles = pipeline::reserveFiles(gs, opts.inputFileNames); }
+        inputFiles = pipeline::reserveFiles(gs, opts.inputFileNames);
 
         if (opts.packageRBIGeneration) {
 #ifdef SORBET_REALMAIN_MIN
@@ -643,18 +661,17 @@ int realmain(int argc, char *argv[]) {
             // only the package files that we know we need to load, it would cut down command-line rbi generation by
             // seconds.
             auto packageFileRefs = pipeline::reserveFiles(gs, packageFiles);
-            auto packages = pipeline::index(*gs, packageFileRefs, opts, *workers, nullptr);
+            auto packages = pipeline::index(*gs, absl::Span<core::FileRef>(packageFileRefs), opts, *workers, nullptr);
             {
                 core::UnfreezeNameTable unfreezeToEnterPackagerOptionsGS(*gs);
                 core::packages::UnfreezePackages unfreezeToEnterPackagerOptionsPackageDB = gs->unfreezePackages();
-                gs->setPackagerOptions(
-                    opts.secondaryTestPackageNamespaces, opts.extraPackageFilesDirectoryUnderscorePrefixes,
-                    opts.extraPackageFilesDirectorySlashPrefixes, opts.packageSkipRBIExportEnforcementDirs,
-                    opts.skipPackageImportVisibilityCheckFor, opts.stripePackagesHint);
+                gs->setPackagerOptions(opts.extraPackageFilesDirectoryUnderscorePrefixes,
+                                       opts.extraPackageFilesDirectorySlashPrefixes,
+                                       opts.packageSkipRBIExportEnforcementDirs, opts.allowRelaxedPackagerChecksFor,
+                                       opts.stripePackagesHint);
             }
 
-            packages = packager::Packager::findPackages(*gs, *workers, move(packages));
-
+            packager::Packager::findPackages(*gs, absl::Span<ast::ParsedFile>(packages));
             packager::Packager::setPackageNameOnFiles(*gs, packages);
             packager::Packager::setPackageNameOnFiles(*gs, inputFiles);
 
@@ -700,40 +717,77 @@ int realmain(int argc, char *argv[]) {
         }
 
         {
-            if (!opts.storeState.empty() || opts.forceHashing) {
-                // Calculate file hashes alongside indexing when --store-state is specified for LSP mode
-                indexed = hashing::Hashing::indexAndComputeFileHashes(gs, opts, *logger, inputFiles, *workers, kvstore);
-            } else {
-                indexed = pipeline::index(*gs, inputFiles, opts, *workers, kvstore);
+            // ----- index -----
+
+            auto inputFilesSpan = absl::Span<core::FileRef>(inputFiles);
+            if (opts.stripePackages) {
+                auto numPackageFiles = pipeline::partitionPackageFiles(*gs, inputFilesSpan);
+                auto inputPackageFiles = inputFilesSpan.first(numPackageFiles);
+                inputFilesSpan = inputFilesSpan.subspan(numPackageFiles);
+
+                if (!opts.storeState.empty() || opts.forceHashing) {
+                    indexed = hashing::Hashing::indexAndComputeFileHashes(gs, opts, *logger, inputPackageFiles,
+                                                                          *workers, kvstore);
+                } else {
+                    indexed = pipeline::index(*gs, inputPackageFiles, opts, *workers, kvstore);
+                }
+
+                // Cache these before any pipeline::package rewrites, so that the cache is still
+                // usable regardless of whether `--stripe-packages` was passed.
+                cache::maybeCacheGlobalStateAndFiles(OwnedKeyValueStore::abort(move(kvstore)), opts, *gs, *workers,
+                                                     indexed);
+
+                // First run: only the __package.rb files. This populates the packageDB
+                pipeline::setPackagerOptions(*gs, opts);
+                pipeline::package(*gs, absl::Span<ast::ParsedFile>(indexed), opts, *workers);
+                // Only need to compute hashes when running to compute a FileHash
+                auto foundHashes = nullptr;
+                auto canceled = pipeline::name(*gs, absl::Span<ast::ParsedFile>(indexed), opts, *workers, foundHashes);
+                ENFORCE(!canceled, "There's no cancellation in batch mode");
             }
+
+            auto nonPackageIndexed =
+                (!opts.storeState.empty() || opts.forceHashing)
+                    // Calculate file hashes alongside indexing when --store-state is specified for LSP mode
+                    ? hashing::Hashing::indexAndComputeFileHashes(gs, opts, *logger, inputFilesSpan, *workers, kvstore)
+                    : pipeline::index(*gs, inputFilesSpan, opts, *workers, kvstore);
+
+            // Cache these before any pipeline::package rewrites, so that the cache is still usable
+            // regardless of whether `--stripe-packages` was passed.
+            cache::maybeCacheGlobalStateAndFiles(OwnedKeyValueStore::abort(move(kvstore)), opts, *gs, *workers,
+                                                 nonPackageIndexed);
+
+            // Second run: all the other files (the packageDB shouldn't change)
+            pipeline::package(*gs, absl::Span<ast::ParsedFile>(nonPackageIndexed), opts, *workers);
+
+            // Only need to compute hashes when running to compute a FileHash
+            auto foundHashes = nullptr;
+            auto canceled =
+                pipeline::name(*gs, absl::Span<ast::ParsedFile>(nonPackageIndexed), opts, *workers, foundHashes);
+            ENFORCE(!canceled, "There's no cancellation in batch mode");
+
+            pipeline::unpartitionPackageFiles(indexed, move(nonPackageIndexed));
+            // TODO(jez) At this point, it's not correct to call it `indexed` anymore: we've run namer too
+
             if (gs->hadCriticalError()) {
                 gs->errorQueue->flushAllErrors(*gs);
             }
         }
-        cache::maybeCacheGlobalStateAndFiles(OwnedKeyValueStore::abort(move(kvstore)), opts, *gs, *workers, indexed);
 
         if (gs->runningUnderAutogen) {
 #ifdef SORBET_REALMAIN_MIN
             logger->warn("Autogen is disabled in sorbet-orig for faster builds");
             return 1;
 #else
-
+            // TODO(jez) Make sure that it's still okay to run this phase after namer, otherwise
+            // you'll have to adjust the non-autogen pipeline code. At first read, it seems like it
+            // unwraps ConstantLit to UnresolvedConstantLit and proceeds as normal, so I think it
+            // should be fine.
             if (!opts.autogenConstantCacheConfig.cacheFile.empty()) {
                 // we should regenerate the constant cache here
                 indexed = pipeline::autogenWriteCacheFile(*gs, opts.autogenConstantCacheConfig.cacheFile, move(indexed),
                                                           *workers);
             }
-
-            gs->suppressErrorClass(core::errors::Namer::RedefinitionOfMethod.code);
-            gs->suppressErrorClass(core::errors::Namer::InvalidClassOwner.code);
-            gs->suppressErrorClass(core::errors::Namer::ModuleKindRedefinition.code);
-            gs->suppressErrorClass(core::errors::Namer::ConstantKindRedefinition.code);
-            gs->suppressErrorClass(core::errors::Resolver::StubConstant.code);
-            gs->suppressErrorClass(core::errors::Resolver::RecursiveTypeAlias.code);
-
-            // Only need to compute FoundMethodHashes when running to compute a FileHash
-            auto foundMethodHashes = nullptr;
-            indexed = move(pipeline::name(*gs, move(indexed), opts, *workers, foundMethodHashes).result());
 
             {
                 core::UnfreezeNameTable nameTableAccess(*gs);
@@ -742,15 +796,14 @@ int realmain(int argc, char *argv[]) {
                 indexed = resolver::Resolver::runConstantResolution(*gs, move(indexed), *workers);
             }
 
-            autogen::AutogenConfig autogenCfg = {.behaviorAllowedInRBIsPaths =
-                                                     std::move(opts.autogenBehaviorAllowedInRBIFilesPaths)};
+            autogen::AutogenConfig autogenCfg = {
+                .behaviorAllowedInRBIsPaths = std::move(opts.autogenBehaviorAllowedInRBIFilesPaths),
+                .msgpackSkipReferenceMetadata = std::move(opts.autogenMsgpackSkipReferenceMetadata)};
 
             runAutogen(*gs, opts, autogenCfg, *workers, indexed, opts.autogenConstantCacheConfig.changedFiles);
 #endif
         } else {
-            // Only need to compute hashes when running to compute a FileHash
-            auto foundHashes = nullptr;
-            indexed = move(pipeline::resolve(gs, move(indexed), opts, *workers, foundHashes).result());
+            indexed = move(pipeline::resolve(gs, move(indexed), opts, *workers).result());
             if (gs->hadCriticalError()) {
                 gs->errorQueue->flushAllErrors(*gs);
             }
@@ -814,7 +867,7 @@ int realmain(int argc, char *argv[]) {
                 }
                 minErrorLevel = levelToRecommendation(minErrorLevel);
                 if (file.data(*gs).originalSigil == minErrorLevel) {
-                    // if the file could be strong, but is only marked strict, ensure that we don't reccomend that it be
+                    // if the file could be strong, but is only marked strict, ensure that we don't recommend that it be
                     // marked strict.
                     continue;
                 }

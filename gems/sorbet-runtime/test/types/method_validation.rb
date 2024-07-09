@@ -120,7 +120,7 @@ module Opus::Types::Test
           mod = Module.new do
             extend T::Sig
             sig {params(a: Integer, b: Integer).returns(Integer)}
-            def self.foo(a: 1, b:)
+            def self.foo(a: 1, b:) # rubocop:disable Style/KeywordParametersOrder
               a + b
             end
           end
@@ -225,7 +225,7 @@ module Opus::Types::Test
 
         if check_alloc_counts
           expected_allocations = T::Configuration::AT_LEAST_RUBY_2_7 ? 1 : 2
-          assert_equal(expected_allocations, allocated) # dmitry: for some reason, when run locally this numeber is 0, in CI it's 2. IDK why.
+          assert_equal(expected_allocations, allocated) # dmitry: for some reason, when run locally this number is 0, in CI it's 2. IDK why.
         end
       end
     end
@@ -257,7 +257,7 @@ module Opus::Types::Test
         assert_equal("Return value: Expected type String, got type Symbol with value :foo", lines[0])
         # Note that the paths here could be relative or absolute depending on how this test was invoked.
         assert_match(%r{\ACaller: .*test.*/types/method_validation.rb:#{__LINE__ - 6}\z}, lines[1])
-        assert_match(%r{\ADefinition: .*test.*/types/method_validation.rb:#{__LINE__ - 12}\z}, lines[2])
+        assert_match(%r{\ADefinition: .*test.*/types/method_validation.rb:#{__LINE__ - 12} \(.*foo\)\z}, lines[2])
         assert_empty(lines[3..-1])
       end
 
@@ -275,7 +275,7 @@ module Opus::Types::Test
         assert_equal("Parameter 'bar': Expected type Integer, got type NilClass", lines[0])
         # Note that the paths here could be relative or absolute depending on how this test was invoked.
         assert_match(%r{\ACaller: .*test.*/types/method_validation.rb:#{__LINE__ - 6}\z}, lines[1])
-        assert_match(%r{\ADefinition: .*test.*/types/method_validation.rb:#{__LINE__ - 12}\z}, lines[2])
+        assert_match(%r{\ADefinition: .*test.*/types/method_validation.rb:#{__LINE__ - 12} \(.*foo\)\z}, lines[2])
         assert_empty(lines[3..-1])
       end
 
@@ -293,7 +293,7 @@ module Opus::Types::Test
         assert_equal("Block parameter 'blk': Expected type Proc, got type NilClass", lines[0])
         # Note that the paths here could be relative or absolute depending on how this test was invoked.
         assert_match(%r{\ACaller: .*test.*/types/method_validation.rb:#{__LINE__ - 6}\z}, lines[1])
-        assert_match(%r{\ADefinition: .*test.*/types/method_validation.rb:#{__LINE__ - 12}\z}, lines[2])
+        assert_match(%r{\ADefinition: .*test.*/types/method_validation.rb:#{__LINE__ - 12} \(.*foo\)\z}, lines[2])
         assert_empty(lines[3..-1])
       end
 
@@ -311,14 +311,14 @@ module Opus::Types::Test
         assert_match(/Bind: Expected type Integer, got type Module with value #<Module:0x/, lines[0])
         # Note that the paths here could be relative or absolute depending on how this test was invoked.
         assert_match(%r{\ACaller: .*test.*/types/method_validation.rb:#{__LINE__ - 6}\z}, lines[1])
-        assert_match(%r{\ADefinition: .*test.*/types/method_validation.rb:#{__LINE__ - 12}\z}, lines[2])
+        assert_match(%r{\ADefinition: .*test.*/types/method_validation.rb:#{__LINE__ - 12} \(.*foo\)\z}, lines[2])
         assert_empty(lines[3..-1])
       end
 
       it "accepts T.proc" do
         @mod.sig {params(blk: T.proc.params(i: Integer).returns(Integer)).returns(Integer)}
         def @mod.foo(&blk)
-          blk.call(4)
+          yield 4
         end
 
         @mod.foo {|i| i**2}
@@ -484,7 +484,7 @@ module Opus::Types::Test
             if signature.on_failure
               T::Configuration.soft_assert_handler(
                 "TypeError: #{opts[:pretty_message]}",
-                {notify: signature.on_failure[1][:notify]}
+                notify: signature.on_failure[1][:notify]
               )
             else
               raise 'test failed'

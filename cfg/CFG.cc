@@ -31,7 +31,12 @@ int CFG::numLocalVariables() const {
     return this->localVariables.size();
 }
 
-BasicBlock *CFG::freshBlock(int outerLoops, int rubyRegionId) {
+BasicBlock *CFG::freshBlock(int outerLoops, BasicBlock *current) {
+    ENFORCE(current != nullptr);
+    return this->freshBlockWithRegion(outerLoops, current->rubyRegionId);
+}
+
+BasicBlock *CFG::freshBlockWithRegion(int outerLoops, int rubyRegionId) {
     int id = this->maxBasicBlockId++;
     auto &r = this->basicBlocks.emplace_back(make_unique<BasicBlock>());
     r->id = id;
@@ -64,8 +69,8 @@ LocalRef CFG::enterLocal(core::LocalVariable variable) {
 }
 
 CFG::CFG() {
-    freshBlock(0, 0); // entry;
-    freshBlock(0, 0); // dead code;
+    freshBlockWithRegion(0, 0); // entry;
+    freshBlockWithRegion(0, 0); // dead code;
     deadBlock()->bexit.elseb = deadBlock();
     deadBlock()->bexit.thenb = deadBlock();
     deadBlock()->bexit.cond.variable = LocalRef::unconditional();
@@ -217,7 +222,7 @@ string CFG::toString(const core::GlobalState &gs) const {
         auto text = basicBlock->toString(gs, *this);
         auto lines = absl::StrSplit(text, "\n");
 
-        auto shape = basicBlock->id == 0 ? "invhouse" : basicBlock->id == 1 ? "parallelogram" : "rectangle";
+        auto shape = basicBlock->id == 0 ? "cds" : basicBlock->id == 1 ? "parallelogram" : "rectangle";
         // whole block red if whole block is dead
         auto color = basicBlock->firstDeadInstructionIdx == 0 ? "red" : "black";
         fmt::format_to(std::back_inserter(buf),
@@ -282,7 +287,7 @@ string CFG::showRaw(core::Context ctx) const {
         auto text = basicBlock->showRaw(ctx, *this);
         auto lines = absl::StrSplit(text, "\n");
 
-        auto shape = basicBlock->id == 0 ? "invhouse" : basicBlock->id == 1 ? "parallelogram" : "rectangle";
+        auto shape = basicBlock->id == 0 ? "cds" : basicBlock->id == 1 ? "parallelogram" : "rectangle";
         // whole block red if whole block is dead
         auto color = basicBlock->firstDeadInstructionIdx == 0 ? "red" : "black";
         fmt::format_to(std::back_inserter(buf),
@@ -348,7 +353,7 @@ optional<BasicBlock::BlockExitCondInfo> BasicBlock::maybeGetUpdateKnowledgeRecei
 
     if (send->fun == core::Names::bang() && this->exprs.size() >= 2) {
         // Heuristic, because it's overwhelmingly common to see `!x.foo.nil?`, in which case the
-        // relevent receiver is the second-last, not the last, send binding.
+        // relevant receiver is the second-last, not the last, send binding.
         auto bangRecv = send->recv.variable;
         auto &secondLastBinding = this->exprs[this->exprs.size() - 2];
         auto secondLastSend = looksLikeUpdateKnowledgeSend(inWhat, secondLastBinding, bangRecv);
@@ -367,7 +372,7 @@ string BasicBlock::toString(const core::GlobalState &gs, const CFG &cfg) const {
     fmt::memory_buffer buf;
     fmt::format_to(std::back_inserter(buf), "block[id={}, rubyRegionId={}]({})\n", this->id, this->rubyRegionId,
                    fmt::map_join(
-                       this->args, ", ", [&](const auto &arg) -> auto { return arg.toString(gs, cfg); }));
+                       this->args, ", ", [&](const auto &arg) -> auto{ return arg.toString(gs, cfg); }));
 
     if (this->outerLoops > 0) {
         fmt::format_to(std::back_inserter(buf), "outerLoops: {}\n", this->outerLoops);
@@ -384,7 +389,7 @@ string BasicBlock::toTextualString(const core::GlobalState &gs, optional<core::F
     fmt::format_to(std::back_inserter(buf), "bb{}[rubyRegionId={}, firstDead={}]({}):\n", this->id, this->rubyRegionId,
                    this->firstDeadInstructionIdx,
                    fmt::map_join(
-                       this->args, ", ", [&](const auto &arg) -> auto { return arg.toString(gs, cfg); }));
+                       this->args, ", ", [&](const auto &arg) -> auto{ return arg.toString(gs, cfg); }));
 
     if (this->outerLoops > 0) {
         fmt::format_to(std::back_inserter(buf), "    # outerLoops: {}\n", this->outerLoops);
@@ -421,7 +426,7 @@ string BasicBlock::showRaw(const core::GlobalState &gs, const CFG &cfg) const {
     fmt::memory_buffer buf;
     fmt::format_to(std::back_inserter(buf), "block[id={}]({})\n", this->id,
                    fmt::map_join(
-                       this->args, ", ", [&](const auto &arg) -> auto { return arg.showRaw(gs, cfg); }));
+                       this->args, ", ", [&](const auto &arg) -> auto{ return arg.showRaw(gs, cfg); }));
 
     if (this->outerLoops > 0) {
         fmt::format_to(std::back_inserter(buf), "outerLoops: {}\n", this->outerLoops);

@@ -95,7 +95,7 @@ public:
     CheckSize(Flags, 2, 1);
 
     Loc loc() const;
-    const SymbolRef::LOC_store &locs() const;
+    absl::Span<const Loc> locs() const;
     void addLoc(const core::GlobalState &gs, core::Loc loc);
     void removeLocsForFile(core::FileRef file);
     uint32_t hash(const GlobalState &gs) const;
@@ -244,7 +244,7 @@ public:
     CheckSize(Flags, 1, 1);
 
     Loc loc() const;
-    const SymbolRef::LOC_store &locs() const;
+    absl::Span<const Loc> locs() const;
     void addLoc(const core::GlobalState &gs, core::Loc loc);
     void removeLocsForFile(core::FileRef file);
 
@@ -321,7 +321,7 @@ public:
     CheckSize(Flags, 1, 1);
 
     Loc loc() const;
-    const SymbolRef::LOC_store &locs() const;
+    absl::Span<const Loc> locs() const;
     void addLoc(const core::GlobalState &gs, core::Loc loc);
     void removeLocsForFile(core::FileRef file);
 
@@ -399,7 +399,7 @@ public:
     CheckSize(Flags, 2, 1);
 
     Loc loc() const;
-    const SymbolRef::LOC_store &locs() const;
+    absl::Span<const Loc> locs() const;
     void addLoc(const core::GlobalState &gs, core::Loc loc);
     void removeLocsForFile(core::FileRef file);
 
@@ -512,13 +512,20 @@ public:
         }
     }
 
+    inline void unsetClassOrModuleLinearizationComputed() {
+        flags.isLinearizationComputed = false;
+    }
+
     SymbolRef findMember(const GlobalState &gs, NameRef name) const;
     MethodRef findMethod(const GlobalState &gs, NameRef name) const;
-    SymbolRef findMemberNoDealias(const GlobalState &gs, NameRef name) const;
-    MethodRef findMethodNoDealias(const GlobalState &gs, NameRef name) const;
+    SymbolRef findMemberNoDealias(NameRef name) const;
+    MethodRef findMethodNoDealias(NameRef name) const;
     SymbolRef findMemberTransitive(const GlobalState &gs, NameRef name) const;
     SymbolRef findMemberTransitiveNoDealias(const GlobalState &gs, NameRef name) const;
     MethodRef findMethodTransitive(const GlobalState &gs, NameRef name) const;
+    // A version of findMemberTransitive that skips looking in the members of the current symbol,
+    // instead looking only in the members of any parent.
+    MethodRef findParentMethodTransitive(const GlobalState &gs, NameRef name) const;
     MethodRef findConcreteMethodTransitive(const GlobalState &gs, NameRef name) const;
 
     /* transitively finds a member with the most similar name */
@@ -549,7 +556,7 @@ public:
     void recordSealedSubclass(GlobalState &gs, ClassOrModuleRef subclass);
 
     // Returns the locations that are allowed to subclass the sealed class.
-    const SymbolRef::LOC_store &sealedLocs(const GlobalState &gs) const;
+    absl::Span<const Loc> sealedLocs(const GlobalState &gs) const;
 
     TypePtr sealedSubclassesToUnion(const GlobalState &ctx) const;
 
@@ -588,8 +595,8 @@ public:
         return superClass_;
     }
 
-    inline void setSuperClass(ClassOrModuleRef claz) {
-        superClass_ = claz;
+    inline void setSuperClass(ClassOrModuleRef klass) {
+        superClass_ = klass;
     }
 
     Flags flags;
@@ -644,14 +651,11 @@ private:
                                                                       std::vector<ClassOrModuleRef> &seen);
 
     SymbolRef findMemberTransitiveInternal(const GlobalState &gs, NameRef name, int maxDepth, bool dealias) const;
-
-    inline void unsetClassOrModuleLinearizationComputed() {
-        flags.isLinearizationComputed = false;
-    }
+    SymbolRef findParentMemberTransitiveInternal(const GlobalState &gs, NameRef name, int maxDepth, bool dealias) const;
 
     void addMixinAt(ClassOrModuleRef sym, std::optional<uint16_t> index);
 };
-CheckSize(ClassOrModule, 128, 8);
+CheckSize(ClassOrModule, 120, 8);
 
 } // namespace sorbet::core
 #endif // SORBET_SYMBOLS_H

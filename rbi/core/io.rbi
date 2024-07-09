@@ -1821,9 +1821,17 @@ class IO < Object
     params(
       ext_enc: T.nilable(T.any(String, Encoding)),
       int_enc: T.nilable(T.any(String, Encoding)),
-      opt: T.nilable(T::Hash[Symbol, String]),
-      blk: T.nilable(T.proc.params(read_io: IO, write_io: IO).void)
+      opt: T.nilable(T::Hash[Symbol, String])
     ).returns([IO, IO])
+  end
+  sig do
+    type_parameters(:T)
+    .params(
+      ext_enc: T.nilable(T.any(String, Encoding)),
+      int_enc: T.nilable(T.any(String, Encoding)),
+      opt: T.nilable(T::Hash[Symbol, String]),
+      blk: T.nilable(T.proc.params(read_io: IO, write_io: IO).returns(T.type_parameter(:T)))
+    ).returns(T.type_parameter(:T))
   end
   def self.pipe(ext_enc = nil, int_enc = nil, opt = nil, &blk); end
 
@@ -2718,11 +2726,11 @@ class IO < Object
   # ```
   sig do
     params(
-        arg0: Object,
+        args: Object,
     )
     .returns(Integer)
   end
-  def write(arg0); end
+  def write(*args); end
 
   # Opens the file, optionally seeks to the given *offset*, then returns
   # *length* bytes (defaulting to the rest of the file). binread ensures the

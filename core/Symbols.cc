@@ -23,10 +23,10 @@ namespace sorbet::core {
 using namespace std;
 
 const int Symbols::MAX_SYNTHETIC_CLASS_SYMBOLS = 215;
-const int Symbols::MAX_SYNTHETIC_METHOD_SYMBOLS = 50;
+const int Symbols::MAX_SYNTHETIC_METHOD_SYMBOLS = 54;
 const int Symbols::MAX_SYNTHETIC_FIELD_SYMBOLS = 20;
 const int Symbols::MAX_SYNTHETIC_TYPEARGUMENT_SYMBOLS = 4;
-const int Symbols::MAX_SYNTHETIC_TYPEMEMBER_SYMBOLS = 73;
+const int Symbols::MAX_SYNTHETIC_TYPEMEMBER_SYMBOLS = 72;
 
 namespace {
 constexpr string_view COLON_SEPARATOR = "::"sv;
@@ -426,7 +426,7 @@ string FieldRef::show(const GlobalState &gs, ShowOptions options) const {
 
 string TypeArgumentRef::show(const GlobalState &gs, ShowOptions options) const {
     auto sym = data(gs);
-    if (options.showForRBI) {
+    if (options.useValidSyntax) {
         return fmt::format("T.type_parameter(:{})", sym->name.show(gs));
     } else {
         return fmt::format("T.type_parameter(:{}) (of {})", sym->name.show(gs), sym->owner.show(gs));
@@ -438,7 +438,7 @@ string TypeMemberRef::show(const GlobalState &gs, ShowOptions options) const {
     if (sym->name == core::Names::Constants::AttachedClass()) {
         auto owner = sym->owner.asClassOrModuleRef();
         auto attached = owner.data(gs)->attachedClass(gs);
-        if (options.showForRBI || !attached.exists()) {
+        if (options.useValidSyntax || !attached.exists()) {
             // Attached wont exist for a number of cases:
             // - owner is a module that doesn't use has_attached_class!
             // - owner is a singleton class of a module
@@ -446,7 +446,7 @@ string TypeMemberRef::show(const GlobalState &gs, ShowOptions options) const {
         }
         return fmt::format("T.attached_class (of {})", attached.show(gs, options));
     }
-    if (options.showForRBI) {
+    if (options.useValidSyntax) {
         return sym->name.show(gs);
     }
     return showInternal(gs, sym->owner, sym->name, COLON_SEPARATOR);
@@ -528,7 +528,7 @@ uint16_t ClassOrModule::addMixinPlaceholder(const GlobalState &gs) {
 }
 
 SymbolRef ClassOrModule::findMember(const GlobalState &gs, NameRef name) const {
-    auto ret = findMemberNoDealias(gs, name);
+    auto ret = findMemberNoDealias(name);
     if (ret.exists()) {
         return ret.dealias(gs);
     }
@@ -543,7 +543,7 @@ MethodRef ClassOrModule::findMethod(const GlobalState &gs, NameRef name) const {
     return Symbols::noMethod();
 }
 
-SymbolRef ClassOrModule::findMemberNoDealias(const GlobalState &gs, NameRef name) const {
+SymbolRef ClassOrModule::findMemberNoDealias(NameRef name) const {
     histogramInc("find_member_scope_size", members().size());
     auto fnd = members().find(name);
     if (fnd == members().end()) {
@@ -552,8 +552,8 @@ SymbolRef ClassOrModule::findMemberNoDealias(const GlobalState &gs, NameRef name
     return fnd->second;
 }
 
-MethodRef ClassOrModule::findMethodNoDealias(const GlobalState &gs, NameRef name) const {
-    auto sym = findMemberNoDealias(gs, name);
+MethodRef ClassOrModule::findMethodNoDealias(NameRef name) const {
+    auto sym = findMemberNoDealias(name);
     if (!sym.isMethod()) {
         return Symbols::noMethod();
     }
@@ -578,14 +578,19 @@ MethodRef ClassOrModule::findMethodTransitive(const GlobalState &gs, NameRef nam
     return Symbols::noMethod();
 }
 
-bool singleFileDefinition(const GlobalState &gs, const core::SymbolRef::LOC_store &locs, core::FileRef file) {
+MethodRef ClassOrModule::findParentMethodTransitive(const GlobalState &gs, NameRef name) const {
+    auto dealias = true;
+    auto sym = findParentMemberTransitiveInternal(gs, name, 100, dealias);
+    if (sym.exists() && sym.isMethod()) {
+        return sym.asMethodRef();
+    }
+    return Symbols::noMethod();
+}
+
+bool singleFileDefinition(const GlobalState &gs, absl::Span<const Loc> locs, core::FileRef file) {
     bool result = false;
 
     for (auto &loc : locs) {
-        if (loc.file().data(gs).isRBI()) {
-            continue;
-        }
-
         if (loc.file() != file) {
             return false;
         }
@@ -596,12 +601,8 @@ bool singleFileDefinition(const GlobalState &gs, const core::SymbolRef::LOC_stor
     return result;
 }
 
-// Returns true if the given symbol is only defined in a given file (not accounting for RBIs).
+// Returns true if the given symbol is only defined in a given file.
 bool SymbolRef::isOnlyDefinedInFile(const GlobalState &gs, core::FileRef file) const {
-    if (file.data(gs).isRBI()) {
-        return false;
-    }
-
     return singleFileDefinition(gs, locs(gs), file);
 }
 
@@ -745,6 +746,32 @@ MethodRef ClassOrModule::findConcreteMethodTransitive(const GlobalState &gs, Nam
     return findConcreteMethodTransitiveInternal(gs, this->ref(gs), name, 100);
 }
 
+SymbolRef ClassOrModule::findParentMemberTransitiveInternal(const GlobalState &gs, NameRef name, int maxDepth,
+                                                            bool dealias) const {
+    SymbolRef result;
+    if (flags.isLinearizationComputed) {
+        for (auto it = this->mixins().begin(); it != this->mixins().end(); ++it) {
+            ENFORCE(it->exists());
+            result = dealias ? it->data(gs)->findMember(gs, name) : it->data(gs)->findMemberNoDealias(name);
+            if (result.exists()) {
+                return result;
+            }
+        }
+    } else {
+        for (auto it = this->mixins().rbegin(); it != this->mixins().rend(); ++it) {
+            ENFORCE(it->exists());
+            result = it->data(gs)->findMemberTransitiveInternal(gs, name, maxDepth - 1, dealias);
+            if (result.exists()) {
+                return result;
+            }
+        }
+    }
+    if (this->superClass().exists()) {
+        return this->superClass().data(gs)->findMemberTransitiveInternal(gs, name, maxDepth - 1, dealias);
+    }
+    return Symbols::noSymbol();
+}
+
 SymbolRef ClassOrModule::findMemberTransitiveInternal(const GlobalState &gs, NameRef name, int maxDepth,
                                                       bool dealias) const {
     if (maxDepth == 0) {
@@ -770,32 +797,12 @@ SymbolRef ClassOrModule::findMemberTransitiveInternal(const GlobalState &gs, Nam
         Exception::raise("findMemberTransitive hit a loop while resolving");
     }
 
-    SymbolRef result = dealias ? findMember(gs, name) : findMemberNoDealias(gs, name);
+    SymbolRef result = dealias ? findMember(gs, name) : findMemberNoDealias(name);
     if (result.exists()) {
         return result;
     }
-    if (flags.isLinearizationComputed) {
-        for (auto it = this->mixins().begin(); it != this->mixins().end(); ++it) {
-            ENFORCE(it->exists());
-            result = dealias ? it->data(gs)->findMember(gs, name) : it->data(gs)->findMemberNoDealias(gs, name);
-            if (result.exists()) {
-                return result;
-            }
-            result = core::Symbols::noSymbol();
-        }
-    } else {
-        for (auto it = this->mixins().rbegin(); it != this->mixins().rend(); ++it) {
-            ENFORCE(it->exists());
-            result = it->data(gs)->findMemberTransitiveInternal(gs, name, maxDepth - 1, dealias);
-            if (result.exists()) {
-                return result;
-            }
-        }
-    }
-    if (this->superClass().exists()) {
-        return this->superClass().data(gs)->findMemberTransitiveInternal(gs, name, maxDepth - 1, dealias);
-    }
-    return Symbols::noSymbol();
+
+    return findParentMemberTransitiveInternal(gs, name, maxDepth, dealias);
 }
 
 vector<ClassOrModule::FuzzySearchResult> ClassOrModule::findMemberFuzzyMatch(const GlobalState &gs, NameRef name,
@@ -1081,7 +1088,7 @@ bool isHiddenFromPrinting(const GlobalState &gs, SymbolRef symbol) {
     return false;
 }
 
-void printLocs(const GlobalState &gs, fmt::memory_buffer &buf, const InlinedVector<Loc, 2> &locs, bool showRaw) {
+void printLocs(const GlobalState &gs, fmt::memory_buffer &buf, absl::Span<const Loc> locs, bool showRaw) {
     if (!locs.empty()) {
         fmt::format_to(std::back_inserter(buf), " @ ");
         if (locs.size() > 1) {
@@ -1600,7 +1607,7 @@ bool SymbolRef::isPrintable(const GlobalState &gs) const {
     }
 }
 
-const InlinedVector<Loc, 2> &SymbolRef::locs(const GlobalState &gs) const {
+absl::Span<const Loc> SymbolRef::locs(const GlobalState &gs) const {
     switch (kind()) {
         case SymbolRef::Kind::ClassOrModule:
             return asClassOrModuleRef().data(gs)->locs();
@@ -1883,10 +1890,10 @@ void ClassOrModule::recordSealedSubclass(GlobalState &gs, ClassOrModuleRef subcl
     }
 }
 
-const InlinedVector<Loc, 2> &ClassOrModule::sealedLocs(const GlobalState &gs) const {
+absl::Span<const Loc> ClassOrModule::sealedLocs(const GlobalState &gs) const {
     ENFORCE(this->flags.isSealed, "Class is not marked sealed: {}", ref(gs).show(gs));
     auto sealedSubclasses = this->lookupSingletonClass(gs).data(gs)->findMethod(gs, core::Names::sealedSubclasses());
-    auto &result = sealedSubclasses.data(gs)->locs();
+    auto result = sealedSubclasses.data(gs)->locs();
     ENFORCE(result.size() > 0);
     return result;
 }
@@ -2593,19 +2600,19 @@ Loc TypeParameter::loc() const {
     return Loc::none();
 }
 
-const InlinedVector<Loc, 2> &Method::locs() const {
+absl::Span<const Loc> Method::locs() const {
     return locs_;
 }
 
-const InlinedVector<Loc, 2> &ClassOrModule::locs() const {
+absl::Span<const Loc> ClassOrModule::locs() const {
     return locs_;
 }
 
-const InlinedVector<Loc, 2> &Field::locs() const {
+absl::Span<const Loc> Field::locs() const {
     return locs_;
 }
 
-const InlinedVector<Loc, 2> &TypeParameter::locs() const {
+absl::Span<const Loc> TypeParameter::locs() const {
     return locs_;
 }
 

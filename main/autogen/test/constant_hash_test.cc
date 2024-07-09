@@ -174,7 +174,7 @@ TEST_CASE("Require") { // NOLINT
     // changing the name of a require should affect the hash
     CHECK_NE(req, helper.hashExample("require 'bar'\n"));
 
-    // adding a new requires hould affect the hash
+    // adding a new require should affect the hash
     CHECK_NE(req, helper.hashExample("require 'foo'\n"
                                      "require 'bar'\n"));
 
@@ -184,18 +184,6 @@ TEST_CASE("Require") { // NOLINT
     // other sends should not affect the hash
     CHECK_EQ(req, helper.hashExample("require 'foo'\n"
                                      "do_the_thing!"));
-}
-
-TEST_CASE("Package Autoloader Compatibility") { // NOLINT
-    Helper helper;
-
-    auto req = helper.hashExample("autoloader_compatibility 'legacy'\n");
-
-    // removing the annotation should affect the hash
-    CHECK_NE(req, helper.hashExample("\n"));
-
-    // changing the annotation should affect the hash
-    CHECK_NE(req, helper.hashExample("autoloader_compatibility 'strict'\n"));
 }
 
 TEST_CASE("Extend/Include") {

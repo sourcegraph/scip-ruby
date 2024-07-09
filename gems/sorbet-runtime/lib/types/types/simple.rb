@@ -13,13 +13,22 @@ module T::Types
       @raw_type = raw_type
     end
 
+    def build_type
+      nil
+    end
+
     # overrides Base
     def name
       # Memoize to mitigate pathological performance with anonymous modules (https://bugs.ruby-lang.org/issues/11119)
       #
       # `name` isn't normally a hot path for types, but it is used in initializing a T::Types::Union,
       # and so in `T.nilable`, and so in runtime constructions like `x = T.let(nil, T.nilable(Integer))`.
+      #
+      # Care more about back compat than we do about performance here.
+      # Once 2.6 is well in the rear view mirror, we can replace this.
+      # rubocop:disable Performance/BindCall
       @name ||= (NAME_METHOD.bind(@raw_type).call || @raw_type.name).freeze
+      # rubocop:enable Performance/BindCall
     end
 
     # overrides Base
@@ -32,6 +41,11 @@ module T::Types
       case other
       when Simple
         @raw_type <= other.raw_type
+      when TypedClass
+        # This case is a bit odd--we would have liked to solve this like we do
+        # for `T::Array` et al., but don't for backwards compatibility.
+        # See `type_for_module` below.
+        @raw_type <= other.underlying_class
       else
         false
       end
@@ -89,6 +103,9 @@ module T::Types
           elsif !Object.autoload?(:Set) && Object.const_defined?(:Set) && mod == ::Set
             T::Set[T.untyped]
           else
+            # ideally we would have a case mapping from ::Class -> T::Class here
+            # but for backwards compatibility we don't have that, and instead
+            # have a special case in subtype_of_single?
             Simple.new(mod)
           end
 

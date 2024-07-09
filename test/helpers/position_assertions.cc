@@ -13,6 +13,7 @@
 #include "test/helpers/position_assertions.h"
 #include <iterator>
 #include <regex>
+#include <string.h>
 
 using namespace std;
 
@@ -231,7 +232,7 @@ bool checkAllInner(const sorbet::UnorderedMap<string, shared_ptr<sorbet::core::F
 
 // Matches '    #    ^^^^^ label: dafhdsjfkhdsljkfh*&#&*%'
 // and '    # label: foobar'.
-const regex rangeAssertionRegex("(#[ ]*)(\\^*)[ ]*([a-zA-Z0-9-]+): (.*)$");
+const regex rangeAssertionRegex("(#[ ]*)(\\^*|\\|*)[ ]*([a-zA-Z0-9-]+): (.*)$");
 
 const regex whitespaceRegex("^[ ]*$");
 
@@ -256,7 +257,9 @@ const UnorderedMap<
         {"enable-packager", BooleanPropertyAssertion::make},
         {"enable-experimental-requires-ancestor", BooleanPropertyAssertion::make},
         {"experimental-ruby3-keyword-args", BooleanPropertyAssertion::make},
+        {"typed-super", BooleanPropertyAssertion::make},
         {"enable-suggest-unsafe", BooleanPropertyAssertion::make},
+        {"enable-experimental-lsp-extract-to-variable", BooleanPropertyAssertion::make},
         {"selective-apply-code-action", StringPropertyAssertions::make},
         {"use-code-action-resolve", BooleanPropertyAssertion::make},
         {"assert-no-code-action", StringPropertyAssertions::make},
@@ -272,10 +275,12 @@ const UnorderedMap<
         {"apply-rename", ApplyRenameAssertion::make},
         {"extra-package-files-directory-prefix-underscore", StringPropertyAssertion::make},
         {"extra-package-files-directory-prefix-slash", StringPropertyAssertion::make},
-        {"skip-package-import-visibility-check-for", StringPropertyAssertion::make},
+        {"allow-relaxed-packager-checks-for", StringPropertyAssertion::make},
         {"implementation", ImplementationAssertion::make},
         {"find-implementation", FindImplementationAssertion::make},
         {"show-symbol", ShowSymbolAssertion::make},
+        {"enable-typed-false-completion-nudges", BooleanPropertyAssertion::make},
+        {"go-to-def-special", GoToDefSpecialAssertion::make},
 };
 
 // Ignore any comments that have these labels (e.g. `# typed: true`).
@@ -573,6 +578,7 @@ vector<shared_ptr<RangeAssertion>> parseAssertionsForFile(const shared_ptr<core:
         smatch matches;
         if (regex_search(line, matches, rangeAssertionRegex)) {
             int numCarets = matches[2].str().size();
+            bool zeroLenSelection = matches[2].str()[0] == '|';
             auto textBeforeComment = matches.prefix().str();
             bool lineHasCode = !regex_match(textBeforeComment, whitespaceRegex);
             if (numCarets != 0) {
@@ -588,6 +594,13 @@ vector<shared_ptr<RangeAssertion>> parseAssertionsForFile(const shared_ptr<core:
                     // Ignore erroneous comment.
                     continue;
                 }
+                if (zeroLenSelection && numCarets > 1) {
+                    // Position assertion with no selection
+                    ADD_FAIL_CHECK_AT(filename.c_str(), lineNum + 1,
+                                      fmt::format("Invalid assertion comment found on line {}:\n{}\nAssertions with | "
+                                                  "should only point to 1 character",
+                                                  lineNum, line));
+                }
             }
 
             if (numCarets == 0 && lineHasCode) {
@@ -602,7 +615,7 @@ vector<shared_ptr<RangeAssertion>> parseAssertionsForFile(const shared_ptr<core:
             unique_ptr<Range> range;
             if (numCarets > 0) {
                 int caretBeginPos = textBeforeComment.size() + matches[1].str().size();
-                int caretEndPos = caretBeginPos + numCarets;
+                int caretEndPos = caretBeginPos + (zeroLenSelection ? 0 : numCarets);
                 range = RangeAssertion::makeRange(lastSourceLineNum, caretBeginPos, caretEndPos);
             } else if (assertionContents == "unexpected token tNL") {
                 range = RangeAssertion::makeRange(lineNum);
@@ -887,7 +900,13 @@ void UsageAssertion::check(const UnorderedMap<string, shared_ptr<core::File>> &s
         return;
     }
 
-    assertLocationsMatch(config, sourceFileContents, symbol, allLocs, line, character, locSourceLine, locFilename,
+    vector<shared_ptr<RangeAssertion>> newLocs;
+    for (const auto &assertion : allLocs) {
+        if (dynamic_pointer_cast<GoToDefSpecialAssertion>(assertion) == nullptr) {
+            newLocs.emplace_back(assertion);
+        }
+    }
+    assertLocationsMatch(config, sourceFileContents, symbol, newLocs, line, character, locSourceLine, locFilename,
                          locations, "reference");
 }
 
@@ -944,7 +963,13 @@ void UsageAssertion::checkHighlights(const UnorderedMap<string, shared_ptr<core:
         return;
     }
 
-    assertLocationsMatch(config, sourceFileContents, symbol, allLocs, line, character, locSourceLine, locFilename,
+    vector<shared_ptr<RangeAssertion>> newLocs;
+    for (const auto &assertion : allLocs) {
+        if (dynamic_pointer_cast<GoToDefSpecialAssertion>(assertion) == nullptr) {
+            newLocs.emplace_back(assertion);
+        }
+    }
+    assertLocationsMatch(config, sourceFileContents, symbol, newLocs, line, character, locSourceLine, locFilename,
                          locations, "highlight");
 }
 
@@ -997,6 +1022,25 @@ shared_ptr<ImportUsageAssertion> ImportUsageAssertion::make(string_view filename
 
 string UsageAssertion::toString() const {
     return fmt::format("usage: {}", symbol);
+}
+
+GoToDefSpecialAssertion::GoToDefSpecialAssertion(string_view filename, unique_ptr<Range> &range, int assertionLine,
+                                                 string_view symbol, vector<int> versions)
+    : UsageAssertion(filename, range, assertionLine, symbol, versions) {}
+
+shared_ptr<GoToDefSpecialAssertion> GoToDefSpecialAssertion::make(string_view filename, unique_ptr<Range> &range,
+                                                                  int assertionLine, string_view assertionContents,
+                                                                  string_view assertionType) {
+    auto [symbol, versions, option] = getSymbolVersionAndOption(assertionContents);
+    if (!option.empty()) {
+        ADD_FAIL_CHECK_AT(string(filename).c_str(), assertionLine + 1,
+                          fmt::format("Unexpected import assertion option: `{}`", option));
+    }
+    return make_shared<GoToDefSpecialAssertion>(filename, range, assertionLine, symbol, versions);
+}
+
+string GoToDefSpecialAssertion::toString() const {
+    return fmt::format("go-to-def-special: {}", symbol);
 }
 
 TypeDefAssertion::TypeDefAssertion(string_view filename, unique_ptr<Range> &range, int assertionLine,
@@ -1450,7 +1494,7 @@ shared_ptr<ApplyCompletionAssertion> ApplyCompletionAssertion::make(string_view 
 
     ADD_FAIL_CHECK_AT(
         string(filename).c_str(), assertionLine + 1,
-        fmt::format("Improperly formatted apply-completion assertion. Expected '[<version>] <index>'. Found '{}'",
+        fmt::format("Improperly formatted apply-completion assertion. Expected '[<version>] item: <index>'. Found '{}'",
                     assertionContents));
 
     return nullptr;
@@ -1717,8 +1761,8 @@ ApplyCodeActionAssertion::ApplyCodeActionAssertion(string_view filename, unique_
 string ApplyCodeActionAssertion::toString() const {
     return fmt::format("apply-code-action: [{}] {}", version, title);
 }
-optional<pair<string, string>> ApplyCodeActionAssertion::expectedFile() {
-    auto expectedUpdatedFilePath = updatedFilePath(this->filename, this->version);
+optional<pair<string, string>> ApplyCodeActionAssertion::expectedFile(string filename, string version) {
+    auto expectedUpdatedFilePath = updatedFilePath(filename, version);
     string expectedEditedFileContents;
     try {
         expectedEditedFileContents = FileOps::read(expectedUpdatedFilePath);
@@ -1771,11 +1815,6 @@ getFileByUri(const LSPConfiguration &config,
 
 void ApplyCodeActionAssertion::check(const UnorderedMap<std::string, std::shared_ptr<core::File>> &sourceFileContents,
                                      LSPWrapper &wrapper, const CodeAction &codeAction) {
-    auto maybeFile = expectedFile();
-    if (!maybeFile.has_value()) {
-        return;
-    }
-    auto [expectedUpdatedFilePath, expectedEditedFileContents] = maybeFile.value();
     const auto &config = wrapper.config();
     for (auto &c : *codeAction.edit.value()->documentChanges) {
         auto file = getFileByUri(config, sourceFileContents, c->textDocument->uri);
@@ -1783,6 +1822,12 @@ void ApplyCodeActionAssertion::check(const UnorderedMap<std::string, std::shared
         string actualEditedFileContents = string(file->source());
         c = sortEdits(move(c));
 
+        auto maybeFile = expectedFile(uriToFilePath(config, c->textDocument->uri), this->version);
+        if (!maybeFile.has_value()) {
+            return;
+        }
+
+        auto [expectedUpdatedFilePath, expectedEditedFileContents] = maybeFile.value();
         for (auto &e : c->edits) {
             auto reindent = false;
             actualEditedFileContents = applyEdit(actualEditedFileContents, *file, *e->range, e->newText, reindent);
@@ -1796,12 +1841,11 @@ void ApplyCodeActionAssertion::checkAll(
     const CodeAction &codeAction) {
     const auto &config = wrapper.config();
     UnorderedMap<string, string> accumulatedOriginalEditedContents{};
+
+    // actualEditedFileContents -> (expectedUpdatedFilePath, expectedEditedFileContents)
+    // Maps original file contents to a edited filename and contents
+    UnorderedMap<string, std::pair<std::string, std::string>> fileToUpdatedFile;
     string actualEditedFileContents;
-    auto maybeFile = expectedFile();
-    if (!maybeFile.has_value()) {
-        return;
-    }
-    auto [expectedUpdatedFilePath, expectedEditedFileContents] = maybeFile.value();
     for (auto &c : *codeAction.edit.value()->documentChanges) {
         auto file = getFileByUri(config, sourceFileContents, c->textDocument->uri);
 
@@ -1809,6 +1853,12 @@ void ApplyCodeActionAssertion::checkAll(
         actualEditedFileContents = string(file->source());
 
         for (auto &e : c->edits) {
+            auto maybeFile = expectedFile(uriToFilePath(config, c->textDocument->uri), this->version);
+            if (!maybeFile.has_value()) {
+                continue;
+            }
+            fileToUpdatedFile.insert_or_assign(actualEditedFileContents, maybeFile.value());
+
             string oldSource = accumulatedOriginalEditedContents.contains(actualEditedFileContents)
                                    ? accumulatedOriginalEditedContents[actualEditedFileContents]
                                    : actualEditedFileContents;
@@ -1820,6 +1870,7 @@ void ApplyCodeActionAssertion::checkAll(
     }
 
     for (auto pair : accumulatedOriginalEditedContents) {
+        auto [expectedUpdatedFilePath, expectedEditedFileContents] = fileToUpdatedFile[pair.first];
         assertResults(expectedUpdatedFilePath, expectedEditedFileContents, pair.second);
     }
 }

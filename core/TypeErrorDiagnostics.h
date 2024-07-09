@@ -20,16 +20,13 @@ public:
     static void maybeAutocorrect(const GlobalState &gs, ErrorBuilder &e, Loc loc, const TypeConstraint &constr,
                                  const TypePtr &expectedType, const TypePtr &actualType);
 
-    static void explainTypeMismatch(const GlobalState &gs, ErrorBuilder &e, const TypePtr &expected,
-                                    const TypePtr &got);
+    static void explainTypeMismatch(const GlobalState &gs, ErrorBuilder &e, const ErrorSection::Collector &collector,
+                                    const TypePtr &expected, const TypePtr &got);
 
     static void insertTypeArguments(const GlobalState &gs, ErrorBuilder &e, ClassOrModuleRef klass,
                                     core::Loc replaceLoc);
 
     static void explainUntyped(const GlobalState &gs, ErrorBuilder &e, ErrorClass what, const TypeAndOrigins &untyped,
-                               Loc originForUninitialized);
-
-    static void explainUntyped(const GlobalState &gs, ErrorBuilder &e, ErrorClass what, TypePtr untyped, Loc origin,
                                Loc originForUninitialized);
 
     static std::optional<core::AutocorrectSuggestion::Edit>

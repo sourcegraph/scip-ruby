@@ -1,7 +1,17 @@
 # -- test/testdata/packager/nested_inner_namespaces/__package.rb --
 class <emptyTree><<C <root>>> < (::<todo sym>)
-  class ::<PackageSpecRegistry>::<C RootPackage><<C <todo sym>>> < (<emptyTree>::<C PackageSpec>)
+  class ::<PackageSpecRegistry>::<C RootPackage><<C <todo sym>>> < (::PackageSpec)
     <self>.import(::<PackageSpecRegistry>::<C RootPackage>::<C Foo>)
+  end
+end
+# -- test/testdata/packager/nested_inner_namespaces/foo/__package.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class ::<PackageSpecRegistry>::<C RootPackage>::<C Foo><<C <todo sym>>> < (::PackageSpec)
+    <self>.export(::<root>::<C RootPackage>::<C Foo>::<C Constant>)
+
+    <self>.export(::<root>::<C RootPackage>::<C Foo>::<C Bar>::<C Constant>)
+
+    <self>.export(::<root>::<C RootPackage>::<C Foo>::<C Bar>::<C Baz>)
   end
 end
 # -- test/testdata/packager/nested_inner_namespaces/bar.rb --
@@ -26,16 +36,6 @@ class <emptyTree><<C <root>>> < (::<todo sym>)
     <self>.extend(<emptyTree>::<C T>::<C Sig>)
 
     <runtime method definition of main>
-  end
-end
-# -- test/testdata/packager/nested_inner_namespaces/foo/__package.rb --
-class <emptyTree><<C <root>>> < (::<todo sym>)
-  class ::<PackageSpecRegistry>::<C RootPackage>::<C Foo><<C <todo sym>>> < (<emptyTree>::<C PackageSpec>)
-    <self>.export(::<root>::<C RootPackage>::<C Foo>::<C Constant>)
-
-    <self>.export(::<root>::<C RootPackage>::<C Foo>::<C Bar>::<C Constant>)
-
-    <self>.export(::<root>::<C RootPackage>::<C Foo>::<C Bar>::<C Baz>)
   end
 end
 # -- test/testdata/packager/nested_inner_namespaces/foo/foo.rb --

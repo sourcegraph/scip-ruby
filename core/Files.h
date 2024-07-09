@@ -36,7 +36,6 @@ public:
     friend class ::sorbet::core::serialize::SerializerImpl;
 
     static StrictLevel fileStrictSigil(std::string_view source);
-    static LocOffsets locStrictSigil(std::string_view source);
     static CompiledLevel fileCompiledSigil(std::string_view source);
     static PackagedLevel filePackagedSigil(std::string_view source);
 
@@ -49,11 +48,12 @@ public:
     bool isStdlib() const;
     bool isPackageRBI() const;
 
+    bool permitOverloadDefinitions() const;
+
     static bool isRBIPath(std::string_view path);
     static bool isPackagePath(std::string_view path);
 
     bool isPackage() const;
-    void setIsPackage(bool isPackage);
 
     // Whether the file is open in the LSP client. (Always false if not running under LSP.)
     bool isOpenInClient() const;

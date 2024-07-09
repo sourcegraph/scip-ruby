@@ -12,6 +12,42 @@
 using namespace std;
 namespace sorbet::infer {
 
+bool Inference::willRun(core::Context ctx, core::LocOffsets loc, core::MethodRef method) {
+    // With scip-ruby, we might as well try making progress with untyped code.
+    auto minStrictLevel = ctx.state.isSCIPRuby ? core::StrictLevel::False : core::StrictLevel::True;
+    if (ctx.file.data(ctx).strictLevel < minStrictLevel) {
+        return false;
+    }
+
+    const auto &methodData = method.data(ctx);
+    auto name = methodData->name;
+    auto isMangleRenameOverload = name.kind() == core::NameKind::UNIQUE &&
+                                  name.dataUnique(ctx)->uniqueNameKind == core::UniqueNameKind::MangleRenameOverload;
+    if (isMangleRenameOverload || methodData->flags.isOverloaded) {
+        if (auto e = ctx.beginError(loc, core::errors::Infer::TypecheckOverloadBody)) {
+            e.setHeader("Refusing to typecheck `{}` against an overloaded signature", method.show(ctx));
+            auto overloadMethod = method;
+            if (isMangleRenameOverload) {
+                overloadMethod =
+                    methodData->owner.data(ctx)->findMember(ctx, name.dataUnique(ctx)->original).asMethodRef();
+            }
+            e.addErrorLine(overloadMethod.data(ctx)->loc(), "Given an overloaded signature here");
+            e.addErrorNote("Overloads are only supported in RBI files.\n"
+                           "    To silence this error, mark this file `{}`\n"
+                           "    Read the error doc for how to avoid using overloaded methods in the first place.",
+                           "# typed: false");
+        }
+
+        return false;
+    }
+
+    if (methodData->flags.isAbstract && ctx.file.data(ctx).compiledLevel != core::CompiledLevel::True) {
+        return false;
+    }
+
+    return true;
+}
+
 unique_ptr<cfg::CFG> Inference::run(core::Context ctx, unique_ptr<cfg::CFG> cfg) {
     Timer timeit(ctx.state.tracer(), "Inference::run", {{"func", string(cfg->symbol.toStringFullName(ctx))}});
     ENFORCE(cfg->symbol == ctx.owner.asMethodRef());
@@ -230,12 +266,10 @@ unique_ptr<cfg::CFG> Inference::run(core::Context ctx, unique_ptr<cfg::CFG> cfg)
                         bool andAndOrOr = false;
                         if (ident != nullptr) {
                             auto name = ident->what.data(*cfg)._name;
-                            if (name.kind() == core::NameKind::UNIQUE &&
-                                name.dataUnique(ctx)->original == core::Names::andAnd()) {
+                            if (name.isUniqueNameOf(ctx, core::Names::andAnd())) {
                                 e.setHeader("Left side of `{}` condition was always `{}`", "&&", "truthy");
                                 andAndOrOr = true;
-                            } else if (name.kind() == core::NameKind::UNIQUE &&
-                                       name.dataUnique(ctx)->original == core::Names::orOr()) {
+                            } else if (name.isUniqueNameOf(ctx, core::Names::orOr())) {
                                 e.setHeader("Left side of `{}` condition was always `{}`", "||", "falsy");
                                 andAndOrOr = true;
                             }
@@ -247,7 +281,7 @@ unique_ptr<cfg::CFG> Inference::run(core::Context ctx, unique_ptr<cfg::CFG> cfg)
                         for (const auto &prevBasicBlock : bb->backEdges) {
                             const auto &prevEnv = outEnvironments[prevBasicBlock->id];
                             if (prevEnv.isDead) {
-                                // This prevous block doesn't actually matter, because it was dead
+                                // This previous block doesn't actually matter, because it was dead
                                 // (never got to evaluating its jump condition), so don't clutter
                                 // the error message.
                                 continue;
@@ -264,6 +298,23 @@ unique_ptr<cfg::CFG> Inference::run(core::Context ctx, unique_ptr<cfg::CFG> cfg)
 
                             auto alwaysWhat = prevBasicBlock->bexit.thenb->id == bb->id ? "falsy" : "truthy";
                             auto bexitLoc = ctx.locAt(prevBasicBlock->bexit.loc);
+
+                            auto bexitVar = cond.variable.data(*cfg)._name;
+                            if ((bexitVar.isUniqueNameOf(ctx, core::Names::andAnd()) ||
+                                 bexitVar.isUniqueNameOf(ctx, core::Names::orOr())) &&
+                                !prevBasicBlock->exprs.empty() &&
+                                prevBasicBlock->exprs.back().bind.variable == cond.variable) {
+                                // ^ This condition is a hack that hardcodes the most common structure of the CFG
+                                // we'd need to handle. If we had SSA form in Sorbet's CFG, we wouldn't have to pray
+                                // that the bexit var's initializer is the .back() of the expression in the block
+                                // (despite how rare it is for that to _not_ be the case).
+
+                                // We want to show one location for the "Conditional branch on untyped" warning/error,
+                                // but setting that location clobbers the location we need for this autocorrect to work.
+                                // So we have to claw back what the LHS of the || or && would have been.
+                                bexitLoc = ctx.locAt(prevBasicBlock->exprs.back().loc);
+                            }
+
                             e.addErrorLine(bexitLoc, "This condition was always `{}` (`{}`)", alwaysWhat,
                                            cond.type.show(ctx));
 
@@ -327,6 +378,15 @@ unique_ptr<cfg::CFG> Inference::run(core::Context ctx, unique_ptr<cfg::CFG> cfg)
                 if (auto e = ctx.beginError(bb->bexit.loc, what)) {
                     e.setHeader("Conditional branch on `{}`", "T.untyped");
                     core::TypeErrorDiagnostics::explainUntyped(ctx, e, what, bexitTpo, methodLoc);
+                }
+            } else if (bb->bexit.cond.variable != cfg::LocalRef::unconditional() && bexitTpo.type.hasTopLevelVoid()) {
+                if (auto e = ctx.beginError(bb->bexit.loc, core::errors::Infer::BranchOnVoid)) {
+                    e.setHeader("Branching on `{}` value", "void");
+                    e.addErrorSection(bexitTpo.explainGot(ctx, methodLoc));
+                    e.addErrorNote("Methods which return `{}` and which are checked at runtime have their\n"
+                                   "    return value replaced with a special void singleton value when called.\n"
+                                   "    It does not make sense to branch on this value.",
+                                   "void");
                 }
             }
         } else {

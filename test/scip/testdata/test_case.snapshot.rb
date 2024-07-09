@@ -8,7 +8,7 @@
  class MyTest < ActiveSupport::TestCase
 #      ^^^^^^ definition [..] MyTest#
 #               ^^^^^^^^^^^^^ reference [..] ActiveSupport#
-#                              ^^^^^^^^ definition [..] ActiveSupport#TestCase#
+#                              ^^^^^^^^ reference [..] ActiveSupport#TestCase#
    extend T::Sig
 #  ^^^^^^ reference [..] Kernel#extend().
    # Helper instance method
@@ -27,7 +27,7 @@
    end
  
    setup do
-#  ^^^^^ definition [..] MyTest#initialize().
+#  ^^^^^ definition [..] MyTest#`<before>`().
      @a = T.let(1, Integer)
    end
  
@@ -44,7 +44,7 @@
  class NoMatchTest < ActiveSupport::TestCase
 #      ^^^^^^^^^^^ definition [..] NoMatchTest#
 #                    ^^^^^^^^^^^^^ reference [..] ActiveSupport#
-#                                   ^^^^^^^^ definition [..] ActiveSupport#TestCase#
+#                                   ^^^^^^^^ reference [..] ActiveSupport#TestCase#
    extend T::Sig
 #  ^^^^^^ reference [..] Kernel#extend().
  
@@ -75,7 +75,7 @@
 #      ^^^^^^^^^^^^ definition [..] NoParentClass#assert_equal().
  
    setup do
-#  ^^^^^ definition [..] NoParentClass#initialize().
+#  ^^^^^ definition [..] NoParentClass#`<before>`().
      @a = T.let(1, Integer)
    end
  

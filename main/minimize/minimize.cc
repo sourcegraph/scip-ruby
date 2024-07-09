@@ -52,10 +52,10 @@ OutputCategory outputCategoryFromClassName(string_view fullName) {
     } else if (absl::StrContains(fullName, "::Mutator")) {
         return OutputCategory::Mutator;
     } else if (absl::StrContains(fullName, "::Model")) {
-        if (absl::StartsWith(fullName, "Plaid") || absl::StartsWith(fullName, "Algolia")) {
-            return OutputCategory::External;
-        } else {
+        if (absl::StartsWith(fullName, "Opus") || absl::StartsWith(fullName, "Chalk")) {
             return OutputCategory::Model;
+        } else {
+            return OutputCategory::External;
         }
     } else if (absl::StrContains(fullName, "::Autogen::Proto")) {
         return OutputCategory::AutogenProto;
@@ -219,7 +219,8 @@ void serializeMethods(const core::GlobalState &sourceGS, const core::GlobalState
         // probably update this pass to also serialize any new type information.
 
         auto isSingleton = rbiClass.data(rbiGS)->isSingletonClass(rbiGS);
-        outfile.fmt("  def {}{}(", isSingleton ? "self." : "", rbiEntryShortName);
+        auto isPrivate = rbiEntry.data(rbiGS)->flags.isPrivate;
+        outfile.fmt("  {}def {}{}(", isPrivate ? "private " : "", isSingleton ? "self." : "", rbiEntryShortName);
 
         auto &rbiParameters = rbiEntry.data(rbiGS)->arguments;
         if (rbiParameters.size() == 3 && rbiParameters[1].name == core::Names::fwdKwargs()) {
@@ -413,14 +414,19 @@ void Minimize::indexAndResolveForMinimize(unique_ptr<core::GlobalState> &sourceG
     // I'm ignoring everything relating to caching here, because missing methods is likely
     // to run on a new _unknown.rbi file every time and I didn't want to think about it.
     // If this phase gets slow, we can consider whether caching would speed things up.
-    auto rbiIndexed = pipeline::index(*rbiGS, rbiInputFiles, opts, workers, nullptr);
+    auto rbiIndexed = pipeline::index(*rbiGS, absl::Span<core::FileRef>(rbiInputFiles), opts, workers, nullptr);
     if (rbiGS->hadCriticalError()) {
         rbiGS->errorQueue->flushAllErrors(*rbiGS);
     }
 
+    pipeline::setPackagerOptions(*rbiGS, opts);
+    pipeline::package(*rbiGS, absl::Span<ast::ParsedFile>(rbiIndexed), opts, workers);
     // Only need to compute FoundDefHashes when running to compute a FileHash
     auto foundHashes = nullptr;
-    rbiIndexed = move(pipeline::resolve(rbiGS, move(rbiIndexed), opts, workers, foundHashes).result());
+    auto canceled = pipeline::name(*rbiGS, absl::Span<ast::ParsedFile>(rbiIndexed), opts, workers, foundHashes);
+    ENFORCE(!canceled, "Can only cancel in LSP mode");
+
+    rbiIndexed = move(pipeline::resolve(rbiGS, move(rbiIndexed), opts, workers).result());
     if (rbiGS->hadCriticalError()) {
         rbiGS->errorQueue->flushAllErrors(*rbiGS);
     }
