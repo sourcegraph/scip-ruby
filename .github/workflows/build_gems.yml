@@ -6,13 +6,13 @@ jobs:
     name: 'Build gem'
     strategy:
       matrix:
-        platform: ['ubuntu-20.04', 'macos-12']
-        config: ['debug', 'release']
+        platform: ['ubuntu-20.04', 'macos-13']
+        config: ['asserts', 'release']
     runs-on: ${{ matrix.platform }}
     env:
       TAG: ${{ github.event.ref }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       # Keep in sync with ci.yml
       - uses: ruby/setup-ruby@v1
       - name: Manually evict cache entry if applicable
@@ -20,7 +20,7 @@ jobs:
         run: ACCESS_TOKEN='${{ secrets.GITHUB_TOKEN }}' python3 .github/workflows/evict.py
       - name: "🚀 Mount Bazel build cache"
         if: ${{ runner.os == 'Linux' }}
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/bazelcache/build
           key: bazel-build-${{ runner.os }}-${{ github.sha }}
@@ -28,7 +28,7 @@ jobs:
             bazel-build-${{ runner.os }}-
             bazel-build-
       - name: "🚀 Mount Bazel repo cache"
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         if: ${{ runner.os == 'Linux' }}
         with:
           path: ~/bazelcache/repos
@@ -42,7 +42,7 @@ jobs:
         run: echo "OS=$(uname -s | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
       - name: ${{ format('🏗 Build ({0})', matrix.config) }}
         run: |
-          CONFIG="dbg"
+          CONFIG="dev"
           if [ "$CFG" == "release" ]; then
             CONFIG="release-${OS/darwin/mac}"
           fi
@@ -52,9 +52,14 @@ jobs:
           OS: ${{ env.OS }}
           CFG: ${{ matrix.config }}
       - name: "🪵 Upload log"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.config }}-build-log
           path: log
       - name: ${{ format('💎 Build Gem(s) ({0})', matrix.config) }}
-        run: ./bazel build //gems/scip-ruby --config="${{ env.config }}"
+        run: |
+          CONFIG="dev"
+          if [ "$CFG" == "release" ]; then
+            CONFIG="release-${OS/darwin/mac}"
+          fi
+          ./bazel build //gems/scip-ruby --config="$CONFIG"
