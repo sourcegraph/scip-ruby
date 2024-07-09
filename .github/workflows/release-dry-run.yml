@@ -15,7 +15,7 @@ jobs:
       matrix:
         # Use macos-14 as macos-13 runner is only offered for x86_64
         platform: ['ubuntu-20.04-16core-graph-team', 'macos-13-xlarge']
-        config: ['debug', 'release']
+        config: ['asserts', 'release']
     runs-on: ${{ matrix.platform }}
     env:
       TAG: ${{ inputs.fakeTag }}
@@ -52,7 +52,7 @@ jobs:
         run: echo "OS=$(uname -s | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
       - name: ${{ format('🏗 Build ({0})', matrix.config) }}
         run: |
-          CONFIG="dbg"
+          CONFIG="dev"
           if [ "$CFG" == "release" ]; then
             CONFIG="release-${OS/darwin/mac}"
           fi
@@ -63,7 +63,7 @@ jobs:
           CFG: ${{ matrix.config }}
       - name: ${{ format('🪄 Rename binary ({0})', matrix.config) }}
         run: |
-          SUFFIX="-debug"
+          SUFFIX="-asserts"
           if [ "$CFG" == "release" ]; then
             SUFFIX=""
           fi

@@ -110,7 +110,7 @@ see the [Design Decisions doc][].
 
 ```
 # Optionally replace 'dbg' with 'release-linux' or 'release-mac'
-./bazel build //main:scip-ruby --config=dbg
+./bazel build //main:scip-ruby --config=dev
 ```
 
 The generated binary is located at `./bazel-bin/main/scip-ruby`.
@@ -120,7 +120,7 @@ For more information about configurations, see the [Sorbet README](/sorbet-READM
 ### Building gems
 
 ```bash
-./bazel build //gems/scip-ruby --config=dbg
+./bazel build //gems/scip-ruby --config=dev
 ```
 
 The generated gems are located in `./bazel-bin/gems/scip-ruby`.
@@ -159,13 +159,13 @@ Here are some example test invocations:
 
 ```
 # Run both snapshot tests and unit tests
-./bazel test --config=dbg //test/scip
+./bazel test --config=dev //test/scip
 
 # Run only unit tests
-./bazel test --config=dbg //test/scip:unit_tests
+./bazel test --config=dev //test/scip:unit_tests
 
 # Run a specific snapshot test, e.g. 'testdata/alias.rb'
-./bazel test --config=dbg //test/scip:alias
+./bazel test --config=dev //test/scip:alias
 ```
 
 You can add `--test_output=errors` to see diffs for snapshot mismatches.
@@ -174,10 +174,10 @@ Snapshot outputs can be easily updated:
 
 ```
 # Update all snapshots
-./bazel test --config=dbg //test/scip:update
+./bazel test --config=dev //test/scip:update
 
 # Update snapshot for a single test
-./bazel test --config=dbg //test/scip:update_alias
+./bazel test --config=dev //test/scip:update_alias
 ```
 
 Repo tests are kinda' broken right now; they're disabled
@@ -189,7 +189,7 @@ Then run the tests using:
 
 ```bash
 # If Ruby was installed via asdf (recommended to avoid dependency on system Ruby on macOS)
-./bazel test //test/scip/repos --config=dbg
+./bazel test //test/scip/repos --config=dev
 ```
 
 This may take a few minutes to run.
@@ -262,7 +262,7 @@ Typically, I'll copy over the minimized code
 to the root and run:
 
 ```bash
-./bazel build //main:scip-ruby --config=dbg && ./bazel-out/darwin_arm64-dbg/bin/main/scip-ruby tmp.rb -p cfg-text-loc --index-file /dev/null
+./bazel build //main:scip-ruby --config=dev && ./bazel-out/darwin_arm64-dbg/bin/main/scip-ruby tmp.rb -p cfg-text-loc --index-file /dev/null
 ```
 
 Alternately, it may be useful to create a `tmp.rb`
@@ -271,9 +271,9 @@ file under the `test/scip/testdata/` directory
 
 ```bash
 # Check
-./bazel test //test/scip:tmp --config=dbg
+./bazel test //test/scip:tmp --config=dev
 # View output
-./bazel test //test/scip:update_tmp --config=dbg && cat test/scip/testdata/tmp.snapshot.rb
+./bazel test //test/scip:update_tmp --config=dev && cat test/scip/testdata/tmp.snapshot.rb
 ```
 
 Having the [SCIP CLI](https://github.com/sourcegraph/scip) available

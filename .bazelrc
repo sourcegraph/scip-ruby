@@ -68,9 +68,12 @@ build --cxxopt=-Wno-unqualified-std-cast-call --host_cxxopt=-Wno-unqualified-std
 ##
 ## debug configuration
 ##
+build:dev --config=dbg --copt=-O1
+
 build:dbg --copt=-O0
 build:dbg --compilation_mode=dbg
 build:dbg --config=debugsymbols
+
 
 build:rubydbg --copt=-DRUBY_DEBUG --copt=-DVM_CHECK_MODE=1 --copt=-DTRANSIENT_HEAP_CHECK_MODE --copt=-DRGENGC_CHECK_MODE --copt=-DENC_DEBUG
 
@@ -136,7 +139,7 @@ build:release-linux           --copt=-march=sandybridge
 build:release-sanitized-linux --copt=-march=sandybridge
 build:release-linux-aarch64   --copt=-march=armv8.1a
 
-build:release-mac --config=release-common --platforms=@//tools/platforms:darwin_arm64
+build:release-mac --config=release-common --platforms=@//tools/platforms:darwin_x86_64
 
 build:release-debug-linux --config=release-linux
 build:release-debug-linux --config=release-debug-common
