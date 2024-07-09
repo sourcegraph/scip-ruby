@@ -125,7 +125,7 @@ For more information about configurations, see the [Sorbet README](/sorbet-READM
 
 The generated gems are located in `./bazel-bin/gems/scip-ruby`.
 For testing in local builds and CI, the gems use a hard-coded version `1993.5.16`.
-To build a different version, pass `--//gem/scip-ruby:version=M.N.P`.
+To build a different version, pass `--//gems/scip-ruby:version=M.N.P`.
 
 ## IDE Integration
 
