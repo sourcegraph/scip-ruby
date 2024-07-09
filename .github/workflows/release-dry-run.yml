@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         # Use macos-14 as macos-13 runner is only offered for x86_64
-        platform: ['ubuntu-20.04', 'macos-14']
+        platform: ['ubuntu-20.04-16core-graph-team', 'macos-13-xlarge']
         config: ['debug', 'release']
     runs-on: ${{ matrix.platform }}
     env:
