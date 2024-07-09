@@ -45,7 +45,7 @@ jobs:
             bazel-repos-${{ runner.os }}-
             bazel-repos-
       - name: "⚙️ Setup Bazel"
-        run: 
+        run: |
           echo "rbenv=$(which rbenv)"
           echo "version=${TAG/refs\/tags\/scip-ruby-v/}"
           VERSION="${TAG/refs\/tags\/scip-ruby-v/}" .github/workflows/setup-bazel.sh
