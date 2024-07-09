@@ -3,9 +3,9 @@ on:
   workflow_dispatch:
     inputs:
       fakeVersion:
-        description: 'Fake version to use'
+        description: 'Fake version to use (format: vM.N.P.blah, do not use dashes)'
         required: true
-        default: 'v0.0.0-testing'
+        default: 'v0.0.0.pre.testing'
         type: string
 
 jobs:
