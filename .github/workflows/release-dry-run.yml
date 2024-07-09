@@ -2,10 +2,10 @@ name: 'Release (Dry Run)' # This name is used by the publish-docker workflow
 on:
   workflow_dispatch:
     inputs:
-      fakeTag:
-        description: 'Fake tag to use'
+      fakeVersion:
+        description: 'Fake version to use'
         required: true
-        default: 'scip-ruby-v0.0.0-testing'
+        default: 'v0.0.0-testing'
         type: string
 
 jobs:
@@ -18,7 +18,7 @@ jobs:
         config: ['asserts', 'release']
     runs-on: ${{ matrix.platform }}
     env:
-      TAG: ${{ inputs.fakeTag }}
+      FAKE_VERSION: ${{ inputs.fakeVersion }}
     steps:
       - uses: actions/checkout@v4
       # Keep in sync with ci.yml
@@ -47,8 +47,8 @@ jobs:
       - name: "⚙️ Setup Bazel"
         run: |
           echo "rbenv=$(which rbenv)"
-          echo "version=${TAG/refs\/tags\/scip-ruby-v/}"
-          VERSION="${TAG/refs\/tags\/scip-ruby-v/}" .github/workflows/setup-bazel.sh
+          echo "version=${FAKE_VERSION/v/}"
+          VERSION="${FAKE_VERSION/v/}" .github/workflows/setup-bazel.sh
           echo "--- .bazelrc.local contents ---"
           cat .bazelrc.local
           echo "--- end of .bazelrc.local"
@@ -97,12 +97,14 @@ jobs:
     name: 'Create release (dry run)'
     needs: build-and-upload-artifacts
     runs-on: 'ubuntu-20.04'
+    env:
+      FAKE_VERSION: ${{ inputs.fakeVersion }}
     steps:
       - uses: actions/checkout@v3
       - name: Create Release
         run: |
-          TAG="${GITHUB_REF/refs\/tags\//}"
-          TITLE="${TAG/-v/ v}"
+          TAG="$FAKE_VERSION"
+          TITLE="scip-ruby $FAKE_VERSION"
           TEMPLATE="$(< .github/workflows/release-template.md)"
           echo "${TEMPLATE//TAG_PLACEHOLDER/$TAG}" > notes
           echo "Create release: tag=$TAG, title=$TITLE"
