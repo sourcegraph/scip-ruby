@@ -79,7 +79,7 @@ jobs:
           OS: ${{ env.OS }}
           CFG: ${{ matrix.config }}
       - name: ${{ format('📦 Store binary ({0})', matrix.config) }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}-${{ matrix.config }}-release-artifacts
           path: ${{ env.outBinaryPath }}
@@ -100,7 +100,7 @@ jobs:
     env:
       FAKE_VERSION: ${{ inputs.fakeVersion }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Create Release
         run: |
           TAG="$FAKE_VERSION"

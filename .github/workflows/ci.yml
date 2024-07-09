@@ -11,13 +11,13 @@ jobs:
   test:
     runs-on: 'ubuntu-20.04'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
       # Keep in sync with release.yml
       - name: Manually evict cache entry if applicable
         run: ACCESS_TOKEN='${{ secrets.GITHUB_TOKEN }}' python3 .github/workflows/evict.py
       - name: "🚀 Mount Bazel build cache"
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/bazelcache/build
           key: bazel-build-${{ runner.os }}-${{ github.sha }}
@@ -25,7 +25,7 @@ jobs:
             bazel-build-${{ runner.os }}-
             bazel-build-
       - name: "🚀 Mount Bazel repo cache"
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/bazelcache/repos
           key: bazel-repos-${{ runner.os }}-${{ hashFiles('WORKSPACE') }}
@@ -37,7 +37,7 @@ jobs:
       - name: "🏗 Build"
         run: ./bazel build //main:scip-ruby //test:scip_test_runner --config=dbg --execution_log_binary_file=log
       - name: "🪵 Upload log"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ci-build-log
           path: log
