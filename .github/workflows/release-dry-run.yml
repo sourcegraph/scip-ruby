@@ -81,7 +81,7 @@ jobs:
       - name: ${{ format('📦 Store binary ({0})', matrix.config) }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform }}-${{ matrix.config }}-release-artifacts
+          name: artifacts-binary-${{ matrix.platform }}-${{ matrix.config }}
           path: ${{ env.outBinaryPath }}
           retention-days: 2
       - name: ${{ format('💎 Build Gem(s) ({0})', matrix.config) }}
@@ -89,7 +89,7 @@ jobs:
       - name: ${{ format('📦 Store Gem(s) to GitHub ({0})', matrix.config) }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform }}-${{ matrix.config }}-release-artifacts
+          name: artifacts-gem-${{ matrix.platform }}-${{ matrix.config }}
           path: bazel-bin/gems/scip-ruby/*.gem
           retention-days: 2
 
@@ -110,5 +110,9 @@ jobs:
           echo "Create release: tag=$TAG, title=$TITLE"
       - name: '📥 Download all artifacts'
         uses: actions/download-artifact@v4
+        with:
+          pattern: artifacts-*
+          path: release-artifacts
+          merge-multiple: true
       - name: '📤 List artifacts for release'
-        run: ls ./*-release-artifacts/**
+        run: ls ./release-artifacts/**
