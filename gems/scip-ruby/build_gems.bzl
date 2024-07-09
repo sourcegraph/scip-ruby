@@ -48,10 +48,10 @@ def _build_gems(ctx):
     version = ctx.attr._version[VersionProvider].version
     name = ctx.attr.gem_name
     os = ctx.attr.gem_target_os
-    darwin_versions = [20, 21, 22]
+    darwin_versions = [22, 23]
     if os == "darwin":
         outs = [
-            "{}-{}-universal-darwin-{}.gem".format(name, version, dv)
+            "{}-{}-arm64-darwin-{}.gem".format(name, version, dv)
             for dv in darwin_versions
         ]
     else:

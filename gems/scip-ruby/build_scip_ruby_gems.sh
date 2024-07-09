@@ -39,11 +39,11 @@ cat scip-ruby.template.gemspec \
   > "$GEMSPEC"
 
 if [ "$(uname -s)" == "Darwin" ]; then
-  # Darwin 20 ~ macOS 11 (Big Sur) was released in mid-2020.
+  # Darwin 22 ~ macOS 13 (Ventura) was released in late-2022.
   # We can publish older releases if someone asks for them.
   DARWIN_VERSIONS=($DARWIN_VERSIONS)
   for i in "${DARWIN_VERSIONS[@]}"; do
-    sed -i.bak "s/Gem::Platform::CURRENT/'universal-darwin-$i'/" "$GEMSPEC"
+    sed -i.bak "s/Gem::Platform::CURRENT/'arm64-darwin-$i'/" "$GEMSPEC"
     "$GEM_EXE" build "$GEMSPEC"
     mv "$GEMSPEC.bak" "$GEMSPEC"
   done
