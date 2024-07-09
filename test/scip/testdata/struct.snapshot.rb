@@ -50,10 +50,6 @@
 #^^^^^ reference [..] POINT#
 #^^^^^ definition [..] POINT#
 #^^^^^ definition [..] POINT#
-#^^^^^^^^^^^^^^^^^^^^ reference [..] Struct#
-#^^^^^^^^^^^^^^^^^^^^ definition local 2~#119448696
-#^^^^^^^^^^^^^^^^^^^^ definition local 5~#119448696
-#^^^^^^^^^^^^^^^^^^^^ definition [..] POINT#initialize().
 #                    ^ definition [..] POINT#`x=`().
 #                    ^ definition [..] POINT#x().
 #                    ^ reference [..] BasicObject#
