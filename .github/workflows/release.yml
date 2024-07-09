@@ -9,7 +9,7 @@ jobs:
     name: 'Build and upload artifacts'
     strategy:
       matrix:
-        platform: ['ubuntu-20.04', 'macos-12']
+        platform: ['ubuntu-20.04-16core-graph-team', 'macos-13-xlarge']
         config: ['asserts', 'release']
     runs-on: ${{ matrix.platform }}
     env:
