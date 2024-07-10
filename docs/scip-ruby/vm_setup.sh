@@ -9,13 +9,15 @@
 sudo apt update
 sudo apt autoremove
 sudo apt upgrade
-sudo apt install wget unzip ripgrep fd-find gcc libncurses5-dev libncursesw5-dev xxd libtinfo5 make zlib1g-dev autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev libffi-dev libgdbm6 libgdbm-dev libdb-dev uuid-dev
+sudo apt install -y wget unzip ripgrep fd-find gcc libncurses5-dev libncursesw5-dev xxd libtinfo5 make zlib1g-dev autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev libffi-dev libgdbm6 libgdbm-dev libdb-dev uuid-dev
 
 rm -rf ~/.rbenv
 git clone https://github.com/rbenv/rbenv.git ~/.rbenv --depth=1
 (cd ~/.rbenv && src/configure && make -C src)
 echo 'export PATH="$HOME/.rbenv/bin:$PATH"' >> ~/.bashrc
+echo 'export PATH="$HOME/.rbenv/bin:$PATH"' >> ~/.zshenv
 echo 'eval "$(rbenv init - bash)"' >> ~/.bashrc
+echo 'eval "$(rbenv init - zsh)"' >> ~/.zshenv
 source ~/.bashrc
 
 git clone https://github.com/rbenv/ruby-build.git --depth=1
@@ -24,7 +26,7 @@ rm -rf ruby-build
 
 curl -fsSL https://github.com/rbenv/rbenv-installer/raw/main/bin/rbenv-doctor | bash
 
-MAKE_OPTS="-j $(getconf _NPROCESSORS_ONLN)" rbenv install 2.7.2
+MAKE_OPTS="-j $(getconf _NPROCESSORS_ONLN)" "$HOME/.rbenv/bin/rbenv" install 3.2.2
 
 git clone https://github.com/sourcegraph/scip-ruby.git
 cd scip-ruby
