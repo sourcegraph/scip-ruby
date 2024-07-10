@@ -1,5 +1,6 @@
 Download the binary for your platform using:
 
+<!-- Keep command below in sync with README.md -->
 ```bash
 TAG=TAG_PLACEHOLDER \
 ARCH="$(uname -m)" \
