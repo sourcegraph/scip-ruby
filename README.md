@@ -89,8 +89,12 @@ You can download a
 [release binary](https://github.com/sourcegraph/scip-ruby/releases)
 and run it directly, similar to invoking Sorbet.
 
+<!-- Keep command below in sync with release-template.md -->
 ```bash
-curl -L "https://github.com/sourcegraph/scip-ruby/releases/latest/download/scip-ruby-x86_64-$(uname -s | tr '[:upper:]' '[:lower:]')" -o scip-ruby && chmod +x scip-ruby
+ARCH="$(uname -m)" \
+OS="$(uname -s | tr '[:upper:]' '[:lower:]')" \
+bash -c 'curl -L "https://github.com/sourcegraph/scip-ruby/releases/latest/download/scip-ruby-$ARCH-$OS" -o scip-ruby' && \
+chmod +x scip-ruby
 
 # If using in CI with 'set -e', make sure to wrap the
 # scip-ruby invocation in 'set +e' followed by 'set -e'
