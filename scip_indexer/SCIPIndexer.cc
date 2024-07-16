@@ -968,14 +968,14 @@ public:
             auto symRef = this->aliasMap.try_consume(arg.variable);
             ENFORCE(symRef.has_value());
             auto [namedSym, _] = symRef.value();
-            auto check =
+            auto isDefinition =
                 isMethodFileStaticInit ||
                 (namedSym.kind() != GenericSymbolRef::Kind::Field &&
                  method == gs.lookupStaticInitForClass(namedSym.asSymbolRef().asClassOrModuleRef().data(gs)->owner,
                                                        /*allowMissing*/ true));
             absl::Status status;
             string kind;
-            if (check) {
+            if (isDefinition) {
                 status = this->scipState.saveDefinition(gs, file, namedSym, arg.loc);
                 kind = "definition";
             } else {
@@ -1161,8 +1161,24 @@ public:
         //   In this situation, M should count as a reference if we're mimicking RubyMine.
         //   Specifically, Go to Definition for modules seems to go to 'module M' even
         //   when other forms like 'class M::C' are present.
+        bool isMethodClassStaticInit = false;
+        auto methodOwner = method.owner(gs);
+        if (methodOwner.isClassOrModule() && methodOwner.asClassOrModuleRef().exists()) {
+            auto attached = methodOwner.asClassOrModuleRef().data(gs)->attachedClass(gs);
+            if (attached.exists()) {
+                isMethodClassStaticInit = method == gs.lookupStaticInitForClass(attached,
+                                                                                /*allowMissing*/ true);
+            }
+        }
         for (auto &[namedSym, loc] : todo) {
-            auto status = this->scipState.saveReference(ctx, namedSym, nullopt, loc, 0);
+            absl::Status status;
+            if (isMethodClassStaticInit && namedSym.isEnumConstant(gs)) {
+                // Enum constants don't have references in the <static-init> of the owner
+                // class, but they do have alias instructions, so record those as definitions.
+                status = this->scipState.saveDefinition(ctx, file, namedSym, loc);
+            } else {
+                status = this->scipState.saveReference(ctx, namedSym, nullopt, loc, 0);
+            }
             ENFORCE(status.ok(), "status: {}\n", status.message());
         }
     }
@@ -1361,10 +1377,17 @@ public:
         if (this->doNothing() || ast::isa_tree<ast::EmptyTree>(klass.name)) {
             return;
         }
-        auto scipState = this->getSCIPState();
+        auto nameLoc = klass.name.loc();
+        // The exists() case is present for defensiveness.
+        // The empty() check is present for enums where the definition generates
+        // a synthetic class with a zero-length location, see TEnum.cc.
+        if (!nameLoc.exists() || nameLoc.empty()) {
+            return;
+        }
 
-        auto status = scipState->saveDefinition(gs, file, scip_indexer::GenericSymbolRef::classOrModule(klass.symbol),
-                                                klass.name.loc());
+        auto scipState = this->getSCIPState();
+        auto status =
+            scipState->saveDefinition(gs, file, scip_indexer::GenericSymbolRef::classOrModule(klass.symbol), nameLoc);
         ENFORCE(status.ok());
         auto *expr = &klass.name;
         if (auto *constantLit = ast::cast_tree<ast::ConstantLit>(*expr)) {

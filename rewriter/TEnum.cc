@@ -150,10 +150,7 @@ std::optional<ProcessStatResult> processStat(core::MutableContext ctx, ast::Clas
 
     auto statLocZero = stat.loc().copyWithZeroLength();
     auto name = ctx.state.enterNameConstant(ctx.state.freshNameUnique(core::UniqueNameKind::TEnum, lhs->cnst, 1));
-    // For some reason, Sorbet uses a zero-length range here,
-    // but it seems like we need this for scip-ruby?
-    // https://github.com/sorbet/sorbet/pull/7092
-    auto classCnst = ast::MK::UnresolvedConstant(lhs->loc, ast::MK::EmptyTree(), name);
+    auto classCnst = ast::MK::UnresolvedConstant(statLocZero, ast::MK::EmptyTree(), name);
     ast::ClassDef::ANCESTORS_store parent;
     parent.emplace_back(klass->name.deepCopy());
     ast::ClassDef::RHS_store classRhs;

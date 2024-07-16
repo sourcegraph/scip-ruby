@@ -169,6 +169,18 @@ public:
         return Kind::ClassOrModule;
     }
 
+    bool isEnumConstant(const core::GlobalState &gs) const {
+        if (this->kind() != Kind::Field) {
+            return false;
+        }
+        auto sym = this->selfOrOwner.asClassOrModuleRef();
+        if (!sym.exists()) {
+            return false;
+        }
+        auto super = sym.data(gs)->superClass();
+        return super == core::Symbols::T_Enum();
+    }
+
     UntypedGenericSymbolRef withoutType() const {
         switch (this->kind()) {
             case Kind::Field:
