@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0.4.1
+
+Fixes a bug where Go to definition for enum values would not
+work correctly. (https://github.com/sourcegraph/scip-ruby/pull/220)
+
 ## v0.4.0
 
 Updated with changes from upstream Sorbet as of June 22 2024 (0a7b175bc0bb41e2672369554f74364e83711a84).
