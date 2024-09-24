@@ -674,7 +674,7 @@ BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlo
                     unconditionalJump(current, headerBlock, cctx.inWhat, s.loc);
 
                     LocalRef blockrv = cctx.newTemporary(core::Names::blockReturnTemp());
-                    BasicBlock *blockLast;
+                    BasicBlock *blockLast = nullptr;
                     {
                         auto newCctx = cctx.withTarget(blockrv)
                                            .withBlockBreakTarget(cctx.target)
