@@ -24,7 +24,8 @@ However, scip-ruby can also index `# typed: false` files on a best-effort basis.
 Like Sorbet, scip-ruby treats files without a `# typed:` sigil
 as implicitly being `# typed: false`.
 
-Currently, we have gems and binaries available for x86\_64 Linux and x86\_64 macOS (supported on arm64 macOS via Rosetta).
+Currently, we have gems and binaries available for x86\_64 Linux and arm64 macOS.
+<!-- Keep list of platforms in sync with .github/workflows/release.yml -->
 
 ## Quick Start
 

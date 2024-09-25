@@ -10,6 +10,7 @@ jobs:
     strategy:
       matrix:
         platform: ['ubuntu-20.04-16core-graph-team', 'macos-13-xlarge']
+        # Keep the platform list in sync with 'Supported Configurations' in README.md
         config: ['asserts', 'release']
     runs-on: ${{ matrix.platform }}
     env:
