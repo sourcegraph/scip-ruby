@@ -12,8 +12,8 @@
 
 #include "common/FileSystem.h"
 #include "common/sort/sort.h"
-#include "core/source_generator/source_generator.h"
 #include "core/Loc.h"
+#include "core/source_generator/source_generator.h"
 #include "main/lsp/LSPLoop.h"
 
 #include "scip_indexer/Debug.h"
@@ -184,10 +184,6 @@ bool GenericSymbolRef::isSorbetInternal(const core::GlobalState &gs, core::Symbo
             if (klass == core::Symbols::Sorbet_Private() || klass == core::Symbols::T() || klass == classT) {
                 return true;
             }
-            auto name = klass.data(gs)->name;
-            if (name == core::Names::Constants::Opus()) {
-                return true;
-            }
         }
         visited.insert(sym);
         sym = sym.owner(gs);
@@ -228,7 +224,8 @@ void GenericSymbolRef::saveDocStrings(const core::GlobalState &gs, core::TypePtr
             auto ref = this->selfOrOwner.asMethodRef();
             auto recvType = ref.data(gs)->owner.data(gs)->resultType;
             checkType(recvType, fmt::format("receiver type for {}", ref.showFullName(gs)));
-            markdown = core::source_generator::prettyTypeForMethod(gs, ref, recvType, nullptr, nullptr, core::ShowOptions());
+            markdown =
+                core::source_generator::prettyTypeForMethod(gs, ref, recvType, nullptr, nullptr, core::ShowOptions());
             // FIXME(varun): For some reason, it looks like a bunch of public methods
             // get marked as private here. Avoid printing misleading info until we fix that.
             // https://github.com/sourcegraph/scip-ruby/issues/33
