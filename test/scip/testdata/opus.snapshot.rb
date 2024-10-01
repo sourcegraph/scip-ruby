@@ -36,7 +36,11 @@
 #  ^^^^^^^^^^^^^^^ definition [..] ABC#TYPES_IN_MODULE.
 #                                     ^^ reference [..] Kernel#
 #                                     ^^ reference [..] Kernel#lambda().
+#                                          ^^^^ reference [..] Opus#
+#                                                ^^^^^^^ reference [..] Opus#Derived#
 #                                                                     ^^^^^^ reference [..] Symbol#
+#                                                                                                       ^^^^ reference [..] Opus#
+#                                                                                                             ^^^^ reference [..] Opus#Base#
 #                                                                                                             ^^^^^^^ definition local 4~#119448696
 #                                                                                                             ^^^^^^^^ reference [..] ABC#TYPES_IN_MODULE.
  end
@@ -47,7 +51,11 @@
 #  ^^^^^^^^^^^^^^ definition [..] Other#TYPES_IN_CLASS.
 #                                    ^^ reference [..] Kernel#
 #                                    ^^ reference [..] Kernel#lambda().
+#                                         ^^^^ reference [..] Opus#
+#                                               ^^^^^^^ reference [..] Opus#Derived#
 #                                                                    ^^^^^^ reference [..] Symbol#
+#                                                                                                      ^^^^ reference [..] Opus#
+#                                                                                                            ^^^^ reference [..] Opus#Base#
 #                                                                                                            ^^^^^^^ definition local 4~#119448696
 #                                                                                                            ^^^^^^^^ reference [..] Other#TYPES_IN_CLASS.
  end
