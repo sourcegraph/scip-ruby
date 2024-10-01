@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0.4.2
+
+Fixes a bug where reference data for constants in the `Opus`
+namespaces was not emitted correctly. (https://github.com/sourcegraph/scip-ruby/pull/223)
+
 ## v0.4.1
 
 Fixes a bug where Go to definition for enum values would not
