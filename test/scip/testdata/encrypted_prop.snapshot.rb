@@ -28,11 +28,23 @@
 #           ^^^^^^^^^^^^^^ definition [..] `<Class:EncryptedProp>`#encrypted_prop().
    encrypted_prop :foo
 #  ^^^^^^^^^^^^^^^^^^^ reference [..] String#
+#  ^^^^^^^^^^^^^^^^^^^ reference [..] Opus#DB#
+#  ^^^^^^^^^^^^^^^^^^^ reference [..] Opus#DB#Model#
+#  ^^^^^^^^^^^^^^^^^^^ reference [..] Opus#DB#Model#Mixins#
+#  ^^^^^^^^^^^^^^^^^^^ reference [..] Opus#DB#Model#Mixins#Encryptable#
+#  ^^^^^^^^^^^^^^^^^^^ reference [..] Opus#DB#Model#Mixins#Encryptable#EncryptedValue#
+#  ^^^^^^^^^^^^^^^^^^^ reference [..] Opus#
 #                  ^^^ definition [..] EncryptedProp#`encrypted_foo=`().
 #                  ^^^ definition [..] EncryptedProp#`foo=`().
 #                  ^^^ definition [..] EncryptedProp#encrypted_foo().
 #                  ^^^ definition [..] EncryptedProp#foo().
    encrypted_prop :bar, migrating: true, immutable: true
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Opus#DB#Model#Mixins#Encryptable#
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Opus#DB#
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Opus#DB#Model#
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Opus#DB#Model#Mixins#
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Opus#
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Opus#DB#Model#Mixins#Encryptable#EncryptedValue#
 #  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] String#
 #                  ^^^ definition [..] EncryptedProp#bar().
 #                  ^^^ definition [..] EncryptedProp#encrypted_bar().
