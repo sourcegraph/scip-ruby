@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v0.4.3
+
+Adds reference relationships between constant aliases
+so that Find references on an alias Y with a definition
+Y = X also returns references to X.
+
+The converse behavior of Find references for 'X' requires
+changes to the Sourcegraph backend and no further changes
+from the indexer.
+
 ## v0.4.2
 
 Fixes a bug where reference data for constants in the `Opus`
