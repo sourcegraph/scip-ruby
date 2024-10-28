@@ -32,6 +32,7 @@
 #       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'allows path constants inside of IT'>`().
        C3 = Mod::C
 #      ^^ definition [..] MyTest#C3.
+#      relation reference=[..] Mod#C#
 #           ^^^ reference [..] Mod#
 #                ^ reference [..] Mod#C#
        C3.new

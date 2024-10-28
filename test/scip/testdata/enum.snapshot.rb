@@ -16,6 +16,7 @@
 #        ^^^ reference [..] Class#new().
      C = B
 #    ^ definition [..] X#C.
+#    relation reference=[..] X#B.
 #        ^ reference [..] X#B.
    end
  
@@ -38,6 +39,7 @@
 #        ^^^ reference [..] Class#new().
      E = B
 #    ^ definition [..] Y#E.
+#    relation reference=[..] X#B.
 #    ^^^^^ reference [..] Y#E.
 #        ^ reference [..] X#B.
    end

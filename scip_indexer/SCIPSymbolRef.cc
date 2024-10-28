@@ -130,7 +130,7 @@ string UntypedGenericSymbolRef::showRaw(const core::GlobalState &gs) const {
     return fmt::format("UGSR({})", absl::StripAsciiWhitespace(this->selfOrOwner.showFullName(gs)));
 }
 
-void UntypedGenericSymbolRef::saveRelationships(
+void UntypedGenericSymbolRef::saveParentRelationships(
     const core::GlobalState &gs, const RelationshipsMap &relationshipMap, SmallVec<scip::Relationship> &rels,
     const absl::FunctionRef<void(UntypedGenericSymbolRef, std::string &)> &saveSymbolString) const {
     auto it = relationshipMap.find(*this);
