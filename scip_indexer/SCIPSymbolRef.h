@@ -70,10 +70,9 @@ public:
     utils::Result symbolForExpr(const core::GlobalState &gs, const GemMapping &gemMap, std::optional<core::Loc> loc,
                                 scip::Symbol &symbol) const;
 
-    void
-    saveRelationships(const core::GlobalState &gs, const RelationshipsMap &relationshipMap,
-                      SmallVec<scip::Relationship> &rels,
-                      const absl::FunctionRef<void(UntypedGenericSymbolRef, std::string &)> &saveSymbolString) const;
+    void saveParentRelationships(
+        const core::GlobalState &gs, const RelationshipsMap &relationshipMap, SmallVec<scip::Relationship> &rels,
+        const absl::FunctionRef<void(UntypedGenericSymbolRef, std::string &)> &saveSymbolString) const;
 
     std::string showRaw(const core::GlobalState &gs) const;
 };

@@ -386,13 +386,13 @@ private:
         return !inserted;
     }
 
-    void saveRelationships(const core::GlobalState &gs, core::FileRef file, UntypedGenericSymbolRef untypedSymRef,
-                           SmallVec<scip::Relationship> &rels) {
-        untypedSymRef.saveRelationships(gs, this->relationshipsMap[file], rels,
-                                        [this, &gs](UntypedGenericSymbolRef sym, std::string &out) {
-                                            auto status = this->saveSymbolString(gs, sym, nullptr, out);
-                                            ENFORCE(status.skip() || status.ok());
-                                        });
+    void saveParentRelationships(const core::GlobalState &gs, core::FileRef file, UntypedGenericSymbolRef untypedSymRef,
+                                 SmallVec<scip::Relationship> &rels) {
+        untypedSymRef.saveParentRelationships(gs, this->relationshipsMap[file], rels,
+                                              [this, &gs](UntypedGenericSymbolRef sym, std::string &out) {
+                                                  auto status = this->saveSymbolString(gs, sym, nullptr, out);
+                                                  ENFORCE(status.skip() || status.ok());
+                                              });
     }
 
 public:
@@ -410,10 +410,19 @@ public:
         return this->saveDefinitionImpl(gs, file, occ.toSCIPString(gs, file), loc, docStrings, {});
     }
 
+    void saveAliasRelationship(const core::GlobalState &gs, UntypedGenericSymbolRef aliasedSymbol,
+                               SmallVec<scip::Relationship> &rels) {
+        scip::Relationship rel;
+        rel.set_is_reference(true);
+        this->saveSymbolString(gs, aliasedSymbol, /*symbol*/ nullptr, *rel.mutable_symbol());
+        rels.push_back(move(rel));
+    }
+
     // Save definition when you have a sorbet Symbol.
     // Meant for methods, fields etc., but not local variables.
     // TODO(varun): Should we always pass in the location instead of sometimes only?
     absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, GenericSymbolRef symRef,
+                                optional<UntypedGenericSymbolRef> aliasedSymbol,
                                 optional<core::LocOffsets> loc = nullopt) {
         // In practice, there doesn't seem to be any situation which triggers
         // a duplicate definition being emitted, so skip calling cacheOccurrence here.
@@ -438,7 +447,10 @@ public:
         symRef.saveDocStrings(gs, symRef.definitionType(), occLoc, docs);
 
         SmallVec<scip::Relationship> rels;
-        this->saveRelationships(gs, file, symRef.withoutType(), rels);
+        this->saveParentRelationships(gs, file, symRef.withoutType(), rels);
+        if (aliasedSymbol.has_value()) {
+            this->saveAliasRelationship(gs, aliasedSymbol.value(), rels);
+        }
 
         return this->saveDefinitionImpl(gs, file, symbolString, occLoc, docs, rels);
     }
@@ -544,7 +556,10 @@ public:
                 continue;
             }
             SmallVec<scip::Relationship> rels;
-            this->saveRelationships(gs, file, symRef, rels);
+            this->saveParentRelationships(gs, file, symRef, rels);
+            // For ref-only symbols, since we're lacking a direct definition,
+            // there's no way to determine if the actual definition has an alias or not.
+            // So don't call saveAliasRelationship.
             this->saveSymbolInfo(file, symbolString, {}, rels);
         }
     }
@@ -735,6 +750,15 @@ public:
         return {{namedSym, loc}};
     }
 
+    optional<GenericSymbolRef> try_get(cfg::LocalRef localRef) {
+        auto it = this->map.find(localRef);
+        if (it == this->map.end()) {
+            return nullopt;
+        }
+        auto &[namedSym, loc, emitted] = it->second;
+        return namedSym;
+    }
+
     string showRaw(const core::GlobalState &gs, core::FileRef file, const cfg::CFG &cfg) const {
         return showMap(this->map, [&](const cfg::LocalRef &local, const auto &data) -> string {
             auto symRef = get<0>(data);
@@ -831,13 +855,23 @@ private:
         RValue,
     };
 
+    struct DefRefData {
+        ValueCategory valueCategory;
+        // Only applicable for lvalues.
+        optional<cfg::LocalRef> aliasRHS;
+
+        static const DefRefData RValue() {
+            return DefRefData{ValueCategory::RValue, /*aliasRHS*/ nullopt};
+        }
+    };
+
     // Emit an occurrence for a local variable if applicable.
     //
     // Returns true if an occurrence was emitted.
     //
     // The type should be provided if we have an lvalue.
     bool emitLocalOccurrence(const cfg::CFG &cfg, const cfg::BasicBlock *bb, cfg::LocalOccurrence local,
-                             ValueCategory category, core::TypePtr type) {
+                             DefRefData defRefData, core::TypePtr type) {
         auto loc = local.loc;
         if (!loc.exists() || loc.empty()) {
             // Safeguard against incorrect merges from upstream Sorbet, where
@@ -856,7 +890,7 @@ private:
         }
         scip::SymbolRole referenceRole;
         bool isDefinition = false;
-        switch (category) {
+        switch (defRefData.valueCategory) {
             case ValueCategory::LValue: {
                 referenceRole = scip::SymbolRole::WriteAccess;
                 if (!this->functionLocals.contains(localRef)) {
@@ -894,7 +928,17 @@ private:
         if (symRef.has_value()) {
             auto [namedSym, _] = symRef.value();
             if (isDefinition) {
-                status = this->scipState.saveDefinition(gs, file, namedSym, loc);
+                optional<UntypedGenericSymbolRef> aliasedSymbol = nullopt;
+                if (defRefData.aliasRHS.has_value()) {
+                    if (auto symRef = this->aliasMap.try_get(defRefData.aliasRHS.value())) {
+                        aliasedSymbol = symRef.value().withoutType();
+                    } else {
+                        spdlog::warn("Alias not found for {} in file: {}, code navigation across constant aliases may "
+                                     "not work correctly",
+                                     defRefData.aliasRHS->toString(gs, cfg), file.data(gs).path());
+                    }
+                }
+                status = this->scipState.saveDefinition(gs, file, namedSym, aliasedSymbol, loc);
             } else {
                 auto overrideType = computeOverrideType(namedSym.definitionType(), type);
                 status = this->scipState.saveReference(ctx, namedSym, overrideType, loc, referenceRole);
@@ -976,7 +1020,7 @@ public:
             absl::Status status;
             string kind;
             if (isDefinition) {
-                status = this->scipState.saveDefinition(gs, file, namedSym, arg.loc);
+                status = this->scipState.saveDefinition(gs, file, namedSym, /*aliasedSymbol*/ nullopt, arg.loc);
                 kind = "definition";
             } else {
                 status = this->scipState.saveReference(ctx, namedSym, nullopt, arg.loc, 0);
@@ -1003,12 +1047,20 @@ public:
                 if (binding.value.tag() != cfg::Tag::Alias && binding.value.tag() != cfg::Tag::ArgPresent) {
                     // Emit occurrence information for the LHS
                     auto occ = cfg::LocalOccurrence{binding.bind.variable, lhsLocIfPresent(binding)};
-                    this->emitLocalOccurrence(cfg, bb, occ, ValueCategory::LValue, binding.bind.type);
+                    optional<cfg::LocalRef> aliasRHS = nullopt;
+                    if (binding.value.tag() == cfg::Tag::Ident) {
+                        auto ident = cfg::cast_instruction<cfg::Ident>(binding.value);
+                        if (ident->what.exists() && ident->what.isAliasForGlobal(gs, cfg)) {
+                            aliasRHS = ident->what;
+                        }
+                    }
+                    auto defRefData = DefRefData{ValueCategory::LValue, aliasRHS};
+                    this->emitLocalOccurrence(cfg, bb, occ, defRefData, binding.bind.type);
                 }
                 // Emit occurrence information for the RHS
                 auto emitLocal = [this, &cfg, &bb, &binding](cfg::LocalRef local) -> void {
                     (void)this->emitLocalOccurrence(cfg, bb, cfg::LocalOccurrence{local, binding.loc},
-                                                    ValueCategory::RValue, binding.bind.type);
+                                                    DefRefData::RValue(), binding.bind.type);
                 };
                 switch (binding.value.tag()) {
                     case cfg::Tag::Ident: {
@@ -1022,7 +1074,7 @@ public:
 
                         // Emit reference for the receiver, if present.
                         if (send->recv.loc.exists() && !send->recv.loc.empty()) {
-                            this->emitLocalOccurrence(cfg, bb, send->recv.occurrence(), ValueCategory::RValue,
+                            this->emitLocalOccurrence(cfg, bb, send->recv.occurrence(), DefRefData::RValue(),
                                                       send->recv.type);
                         }
 
@@ -1066,7 +1118,7 @@ public:
                             // and the first one is a write. Instead of emitting two occurrences, it'd be nice to emit
                             // a combined read-write occurrence. However, that would require complicating the code a
                             // bit, so let's leave it as-is for now.
-                            this->emitLocalOccurrence(cfg, bb, arg.occurrence(), ValueCategory::RValue, arg.type);
+                            this->emitLocalOccurrence(cfg, bb, arg.occurrence(), DefRefData::RValue(), arg.type);
                         }
 
                         break;
@@ -1175,7 +1227,7 @@ public:
             if (isMethodClassStaticInit && namedSym.isEnumConstant(gs)) {
                 // Enum constants don't have references in the <static-init> of the owner
                 // class, but they do have alias instructions, so record those as definitions.
-                status = this->scipState.saveDefinition(ctx, file, namedSym, loc);
+                status = this->scipState.saveDefinition(ctx, file, namedSym, /*aliasSymbol*/ nullopt, loc);
             } else {
                 status = this->scipState.saveReference(ctx, namedSym, nullopt, loc, 0);
             }
@@ -1386,8 +1438,8 @@ public:
         }
 
         auto scipState = this->getSCIPState();
-        auto status =
-            scipState->saveDefinition(gs, file, scip_indexer::GenericSymbolRef::classOrModule(klass.symbol), nameLoc);
+        auto sym = scip_indexer::GenericSymbolRef::classOrModule(klass.symbol);
+        auto status = scipState->saveDefinition(gs, file, sym, /*aliasedSymbol*/ nullopt, nameLoc);
         ENFORCE(status.ok());
         auto *expr = &klass.name;
         if (auto *constantLit = ast::cast_tree<ast::ConstantLit>(*expr)) {
@@ -1410,7 +1462,8 @@ public:
         }
         auto scipState = this->getSCIPState();
         if (methodDef.name != core::Names::staticInit()) {
-            auto status = scipState->saveDefinition(gs, file, scip_indexer::GenericSymbolRef::method(methodDef.symbol));
+            auto sym = scip_indexer::GenericSymbolRef::method(methodDef.symbol);
+            auto status = scipState->saveDefinition(gs, file, sym, /*aliasedSymbol*/ nullopt);
             ENFORCE(status.ok());
         }
 
