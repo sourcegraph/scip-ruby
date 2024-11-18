@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.4.4
+
+Fixes a bug where occurrence data (definitions and references)
+were not emitted for test code using the Minitest DSL.
+(https://github.com/sourcegraph/scip-ruby/pull/229)
+
 ## v0.4.3
 
 Adds reference relationships between constant aliases
