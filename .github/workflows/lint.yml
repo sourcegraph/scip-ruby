@@ -23,10 +23,10 @@ jobs:
             echo "-----------------------------------------------------"
             exit 1
           fi
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: '>=1.19'
-      # - name: Lint workflow files
-      #   run: |
-      #     go install github.com/rhysd/actionlint/cmd/actionlint@latest
-      #     actionlint .github/workflows/*.yml
+      - name: Lint workflow files
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@latest
+          actionlint .github/workflows/*.yml
