@@ -4,7 +4,9 @@ class MyTest
     end
 
     it "works outside" do
-        outside_method
+        x = outside_method
+        x = x + 1
+        return
     end
 
     it "allows constants inside of IT" do

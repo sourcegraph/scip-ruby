@@ -1270,6 +1270,30 @@ private:
 
 using LocalSymbolTable = UnorderedMap<core::LocalVariable, core::Loc>;
 
+bool isSyntheticMethodWithHandwrittenBody(const core::GlobalState &gs, core::NameRef name) {
+    // The list of names is taken from:
+    // 1. The test case rewriter/minitest.rb.
+    // 2. https://ruby-doc.org/stdlib-3.0.1/libdoc/minitest/rdoc/Minitest/Spec/DSL/InstanceMethods.html
+    // 3. The code in Minitest.cc
+    // 4. The code in TestCase.cc
+    if (name == core::NameRef::noName()) {
+        return false;
+    }
+    bool special = name == core::Names::describe() || name == core::Names::it() || name == core::Names::before() ||
+                   name == core::Names::beforeAngles() || name == core::Names::after() ||
+                   name == core::Names::afterAngles() || name == core::Names::testEach() ||
+                   name == core::Names::let() || name == core::Names::test() || name == core::Names::setup() ||
+                   name == core::Names::teardown();
+    if (special) {
+        return true;
+    }
+    if (name.kind() == core::NameKind::UTF8) {
+        auto nameText = name.dataUtf8(gs)->utf8;
+        return absl::StartsWith(nameText, "<it '") || absl::StartsWith(nameText, "<describe ");
+    }
+    return false;
+}
+
 class SCIPSemanticExtension : public SemanticExtension {
     string indexFilePath;
     scip_indexer::Config config;
@@ -1468,7 +1492,10 @@ public:
         }
 
         // It is not useful to emit occurrences for method bodies that are synthesized.
-        if (methodDef.flags.isRewriterSynthesized) {
+        //
+        // However, some of these methods are synthesized based on code blocks, particularly
+        // test code. For that code, continue emitting occurrence data.
+        if (methodDef.flags.isRewriterSynthesized && !isSyntheticMethodWithHandwrittenBody(gs, methodDef.name)) {
             return;
         }
 

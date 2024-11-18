@@ -29,6 +29,10 @@
    setup do
 #  ^^^^^ definition [..] MyTest#`<before>`().
      @a = T.let(1, Integer)
+#    ^^ definition [..] MyTest#`@a`.
+#    ^^^^^^^^^^^^^^^^^^^^^^ reference [..] MyTest#`@a`.
+#                  ^^^^^^^ definition local 1~#2938098190
+#                  ^^^^^^^ reference [..] Integer#
    end
  
    test "valid method call" do
@@ -77,6 +81,10 @@
    setup do
 #  ^^^^^ definition [..] NoParentClass#`<before>`().
      @a = T.let(1, Integer)
+#    ^^ definition [..] NoParentClass#`@a`.
+#    ^^^^^^^^^^^^^^^^^^^^^^ reference [..] NoParentClass#`@a`.
+#                  ^^^^^^^ definition local 1~#2938098190
+#                  ^^^^^^^ reference [..] Integer#
    end
  
    test "it works" do
@@ -87,5 +95,7 @@
    teardown do
 #  ^^^^^^^^ definition [..] NoParentClass#teardown().
      @a = 5
+#    ^^ definition [..] NoParentClass#`@a`.
+#    ^^^^^^ reference [..] NoParentClass#`@a`.
    end
  end

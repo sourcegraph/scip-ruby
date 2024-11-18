@@ -7,7 +7,13 @@
  
      it "works outside" do
 #       ^^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'works outside'>`().
-         outside_method
+         x = outside_method
+#        ^ definition local 1~#1914741329
+#            ^^^^^^^^^^^^^^ reference [..] MyTest#outside_method().
+         x = x + 1
+#        ^ reference (write) local 1~#1914741329
+#            ^ reference local 1~#1914741329
+         return
      end
  
      it "allows constants inside of IT" do
@@ -16,6 +22,7 @@
 #      ^^^^^ definition [..] MyTest#CONST.
 #      ^^^^^^^^^^ reference [..] Kernel#
 #      ^^^^^^^^^^ reference [..] Kernel#raise().
+#      ^^^^^^^^^^ reference [..] Module#
      end
  
      it "allows let-ed constants inside of IT" do
@@ -24,6 +31,8 @@
 #      ^^ definition [..] MyTest#C2.
 #      ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Kernel#
 #      ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Kernel#raise().
+#      ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Module#
+#                     ^^^^^^^ definition local 1~#95163902
 #                     ^^^^^^^ definition local 3~#119448696
 #                     ^^^^^^^ reference [..] Integer#
      end
@@ -36,6 +45,8 @@
 #           ^^^ reference [..] Mod#
 #                ^ reference [..] Mod#C#
        C3.new
+#      ^^ reference [..] MyTest#C3.
+#         ^^^ reference [..] Class#new().
      end
  
      describe "some inner tests" do
@@ -48,7 +59,9 @@
          it "works inside" do
 #           ^^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'some inner tests'>`#`<it 'works inside'>`().
              outside_method
+#            ^^^^^^^^^^^^^^ reference [..] MyTest#outside_method().
              inside_method
+#            ^^^^^^^^^^^^^ reference [..] MyTest#`<describe 'some inner tests'>`#inside_method().
          end
      end
  
@@ -58,13 +71,21 @@
      before do
 #    ^^^^^^ definition [..] MyTest#`<before>`().
          @foo = T.let(3, Integer)
+#        ^^^^ definition [..] MyTest#`@foo`.
+#                        ^^^^^^^ definition local 1~#2938098190
+#                        ^^^^^^^ reference [..] Integer#
          instance_helper
+#        ^^^^^^^^^^^^^^^ reference [..] MyTest#instance_helper().
      end
  
      it 'can read foo' do
 #       ^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'can read foo'>`().
          T.assert_type!(@foo, Integer)
+#                       ^^^^ reference [..] MyTest#`@foo`.
+#                             ^^^^^^^ definition local 1~#3909275672
+#                             ^^^^^^^ reference [..] Integer#
          instance_helper
+#        ^^^^^^^^^^^^^^^ reference [..] MyTest#instance_helper().
      end
  
      def self.random_method
