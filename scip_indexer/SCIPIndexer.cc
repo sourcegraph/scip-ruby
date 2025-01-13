@@ -789,6 +789,44 @@ optional<core::TypePtr> computeOverrideType(core::TypePtr definitionType, core::
     return {newType};
 }
 
+core::ClassOrModuleRef computeReceiver(const core::GlobalState &gs, const cfg::Send &send) {
+    auto recvType = send.recv.type;
+    // TODO(varun): When is the isTemporary check going to succeed?
+    if (!recvType || !send.fun.exists() || !send.funLoc.exists() || send.funLoc.empty() ||
+        isTemporary(gs, core::LocalVariable(send.fun, 1))) {
+        return core::ClassOrModuleRef();
+    }
+    // NOTE(varun): Based on core::Types::getRepresentedClass. Trying to use it directly
+    // didn't quite work properly, but we might want to consolidate the implementation. I
+    // didn't quite understand the bit about attachedClass.
+    if (core::isa_type<core::ClassType>(recvType)) {
+        return core::cast_type_nonnull<core::ClassType>(recvType).symbol;
+    }
+    if (core::isa_type<core::AppliedType>(recvType)) {
+        // Triggered for a module nested inside a class
+        // as well as for class method calls. E.g.
+        // XYZ::MyKlass.myKlassMethod
+        auto recv = core::cast_type_nonnull<core::AppliedType>(recvType).klass;
+        if (recv.exists() && send.fun == core::Names::call()) {
+            // Special case to mimic code navigation from rewriter/Command.cc
+            // See associated test call.rb for details as well as GRAPH-895.
+            auto recvAttached = recv.data(gs)->attachedClass(gs);
+            if (recvAttached.exists()) {
+                auto super = recvAttached.data(gs)->superClass();
+                if (super.exists()) {
+                    auto superData = super.data(gs);
+                    if (superData->name == core::Names::Constants::Command() && superData->owner.exists() &&
+                        superData->owner.data(gs)->name == core::Names::Constants::Opus()) {
+                        return recvAttached;
+                    }
+                }
+            }
+        }
+        return recv;
+    }
+    return core::ClassOrModuleRef();
+}
+
 /// Convenience type to handle CFG traversal and recording info in SCIPState.
 ///
 /// Any caches that are not specific to a traversal should be added to SCIPState.
@@ -988,6 +1026,7 @@ private:
 
 public:
     void traverse(const cfg::CFG &cfg) {
+        auto abc = std::vector<int>();
         this->aliasMap.populate(this->ctx, cfg, this->scipState.fieldResolver,
                                 this->scipState.relationshipsMap[ctx.file]);
         auto &gs = this->ctx.state;
@@ -1071,6 +1110,7 @@ public:
                     case cfg::Tag::Send: {
                         // emit occurrence for function
                         auto send = cfg::cast_instruction<cfg::Send>(binding.value);
+                        auto curPos = core::Loc(file, send->funLoc).filePosToString(gs);
 
                         // Emit reference for the receiver, if present.
                         if (send->recv.loc.exists() && !send->recv.loc.empty()) {
@@ -1080,29 +1120,17 @@ public:
 
                         // Emit reference for the method being called
                         auto recvType = send->recv.type;
-                        // TODO(varun): When is the isTemporary check going to succeed?
-                        if (recvType && send->fun.exists() && send->funLoc.exists() && !send->funLoc.empty() &&
-                            !isTemporary(gs, core::LocalVariable(send->fun, 1))) {
-                            core::ClassOrModuleRef recv{};
-                            // NOTE(varun): Based on core::Types::getRepresentedClass. Trying to use it directly
-                            // didn't quite work properly, but we might want to consolidate the implementation. I
-                            // didn't quite understand the bit about attachedClass.
-                            if (core::isa_type<core::ClassType>(recvType)) {
-                                recv = core::cast_type_nonnull<core::ClassType>(recvType).symbol;
-                            } else if (core::isa_type<core::AppliedType>(send->recv.type)) {
-                                // Triggered for a module nested inside a class
-                                recv = core::cast_type_nonnull<core::AppliedType>(send->recv.type).klass;
-                            }
-                            if (recv.exists()) {
-                                auto funSym = recv.data(gs)->findMethodTransitive(gs, send->fun);
-                                if (funSym.exists()) {
-                                    // TODO(varun): For arrays, hashes etc., try to identify if the function
-                                    // matches a known operator (e.g. []=), and emit an appropriate
-                                    // 'WriteAccess' symbol role for it.
-                                    auto status = this->scipState.saveReference(ctx, GenericSymbolRef::method(funSym),
-                                                                                nullopt, send->funLoc, 0);
-                                    ENFORCE(status.ok());
-                                }
+                        auto recv = computeReceiver(gs, *send);
+                        if (recv.exists()) {
+                            auto funSym = recv.data(gs)->findMethodTransitive(gs, send->fun);
+                            auto funName = send->fun.showRaw(gs);
+                            if (funSym.exists()) {
+                                // TODO(varun): For arrays, hashes etc., try to identify if the function
+                                // matches a known operator (e.g. []=), and emit an appropriate
+                                // 'WriteAccess' symbol role for it.
+                                auto status = this->scipState.saveReference(ctx, GenericSymbolRef::method(funSym),
+                                                                            nullopt, send->funLoc, 0);
+                                ENFORCE(status.ok());
                             }
                         }
 
@@ -1114,10 +1142,10 @@ public:
                             // NOTE: For constructs like a += b, the instruction sequence ends up being:
                             //   $tmp = $a
                             //   $a = $tmp.+($b)
-                            // The location for $tmp will point to $a in the source. However, the second one is a read,
-                            // and the first one is a write. Instead of emitting two occurrences, it'd be nice to emit
-                            // a combined read-write occurrence. However, that would require complicating the code a
-                            // bit, so let's leave it as-is for now.
+                            // The location for $tmp will point to $a in the source. However, the second one is
+                            // a read, and the first one is a write. Instead of emitting two occurrences, it'd
+                            // be nice to emit a combined read-write occurrence. However, that would require
+                            // complicating the code a bit, so let's leave it as-is for now.
                             this->emitLocalOccurrence(cfg, bb, arg.occurrence(), DefRefData::RValue(), arg.type);
                         }
 
@@ -1519,7 +1547,8 @@ public:
                                            cxxopts::value<string>());
         optsBuilder.add_options("indexer")(
             "gem-metadata",
-            "Metadata in 'name@version' format to be used for cross-repository code navigation. For repositories which "
+            "Metadata in 'name@version' format to be used for cross-repository code navigation. For repositories "
+            "which "
             "index every commit, the SHA should be used for the version instead of a git tag (or equivalent).",
             cxxopts::value<string>());
         optsBuilder.add_options("indexer")(
