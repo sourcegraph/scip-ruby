@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## v0.4.5
+
+Fixes a bug where references to `call` methods in subclasses
+of `Opus::Command` were not emitted correctly,
+unlike the special-case behavior
+in Sorbet's rewriter/Command.cc.
+(https://github.com/sourcegraph/scip-ruby/pull/232)
+
 ## v0.4.4
 
 Fixes a bug where occurrence data (definitions and references)
