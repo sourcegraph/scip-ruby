@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.4.6
+
+Backports upstream Sorbet fix for crashes for specific
+code patterns when using the Minitest DSL.
+(https://github.com/sourcegraph/scip-ruby/pull/235)
+
 ## v0.4.5
 
 Fixes a bug where references to `call` methods in subclasses
