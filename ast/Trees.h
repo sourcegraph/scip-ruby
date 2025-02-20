@@ -1040,6 +1040,8 @@ public:
 
     std::string toStringWithTabs(const core::GlobalState &gs, int tabs = 0) const;
     std::string showRaw(const core::GlobalState &gs, int tabs = 0) const;
+    bool isName() const;
+    core::NameRef asName() const;
     std::string nodeName() const;
     bool isString() const;
     bool isSymbol() const;
