@@ -1,0 +1,35 @@
+FROM --platform=linux/amd64 \
+    ruby:2.7.6-alpine3.16@sha256:b014cf3e792d7130daec772241a211c40be009fc7f00e2b728ffe26805649575
+
+# This is the base Docker image for scip-ruby with common dependencies
+
+# Version argument to be passed during build
+ARG SCIP_RUBY_VERSION
+
+# gcompat is a glibc-musl compat library (scip-ruby links in glibc)
+# Other deps are to help build C extensions in gems.
+RUN apk add --no-cache \
+    bash \
+    wget \
+    make \
+    libstdc++ \
+    gcc \
+    g++ \
+    automake \
+    autoconf \
+    gcompat \
+    git
+
+# Use a release binary instead of building from source
+# because release builds are very time-consuming.
+#
+# The release version is verified by tools/scripts/publish-scip-ruby.sh
+# The binary at this version is guaranteed to exist because this workflow runs either:
+# 1. Manually with a specific tag that already has a release
+# 2. After the Release workflow completes (which creates the release and uploads the binary)
+RUN wget https://github.com/sourcegraph/scip-ruby/releases/download/scip-ruby-v${SCIP_RUBY_VERSION}/scip-ruby-x86_64-linux \
+    -O /usr/bin/scip-ruby && \
+    chmod +x /usr/bin/scip-ruby
+
+# Set working directory for sources
+WORKDIR /sources
