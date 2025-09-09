@@ -6,6 +6,10 @@ FROM --platform=linux/amd64 \
 # Version argument to be passed during build
 ARG SCIP_RUBY_VERSION
 
+# Fail if SCIP_RUBY_VERSION is not provided
+RUN test -n "${SCIP_RUBY_VERSION}" || \
+    (echo "ERROR: SCIP_RUBY_VERSION build arg is required" && exit 1)
+
 # gcompat is a glibc-musl compat library (scip-ruby links in glibc)
 # Other deps are to help build C extensions in gems.
 RUN apk add --no-cache \
