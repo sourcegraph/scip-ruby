@@ -42,14 +42,40 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Build and push
+      - name: Build base image (not published)
+        id: docker_build_base
+        uses: docker/build-push-action@v6
+        with:
+          file: Dockerfile.base
+          push: false
+          load: true
+          build-args: |
+            SCIP_RUBY_VERSION=${{ env.PATCH }}
+          tags: |
+            scip-ruby-base:${{ env.PATCH }}
+      - name: Build and push autoindex image
         id: docker_build_autoindex
         uses: docker/build-push-action@v6
         with:
           file: Dockerfile.autoindex
           push: true
+          build-args: |
+            BASE_TAG=${{ env.PATCH }}
           tags: |
             sourcegraph/scip-ruby:autoindex
             sourcegraph/scip-ruby:autoindex-${{ env.PATCH }}
             sourcegraph/scip-ruby:autoindex-${{ env.MINOR }}
             sourcegraph/scip-ruby:autoindex-${{ env.MAJOR }}
+      - name: Build and push scip-ruby image
+        id: docker_build_scip_ruby
+        uses: docker/build-push-action@v6
+        with:
+          file: Dockerfile
+          push: true
+          build-args: |
+            BASE_TAG=${{ env.PATCH }}
+          tags: |
+            sourcegraph/scip-ruby:latest
+            sourcegraph/scip-ruby:${{ env.PATCH }}
+            sourcegraph/scip-ruby:${{ env.MINOR }}
+            sourcegraph/scip-ruby:${{ env.MAJOR }}
