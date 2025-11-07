@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         # Use macos-14 as macos-13 runner is only offered for x86_64
-        platform: ['ubuntu-20.04-16core-graph-team', 'macos-13-xlarge']
+        platform: ['ubuntu-22.04-32core-graph-team-amd64', 'macos-13-xlarge']
         config: ['asserts', 'release']
     runs-on: ${{ matrix.platform }}
     env:
@@ -96,7 +96,7 @@ jobs:
   create-release:
     name: 'Create release (dry run)'
     needs: build-and-upload-artifacts
-    runs-on: 'ubuntu-20.04'
+    runs-on: 'ubuntu-22.04'
     env:
       FAKE_VERSION: ${{ inputs.fakeVersion }}
     steps:

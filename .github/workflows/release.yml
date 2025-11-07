@@ -9,7 +9,7 @@ jobs:
     name: 'Build and upload artifacts'
     strategy:
       matrix:
-        platform: ['ubuntu-20.04-16core-graph-team', 'macos-13-xlarge']
+        platform: ['ubuntu-22.04-32core-graph-team-amd64', 'macos-13-xlarge']
         # Keep the platform list in sync with 'Supported Configurations' in README.md
         config: ['asserts', 'release']
     runs-on: ${{ matrix.platform }}
@@ -89,7 +89,7 @@ jobs:
   create-release:
     name: 'Create release'
     needs: build-and-upload-artifacts
-    runs-on: 'ubuntu-20.04'
+    runs-on: 'ubuntu-22.04'
     steps:
       - uses: actions/checkout@v4
       - name: Create Release
