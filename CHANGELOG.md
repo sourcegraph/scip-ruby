@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v0.4.7
+
+Changes the internal symbol structure for local variables
+and parameters to be compliant with the [SCIP](https://github.com/sourcegraph/scip) specification.
+
+Sourcegraph 6.9 has stronger validation checks,
+which prevents Find references from working correctly
+with local variables. This issue is not applicable
+to later releases such as Sourcegraph 6.10 or newer.
+
 ## v0.4.6
 
 Backports upstream Sorbet fix for crashes for specific
