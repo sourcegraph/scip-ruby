@@ -44,19 +44,19 @@
 #      | sig { params(c: T.untyped, b: T.untyped).returns(T::Boolean) }
 #      | def m3(c, b)
 #      | ```
-#         ^ definition local 1~#2519626513
+#         ^ definition local 1$2519626513
 #         documentation
 #         | ```ruby
 #         | c (T.untyped)
 #         | ```
-#            ^ definition local 2~#2519626513
+#            ^ definition local 2$2519626513
 #            documentation
 #            | ```ruby
 #            | b (T.untyped)
 #            | ```
      c.m2 || b
-#    ^ reference local 1~#2519626513
-#            ^ reference local 2~#2519626513
+#    ^ reference local 1$2519626513
+#            ^ reference local 2$2519626513
    end
  
    # _This_ is a
@@ -71,13 +71,13 @@
 #      documentation
 #      | _This_ is a
 #      | **doc comment.**
-#         ^^ definition local 1~#2536404132
+#         ^^ definition local 1$2536404132
 #         documentation
 #         | ```ruby
 #         | xs (T.untyped)
 #         | ```
      xs[0]
-#    ^^ reference local 1~#2536404132
+#    ^^ reference local 1$2536404132
    end
  
    # Yet another..
@@ -112,19 +112,19 @@
 #      documentation
 #      | And...
 #      | ...one more doc comment
-#         ^ definition local 1~#2569959370
+#         ^ definition local 1$2569959370
 #         documentation
 #         | ```ruby
 #         | c (T.untyped)
 #         | ```
-#            ^ definition local 2~#2569959370
+#            ^ definition local 2$2569959370
 #            documentation
 #            | ```ruby
 #            | b (T.untyped)
 #            | ```
      c.m2 || b
-#    ^ reference local 1~#2569959370
-#            ^ reference local 2~#2569959370
+#    ^ reference local 1$2569959370
+#            ^ reference local 2$2569959370
    end
  end
  

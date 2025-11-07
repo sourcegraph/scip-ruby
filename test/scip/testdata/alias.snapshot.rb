@@ -39,9 +39,9 @@
  
  def myfunction(myparam)
 #    ^^^^^^^^^^ definition [..] Object#myfunction().
-#               ^^^^^^^ definition local 1~#3083414419
+#               ^^^^^^^ definition local 1$3083414419
    myparam + Mod2::FEG
-#  ^^^^^^^ reference local 1~#3083414419
+#  ^^^^^^^ reference local 1$3083414419
 #            ^^^^ reference [..] Mod2#
 #                  ^^^ reference [..] Mod2#FEG.
  end
@@ -70,7 +70,7 @@
 #  ^^^ definition [..] X#All.
 #               ^ reference [..] X#A.
 #                  ^ reference [..] X#B.
-#                         ^^^^^^^^ definition local 4~#119448696
+#                         ^^^^^^^^ definition local 4$119448696
 #                               ^ reference [..] X#
  end
  

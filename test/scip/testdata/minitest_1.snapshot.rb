@@ -8,11 +8,11 @@
      it "works outside" do
 #       ^^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'works outside'>`().
          x = outside_method
-#        ^ definition local 1~#1914741329
+#        ^ definition local 1$1914741329
 #            ^^^^^^^^^^^^^^ reference [..] MyTest#outside_method().
          x = x + 1
-#        ^ reference (write) local 1~#1914741329
-#            ^ reference local 1~#1914741329
+#        ^ reference (write) local 1$1914741329
+#            ^ reference local 1$1914741329
          return
      end
  
@@ -32,8 +32,8 @@
 #      ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Kernel#
 #      ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Kernel#raise().
 #      ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Module#
-#                     ^^^^^^^ definition local 1~#95163902
-#                     ^^^^^^^ definition local 3~#119448696
+#                     ^^^^^^^ definition local 1$95163902
+#                     ^^^^^^^ definition local 3$119448696
 #                     ^^^^^^^ reference [..] Integer#
      end
  
@@ -72,7 +72,7 @@
 #    ^^^^^^ definition [..] MyTest#`<before>`().
          @foo = T.let(3, Integer)
 #        ^^^^ definition [..] MyTest#`@foo`.
-#                        ^^^^^^^ definition local 1~#2938098190
+#                        ^^^^^^^ definition local 1$2938098190
 #                        ^^^^^^^ reference [..] Integer#
          instance_helper
 #        ^^^^^^^^^^^^^^^ reference [..] MyTest#instance_helper().
@@ -82,7 +82,7 @@
 #       ^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'can read foo'>`().
          T.assert_type!(@foo, Integer)
 #                       ^^^^ reference [..] MyTest#`@foo`.
-#                             ^^^^^^^ definition local 1~#3909275672
+#                             ^^^^^^^ definition local 1$3909275672
 #                             ^^^^^^^ reference [..] Integer#
          instance_helper
 #        ^^^^^^^^^^^^^^^ reference [..] MyTest#instance_helper().

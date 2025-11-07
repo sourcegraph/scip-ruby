@@ -27,7 +27,7 @@
 #                                                                                  ^^^^^^^^ reference [..] `<Class:T>`#class_of().
 #                                                                                           ^^^^ reference [..] Opus#
 #                                                                                                 ^^^^ reference [..] Opus#Base#
-#                                                                                                 ^^^^^^^ definition local 4~#119448696
+#                                                                                                 ^^^^^^^ definition local 4$119448696
 #                                                                                                 ^^^^^^^^ reference [..] TYPES.
  
  module ABC
@@ -41,7 +41,7 @@
 #                                                                     ^^^^^^ reference [..] Symbol#
 #                                                                                                       ^^^^ reference [..] Opus#
 #                                                                                                             ^^^^ reference [..] Opus#Base#
-#                                                                                                             ^^^^^^^ definition local 4~#119448696
+#                                                                                                             ^^^^^^^ definition local 4$119448696
 #                                                                                                             ^^^^^^^^ reference [..] ABC#TYPES_IN_MODULE.
  end
  
@@ -56,6 +56,6 @@
 #                                                                    ^^^^^^ reference [..] Symbol#
 #                                                                                                      ^^^^ reference [..] Opus#
 #                                                                                                            ^^^^ reference [..] Opus#Base#
-#                                                                                                            ^^^^^^^ definition local 4~#119448696
+#                                                                                                            ^^^^^^^ definition local 4$119448696
 #                                                                                                            ^^^^^^^^ reference [..] Other#TYPES_IN_CLASS.
  end

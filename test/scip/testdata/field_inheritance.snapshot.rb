@@ -233,7 +233,7 @@
    @@x = T.let(0, Integer)
 #  ^^^ definition [..] `<Class:DD1>`#`@@x`.
 #  ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] `<Class:DD1>`#`@@x`.
-#                 ^^^^^^^ definition local 1~#119448696
+#                 ^^^^^^^ definition local 1$119448696
 #                 ^^^^^^^ reference [..] Integer#
  end
  
@@ -302,7 +302,7 @@
      @x = T.let(0, Integer)
 #    ^^ definition [..] F1#`@x`.
 #    ^^^^^^^^^^^^^^^^^^^^^^ reference [..] F1#`@x`.
-#                  ^^^^^^^ definition local 1~#3465713227
+#                  ^^^^^^^ definition local 1$3465713227
 #                  ^^^^^^^ reference [..] Integer#
    end
  end

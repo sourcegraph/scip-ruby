@@ -1,18 +1,18 @@
  # typed: true
  
  _ = 0
-#^ definition local 1~#119448696
+#^ definition local 1$119448696
  
  class C1
 #      ^^ definition [..] C1#
    def f()
 #      ^ definition [..] C1#f().
      _a = C1.new
-#    ^^ definition local 1~#3809224601
+#    ^^ definition local 1$3809224601
 #         ^^ reference [..] C1#
 #            ^^^ reference [..] Class#new().
      _b = M2::C2.new
-#    ^^ definition local 3~#3809224601
+#    ^^ definition local 3$3809224601
 #         ^^ reference [..] M2#
 #             ^^ reference [..] M2#C2#
 #                ^^^ reference [..] Class#new().
@@ -35,7 +35,7 @@
  def local_class()
 #    ^^^^^^^^^^^ definition [..] Object#local_class().
    localClass = Class.new
-#  ^^^^^^^^^^ definition local 1~#552113551
+#  ^^^^^^^^^^ definition local 1$552113551
 #               ^^^^^ reference [..] Class#
 #                     ^^^ reference [..] `<Class:Class>`#new().
    # Technically, this is not supported by Sorbet (https://srb.help/3001),
@@ -45,13 +45,13 @@
      ":)"
    end
    _c = localClass.new
-#  ^^ definition local 3~#552113551
-#       ^^^^^^^^^^ reference local 1~#552113551
+#  ^^ definition local 3$552113551
+#       ^^^^^^^^^^ reference local 1$552113551
 #                  ^^^ reference [..] Class#new().
    # TODO: Missing occurrence for myMethod
    _m = localClass.myMethod
-#  ^^ definition local 4~#552113551
-#       ^^^^^^^^^^ reference local 1~#552113551
+#  ^^ definition local 4$552113551
+#       ^^^^^^^^^^ reference local 1$552113551
 #                  ^^^^^^^^ reference [..] Object#myMethod().
    return
  end
@@ -66,7 +66,7 @@
  def module_access()
 #    ^^^^^^^^^^^^^ definition [..] Object#module_access().
    _ = M4::K
-#  ^ definition local 1~#3353511840
+#  ^ definition local 1$3353511840
 #      ^^ reference [..] M4#
 #          ^ reference [..] M4#K.
    return

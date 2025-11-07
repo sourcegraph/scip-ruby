@@ -16,7 +16,7 @@
 #                                           ^^^^^^^ reference [..] T#Boolean.
    def assert(test)
 #      ^^^^^^ definition [..] MyTest#assert().
-#             ^^^^ definition local 1~#2774883451
+#             ^^^^ definition local 1$2774883451
      test ? true : false
    end
  
@@ -31,7 +31,7 @@
      @a = T.let(1, Integer)
 #    ^^ definition [..] MyTest#`@a`.
 #    ^^^^^^^^^^^^^^^^^^^^^^ reference [..] MyTest#`@a`.
-#                  ^^^^^^^ definition local 1~#2938098190
+#                  ^^^^^^^ definition local 1$2938098190
 #                  ^^^^^^^ reference [..] Integer#
    end
  
@@ -83,7 +83,7 @@
      @a = T.let(1, Integer)
 #    ^^ definition [..] NoParentClass#`@a`.
 #    ^^^^^^^^^^^^^^^^^^^^^^ reference [..] NoParentClass#`@a`.
-#                  ^^^^^^^ definition local 1~#2938098190
+#                  ^^^^^^^ definition local 1$2938098190
 #                  ^^^^^^^ reference [..] Integer#
    end
  

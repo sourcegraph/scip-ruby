@@ -9,11 +9,11 @@
 #                     ^^^^^^^ reference [..] T#Boolean.
    def write_f(a)
 #      ^^^^^^^ definition [..] Z1#write_f().
-#              ^ definition local 1~#1000661517
+#              ^ definition local 1$1000661517
      @f = a
 #    ^^ definition [..] Z1#`@f`.
 #    ^^^^^^ reference [..] Z1#`@f`.
-#         ^ reference local 1~#1000661517
+#         ^ reference local 1$1000661517
    end
  
    sig { returns(T::Boolean) }
@@ -42,11 +42,11 @@
 #                     ^^^^^^^ reference [..] T#Boolean.
    def write_f(a)
 #      ^^^^^^^ definition [..] Z2#write_f().
-#              ^ definition local 1~#1000661517
+#              ^ definition local 1$1000661517
      @f = a
 #    ^^ definition [..] Z2#`@f`.
 #    ^^^^^^ reference [..] Z2#`@f`.
-#         ^ reference local 1~#1000661517
+#         ^ reference local 1$1000661517
    end
  end
  
@@ -76,10 +76,10 @@
 #                     ^^^^^^^ reference [..] T#Boolean.
    def write_f_plus_1(a)
 #      ^^^^^^^^^^^^^^ definition [..] Z4#write_f_plus_1().
-#                     ^ definition local 1~#3337417690
+#                     ^ definition local 1$3337417690
      write_f(a)
 #    ^^^^^^^ reference [..] Z1#write_f().
-#            ^ reference local 1~#3337417690
+#            ^ reference local 1$3337417690
      @f = read_f_plus_1?
 #    ^^ definition [..] Z4#`@f`.
 #    relation definition=[..] Z1#`@f`.

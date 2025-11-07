@@ -11,9 +11,9 @@
  
    def g(x)
 #      ^ definition [..] C#g().
-#        ^ definition local 1~#3792446982
+#        ^ definition local 1$3792446982
      x + @f + f
-#    ^ reference local 1~#3792446982
+#    ^ reference local 1$3792446982
 #        ^^ reference [..] C#`@f`.
 #             ^ reference [..] C#f().
    end
