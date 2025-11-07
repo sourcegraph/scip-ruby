@@ -12,6 +12,27 @@ jobs:
     runs-on: 'ubuntu-22.04'
     steps:
       - uses: actions/checkout@v4
+      # Keep in sync with ci.yml
+      - name: Manually evict cache entry if applicable
+        run: ACCESS_TOKEN='${{ secrets.GITHUB_TOKEN }}' python3 .github/workflows/evict.py
+      - name: "🚀 Mount Bazel build cache"
+        uses: actions/cache@v4
+        with:
+          path: ~/bazelcache/build
+          key: lint-bazel-build-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            lint-bazel-build-${{ runner.os }}-
+            lint-bazel-build-
+      - name: "🚀 Mount Bazel repo cache"
+        uses: actions/cache@v4
+        with:
+          path: ~/bazelcache/repos
+          key: lint-bazel-repos-${{ runner.os }}-${{ hashFiles('WORKSPACE') }}
+          restore-keys: |
+            lint-bazel-repos-${{ runner.os }}-
+            lint-bazel-repos-
+      - name: "⚙️ Setup Bazel"
+        run: .github/workflows/setup-bazel.sh
       - name: Format Bazel files
         run: |
           ./tools/scripts/format_build_files.sh
