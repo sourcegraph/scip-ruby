@@ -5,7 +5,7 @@
 #^^^^^^^ reference [..] Kernel#require().
  
  b = C1.new.m1
-#^ definition local 2~#119448696
+#^ definition local 2$119448696
 #documentation
 #| ```ruby
 #| b (T::Boolean)

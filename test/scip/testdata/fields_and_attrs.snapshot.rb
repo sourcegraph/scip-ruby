@@ -113,29 +113,29 @@
 #      ^^^^^^^^^^ definition [..] P#wrong_init().
      # Check that 'r' is a method access but 'a' and 'w' are locals
      a = r
-#    ^ definition local 1~#1021288725
+#    ^ definition local 1$1021288725
 #        ^ reference [..] P#r().
      w = a
-#    ^ definition local 2~#1021288725
-#    ^^^^^ reference local 2~#1021288725
-#        ^ reference local 1~#1021288725
+#    ^ definition local 2$1021288725
+#    ^^^^^ reference local 2$1021288725
+#        ^ reference local 1$1021288725
    end
  end
  
  def useP
 #    ^^^^ definition [..] Object#useP().
    p = P.new
-#  ^ definition local 1~#2121829932
+#  ^ definition local 1$2121829932
 #      ^ reference [..] P#
 #        ^^^ reference [..] Class#new().
    p.a = p.r
-#  ^ reference local 1~#2121829932
+#  ^ reference local 1$2121829932
 #    ^^^ reference [..] P#`a=`().
-#        ^ reference local 1~#2121829932
+#        ^ reference local 1$2121829932
 #          ^ reference [..] P#r().
    p.w = p.a
-#  ^ reference local 1~#2121829932
+#  ^ reference local 1$2121829932
 #    ^^^ reference [..] P#`w=`().
-#        ^ reference local 1~#2121829932
+#        ^ reference local 1$2121829932
 #          ^ reference [..] P#a().
  end
