@@ -33,7 +33,7 @@
  
  $d = T.let(0, Integer)
 #^^ definition [global] `<Class:<root>>`#$d.
-#              ^^^^^^^ definition local 3~#119448696
+#              ^^^^^^^ definition local 3$119448696
 #              ^^^^^^^ reference [..] Integer#
  
  def g

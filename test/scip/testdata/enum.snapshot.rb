@@ -24,7 +24,7 @@
 #  ^^^ definition [..] X#All.
 #               ^ reference [..] X#A.
 #                  ^ reference [..] X#B.
-#                         ^^^^^^^^ definition local 4~#119448696
+#                         ^^^^^^^^ definition local 4$119448696
 #                               ^ reference [..] X#
  end
  
@@ -48,7 +48,7 @@
  def use_abc
 #    ^^^^^^^ definition [..] Object#use_abc().
    x = X::A
-#  ^ definition local 1~#1971237871
+#  ^ definition local 1$1971237871
 #      ^ reference [..] X#
 #         ^ reference [..] X#A.
    return

@@ -21,11 +21,11 @@
    def call()
 #      ^^^^ definition [..] Opus#MyThing#Command#GetThing#call().
      x = 1
-#    ^ definition local 1~#3018949801
+#    ^ definition local 1$3018949801
      y = x
-#    ^ definition local 2~#3018949801
-#    ^^^^^ reference local 2~#3018949801
-#        ^ reference local 1~#3018949801
+#    ^ definition local 2$3018949801
+#    ^^^^^ reference local 2$3018949801
+#        ^ reference local 1$3018949801
    end
  end
  
@@ -38,11 +38,11 @@
    def call()
 #      ^^^^ definition [..] Opus#MyThing#BadCommand#GetThing#call().
      x = 1
-#    ^ definition local 1~#3018949801
+#    ^ definition local 1$3018949801
      y = x
-#    ^ definition local 2~#3018949801
-#    ^^^^^ reference local 2~#3018949801
-#        ^ reference local 1~#3018949801
+#    ^ definition local 2$3018949801
+#    ^^^^^ reference local 2$3018949801
+#        ^ reference local 1$3018949801
    end
  end
  
@@ -54,11 +54,11 @@
    def self.call()
 #           ^^^^ definition [..] NotOpus#Command1#`<Class:GetThing>`#call().
      x = 1
-#    ^ definition local 1~#3018949801
+#    ^ definition local 1$3018949801
      y = x
-#    ^ definition local 2~#3018949801
-#    ^^^^^ reference local 2~#3018949801
-#        ^ reference local 1~#3018949801
+#    ^ definition local 2$3018949801
+#    ^^^^^ reference local 2$3018949801
+#        ^ reference local 1$3018949801
    end
  end
  
@@ -70,11 +70,11 @@
    def call()
 #      ^^^^ definition [..] NotOpus#Command2#GetThing#call().
      x = 1
-#    ^ definition local 1~#3018949801
+#    ^ definition local 1$3018949801
      y = x
-#    ^ definition local 2~#3018949801
-#    ^^^^^ reference local 2~#3018949801
-#        ^ reference local 1~#3018949801
+#    ^ definition local 2$3018949801
+#    ^^^^^ reference local 2$3018949801
+#        ^ reference local 1$3018949801
    end
  end
  

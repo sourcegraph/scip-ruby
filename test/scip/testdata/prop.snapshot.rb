@@ -21,7 +21,7 @@
 #                     ^ reference [..] T#
 #                       ^^^^^^ reference [..] `<Class:T>`#unsafe().
 #                                    ^ reference [..] T#
-#                                    ^^^^^^^^^^^^^^^^^ definition local 1~#1867563647
+#                                    ^^^^^^^^^^^^^^^^^ definition local 1$1867563647
 #                                      ^^^^^^^ reference [..] `<Class:T>`#nilable().
 #                                              ^^^^^^ reference [..] String#
      sig {params(arg0: String).returns(String)}
@@ -29,7 +29,7 @@
 #                                      ^^^^^^ reference [..] String#
      def foo2=(arg0); T.cast(nil, String); end
 #        ^^^^^ definition [..] SomeODM#`foo2=`().
-#                                 ^^^^^^ definition local 1~#2116144614
+#                                 ^^^^^^ definition local 1$2116144614
 #                                 ^^^^^^ reference [..] String#
  end
  
