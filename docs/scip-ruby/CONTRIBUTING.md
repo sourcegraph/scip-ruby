@@ -364,7 +364,6 @@ This will correctly use the `scip-ruby/master` branch as the target.
 
 1. Add release notes to the [CHANGELOG](/CHANGELOG.md).
 2. Bump `scip_ruby_version` in `SCIPIndexer.cc`.
-3. Bump the release version in `Dockerfile.autoindex`.
 
 Run the release script:
 
