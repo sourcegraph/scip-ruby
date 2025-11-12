@@ -52,7 +52,9 @@ load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
 
 llvm_toolchain(
     name = "llvm_toolchain_15_0_6",
-    absolute_paths = True,
+    # absolute_paths = False (the default) creates symlinks for tools like
+    # llvm-libtool-darwin -> libtool in the toolchain bin directory, which is
+    # required for proper tool resolution on macOS.
     alternative_llvm_sources = [
         "https://github.com/llvm/llvm-project/releases/download/llvmorg-{llvm_version}/{basename}",
     ],

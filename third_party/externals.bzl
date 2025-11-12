@@ -191,21 +191,11 @@ def register_sorbet_dependencies():
         urls = ["https://github.com/bazelbuild/rules_cc/archive/refs/tags/0.2.14.tar.gz"],
     )
 
-    # TODO(jez) We keep our changes on the `sorbet` branch of `sorbet/bazel-toolchain`
-    # The `master` branch is the commit of `bazel-contrib/toolchains_llvm` that we're based on
-    # In 2ddd7d791 (#7912) we upgraded the toolchain. Our old toolchain patches are on the `sorbet-old-toolchain` branch
-    #
-    # You can use this version of `toolchains_llvm` when tinkering locally. You'll want to run `bazel clean --expunge`
-    # to ensure that your changes get picked up between builds.
-    # native.local_repository(
-    #     name = "toolchains_llvm",
-    #     path = "../bazel-toolchain",
-    # )
     http_archive(
         name = "toolchains_llvm",
-        url = "https://github.com/sorbet/bazel-toolchain/archive/3f912e338d79ea29ad35f20321f24d551d7d89ad.tar.gz",
-        sha256 = "4c998dc3f3b0c7b31a66aa4e262191b94da93cf31698eb6ac5a751267afbe26a",
-        strip_prefix = "bazel-toolchain-3f912e338d79ea29ad35f20321f24d551d7d89ad",
+        url = "https://github.com/bazel-contrib/toolchains_llvm/releases/download/v1.5.0/toolchains_llvm-v1.5.0.tar.gz",
+        sha256 = "49e69c011bcaa4c9a7246a287ab1fb4f7ed3fde7cbd7300374c1030f40d2bb95",
+        strip_prefix = "toolchains_llvm-v1.5.0",
     )
 
     http_archive(
