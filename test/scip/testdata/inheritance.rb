@@ -47,3 +47,7 @@ class Z4 < Z3
   end
 end
 
+Z5 = Object
+class Z6 < Z5
+end
+
