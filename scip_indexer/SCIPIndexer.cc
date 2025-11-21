@@ -477,7 +477,7 @@ public:
                                          ast::ExpressionPtr &constantLitExpr) {
         auto *expr = &constantLitExpr;
         while (auto *constantLit = ast::cast_tree<ast::ConstantLit>(*expr)) {
-            if (constantLit->symbol.exists() && constantLit->symbol.asClassOrModuleRef().exists()) {
+            if (constantLit->symbol.exists() && constantLit->symbol.isClassOrModule() && constantLit->symbol.asClassOrModuleRef().exists()) {
                 core::Context ctx(gs, constantLit->symbol, file);
                 auto status = this->saveReference(ctx, GenericSymbolRef::classOrModule(constantLit->symbol),
                                                   /*overrideType*/ std::nullopt, constantLit->loc, 0);
