@@ -2,8 +2,8 @@
  
  class X < T::Enum
 #      ^ definition [..] X#
-#      ^ definition [..] X#serialize().
 #          ^ reference [..] T#
+#             ^^^^ definition [..] X#serialize().
 #             ^^^^ reference [..] Module#public().
 #             ^^^^ reference [..] String#
 #             ^^^^ reference [..] T#Enum#

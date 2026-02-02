@@ -243,7 +243,10 @@ void TEnum::run(core::MutableContext ctx, ast::ClassDef *klass) {
         auto serializeReturnTypeClass = core::cast_type_nonnull<core::ClassType>(serializeReturnType);
         ast::ExpressionPtr return_type_ast = ast::MK::Constant(klass->declLoc, serializeReturnTypeClass.symbol);
         auto sig = ast::MK::Sig0(klass->declLoc, std::move(return_type_ast));
-        auto method = ast::MK::SyntheticMethod0(klass->loc, klass->declLoc, klass->name.loc(), core::Names::serialize(),
+        // Use zero-length location for the synthetic serialize() method name to avoid
+        // overlapping with the class name definition. Overlapping definitions cause
+        // issues in the Sourcegraph UI where Find References picks up the wrong symbol.
+        auto method = ast::MK::SyntheticMethod0(klass->loc, klass->declLoc, locZero, core::Names::serialize(),
                                                 ast::MK::RaiseTypedUnimplemented(klass->declLoc));
         ast::Send::ARGS_store nargs;
         ast::Send::Flags flags;
