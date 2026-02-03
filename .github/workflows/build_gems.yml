@@ -6,7 +6,7 @@ jobs:
     name: 'Build gem'
     strategy:
       matrix:
-        platform: ['ubuntu-22.04', 'macos-13']
+        platform: ['ubuntu-24.04', 'macos-14']
         config: ['asserts', 'release']
     runs-on: ${{ matrix.platform }}
     env:

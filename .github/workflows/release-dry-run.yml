@@ -13,8 +13,7 @@ jobs:
     name: 'Build and upload artifacts'
     strategy:
       matrix:
-        # Use macos-14 as macos-13 runner is only offered for x86_64
-        platform: ['ubuntu-22.04-32core-graph-team-amd64', 'macos-13-xlarge']
+        platform: ['ubuntu-24.04-32core-graph-team-amd64', 'macos-14-xlarge']
         config: ['asserts', 'release']
     runs-on: ${{ matrix.platform }}
     env:

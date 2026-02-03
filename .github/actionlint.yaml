@@ -1,4 +1,4 @@
 # Stop actionlint from triggering failures
 self-hosted-runner:
   labels:
-    - ubuntu-22.04-32core-graph-team-amd64
+    - ubuntu-24.04-32core-graph-team-amd64
