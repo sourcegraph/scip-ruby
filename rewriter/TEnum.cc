@@ -238,25 +238,11 @@ void TEnum::run(core::MutableContext ctx, ast::ClassDef *klass) {
             }
         }
     }
-    if (core::isa_type<core::ClassType>(serializeReturnType) && !serializeReturnType.isUntyped() &&
-        !serializeReturnType.isBottom()) {
-        auto serializeReturnTypeClass = core::cast_type_nonnull<core::ClassType>(serializeReturnType);
-        ast::ExpressionPtr return_type_ast = ast::MK::Constant(klass->declLoc, serializeReturnTypeClass.symbol);
-        auto sig = ast::MK::Sig0(klass->declLoc, std::move(return_type_ast));
-        // Use zero-length location for the synthetic serialize() method name to avoid
-        // overlapping with the class name definition. Overlapping definitions cause
-        // issues in the Sourcegraph UI where Find References picks up the wrong symbol.
-        auto method = ast::MK::SyntheticMethod0(klass->loc, klass->declLoc, locZero, core::Names::serialize(),
-                                                ast::MK::RaiseTypedUnimplemented(klass->declLoc));
-        ast::Send::ARGS_store nargs;
-        ast::Send::Flags flags;
-        flags.isPrivateOk = true;
-        auto visibility = ast::MK::Send(klass->declLoc, ast::MK::Self(klass->declLoc), core::Names::public_(),
-                                        klass->declLoc, 0, std::move(nargs), flags);
-
-        klass->rhs.emplace_back(std::move(visibility));
-        klass->rhs.emplace_back(std::move(sig));
-        klass->rhs.emplace_back(std::move(method));
-    }
+    // NOTE: We intentionally skip generating the synthetic serialize() method definition here.
+    // T::Enum provides serialize() but emitting a definition at the class declaration location
+    // causes overlapping definitions with the class itself, which breaks Find References in
+    // Sourcegraph UI. Since serialize() is a Sorbet stdlib method (not user-defined), omitting
+    // the definition is acceptable - users can still navigate via the class inheritance.
+    (void)serializeReturnType; // Silence unused variable warning
 }
 }; // namespace sorbet::rewriter
