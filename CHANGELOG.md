@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v0.4.8
+
+Fixes a bug where `T::Enum` classes emitted overlapping definitions
+for both the class and the synthetic `serialize()` method at the same
+source location.
+(https://github.com/sourcegraph/scip-ruby/pull/246)
+
 ## v0.4.7
 
 Changes the internal symbol structure for local variables
