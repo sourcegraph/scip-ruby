@@ -2,7 +2,10 @@
  
  class X < T::Enum
 #      ^ definition [..] X#
+#      ^ definition [..] X#serialize().
 #          ^ reference [..] T#
+#             ^^^^ reference [..] Module#public().
+#             ^^^^ reference [..] String#
 #             ^^^^ reference [..] T#Enum#
    enums do
      A = new("A")
@@ -21,7 +24,7 @@
 #  ^^^ definition [..] X#All.
 #               ^ reference [..] X#A.
 #                  ^ reference [..] X#B.
-#                         ^^^^^^^^ definition local 3$119448696
+#                         ^^^^^^^^ definition local 4$119448696
 #                               ^ reference [..] X#
  end
  
