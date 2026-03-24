@@ -288,7 +288,8 @@ private:
 
     absl::Status saveDefinitionImpl(const core::GlobalState &gs, core::FileRef file, const string &symbolString,
                                     core::Loc occLoc, const SmallVec<string> &docs,
-                                    const SmallVec<scip::Relationship> &rels) {
+                                    const SmallVec<scip::Relationship> &rels,
+                                    optional<core::Loc> enclosingLoc = nullopt) {
         ENFORCE(!symbolString.empty());
         occLoc = trimColonColonPrefix(gs, occLoc);
         auto range = sorbet::scip_indexer::fromSorbetLoc(gs, occLoc);
@@ -304,6 +305,12 @@ private:
         occurrence.set_symbol_roles(scip::SymbolRole::Definition);
         for (auto val : range) {
             occurrence.add_range(val);
+        }
+        if (enclosingLoc.has_value() && !enclosingLoc->empty()) {
+            auto encRange = sorbet::scip_indexer::fromSorbetLoc(gs, enclosingLoc.value());
+            for (auto val : encRange) {
+                occurrence.add_enclosing_range(val);
+            }
         }
         switch (emitted) {
             case Emitted::Now:
@@ -396,7 +403,8 @@ private:
     }
 
 public:
-    absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ, core::TypePtr type) {
+    absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ, core::TypePtr type,
+                                optional<core::Loc> enclosingLoc = nullopt) {
         if (this->cacheOccurrence(gs, file, occ, scip::SymbolRole::Definition)) {
             return absl::OkStatus();
         }
@@ -407,7 +415,7 @@ public:
             ENFORCE(var.has_value(), "Failed to find source text for definition of local variable");
             docStrings.push_back(fmt::format("```ruby\n{} ({})\n```", var.value(), type.show(gs)));
         }
-        return this->saveDefinitionImpl(gs, file, occ.toSCIPString(gs, file), loc, docStrings, {});
+        return this->saveDefinitionImpl(gs, file, occ.toSCIPString(gs, file), loc, docStrings, {}, enclosingLoc);
     }
 
     void saveAliasRelationship(const core::GlobalState &gs, UntypedGenericSymbolRef aliasedSymbol,
@@ -423,7 +431,8 @@ public:
     // TODO(varun): Should we always pass in the location instead of sometimes only?
     absl::Status saveDefinition(const core::GlobalState &gs, core::FileRef file, GenericSymbolRef symRef,
                                 optional<UntypedGenericSymbolRef> aliasedSymbol,
-                                optional<core::LocOffsets> loc = nullopt) {
+                                optional<core::LocOffsets> loc = nullopt,
+                                optional<core::Loc> enclosingLoc = nullopt) {
         // In practice, there doesn't seem to be any situation which triggers
         // a duplicate definition being emitted, so skip calling cacheOccurrence here.
         auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs);
@@ -452,7 +461,7 @@ public:
             this->saveAliasRelationship(gs, aliasedSymbol.value(), rels);
         }
 
-        return this->saveDefinitionImpl(gs, file, symbolString, occLoc, docs, rels);
+        return this->saveDefinitionImpl(gs, file, symbolString, occLoc, docs, rels, enclosingLoc);
     }
 
     absl::Status saveReference(const core::GlobalState &gs, core::FileRef file, OwnedLocal occ,
@@ -1491,7 +1500,8 @@ public:
 
         auto scipState = this->getSCIPState();
         auto sym = scip_indexer::GenericSymbolRef::classOrModule(klass.symbol);
-        auto status = scipState->saveDefinition(gs, file, sym, /*aliasedSymbol*/ nullopt, nameLoc);
+        auto klassLoc = core::Loc(file, klass.loc);
+        auto status = scipState->saveDefinition(gs, file, sym, /*aliasedSymbol*/ nullopt, nameLoc, klassLoc);
         ENFORCE(status.ok());
         auto *expr = &klass.name;
         if (auto *constantLit = ast::cast_tree<ast::ConstantLit>(*expr)) {
@@ -1513,9 +1523,10 @@ public:
             return;
         }
         auto scipState = this->getSCIPState();
+        auto methodLoc = core::Loc(file, methodDef.loc);
         if (methodDef.name != core::Names::staticInit()) {
             auto sym = scip_indexer::GenericSymbolRef::method(methodDef.symbol);
-            auto status = scipState->saveDefinition(gs, file, sym, /*aliasedSymbol*/ nullopt);
+            auto status = scipState->saveDefinition(gs, file, sym, /*aliasedSymbol*/ nullopt, /*loc*/ nullopt, methodLoc);
             ENFORCE(status.ok());
         }
 

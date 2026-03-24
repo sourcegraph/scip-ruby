@@ -3,6 +3,7 @@
  # T.must, T.assert_type!, T.absurd, T.bind. Other T.* operations
  # (T.let, T.cast, T.unsafe, T.reveal_type) are already covered elsewhere.
  
+#⌄ enclosing_range_start [..] Container#
  class Container
 #      ^^^^^^^^^ definition [..] Container#
    extend T::Sig
@@ -11,6 +12,7 @@
    sig { params(x: T.nilable(String)).returns(Integer) }
 #                            ^^^^^^ reference [..] String#
 #                                             ^^^^^^^ reference [..] Integer#
+#  ⌄ enclosing_range_start [..] Container#use_must().
    def use_must(x)
 #      ^^^^^^^^ definition [..] Container#use_must().
 #               ^ definition local 1$2138952860
@@ -20,9 +22,11 @@
 #           ^ reference local 1$2138952860
 #              ^^^^^^ reference [..] String#length().
    end
+#    ⌃ enclosing_range_end [..] Container#use_must().
  
    sig { params(x: T.untyped).returns(Integer) }
 #                                     ^^^^^^^ reference [..] Integer#
+#  ⌄ enclosing_range_start [..] Container#use_assert_type().
    def use_assert_type(x)
 #      ^^^^^^^^^^^^^^^ definition [..] Container#use_assert_type().
 #                      ^ definition local 1$3012239264
@@ -33,6 +37,7 @@
      x + 1
 #    ^ reference local 1$3012239264
    end
+#    ⌃ enclosing_range_end [..] Container#use_assert_type().
  
    Variant = T.type_alias { T.any(Integer, String) }
 #  ^^^^^^^ definition [..] Container#Variant.
@@ -42,6 +47,7 @@
    sig { params(x: Variant).returns(Integer) }
 #                  ^^^^^^^ reference [..] Container#Variant.
 #                                   ^^^^^^^ reference [..] Integer#
+#  ⌄ enclosing_range_start [..] Container#use_absurd().
    def use_absurd(x)
 #      ^^^^^^^^^^ definition [..] Container#use_absurd().
 #                 ^ definition local 1$4004738816
@@ -59,8 +65,10 @@
        T.absurd(x)
      end
    end
+#    ⌃ enclosing_range_end [..] Container#use_absurd().
  
    sig { returns(T.proc.void) }
+#  ⌄ enclosing_range_start [..] Container#use_bind().
    def use_bind
 #      ^^^^^^^^ definition [..] Container#use_bind().
      proc do
@@ -74,4 +82,6 @@
        nil
      end
    end
+#    ⌃ enclosing_range_end [..] Container#use_bind().
  end
+#  ⌃ enclosing_range_end [..] Container#

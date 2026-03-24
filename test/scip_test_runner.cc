@@ -330,6 +330,11 @@ struct FormatOptions {
     bool showDocs;
 };
 
+struct EnclosingMarker {
+    SCIPRange range;
+    string symbol;
+};
+
 void formatSnapshot(const scip::Document &document, FormatOptions options, std::ostream &out) {
     UnorderedMap<string, scip::SymbolInformation> symbolTable{};
     symbolTable.reserve(document.symbols_size());
@@ -351,6 +356,29 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
                                             {"ruby latest", "[..]"},                          // core and stdlib
                                             {"_global_ latest", "[global]"}});
     };
+    UnorderedMap<int32_t, vector<EnclosingMarker>> enclosingByStartLine{};
+    UnorderedMap<int32_t, vector<EnclosingMarker>> enclosingByEndLine{};
+    for (auto &occ : occurrences) {
+        if (occ.enclosing_range_size() == 0) {
+            continue;
+        }
+        EnclosingMarker marker{SCIPRange(occ.enclosing_range()), occ.symbol()};
+        enclosingByStartLine[marker.range.start.line].push_back(marker);
+        enclosingByEndLine[marker.range.end.line].push_back(marker);
+    }
+    for (auto &entry : enclosingByStartLine) {
+        fast_sort(entry.second, [](const EnclosingMarker &a, const EnclosingMarker &b) -> bool {
+            return a.range.start.column != b.range.start.column ? a.range.start.column < b.range.start.column
+                                                               : a.symbol < b.symbol;
+        });
+    }
+    for (auto &entry : enclosingByEndLine) {
+        fast_sort(entry.second, [](const EnclosingMarker &a, const EnclosingMarker &b) -> bool {
+            return a.range.end.column != b.range.end.column ? a.range.end.column < b.range.end.column
+                                                           : a.symbol < b.symbol;
+        });
+    }
+
     size_t occ_i = 0;
     std::ifstream input(document.relative_path());
     ENFORCE(input.is_open(), "failed to open document to read source code");
@@ -359,6 +387,12 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
     for (string line; getline(input, line); lineNumber++) {
         if (!line.empty() && line.back() == '\r') {
             line.pop_back();
+        }
+        if (auto it = enclosingByStartLine.find(lineNumber); it != enclosingByStartLine.end()) {
+            for (auto &marker : it->second) {
+                out << '#' << string(marker.range.start.column - 1, ' ') << "⌄ enclosing_range_start "
+                    << formatSymbol(marker.symbol) << '\n';
+            }
         }
         out << ' '; // For '#'
         out << absl::StrReplaceAll(line, {{"\t", " "}});
@@ -438,6 +472,12 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
                     }
                 }
                 out << '\n';
+            }
+        }
+        if (auto it = enclosingByEndLine.find(lineNumber); it != enclosingByEndLine.end()) {
+            for (auto &marker : it->second) {
+                out << '#' << string(marker.range.end.column >= 2 ? marker.range.end.column - 2 : 0, ' ')
+                    << "⌃ enclosing_range_end " << formatSymbol(marker.symbol) << '\n';
             }
         }
     }

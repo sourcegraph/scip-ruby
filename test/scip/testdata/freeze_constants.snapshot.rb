@@ -27,6 +27,7 @@
 #| ```
 #         ^ reference [..] X.
  
+#⌄ enclosing_range_start [..] M#
  module M
 #       ^ definition [..] M#
 #       documentation
@@ -53,3 +54,4 @@
 #  | ```
 #           ^ reference [..] X.
  end
+#  ⌃ enclosing_range_end [..] M#

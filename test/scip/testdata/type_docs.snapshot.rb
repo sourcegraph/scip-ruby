@@ -1,6 +1,7 @@
  # typed: true
  # options: showDocs
  
+#⌄ enclosing_range_start [..] M#
  module M
 #       ^ definition [..] M#
 #       documentation
@@ -13,6 +14,7 @@
 #                  ^^^^^^^ reference [..] Integer#
 #                              ^^^^^^ reference [..] String#
 #                                              ^^^^^^ reference [..] String#
+#  ⌄ enclosing_range_start [..] M#js_add().
    def js_add(x, y)
 #      ^^^^^^ definition [..] M#js_add().
 #      documentation
@@ -54,4 +56,6 @@
 #    | return ret (T.noreturn)
 #    | ```
    end
+#    ⌃ enclosing_range_end [..] M#js_add().
  end
+#  ⌃ enclosing_range_end [..] M#

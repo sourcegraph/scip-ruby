@@ -2,6 +2,7 @@
  # options: showDocs
  
  # Class doc comment
+#⌄ enclosing_range_start [..] C1#
  class C1
 #      ^^ definition [..] C1#
 #      documentation
@@ -13,6 +14,7 @@
    extend T::Sig
 #  ^^^^^^ reference [..] Kernel#extend().
  
+#  ⌄ enclosing_range_start [..] C1#m1().
    def m1
 #      ^^ definition [..] C1#m1().
 #      documentation
@@ -21,9 +23,11 @@
 #      | def m1
 #      | ```
    end
+#    ⌃ enclosing_range_end [..] C1#m1().
  
    sig { returns(T::Boolean) }
 #                   ^^^^^^^ reference [..] T#Boolean.
+#  ⌄ enclosing_range_start [..] C1#m2().
    def m2
 #      ^^ definition [..] C1#m2().
 #      documentation
@@ -33,10 +37,12 @@
 #      | ```
      true
    end
+#    ⌃ enclosing_range_end [..] C1#m2().
  
    sig { params(C, T::Boolean).returns(T::Boolean) }
 #                     ^^^^^^^ reference [..] T#Boolean.
 #                                         ^^^^^^^ reference [..] T#Boolean.
+#  ⌄ enclosing_range_start [..] C1#m3().
    def m3(c, b)
 #      ^^ definition [..] C1#m3().
 #      documentation
@@ -58,9 +64,11 @@
 #    ^ reference local 1$2519626513
 #            ^ reference local 2$2519626513
    end
+#    ⌃ enclosing_range_end [..] C1#m3().
  
    # _This_ is a
    # **doc comment.**
+#  ⌄ enclosing_range_start [..] C1#m4().
    def m4(xs)
 #      ^^ definition [..] C1#m4().
 #      documentation
@@ -79,11 +87,13 @@
      xs[0]
 #    ^^ reference local 1$2536404132
    end
+#    ⌃ enclosing_range_end [..] C1#m4().
  
    # Yet another..
    # ...doc comment
    sig { returns(T::Boolean) }
 #                   ^^^^^^^ reference [..] T#Boolean.
+#  ⌄ enclosing_range_start [..] C1#m5().
    def m5
 #      ^^ definition [..] C1#m5().
 #      documentation
@@ -96,12 +106,14 @@
 #      | ...doc comment
      true
    end
+#    ⌃ enclosing_range_end [..] C1#m5().
  
    # And...
    # ...one more doc comment
    sig { params(C, T::Boolean).returns(T::Boolean) }
 #                     ^^^^^^^ reference [..] T#Boolean.
 #                                         ^^^^^^^ reference [..] T#Boolean.
+#  ⌄ enclosing_range_start [..] C1#m6().
    def m6(c, b)
 #      ^^ definition [..] C1#m6().
 #      documentation
@@ -126,8 +138,11 @@
 #    ^ reference local 1$2569959370
 #            ^ reference local 2$2569959370
    end
+#    ⌃ enclosing_range_end [..] C1#m6().
  end
+#  ⌃ enclosing_range_end [..] C1#
  
+#⌄ enclosing_range_start [..] C2#
  class C2 # undocumented class
 #      ^^ definition [..] C2#
 #      documentation
@@ -135,10 +150,12 @@
 #      | class C2
 #      | ```
  end
+#  ⌃ enclosing_range_end [..] C2#
  
  # Module doc comment
  #
  # Some stuff
+#⌄ enclosing_range_start [..] M1#
  module M1
 #       ^^ definition [..] M1#
 #       documentation
@@ -150,6 +167,7 @@
 #       | 
 #       | Some stuff
    # This class is nested inside M1
+#  ⌄ enclosing_range_start [..] M1#C3#
    class C3
 #        ^^ definition [..] M1#C3#
 #        documentation
@@ -159,8 +177,10 @@
 #        documentation
 #        | This class is nested inside M1
    end
+#    ⌃ enclosing_range_end [..] M1#C3#
  
    # This module is nested inside M1
+#  ⌄ enclosing_range_start [..] M1#M2#
    module M2
 #         ^^ definition [..] M1#M2#
 #         documentation
@@ -175,6 +195,7 @@
      # This method is inside M1::M2
      sig { returns(T::Boolean) }
 #                     ^^^^^^^ reference [..] T#Boolean.
+#    ⌄ enclosing_range_start [..] M1#M2#n1().
      def n1
 #        ^^ definition [..] M1#M2#n1().
 #        documentation
@@ -186,8 +207,10 @@
 #        | This method is inside M1::M2
        true
      end
+#      ⌃ enclosing_range_end [..] M1#M2#n1().
  
      # This method is also inside M1::M2
+#    ⌄ enclosing_range_start [..] M1#M2#n2().
      def n2
 #        ^^ definition [..] M1#M2#n2().
 #        documentation
@@ -198,10 +221,14 @@
 #        documentation
 #        | This method is also inside M1::M2
      end
+#      ⌃ enclosing_range_end [..] M1#M2#n2().
    end
+#    ⌃ enclosing_range_end [..] M1#M2#
  end
+#  ⌃ enclosing_range_end [..] M1#
  
  # This is a global function
+#⌄ enclosing_range_start [..] Object#f1().
  def f1
 #    ^^ definition [..] Object#f1().
 #    documentation
@@ -218,12 +245,14 @@
 #  ^^ reference [..] M1#
 #      ^^ reference [..] M1#M2#
  end
+#  ⌃ enclosing_range_end [..] Object#f1().
  
  # Yet another global function
  sig { returns(T::Integer) }
 #^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #      ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #              ^ reference [..] T#
+#⌄ enclosing_range_start [..] Object#f2().
  def f2
 #    ^^ definition [..] Object#f2().
 #    documentation
@@ -235,7 +264,9 @@
 #    | Yet another global function
    return 10
  end
+#  ⌃ enclosing_range_end [..] Object#f2().
  
+#⌄ enclosing_range_start [..] Object#f3().
  def f3 # undocumented global function
 #    ^^ definition [..] Object#f3().
 #    documentation
@@ -244,6 +275,7 @@
 #    | def f3
 #    | ```
  end
+#  ⌃ enclosing_range_end [..] Object#f3().
  
  extend T::Sig
 #^^^^^^ reference [..] Kernel#extend().
@@ -254,6 +286,7 @@
 #^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
 #      ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #              ^ reference [..] T#
+#⌄ enclosing_range_start [..] Object#f4().
  def f4 # another undocumented global function
 #    ^^ definition [..] Object#f4().
 #    documentation
@@ -263,8 +296,10 @@
 #    | ```
    return 10
  end
+#  ⌃ enclosing_range_end [..] Object#f4().
  
  # Parent class
+#⌄ enclosing_range_start [..] K1#
  class K1
 #      ^^ definition [..] K1#
 #      documentation
@@ -274,6 +309,7 @@
 #      documentation
 #      | Parent class
    # sets @x and @@y
+#  ⌄ enclosing_range_start [..] K1#p1().
    def p1
 #      ^^ definition [..] K1#p1().
 #      documentation
@@ -297,8 +333,10 @@
 #    | @@y (Integer(10))
 #    | ```
    end
+#    ⌃ enclosing_range_end [..] K1#p1().
  
    # lorem ipsum, you get it
+#  ⌄ enclosing_range_start [..] `<Class:K1>`#p2().
    def self.p2
 #           ^^ definition [..] `<Class:K1>`#p2().
 #           documentation
@@ -316,9 +354,12 @@
 #    | @z (Integer(10))
 #    | ```
    end
+#    ⌃ enclosing_range_end [..] `<Class:K1>`#p2().
  end
+#  ⌃ enclosing_range_end [..] K1#
  
  # Subclass
+#⌄ enclosing_range_start [..] K2#
  class K2 < K1
 #      ^^ definition [..] K2#
 #      documentation
@@ -339,6 +380,7 @@
 #  | doc comment on class var ooh
  
    # overrides K1's p1
+#  ⌄ enclosing_range_start [..] K2#p1().
    def p1
 #      ^^ definition [..] K2#p1().
 #      documentation
@@ -369,4 +411,6 @@
 #          | ```
 #          relation definition=[..] K1#`@x`.
    end
+#    ⌃ enclosing_range_end [..] K2#p1().
  end
+#  ⌃ enclosing_range_end [..] K2#
