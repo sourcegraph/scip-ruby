@@ -96,6 +96,23 @@ test_args=(
   --test_output=errors \
   "${test_args[@]}" || err=$?
 
+echo "+++ Running packaging tests"
+
+test_args=(
+  "//test/scip/packaging"
+  "-c" "opt"
+  "--config=forcedebug"
+  "--spawn_strategy=local"
+)
+
+./bazel test \
+  --experimental_generate_json_trace_profile \
+  --profile=_out_/profile_packaging_tests.json \
+  --experimental_execution_log_file=_out_/packaging_test.log \
+  --test_summary=terse \
+  --test_output=errors \
+  "${test_args[@]}" || err=$?
+
 if [ "$err" -ne 0 ]; then
   echo "--- annotating build result"
   failing_tests="$(mktemp)"

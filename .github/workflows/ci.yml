@@ -45,3 +45,5 @@ jobs:
         run: ./bazel test //test/scip --config=dbg
       - name: "🏋️‍♂️ Run repo tests"
         run: ./bazel test //test/scip/repos --config=dbg
+      - name: "🏋️‍♂️ Run packaging tests"
+        run: ./bazel test //test/scip/packaging --config=dbg

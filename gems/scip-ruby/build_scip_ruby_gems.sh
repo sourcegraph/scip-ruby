@@ -60,7 +60,11 @@ if [ "$(uname -s)" == "Darwin" ]; then
 
   # Darwin 22 ~ macOS 13 (Ventura) was released in late-2022.
   # We can publish older releases if someone asks for them.
-  DARWIN_VERSIONS=($DARWIN_VERSIONS)
+  if [ "${CURRENT_PLATFORM_GEM_OUT:-}" ]; then
+    DARWIN_VERSIONS=("$(uname -r | cut -d. -f1)")
+  else
+    DARWIN_VERSIONS=($DARWIN_VERSIONS)
+  fi
   for i in "${DARWIN_VERSIONS[@]}"; do
     sed -i.bak "s/Gem::Platform::CURRENT/'arm64-darwin-$i'/" "$GEMSPEC"
     "$GEM_EXE" build "$GEMSPEC"
@@ -72,4 +76,13 @@ fi
 
 popd
 
-mv out/*.gem "$OUT_DIR/"
+if [ "${CURRENT_PLATFORM_GEM_OUT:-}" ]; then
+  gems=(out/*.gem)
+  if [ "${#gems[@]}" -ne 1 ]; then
+    echo "Expected one current-platform gem, found ${#gems[@]}"
+    exit 1
+  fi
+  mv "${gems[0]}" "$CURRENT_PLATFORM_GEM_OUT"
+else
+  mv out/*.gem "$OUT_DIR/"
+fi
