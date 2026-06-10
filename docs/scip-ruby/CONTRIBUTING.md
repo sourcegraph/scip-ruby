@@ -44,8 +44,8 @@ see the [Design Decisions doc][].
 
 ## Configuring Ruby (optional)
 
-If you're going to be running the repository tests or building the
-scip-ruby gem locally, follow these steps before building stuff.
+If you're going to be building the scip-ruby gem locally, follow these steps
+before building stuff.
 
 ### macOS pre-requisites
 
@@ -180,19 +180,15 @@ Snapshot outputs can be easily updated:
 ./bazel test --config=dev //test/scip:update_alias
 ```
 
-Repo tests are kinda' broken right now; they're disabled
-in CI (see ci.yml), and may or may not work on your machine.
-
-If you want to run repo tests, first complete the
-[Configuring Ruby](#configuring-ruby-optional) steps.
-Then run the tests using:
+Repo tests index pinned OSS projects using the `scip-ruby` binary built from
+this checkout. Run them using:
 
 ```bash
-# If Ruby was installed via asdf (recommended to avoid dependency on system Ruby on macOS)
 ./bazel test //test/scip/repos --config=dev
 ```
 
-This may take a few minutes to run.
+These tests currently check that indexing succeeds and creates a non-empty
+`index.scip` file.
 
 ### Writing a new snapshot test
 
@@ -210,26 +206,20 @@ and follow the same structure.
 
 ### Writing a new repo test
 
-First, clone the repo using Sorbet locally
-and check if you can index it.
-Typically, the commands will be something like:
+First, add the project archive information to
+[`third_party/test_gem_data.bzl`](../../third_party/test_gem_data.bzl).
+The archive should be pinned to a specific version and checksum.
+
+Then check that the project can be indexed with the built binary. Typically,
+the command will look like:
 
 ```bash
-BUNDLE_WITH=sorbet bundle install
-
-# Replace srb binary with scip-ruby binary
-cp /path/to/scip-ruby "$(find . -name 'srb' -type f | head -n 1)"
-bundle exec srb --index-file index.scip --gem-metadata "name@version"
+./bazel build //main:scip-ruby --config=dev
+./bazel-bin/main/scip-ruby --index-file index.scip --gem-metadata "name@version"
 ```
 
-In case there are any type errors, create a patch and save it:
-```bash
-git diff > /path/to/test/scip/repos/name-version.patch
-```
-
-Once you're able to successfully index the code,
-modify the [scip_repos_test.bzl](test/scip/repos/scip_repos_test.bzl)
-file to include the relevant data.
+Once you're able to successfully index the code, run
+`./bazel test //test/scip/repos --config=dev`.
 
 ## Debugging
 

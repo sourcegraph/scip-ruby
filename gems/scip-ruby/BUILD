@@ -26,5 +26,9 @@ build_gems(
         "@platforms//os:linux": "linux",
         "@platforms//os:osx": "darwin",
     }),
+    llvm_libunwind = select({
+        "@platforms//os:osx": ["@llvm_toolchain_15_0_6_llvm//:lib/libunwind.1.0.dylib"],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:public"],
 )

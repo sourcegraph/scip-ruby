@@ -79,21 +79,11 @@ test_args=(
   --test_output=errors \
   "${test_args[@]}" || err=$?
 
-echo "--- Installing Ruby"
-
-if (! file /root/.asdf/installs/ruby/2.7.0) || (! asdf global ruby 2.7.0); then
-  rm -rf .asdf/shims
-  OPENSSL_CFLAGS=-Wno-error=implicit-function-declaration asdf install ruby
-  asdf global ruby 2.7.0
-fi
-
 echo "+++ Running repo tests"
 
 test_args=(
   "//test/scip/repos"
   "-c" "opt"
-  "--test_env" "PATH=${PATH}"
-  "--test_env" "HOME=${HOME}"
   "--config=forcedebug"
   "--spawn_strategy=local"
 )

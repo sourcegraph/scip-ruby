@@ -29,6 +29,16 @@ if [ ! -f "$EXTERNAL_GEM_EXE" ]; then
   exit 1
 fi
 
+if [ -n "${LLVM_LIBUNWIND:-}" ]; then
+  if [ ! -f "$LLVM_LIBUNWIND" ] && [[ "$LLVM_LIBUNWIND" == ../* ]]; then
+    LLVM_LIBUNWIND="../../external/${LLVM_LIBUNWIND#../}"
+  fi
+  case "$LLVM_LIBUNWIND" in
+    /*) ;;
+    *) LLVM_LIBUNWIND="$PWD/$LLVM_LIBUNWIND" ;;
+  esac
+fi
+
 GEM_EXE="$EXTERNAL_GEM_EXE"
 file "$GEM_EXE"
 
@@ -39,6 +49,15 @@ cat scip-ruby.template.gemspec \
   > "$GEMSPEC"
 
 if [ "$(uname -s)" == "Darwin" ]; then
+  if [ -z "${LLVM_LIBUNWIND:-}" ]; then
+    echo "Missing LLVM_LIBUNWIND for Darwin gem build"
+    exit 1
+  fi
+  cp -L "$LLVM_LIBUNWIND" native/libunwind.1.dylib
+  install_name_tool -add_rpath @executable_path native/scip-ruby
+  sed -i.bak "s|\['native/scip-ruby'\]|['native/scip-ruby', 'native/libunwind.1.dylib']|" "$GEMSPEC"
+  rm "$GEMSPEC.bak"
+
   # Darwin 22 ~ macOS 13 (Ventura) was released in late-2022.
   # We can publish older releases if someone asks for them.
   DARWIN_VERSIONS=($DARWIN_VERSIONS)

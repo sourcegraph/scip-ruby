@@ -1,41 +1,38 @@
 gem_build_info = [
-    # {
-    #     "repo_name": "brew",
-    # #     "kind": "self_sandboxing",
-    #     "archive_url": "https://github.com/Homebrew/brew/archive/refs/tags/3.5.9.zip",
-    #     "archive_sha256": "28a66005cc6f0f22a9a112ce84cedb833efe6926072dec2c68623195c008852f",
-    #     "ref": "3.5.9",
-    #     "strip_prefix": "brew-3.5.9",
-    #     "gem_subdir": "Library/Homebrew",
-    # #     "prep_cmd": """
-    # #         pushd Library/Homebrew \\
-    # #         && gem install bundler:1.17.3 \\
-    # #         && popd \\
-    # #         && ./bin/brew typecheck
-    # #         """,
-    # #     "run_cmd": """
-    # #         pushd Library/Homebrew \\
-    # #         && find . -name srb -type f -exec cp $${TEST_DIR}/$(location //main:scip-ruby) {} \\; \\
-    # #         && popd \\
-    # #         && ./bin/brew typecheck
-    # #         """,
-    # },
     {
         "repo_name": "shopify-api-ruby",
-        # "kind": "needs_sandboxing",
         "archive_url": "https://github.com/Shopify/shopify-api-ruby/archive/refs/tags/v11.1.0.zip",
         "archive_sha256": "95a209308d6479491ca282af66254bd6c4e1c5b6edb8e0409e2fe29424a51157",
         "ref": "v11.1.0",
         "strip_prefix": "shopify-api-ruby-11.1.0",
-        # "prep_cmd": """
-        #     bundle cache --all \\
-        #     && for p in $(locations //gems/scip-ruby); do cp $${TEST_DIR}/$$p vendor/cache/; done \\
-        #     """,
-        # "run_cmd": """
-        #     bundle install --local \\
-        #     && bundle exec scip-ruby --index-file index.scip --gem-metadata 'shopify-api-ruby@11.1.0' \\
-        #     && file index.scip
-        #     """,
         "gem_subdir": ".",
+        "gem_metadata": "shopify-api-ruby@11.1.0",
+    },
+    {
+        "repo_name": "discourse",
+        "archive_url": "https://github.com/discourse/discourse/archive/refs/tags/v3.2.0.zip",
+        "archive_sha256": "1c8900012c62cdbe2358129f7211c1038c28eada8ee97b1a50452db6319578d0",
+        "ref": "v3.2.0",
+        "strip_prefix": "discourse-3.2.0",
+        "gem_subdir": ".",
+        "gem_metadata": "discourse@3.2.0",
+    },
+    {
+        "repo_name": "faker",
+        "archive_url": "https://github.com/faker-ruby/faker/archive/refs/tags/v3.2.1.zip",
+        "archive_sha256": "19c56fdfc0a38d05b291620bee0ae35e441f88fbbb9af6dd6ff6441be3226590",
+        "ref": "v3.2.1",
+        "strip_prefix": "faker-3.2.1",
+        "gem_subdir": ".",
+        "gem_metadata": "faker@3.2.1",
+    },
+    {
+        "repo_name": "graphql-ruby",
+        "archive_url": "https://github.com/rmosolgo/graphql-ruby/archive/refs/tags/v2.0.24.zip",
+        "archive_sha256": "7ebd06d8040adc066a057c0ef4194a78c72055d0a92f36ae01c0c5552e2ad5f2",
+        "ref": "v2.0.24",
+        "strip_prefix": "graphql-ruby-2.0.24",
+        "gem_subdir": ".",
+        "gem_metadata": "graphql-ruby@2.0.24",
     },
 ]
