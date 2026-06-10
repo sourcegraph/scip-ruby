@@ -1,5 +1,6 @@
 sh_test(
     name = "packaged_gem_runs",
+    size = "medium",
     srcs = ["run_packaging_test.sh"],
     data = [
         "fixture/sample.rb",
@@ -13,7 +14,6 @@ sh_test(
         "SAMPLE_RB": "$(location fixture/sample.rb)",
         "SCIP_RUBY_GEM": "$(location //gems/scip-ruby:scip-ruby-current-platform)",
     },
-    size = "medium",
 )
 
 test_suite(

@@ -48,6 +48,7 @@ def _build_gems(ctx):
     version = ctx.attr._version[VersionProvider].version
     name = ctx.attr.gem_name
     os = ctx.attr.gem_target_os
+
     # Keep this list in step with macOS versions that should be able to install
     # the packaged gem through Bundler.
     darwin_versions = [22, 23, 24]

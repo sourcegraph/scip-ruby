@@ -9,15 +9,6 @@ gem_build_info = [
         "gem_metadata": "shopify-api-ruby@11.1.0",
     },
     {
-        "repo_name": "discourse",
-        "archive_url": "https://github.com/discourse/discourse/archive/refs/tags/v3.2.0.zip",
-        "archive_sha256": "1c8900012c62cdbe2358129f7211c1038c28eada8ee97b1a50452db6319578d0",
-        "ref": "v3.2.0",
-        "strip_prefix": "discourse-3.2.0",
-        "gem_subdir": ".",
-        "gem_metadata": "discourse@3.2.0",
-    },
-    {
         "repo_name": "faker",
         "archive_url": "https://github.com/faker-ruby/faker/archive/refs/tags/v3.2.1.zip",
         "archive_sha256": "19c56fdfc0a38d05b291620bee0ae35e441f88fbbb9af6dd6ff6441be3226590",
