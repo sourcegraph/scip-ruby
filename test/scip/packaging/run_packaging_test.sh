@@ -35,12 +35,9 @@ mkdir -p "$workdir/ruby" "$workdir/project/lib" "$workdir/project/vendor/cache"
 # Unpack the Ruby archive that the packaging test should use.
 tar -xzf "$RUBY_TGZ" -C "$workdir/ruby"
 
-# Find the unpacked Ruby directory, handling both supported archive layouts.
-ruby_root="$workdir/ruby"
-if [[ -d "$ruby_root/versions" ]]; then
-  ruby_root="$ruby_root/versions"
-fi
-ruby_root="$ruby_root/$(< "$RUBY_VERSION_FILE")"
+# Find the unpacked Ruby directory. The archive is expected to use one stable
+# directory layout no matter where the Ruby files originally came from.
+ruby_root="$workdir/ruby/versions/$(< "$RUBY_VERSION_FILE")"
 
 # Point to the Ruby and Bundler programs inside the unpacked Ruby copy.
 ruby_exe="$ruby_root/bin/ruby"
@@ -85,7 +82,12 @@ EOF
 
 # Install the packaged gem from the local cache, then run it against sample.rb.
 (
+  # Work inside the temporary project so Bundler sees the Gemfile created above.
   cd "$workdir/project"
+
+  # Keep all Ruby and Bundler state inside the temporary directory. This prevents
+  # the test from reading or writing gems, config files, or home-directory files
+  # from the machine running the test.
   export BUNDLE_APP_CONFIG="$workdir/bundle_app_config"
   export BUNDLE_DISABLE_SHARED_GEMS=true
   export BUNDLE_PATH="$workdir/bundle"
@@ -94,7 +96,12 @@ EOF
   export HOME="$workdir/home"
   export SORBET_SILENCE_DEV_MESSAGE=1
 
+  # Install only from vendor/cache so the test proves the packaged gem can be
+  # installed without fetching a different copy from the network.
   "$bundle_exe" install --local --quiet
+
+  # Run the installed command against a tiny Ruby file. If the executable, gem
+  # contents, or runtime dependencies are broken, this command should fail.
   "$bundle_exe" exec scip-ruby --index-file "$workdir/index.scip" --gem-metadata "packaging-test@0.0.0" lib/sample.rb
 )
 
