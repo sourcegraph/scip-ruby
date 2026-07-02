@@ -1,10 +1,13 @@
  # typed: true
  
+#⌄ enclosing_range_start [..] MyError#
  class MyError < StandardError
 #      ^^^^^^^ definition [..] MyError#
 #                ^^^^^^^^^^^^^ reference [..] StandardError#
  end
+#  ⌃ enclosing_range_end [..] MyError#
  
+#⌄ enclosing_range_start [..] Object#handle().
  def handle(e)
 #    ^^^^^^ definition [..] Object#handle().
 #           ^ definition local 1$780127187
@@ -14,7 +17,9 @@
 #         ^^^^^^^ reference [..] Kernel#inspect().
 #                 ^^^^ reference [..] Kernel#to_s().
  end
+#  ⌃ enclosing_range_end [..] Object#handle().
  
+#⌄ enclosing_range_start [..] Object#f().
  def f
 #    ^ definition [..] Object#f().
    begin
@@ -34,3 +39,4 @@
 #           ^^ reference local 4$3809224601
    end
  end
+#  ⌃ enclosing_range_end [..] Object#f().

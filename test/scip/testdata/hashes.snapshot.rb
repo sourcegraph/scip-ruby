@@ -1,5 +1,6 @@
  # typed: true
  
+#⌄ enclosing_range_start [..] Object#hashes().
  def hashes(h, k)
 #    ^^^^^^ definition [..] Object#hashes().
 #           ^ definition local 1$1685166589
@@ -15,3 +16,4 @@
 #         ^ reference local 1$1685166589
 #           ^^^ reference local 3$1685166589
  end
+#  ⌃ enclosing_range_end [..] Object#hashes().

@@ -1,23 +1,36 @@
  # typed: true
  
  # From Sorbet docs https://sorbet.org/docs/tstruct
+#⌄ enclosing_range_start [..] S#
+#⌄ enclosing_range_start [..] S#initialize().
  class S < T::Struct
 #      ^ definition [..] S#
 #      ^ definition [..] S#initialize().
 #          ^ reference [..] T#
 #             ^^^^^^ reference [..] T#Struct#
+#  ⌄ enclosing_range_start [..] S#`prop_i=`().
+#  ⌄ enclosing_range_start [..] S#prop_i().
    prop :prop_i, Integer
 #        ^^^^^^ definition [..] S#`prop_i=`().
 #        ^^^^^^ definition [..] S#prop_i().
 #                ^^^^^^^ reference [..] Integer#
+#                      ⌃ enclosing_range_end [..] S#`prop_i=`().
+#                      ⌃ enclosing_range_end [..] S#prop_i().
+#  ⌄ enclosing_range_start [..] S#const_s().
    const :const_s, T.nilable(String)
 #         ^^^^^^^ definition [..] S#const_s().
 #                            ^^^^^^ reference [..] String#
+#                                  ⌃ enclosing_range_end [..] S#const_s().
+#  ⌄ enclosing_range_start [..] S#const_f().
    const :const_f, Float, default: 0.5
 #         ^^^^^^^ definition [..] S#const_f().
 #                  ^^^^^ reference [..] Float#
+#                                    ⌃ enclosing_range_end [..] S#const_f().
  end
+#  ⌃ enclosing_range_end [..] S#
+#  ⌃ enclosing_range_end [..] S#initialize().
  
+#⌄ enclosing_range_start [..] Object#f().
  def f
 #    ^ definition [..] Object#f().
    s = S.new(prop_i: 3)
@@ -45,7 +58,14 @@
 #    ^^^^^^^^ reference [..] S#`prop_i=`().
    return
  end
+#  ⌃ enclosing_range_end [..] Object#f().
  
+#⌄ enclosing_range_start [..] POINT#
+#⌄ enclosing_range_start [..] POINT#
+#                    ⌄ enclosing_range_start [..] POINT#`x=`().
+#                    ⌄ enclosing_range_start [..] POINT#x().
+#                        ⌄ enclosing_range_start [..] POINT#`y=`().
+#                        ⌄ enclosing_range_start [..] POINT#y().
  POINT = Struct.new(:x, :y) do
 #^^^^^ reference [..] POINT#
 #^^^^^ definition [..] POINT#
@@ -56,14 +76,23 @@
 #                        ^ definition [..] POINT#`y=`().
 #                        ^ definition [..] POINT#y().
 #                        ^ reference [..] BasicObject#
+#                    ⌃ enclosing_range_end [..] POINT#`x=`().
+#                    ⌃ enclosing_range_end [..] POINT#x().
+#                        ⌃ enclosing_range_end [..] POINT#`y=`().
+#                        ⌃ enclosing_range_end [..] POINT#y().
+#  ⌄ enclosing_range_start [..] POINT#array().
    def array
 #      ^^^^^ definition [..] POINT#array().
      [x, y]
 #     ^ reference [..] POINT#x().
 #        ^ reference [..] POINT#y().
    end
+#    ⌃ enclosing_range_end [..] POINT#array().
  end
+#  ⌃ enclosing_range_end [..] POINT#
+#  ⌃ enclosing_range_end [..] POINT#
  
+#⌄ enclosing_range_start [..] Object#g().
  def g
 #    ^ definition [..] Object#g().
    p = POINT.new(0, 1)
@@ -80,3 +109,4 @@
 #         ^ reference [..] POINT#x().
    return
  end
+#  ⌃ enclosing_range_end [..] Object#g().
