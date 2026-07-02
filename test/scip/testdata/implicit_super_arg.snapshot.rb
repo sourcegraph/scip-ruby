@@ -18,12 +18,16 @@
  #     <statTemp>$6: Symbol(:<super>) = :<super>
  #     <returnMethodTemp>$2: T.untyped = <cfgAlias>$4: T.class_of(<Magic>).<call-with-block>(<self>: C, <statTemp>$6: Symbol(:<super>), <blk>: T.untyped, a: T.untyped, b: T.untyped)
  #     <finalReturn>: T.noreturn = return <returnMethodTemp>$2: T.untyped
+#⌄ enclosing_range_start [..] C#
  class C
 #      ^ definition [..] C#
+#  ⌄ enclosing_range_start [..] C#f().
    def f(a, b)
 #      ^ definition [..] C#f().
 #        ^ definition local 1$3809224601
 #           ^ definition local 2$3809224601
      super
    end
+#    ⌃ enclosing_range_end [..] C#f().
  end
+#  ⌃ enclosing_range_end [..] C#

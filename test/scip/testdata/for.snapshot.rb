@@ -1,5 +1,6 @@
  # typed: true
  
+#⌄ enclosing_range_start [..] Object#for_loop().
  def for_loop()
 #    ^^^^^^^^ definition [..] Object#for_loop().
    y = 0
@@ -23,3 +24,4 @@
    y
 #  ^ reference local 1$1120785331
  end
+#  ⌃ enclosing_range_end [..] Object#for_loop().

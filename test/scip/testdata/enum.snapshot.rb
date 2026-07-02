@@ -1,5 +1,7 @@
  # typed: strict
  
+#⌄ enclosing_range_start [..] X#
+#⌄ enclosing_range_start [..] X#serialize().
  class X < T::Enum
 #      ^ definition [..] X#
 #      ^ definition [..] X#serialize().
@@ -27,9 +29,12 @@
 #                         ^^^^^^^^ definition local 4$119448696
 #                               ^ reference [..] X#
  end
+#  ⌃ enclosing_range_end [..] X#
+#  ⌃ enclosing_range_end [..] X#serialize().
  
  # Adding more cases like this is not supported (c.f. isTEnum),
  # but let's at least add a test.
+#⌄ enclosing_range_start [..] Y#
  class Y < X
 #      ^ definition [..] Y#
 #          ^ reference [..] X#
@@ -44,7 +49,9 @@
 #        ^ reference [..] X#B.
    end
  end
+#  ⌃ enclosing_range_end [..] Y#
  
+#⌄ enclosing_range_start [..] Object#use_abc().
  def use_abc
 #    ^^^^^^^ definition [..] Object#use_abc().
    x = X::A
@@ -53,3 +60,4 @@
 #         ^ reference [..] X#A.
    return
  end
+#  ⌃ enclosing_range_end [..] Object#use_abc().

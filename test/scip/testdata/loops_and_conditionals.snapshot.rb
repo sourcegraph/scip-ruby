@@ -1,5 +1,6 @@
  # typed: true
  
+#⌄ enclosing_range_start [..] Object#if_elsif_else().
  def if_elsif_else()
 #    ^^^^^^^^^^^^^ definition [..] Object#if_elsif_else().
    x = 0
@@ -43,7 +44,9 @@
  
    return
  end
+#  ⌃ enclosing_range_end [..] Object#if_elsif_else().
  
+#⌄ enclosing_range_start [..] Object#unless().
  def unless()
 #    ^^^^^^ definition [..] Object#unless().
    z = 0
@@ -66,7 +69,9 @@
    end
    return
  end
+#  ⌃ enclosing_range_end [..] Object#unless().
  
+#⌄ enclosing_range_start [..] Object#case().
  def case(x, y)
 #    ^^^^ definition [..] Object#case().
 #         ^ definition local 1$2602907825
@@ -91,7 +96,9 @@
    end
    return
  end
+#  ⌃ enclosing_range_end [..] Object#case().
  
+#⌄ enclosing_range_start [..] Object#for().
  def for(xs)
 #    ^^^ definition [..] Object#for().
 #        ^^ definition local 1$2901640080
@@ -130,7 +137,9 @@
 #              ^^ reference [..] BasicObject#`==`().
    end
  end
+#  ⌃ enclosing_range_end [..] Object#for().
  
+#⌄ enclosing_range_start [..] Object#while().
  def while(xs)
 #    ^^^^^ definition [..] Object#while().
 #          ^^ definition local 1$231090382
@@ -173,7 +182,9 @@
 #              ^^ reference [..] BasicObject#`==`().
    end
  end
+#  ⌃ enclosing_range_end [..] Object#while().
  
+#⌄ enclosing_range_start [..] Object#until().
  def until(xs)
 #    ^^^^^ definition [..] Object#until().
 #          ^^ definition local 1$3132432719
@@ -216,7 +227,9 @@
 #              ^^ reference [..] BasicObject#`==`().
    end
  end
+#  ⌃ enclosing_range_end [..] Object#until().
  
+#⌄ enclosing_range_start [..] Object#flip_flop().
  def flip_flop(xs)
 #    ^^^^^^^^^ definition [..] Object#flip_flop().
 #              ^^ definition local 1$2191960030
@@ -233,3 +246,4 @@
 #         ^ reference local 2$2191960030
    end
  end
+#  ⌃ enclosing_range_end [..] Object#flip_flop().

@@ -1,6 +1,7 @@
  # typed: true
  # options: showDocs
  
+#⌄ enclosing_range_start [..] Object#assign_different_branches().
  def assign_different_branches(b)
 #    ^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] Object#assign_different_branches().
 #    documentation
@@ -30,7 +31,9 @@
    end
    return
  end
+#  ⌃ enclosing_range_end [..] Object#assign_different_branches().
  
+#⌄ enclosing_range_start [..] Object#change_different_branches().
  def change_different_branches(b)
 #    ^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] Object#change_different_branches().
 #    documentation
@@ -66,7 +69,9 @@
    end
    return
  end
+#  ⌃ enclosing_range_end [..] Object#change_different_branches().
  
+#⌄ enclosing_range_start [..] Object#loop_type_change().
  def loop_type_change(bs)
 #    ^^^^^^^^^^^^^^^^ definition [..] Object#loop_type_change().
 #    documentation
@@ -123,7 +128,9 @@
    end
    return
  end
+#  ⌃ enclosing_range_end [..] Object#loop_type_change().
  
+#⌄ enclosing_range_start [..] C#
  class C
 #      ^ definition [..] C#
 #      documentation
@@ -137,6 +144,7 @@
 #  | @k (T.untyped)
 #  | ```
  
+#  ⌄ enclosing_range_start [..] C#change_type().
    def change_type(b)
 #      ^^^^^^^^^^^ definition [..] C#change_type().
 #      documentation
@@ -205,8 +213,11 @@
 #      | ```
      end
    end
+#    ⌃ enclosing_range_end [..] C#change_type().
  end
+#  ⌃ enclosing_range_end [..] C#
  
+#⌄ enclosing_range_start [..] D#
  class D < C
 #      ^ definition [..] D#
 #      documentation
@@ -214,6 +225,7 @@
 #      | class D < C
 #      | ```
 #          ^ reference [..] C#
+#  ⌄ enclosing_range_start [..] D#change_type().
    def change_type(b)
 #      ^^^^^^^^^^^ definition [..] D#change_type().
 #      documentation
@@ -278,4 +290,6 @@
 #      relation definition=[..] C#`@k`.
      end
    end
+#    ⌃ enclosing_range_end [..] D#change_type().
  end
+#  ⌃ enclosing_range_end [..] D#

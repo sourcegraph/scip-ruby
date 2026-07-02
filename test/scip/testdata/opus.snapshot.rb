@@ -1,16 +1,20 @@
  # typed: true
  
+#⌄ enclosing_range_start [..] Opus#Base#
  class Opus::Base
 #      ^^^^ reference [..] Opus#
 #            ^^^^ definition [..] Opus#Base#
  end
+#  ⌃ enclosing_range_end [..] Opus#Base#
  
+#⌄ enclosing_range_start [..] Opus#Derived#
  class Opus::Derived < Opus::Base
 #      ^^^^ reference [..] Opus#
 #            ^^^^^^^ definition [..] Opus#Derived#
 #                      ^^^^ reference [..] Opus#
 #                            ^^^^ reference [..] Opus#Base#
  end
+#  ⌃ enclosing_range_end [..] Opus#Derived#
  
  TYPES = T.let({ derived: -> { Opus::Derived } }, T::Hash[Symbol, T.proc.returns(T.class_of(Opus::Base))])
 #^^^^^ definition [..] TYPES.
@@ -30,6 +34,7 @@
 #                                                                                                 ^^^^^^^ definition local 4$119448696
 #                                                                                                 ^^^^^^^^ reference [..] TYPES.
  
+#⌄ enclosing_range_start [..] ABC#
  module ABC
 #       ^^^ definition [..] ABC#
    TYPES_IN_MODULE = T.let({ derived: -> { Opus::Derived } }, T::Hash[Symbol, T.proc.returns(T.class_of(Opus::Base))])
@@ -44,7 +49,9 @@
 #                                                                                                             ^^^^^^^ definition local 4$119448696
 #                                                                                                             ^^^^^^^^ reference [..] ABC#TYPES_IN_MODULE.
  end
+#  ⌃ enclosing_range_end [..] ABC#
  
+#⌄ enclosing_range_start [..] Other#
  class Other
 #      ^^^^^ definition [..] Other#
    TYPES_IN_CLASS = T.let({ derived: -> { Opus::Derived } }, T::Hash[Symbol, T.proc.returns(T.class_of(Opus::Base))])
@@ -59,3 +66,4 @@
 #                                                                                                            ^^^^^^^ definition local 4$119448696
 #                                                                                                            ^^^^^^^^ reference [..] Other#TYPES_IN_CLASS.
  end
+#  ⌃ enclosing_range_end [..] Other#

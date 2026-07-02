@@ -1,5 +1,6 @@
  # typed: true
  
+#⌄ enclosing_range_start [..] Object#arrays().
  def arrays(a, i)
 #    ^^^^^^ definition [..] Object#arrays().
 #           ^ definition local 1$513334479
@@ -21,3 +22,4 @@
 #  ^ reference local 1$513334479
 #       ^ reference local 1$513334479
  end
+#  ⌃ enclosing_range_end [..] Object#arrays().

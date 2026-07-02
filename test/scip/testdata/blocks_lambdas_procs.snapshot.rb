@@ -1,5 +1,6 @@
  # typed: true
  
+#⌄ enclosing_range_start [..] Object#blk().
  def blk
 #    ^^^ definition [..] Object#blk().
    y = 0
@@ -21,7 +22,9 @@
 #         ^ reference local 3$1472469056
    end
  end
+#  ⌃ enclosing_range_end [..] Object#blk().
  
+#⌄ enclosing_range_start [..] Object#lam().
  def lam
 #    ^^^ definition [..] Object#lam().
    y = 0
@@ -81,7 +84,9 @@
 #  ^^ reference local 11$1499497673
 #     ^^^^ reference [..] Proc#call().
  end
+#  ⌃ enclosing_range_end [..] Object#lam().
  
+#⌄ enclosing_range_start [..] Object#prc().
  def prc
 #    ^^^ definition [..] Object#prc().
    y = 0
@@ -141,14 +146,18 @@
 #  ^^ reference local 11$1283111692
 #     ^^^^ reference [..] Proc#call().
  end
+#  ⌃ enclosing_range_end [..] Object#prc().
  
+#⌄ enclosing_range_start [..] Object#call_block().
  def call_block(&blk)
 #    ^^^^^^^^^^ definition [..] Object#call_block().
 #                ^^^ definition local 1$1487178087
    blk.call
 #  ^^^ reference local 1$1487178087
  end
+#  ⌃ enclosing_range_end [..] Object#call_block().
  
+#⌄ enclosing_range_start [..] Object#use_block_with_defaults().
  def use_block_with_defaults
 #    ^^^^^^^^^^^^^^^^^^^^^^^ definition [..] Object#use_block_with_defaults().
    call_block do |oops: nil|
@@ -161,3 +170,4 @@
 #                 ^^^^ definition local 2$4118119342
    end
  end
+#  ⌃ enclosing_range_end [..] Object#use_block_with_defaults().

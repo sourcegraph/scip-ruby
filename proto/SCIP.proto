@@ -400,6 +400,14 @@ message Occurrence {
   SyntaxKind syntax_kind = 5;
   // (optional) Diagnostics that have been reported for this specific range.
   repeated Diagnostic diagnostics = 6;
+  // (optional) Using the same encoding as the sibling `range` field, half-open
+  // source range of the nearest non-trivial enclosing AST node. This range must
+  // enclose the `range` field.
+  //
+  // For definition occurrences, the enclosing range should indicate the
+  // start/end bounds of the entire definition AST node, including
+  // documentation.
+  repeated int32 enclosing_range = 7;
 }
 
 // Represents a diagnostic, such as a compiler error or warning, which should be
