@@ -109,3 +109,12 @@
  end
 #  ⌃ enclosing_range_end [..] Z4#
  
+ Z5 = Object
+#^^ definition [..] Z5.
+#relation reference=[..] Object#
+#^^^^^^^^^^^ reference [..] Z5.
+#     ^^^^^^ reference [..] Object#
+ class Z6 < Z5
+#      ^^ definition [..] Z6#
+ end
+ 
