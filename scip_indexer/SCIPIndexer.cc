@@ -119,7 +119,12 @@ InlinedVector<int32_t, 4> fromSorbetLoc(const core::GlobalState &gs, core::Loc l
 }
 
 core::Loc trimColonColonPrefix(const core::GlobalState &gs, core::Loc baseLoc) {
-    ENFORCE(!baseLoc.empty());
+    // Sorbet can assign empty locations to synthesized AST nodes. There is no
+    // source prefix to trim in that case, and callers will skip emitting an
+    // occurrence because SCIP ranges must be non-empty.
+    if (!baseLoc.exists() || baseLoc.empty()) {
+        return baseLoc;
+    }
     auto source = baseLoc.source(gs);
     if (!source.has_value()) {
         return baseLoc;
@@ -291,6 +296,9 @@ private:
                                     const SmallVec<scip::Relationship> &rels,
                                     optional<core::Loc> enclosingLoc = nullopt) {
         ENFORCE(!symbolString.empty());
+        if (!occLoc.exists() || occLoc.empty()) {
+            return absl::OkStatus();
+        }
         occLoc = trimColonColonPrefix(gs, occLoc);
         auto range = sorbet::scip_indexer::fromSorbetLoc(gs, occLoc);
         if (range.size() == 4) {
@@ -328,7 +336,11 @@ private:
     void saveReferenceImpl(const core::GlobalState &gs, core::FileRef file, const string &symbolString,
                            const SmallVec<string> &overrideDocs, core::LocOffsets occLocOffsets, int32_t symbol_roles) {
         ENFORCE(!symbolString.empty());
-        auto occLoc = trimColonColonPrefix(gs, core::Loc(file, occLocOffsets));
+        auto occLoc = core::Loc(file, occLocOffsets);
+        if (!occLoc.exists() || occLoc.empty()) {
+            return;
+        }
+        occLoc = trimColonColonPrefix(gs, occLoc);
         scip::Occurrence occurrence;
         occurrence.set_symbol(symbolString);
         occurrence.set_symbol_roles(symbol_roles);
