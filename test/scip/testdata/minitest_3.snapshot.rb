@@ -31,6 +31,10 @@
 #                                   ^ definition local 2$416088458
  
      describe "d" do
+       # `before` inside `test_each` has a synthesized method name with an empty
+       # source location. The indexer should skip that definition occurrence.
+       before do
+       end
 #      ⌄ enclosing_range_start [..] Test#`<it 'b'>`().
        it "b" do
 #         ^^^ definition [..] Test#`<it 'b'>`().

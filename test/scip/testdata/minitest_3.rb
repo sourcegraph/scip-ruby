@@ -11,6 +11,10 @@ class Test
   test_each([[1,2], [3,4]]) do |(a,b)|
 
     describe "d" do
+      # `before` inside `test_each` has a synthesized method name with an empty
+      # source location. The indexer should skip that definition occurrence.
+      before do
+      end
       it "b" do
         T.reveal_type(a) # error: Revealed type: `Integer`
       end
