@@ -1,4 +1,4 @@
-load(":build_gems.bzl", "build_gems", "setup_standalone_ruby", "version")
+load(":build_gems.bzl", "build_current_platform_gem", "build_gems", "setup_standalone_ruby", "version")
 
 version(
     name = "version",
@@ -25,6 +25,27 @@ build_gems(
     gem_target_os = select({
         "@platforms//os:linux": "linux",
         "@platforms//os:osx": "darwin",
+    }),
+    llvm_libunwind = select({
+        "@platforms//os:osx": ["@llvm_toolchain_15_0_6_llvm//:lib/libunwind.1.0.dylib"],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+)
+
+build_current_platform_gem(
+    name = "scip-ruby-current-platform",
+    srcs = [
+        "bin/scip-ruby",
+        "scip-ruby.template.gemspec",
+    ],
+    gem_name = select({
+        "//tools/config:dbg": "scip-ruby-debug",
+        "//conditions:default": "scip-ruby",
+    }),
+    llvm_libunwind = select({
+        "@platforms//os:osx": ["@llvm_toolchain_15_0_6_llvm//:lib/libunwind.1.0.dylib"],
+        "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
 )

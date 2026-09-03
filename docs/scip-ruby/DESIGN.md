@@ -1,81 +1,56 @@
 # Design Decisions
 
+## Repo tests and packaging tests have separate jobs
+
+Repo tests and packaging tests intentionally cover different risks.
+
+Repo tests answer: "Can the indexer built from this checkout process real Ruby
+projects?" They use the built `scip-ruby` binary directly against pinned OSS
+projects.
+
+Packaging tests answer: "Can the packaged gem be installed and run the way a
+user would get it?" They install the built gem into a small temporary Ruby
+project and run `scip-ruby` from that installation.
+
+Keeping these tests separate makes each failure easier to understand. A repo
+test failure points at indexing behavior on a real project. A packaging test
+failure points at gem building, gem installation, Bundler setup, or the packaged
+launcher.
+
 ## Repo tests
 
 <!-- DEF NOTE[repo-test-structure] -->
 
-WARNING: Right now, the repo tests are broken/disabled,
-so this information is a bit inaccurate. We should fix
-this once the repo tests are fixed.
+Repo tests exercise `scip-ruby` against pinned, real-world OSS projects.
+They intentionally do not install the `scip-ruby` gem into those projects.
+Instead, each test:
 
-The repo tests have a couple of unusual things:
-#. Tests are broken up into 3 stages,
-   instead of being a simple script that does clone
-   + apply patch + invoke dev tool (`scip-ruby`).
-#. There is "manual" caching going on for the intermediate results
-   of these steps. The cache cannot be used in parallel; repo tests run serially.
+1. unpacks a pinned source archive into a fresh temporary directory,
+2. runs the `scip-ruby` binary built from this checkout,
+3. passes explicit gem metadata for the project, and
+4. checks that a non-empty `index.scip` file was created.
 
-I'll cover each of these one-by-one.
+This keeps the tests focused on whether the current indexer can process a
+real project. It avoids modifying third-party lockfiles, installing a freshly
+built gem through Bundler, or mutating a shared Ruby installation while the test
+runs.
 
-Some constraints to keep in mind while reading the sections below:
-#. We want to run tests using as close to "real-world" tools (such as Bundler)
-   as possible instead of trying to mimic what they do.
-#. We want to cache intermediate results as much as possible,
-   as many steps in Ruby installation + Gem installation are slow.
-#. Tests should hopefully run reasonably quickly, especially if you only
-   modify the indexer (most common situation).
-#. Tests should be isolated from each other. We don't one test to "install"
-   `scip-ruby` and have that be visible to another test.
+The current check is intentionally lightweight. 
 
-Before going into details about the caching, first let's cover
-an outline of the 3 stages.
-### 3 stages of repo tests
+## Packaging tests
 
-#. Create a standalone ruby installation: This is cached
-   and the installation is blown away.
-#. Test prep: This step involves installing the dependencies of the gem,
-   including any custom bundler version it may require.
-   The pristine toolchain from the first step is extracted
-   and we run `bundle cache`.
-   After this is done, the _entire_ Ruby toolchain is cached again
-   (because it will be have been modified by `bundle cache`).
-   The modified source tree is also cached (I tried `--frozen` earlier but
-   ran into some error with it that I didn't have time to look into).
-#. Index: This step reuses the two caches from the previous step,
-   applies a patch, copies the `scip-ruby` gem into the `vendor/cache`
-   directory, runs `bundle install --local` (so nothing should be
-   fetched from the internet). Now, everything is in a state which mostly
-   mimics what a user would have. Then we invoke `scip-ruby` normally.
+Packaging tests exercise the built `scip-ruby` gem, not just the built binary.
+They intentionally use a small fixture project instead of the pinned OSS
+projects used by repo tests. Each test:
 
-Intermediate results use tarballs for caching directory trees instead of copying
-directories because it seemed much simpler to deal with a tarball in Bazel.
+1. builds a gem for the current platform,
+2. creates a temporary Ruby project,
+3. installs that gem through Bundler from a local cache,
+4. runs the installed `scip-ruby` command against a sample Ruby file, and
+5. checks that a non-empty `index.scip` file was created.
 
-Why do we go through all this trouble to cache things "manually"?
-### Manual caching
-
-Here are some obstacles the caching system needs to overcome.
-
-* Ruby installation is [path-dependent](https://github.com/ruby/setup-ruby#using-self-hosted-runners).
-* Ruby installation is relatively slow as it builds everything from source:
-  it takes a few minutes even on a Macbook Pro.
-  Installing it per-test would be too time-consuming.
-
-These two factors together imply that we should cache a Ruby installation
-inside a stable directory, not a temporary test directory.
-
-Additionally, we only want one Ruby toolchain cache; to ensure test isolation,
-we run them in serial on the same directory (a GIL for the test suite).
-
-* We want to ensure reproducibility, and not mess with the global environment.
-
-To achieve this, we delete the toolchain directory at the start of a test,
-and restore it from the cache in the 'Test prep' step.
-
-### Bonus: Bundler weirdness
-
-If you run `bundle install --local` for a test gem X,
-after copying an updated `scip-ruby` gem (same version, new checksum)
-into X's `vendor/cache` directory,
-you would naively expect `bundle` to re-install the updated `scip-ruby` gem.
-(install = copy/setup stuff in toolchain-adjacent directories)
-But `bundle` doesn't actually do that. 🙈
+This keeps packaging coverage focused on the path users rely on when installing
+the gem: the gem file, its platform tag, its executable, its bundled binary, and
+the Ruby/Bundler environment around it. It avoids making every repo test also
+prove gem installation, which would make failures harder to diagnose and would
+slow down the real-project coverage.

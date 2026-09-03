@@ -79,21 +79,11 @@ test_args=(
   --test_output=errors \
   "${test_args[@]}" || err=$?
 
-echo "--- Installing Ruby"
-
-if (! file /root/.asdf/installs/ruby/2.7.0) || (! asdf global ruby 2.7.0); then
-  rm -rf .asdf/shims
-  OPENSSL_CFLAGS=-Wno-error=implicit-function-declaration asdf install ruby
-  asdf global ruby 2.7.0
-fi
-
 echo "+++ Running repo tests"
 
 test_args=(
   "//test/scip/repos"
   "-c" "opt"
-  "--test_env" "PATH=${PATH}"
-  "--test_env" "HOME=${HOME}"
   "--config=forcedebug"
   "--spawn_strategy=local"
 )
@@ -102,6 +92,23 @@ test_args=(
   --experimental_generate_json_trace_profile \
   --profile=_out_/profile_repo_tests.json \
   --experimental_execution_log_file=_out_/repo_test.log \
+  --test_summary=terse \
+  --test_output=errors \
+  "${test_args[@]}" || err=$?
+
+echo "+++ Running packaging tests"
+
+test_args=(
+  "//test/scip/packaging"
+  "-c" "opt"
+  "--config=forcedebug"
+  "--spawn_strategy=local"
+)
+
+./bazel test \
+  --experimental_generate_json_trace_profile \
+  --profile=_out_/profile_packaging_tests.json \
+  --experimental_execution_log_file=_out_/packaging_test.log \
   --test_summary=terse \
   --test_output=errors \
   "${test_args[@]}" || err=$?

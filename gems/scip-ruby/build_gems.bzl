@@ -48,7 +48,10 @@ def _build_gems(ctx):
     version = ctx.attr._version[VersionProvider].version
     name = ctx.attr.gem_name
     os = ctx.attr.gem_target_os
-    darwin_versions = [22, 23]
+
+    # Keep this list in step with macOS versions that should be able to install
+    # the packaged gem through Bundler.
+    darwin_versions = [22, 23, 24]
     if os == "darwin":
         outs = [
             "{}-{}-arm64-darwin-{}.gem".format(name, version, dv)
@@ -62,6 +65,13 @@ def _build_gems(ctx):
     for src in ctx.attr.srcs:
         inputs += src.files.to_list()
     inputs.append(ctx.file._scip_ruby_binary)
+    inputs += ctx.files.llvm_libunwind
+
+    llvm_libunwind = ""
+    if ctx.files.llvm_libunwind:
+        if len(ctx.files.llvm_libunwind) != 1:
+            fail("Expected one libunwind input")
+        llvm_libunwind = ctx.files.llvm_libunwind[0].short_path
 
     ctx.actions.run(
         outputs = output_files,
@@ -74,11 +84,53 @@ def _build_gems(ctx):
             "VERSION": version,
             "DARWIN_VERSIONS": " ".join([str(dv) for dv in darwin_versions]),
             "SCIP_RUBY_BINARY": ctx.file._scip_ruby_binary.path,
+            "LLVM_LIBUNWIND": llvm_libunwind,
             "OUT_DIR": output_files[0].dirname,
         },
     )
     runfiles = ctx.runfiles(files = output_files)
     return [DefaultInfo(files = depset(output_files), runfiles = runfiles)]
+
+# Build one gem for the same platform as the machine running this action.
+# This is useful for local packaging tests, where we want to install and run
+# the gem immediately instead of producing every release platform variant.
+def _build_current_platform_gem(ctx):
+    version = ctx.attr._version[VersionProvider].version
+    name = ctx.attr.gem_name
+    output_file = ctx.actions.declare_file("{}-{}-current-platform.gem".format(name, version))
+
+    inputs = ctx.attr._build_script.files.to_list()
+    for src in ctx.attr.srcs:
+        inputs += src.files.to_list()
+    inputs.append(ctx.file._scip_ruby_binary)
+    inputs += ctx.files.llvm_libunwind
+
+    llvm_libunwind = ""
+    if ctx.files.llvm_libunwind:
+        if len(ctx.files.llvm_libunwind) != 1:
+            fail("Expected one libunwind input")
+        llvm_libunwind = ctx.files.llvm_libunwind[0].short_path
+
+    ctx.actions.run(
+        outputs = [output_file],
+        inputs = inputs,
+        mnemonic = "BuildCurrentSCIPRubyGem",
+        executable = ctx.file._build_script,
+        # The macOS platform tag is chosen inside the build script from the
+        # machine running the action. Do not reuse this output across machines.
+        execution_requirements = {"no-cache": "1"},
+        env = {
+            "CURRENT_PLATFORM_GEM_OUT": output_file.path,
+            "DARWIN_VERSIONS": "current",
+            "EXTERNAL_GEM_EXE": ctx.var["EXTERNAL_GEM_EXE"],
+            "LLVM_LIBUNWIND": llvm_libunwind,
+            "NAME": name,
+            "OUT_DIR": output_file.dirname,
+            "SCIP_RUBY_BINARY": ctx.file._scip_ruby_binary.path,
+            "VERSION": version,
+        },
+    )
+    return [DefaultInfo(files = depset([output_file]), runfiles = ctx.runfiles(files = [output_file]))]
 
 build_gems = rule(
     implementation = _build_gems,
@@ -91,6 +143,20 @@ build_gems = rule(
         "_standalone_ruby_tgz": attr.label(default = "//gems/scip-ruby:standalone-ruby", allow_single_file = True),
         "gem_name": attr.string(),
         "gem_target_os": attr.string(),
+        "llvm_libunwind": attr.label_list(allow_files = True),
     },
     doc = "Builds gems for scip-ruby using 'gem build'.",
+)
+
+build_current_platform_gem = rule(
+    implementation = _build_current_platform_gem,
+    attrs = {
+        "_version": attr.label(default = ":version"),
+        "_build_script": attr.label(default = "build_scip_ruby_gems.sh", allow_single_file = True),
+        "srcs": attr.label_list(allow_files = True),
+        "_scip_ruby_binary": attr.label(default = "//main:scip-ruby", allow_single_file = True),
+        "gem_name": attr.string(),
+        "llvm_libunwind": attr.label_list(allow_files = True),
+    },
+    doc = "Builds the scip-ruby gem for the machine running the build.",
 )
