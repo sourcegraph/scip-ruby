@@ -424,19 +424,7 @@ For a source repo, cloning the repo and running `scip-ruby-autoindex` should do 
              ^
     2 errors generated.
     ```
-2. A release build (`--config=release-mac`) fails on Apple Silicon Macs,
-   which (I think) is related to this upstream
-   [jemalloc issue](https://github.com/jemalloc/jemalloc/issues/1997),
-   which is mentioned to be caused due to a QEMU bug. It manifests as an error:
-   ```txt
-   include/jemalloc/internal/rtree.h:118:3: error: constant expression evaluates to -12 which cannot be narrowed to type 'unsigned int' [-Wc++11-narrowing]
-      {RTREE_NSB, RTREE_NHIB + RTREE_NSB}
-       ^~~~~~~~~
-    include/jemalloc/internal/rtree.h:22:19: note: expanded from macro 'RTREE_NSB'
-      #define RTREE_NSB (LG_VADDR - RTREE_NLIB)
-                ^~~~~~~~~~~~~~~~~~~~~~~
-   ```
-3. Using Xcode 14 can trigger a build error inside the C++ toolchain config.
+2. Using Xcode 14 can trigger a build error inside the C++ toolchain config.
    ```text
    File "/private/var/tmp/_bazel_xyz/0eec049f96822615c65f9acc22fdf113/external/local_config_cc/cc_toolchain_config.bzl", line 45, column 25, in _can_use_deterministic_libtool
            if _compare_versions(xcode_version, _SUPPORTS_DETERMINISTIC_MODE) >= 0:
