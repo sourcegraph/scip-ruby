@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v0.4.8
+
+Adds enclosing ranges to SCIP class and method definition occurrences,
+allowing consumers to attribute references to their enclosing definitions.
+(https://github.com/sourcegraph/scip-ruby/pull/250)
+
+Fixes a crash when Sorbet assigns empty source locations to synthesized
+definitions, including Minitest `before` hooks inside `test_each`.
+(https://github.com/sourcegraph/scip-ruby/pull/254)
+
 ## v0.4.7
 
 Changes the internal symbol structure for local variables
