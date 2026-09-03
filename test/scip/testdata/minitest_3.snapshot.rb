@@ -31,6 +31,16 @@
 #                                   ^ definition local 2$416088458
  
      describe "d" do
+#      ⌄ enclosing_range_start [..] Test#`<before>`().
+       before do
+#      ^^^^^^ definition [..] Test#`<before>`().
+       end
+#        ⌃ enclosing_range_end [..] Test#`<before>`().
+#      ⌄ enclosing_range_start [..] Test#`<after>`().
+       after do
+#      ^^^^^ definition [..] Test#`<after>`().
+       end
+#        ⌃ enclosing_range_end [..] Test#`<after>`().
 #      ⌄ enclosing_range_start [..] Test#`<it 'b'>`().
        it "b" do
 #         ^^^ definition [..] Test#`<it 'b'>`().
