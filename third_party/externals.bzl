@@ -187,6 +187,11 @@ def register_sorbet_dependencies():
         url = "https://github.com/bazel-contrib/toolchains_llvm/releases/download/v1.5.0/toolchains_llvm-v1.5.0.tar.gz",
         sha256 = "49e69c011bcaa4c9a7246a287ab1fb4f7ed3fde7cbd7300374c1030f40d2bb95",
         strip_prefix = "toolchains_llvm-v1.5.0",
+        patches = [
+            # Backport of https://github.com/bazel-contrib/toolchains_llvm/pull/686;
+            # remove when upgrading to toolchains_llvm >= v1.7.0.
+            "@com_stripe_ruby_typer//third_party:toolchains_llvm/no_toolchain_lib_dir_on_macos.patch",
+        ],
     )
 
     http_archive(

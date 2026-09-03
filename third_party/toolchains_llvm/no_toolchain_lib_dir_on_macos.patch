@@ -1,0 +1,51 @@
+Backport of https://github.com/bazel-contrib/toolchains_llvm/pull/686
+(merged 2026-02-25, first released in toolchains_llvm v1.7.0).
+
+On macOS, the -L<toolchain>/lib link flag lets Apple's ld64 discover the
+toolchain's libunwind.1.dylib (via the libunwind re-export in the SDK's
+libc++abi.tbd) and bake it into binaries as @rpath/libunwind.1.dylib, which
+fails at runtime with "dyld: Library not loaded". This only shows up with
+--spawn_strategy=local, which our debugsymbols/backtracesymbols configs use.
+Drop this patch when upgrading toolchains_llvm to >= v1.7.0.
+
+diff --git toolchain/cc_toolchain_config.bzl toolchain/cc_toolchain_config.bzl
+--- toolchain/cc_toolchain_config.bzl
++++ toolchain/cc_toolchain_config.bzl
+@@ -287,19 +287,30 @@
+             # libc++abi, so static linking them becomes a problem. We need to
+             # ensure that they are dynamic linked from the system sysroot and
+             # not static linked from the toolchain, so explicitly have the
+-            # sysroot directory on the search path and then add the toolchain
+-            # directory back after we are done.
++            # sysroot directory on the search path.
++            #
++            # The toolchain lib directory is intentionally NOT added to the
++            # search path here. In sandboxed execution, the toolchain's lib/
++            # directory is empty (only declared outputs are present), so the
++            # previous -L flag was a harmless no-op. However, with
++            # --spawn_strategy=local, the full toolchain lib/ directory is
++            # visible to the linker, and ld64 discovers dylibs like
++            # libunwind.1.dylib via the -L search path. These get baked into
++            # the binary as LC_LOAD_DYLIB entries with @rpath install names
++            # that fail at runtime because the toolchain directory is not in
++            # the binary's @rpath search path.
++            #
++            # libunwind_link_flags is left empty on macOS because libunwind
++            # is unconditionally provided by libSystem.B.dylib (clang always
++            # passes -lSystem via Darwin.cpp). The toolchain's libunwind is
++            # redundant and its dylib causes the runtime failure described
++            # above, so the libunwind config flag has no effect on macOS.
+             link_flags.extend([
+                 "-L{}/usr/lib".format(sysroot_path),
+                 "-lc++",
+                 "-lc++abi",
+                 "-Bdynamic",
+-                "-L{}lib".format(toolchain_path_prefix),
+             ])
+-            libunwind_link_flags = [
+-                "-Bstatic",
+-                "-lunwind",
+-            ]
+ 
+     elif stdlib == "libc++":
+         cxx_flags = [
