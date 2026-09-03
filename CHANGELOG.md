@@ -7,8 +7,8 @@ allowing consumers to attribute references to their enclosing definitions.
 (https://github.com/sourcegraph/scip-ruby/pull/250)
 
 Fixes a crash when Sorbet assigns empty source locations to synthesized
-definitions, including Minitest `before` hooks inside `test_each`.
-(https://github.com/sourcegraph/scip-ruby/pull/254)
+definitions particularly with Minitest `before` hooks inside `test_each`.
+(https://github.com/sourcegraph/scip-ruby/pull/256)
 
 ## v0.4.7
 
