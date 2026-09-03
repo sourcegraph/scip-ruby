@@ -31,10 +31,15 @@ if ! git diff --quiet --cached; then
   exit 1
 fi
 
-if ! git remote -v | grep "origin" | grep -q "https://github.com/sourcegraph/scip-ruby.git"; then
-  echo "error: remote 'origin' doesn't point to sourcegraph/scip-ruby"
-  exit 1
-fi
+ORIGIN_PUSH_URL="$(git remote get-url --push origin 2>/dev/null || true)"
+case "$ORIGIN_PUSH_URL" in
+  https://github.com/sourcegraph/scip-ruby.git|git@github.com:sourcegraph/scip-ruby.git)
+    ;;
+  *)
+    echo "error: remote 'origin' doesn't point to sourcegraph/scip-ruby"
+    exit 1
+    ;;
+esac
 
 if ! git rev-parse --abbrev-ref HEAD | grep -q "scip-ruby/master"; then
   echo "error: Releases should be published from scip-ruby/master but HEAD is on a different branch" >&2
