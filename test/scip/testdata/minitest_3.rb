@@ -11,6 +11,10 @@ class Test
   test_each([[1,2], [3,4]]) do |(a,b)|
 
     describe "d" do
+      before do
+      end
+      after do
+      end
       it "b" do
         T.reveal_type(a) # error: Revealed type: `Integer`
       end

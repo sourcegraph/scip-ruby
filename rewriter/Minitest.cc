@@ -225,14 +225,14 @@ ast::ExpressionPtr runUnderEach(core::MutableContext ctx, core::NameRef eachName
             ((send->fun == core::Names::before() || send->fun == core::Names::after()) && send->numPosArgs() == 0 &&
              correctBlockArity)) {
             core::NameRef name;
-            auto arg0Loc = core::LocOffsets::none();
+            auto nameLoc = send->funLoc;
             if (send->fun == core::Names::before()) {
                 name = core::Names::beforeAngles();
             } else if (send->fun == core::Names::after()) {
                 name = core::Names::afterAngles();
             } else {
                 // we use this for the name of our test
-                arg0Loc = send->getPosArg(0).loc();
+                nameLoc = send->getPosArg(0).loc();
                 auto argString = to_s(ctx, send->getPosArg(0));
                 name = ctx.state.enterNameUTF8("<it '" + argString + "'>");
             }
@@ -266,7 +266,7 @@ ast::ExpressionPtr runUnderEach(core::MutableContext ctx, core::NameRef eachName
                                             send->loc.copyWithZeroLength(), move(blk));
             // put that into a method def named the appropriate thing
             auto declLoc = declLocForSendWithBlock(*send);
-            auto method = addSigVoid(ast::MK::SyntheticMethod0(send->loc, declLoc, arg0Loc, move(name), move(each)));
+            auto method = addSigVoid(ast::MK::SyntheticMethod0(send->loc, declLoc, nameLoc, move(name), move(each)));
             // add back any moved constants
             return constantMover.addConstantsToExpression(send->loc, move(method));
         } else if (send->fun == core::Names::describe() && send->numPosArgs() == 1 && correctBlockArity) {
