@@ -351,14 +351,13 @@ This will correctly use the `scip-ruby/master` branch as the target.
 
 ## Syncing Sorbet upstream
 
-1. Create a temporary branch and perform a merge. It doesn't matter
-   if the code compiles or not, only try to fix conflicts reasonably.
-   Do NOT modify existing commits/rewrite history here.
-2. Create a new commit updating the `scip_ruby_sync_upstream_sorbet_sha` value.
-3. If there are compilation/test failures, fix them in a single follow-up commit.
-   In total, we will have N+1 or N+2 commits in the PR, with N from Sorbet.
-4. Once tests are passing, temporarily turn on 'Allow merge commits' in the admin settings.
-   Merge the PR and turn off merging in the admin settings.
+Follow the [Sorbet synchronization runbook](./SYNCING_SORBET.md). It describes
+the commit-by-commit process, validation, progress tracking, and the requirement
+to stop before the first upstream commit that needs an indexer adaptation.
+
+Do not modify existing commits or rewrite the history of `scip-ruby/master`.
+Once a completed sync is passing, temporarily turn on "Allow merge commits" in
+the repository settings, merge the PR, and turn the setting off again.
 
 ## Cutting a release
 
