@@ -28,7 +28,9 @@ change. Never regenerate snapshots to conceal a regression. If correctness is
 uncertain, stop.
 
 Before stopping at an incompatible upstream commit, remove that commit from the
-sync branch and leave the worktree clean at the last successful commit. Report:
+sync branch, append an entry to
+[`docs/scip-ruby/SORBET_SYNC_BLOCKERS.md`](docs/scip-ruby/SORBET_SYNC_BLOCKERS.md),
+commit that documentation change, and leave the worktree clean. Report:
 
 - the last successfully incorporated upstream SHA
 - the incompatible upstream SHA, subject, and GitHub link

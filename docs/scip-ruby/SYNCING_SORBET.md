@@ -13,7 +13,9 @@ each newly incorporated Sorbet mainline commit. A run has two valid outcomes:
 1. It reaches the fixed target SHA, passes final validation, and updates
    `scip_ruby_sync_upstream_sorbet_sha`.
 2. It stops immediately before the first commit that requires an indexer
-   change, leaving a clean branch and a precise adaptation report.
+   change, records the blocker in
+   [`SORBET_SYNC_BLOCKERS.md`](./SORBET_SYNC_BLOCKERS.md), and leaves a clean
+   branch with a precise adaptation report.
 
 Never implement the required indexer adaptation as part of the discovery run.
 After that adaptation has been reviewed and implemented separately, start or
@@ -187,8 +189,13 @@ At the first commit requiring an indexer change:
    git reset --hard "$LAST_SAFE_SHA"
    ```
 
-5. Confirm there is no active cherry-pick and `git status --short` is empty.
-6. Record the incompatible SHA as the next unprocessed commit in the local state
+5. Append a complete entry to `docs/scip-ruby/SORBET_SYNC_BLOCKERS.md` using its
+   template. If that upstream SHA already has an entry, update it instead of
+   adding a duplicate.
+6. Commit only the blocker-log change with a message such as
+   `docs: record Sorbet sync blocker <short SHA>`.
+7. Confirm there is no active cherry-pick and `git status --short` is empty.
+8. Record the incompatible SHA as the next unprocessed commit in the local state
    file.
 
 The blocker report must include:
@@ -204,9 +211,13 @@ The blocker report must include:
 - unresolved design choices or uncertainty
 - confirmation that the incompatible commit is not on the branch and the
   worktree is clean
+- the blocker-log entry and its commit
 
 Report only the first incompatible commit. Later commits may depend on a design
 decision made while adapting to this one.
+
+When the indexer adaptation is later implemented, update the corresponding log
+entry to `Resolved` and link its pull request or commit in the resolution field.
 
 ## Finish a completed sync
 

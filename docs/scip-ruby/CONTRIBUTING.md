@@ -354,6 +354,8 @@ This will correctly use the `scip-ruby/master` branch as the target.
 Follow the [Sorbet synchronization runbook](./SYNCING_SORBET.md). It describes
 the commit-by-commit process, validation, progress tracking, and the requirement
 to stop before the first upstream commit that needs an indexer adaptation.
+Each such stop is recorded in the
+[Sorbet synchronization blocker log](./SORBET_SYNC_BLOCKERS.md).
 
 Do not modify existing commits or rewrite the history of `scip-ruby/master`.
 Once a completed sync is passing, temporarily turn on "Allow merge commits" in
