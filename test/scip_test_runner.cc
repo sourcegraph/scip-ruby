@@ -24,7 +24,6 @@
 #include "ast/treemap/treemap.h"
 #include "cfg/CFG.h"
 #include "cfg/builder/builder.h"
-#include "class_flatten/class_flatten.h"
 #include "common/FileOps.h"
 #include "common/common.h"
 #include "common/sort/sort.h"
@@ -225,16 +224,14 @@ TEST_CASE("GemInference") {
 // Based on a mix of pipeline_test_runner.cc and pipeline.cc
 class CFGCollectorAndTyper {
 public:
-    void postTransformClassDef(core::Context ctx, ast::ExpressionPtr &tree) {
-        auto &c = ast::cast_tree_nonnull<ast::ClassDef>(tree);
+    void postTransformClassDef(core::Context ctx, const ast::ClassDef &c) {
         for (auto &extension : ctx.state.semanticExtensions) {
             extension->typecheckClass(ctx, ctx.file, c);
         }
     }
 
     vector<unique_ptr<cfg::CFG>> cfgs;
-    void preTransformMethodDef(core::Context ctx, ast::ExpressionPtr &tree) {
-        auto &m = ast::cast_tree_nonnull<ast::MethodDef>(tree);
+    void preTransformMethodDef(core::Context ctx, const ast::MethodDef &m) {
 
         if (m.symbol.data(ctx)->flags.isOverloaded) {
             return;
@@ -244,7 +241,7 @@ public:
         cfg = infer::Inference::run(ctx.withOwner(symbol), move(cfg));
         if (cfg) {
             for (auto &extension : ctx.state.semanticExtensions) {
-                extension->typecheck(ctx, ctx.file, *cfg, m);
+                extension->typecheck(ctx, ctx.file, *cfg, &m);
             }
         }
         cfgs.push_back(move(cfg));
@@ -503,8 +500,7 @@ void updateSnapshots(const scip::Index &index, const TestSettings &settings, con
             FAIL(fmt::format("failed to open snapshot output file at {}", outputFilePath));
         }
         auto it = settings.formatOptions.find(doc.relative_path());
-        ENFORCE(it != settings.formatOptions.end(),
-                fmt::format("missing path {} as key in formatOptions map", doc.relative_path()));
+        ENFORCE(it != settings.formatOptions.end(), "missing path {} as key in formatOptions map", doc.relative_path());
         formatSnapshot(doc, it->second, out);
     }
 }
@@ -522,8 +518,7 @@ void compareSnapshots(const scip::Index &index, const TestSettings &settings,
 
         ostringstream out;
         auto it = settings.formatOptions.find(doc.relative_path());
-        ENFORCE(it != settings.formatOptions.end(),
-                fmt::format("missing path {} as key in formatOptions map", doc.relative_path()));
+        ENFORCE(it != settings.formatOptions.end(), "missing path {} as key in formatOptions map", doc.relative_path());
         formatSnapshot(doc, it->second, out);
         auto result = out.str();
 
@@ -567,7 +562,7 @@ void test_one_gem(Expectations &test, const TestSettings &settings) {
 
     gs.censorForSnapshotTests = true; // TODO(varun): Not 100% sure if this is needed?
     // TODO(varun): Should we add the no-stdlib branch here?
-    core::serialize::Serializer::loadGlobalState(gs, getNameTablePayload);
+    core::serialize::Serializer::loadGlobalState(gs, PAYLOAD_SYMBOL_TABLE, PAYLOAD_NAME_TABLE, PAYLOAD_FILE_TABLE);
 
     vector<core::FileRef> files;
     {
@@ -609,7 +604,7 @@ void test_one_gem(Expectations &test, const TestSettings &settings) {
             auto settings = parser::Parser::Settings{};
             auto ast = parser::Parser::run(gs, file, settings);
             sorbet::core::MutableContext ctx(gs, core::Symbols::root(), file);
-            auto tree = ast::ParsedFile{ast::desugar::node2Tree(ctx, move(ast)), file};
+            auto tree = ast::ParsedFile{ast::desugar::node2Tree(ctx, move(ast.tree)), file};
             tree.tree = rewriter::Rewriter::run(ctx, move(tree.tree));
             tree = local_vars::LocalVars::run(ctx, move(tree));
             trees.emplace_back(move(tree));
@@ -627,9 +622,8 @@ void test_one_gem(Expectations &test, const TestSettings &settings) {
         }
         for (auto &resolvedTree : trees) {
             sorbet::core::MutableContext ctx(gs, core::Symbols::root(), resolvedTree.file);
-            resolvedTree = class_flatten::runOne(ctx, move(resolvedTree));
             CFGCollectorAndTyper collector;
-            ast::ShallowWalk::apply(ctx, collector, resolvedTree.tree);
+            ast::ConstShallowWalk::apply(ctx, collector, resolvedTree.tree);
             for (auto &extension : ctx.state.semanticExtensions) {
                 extension->finishTypecheckFile(ctx, resolvedTree.file);
             }

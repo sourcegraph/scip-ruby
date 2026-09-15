@@ -88,19 +88,23 @@ std::unique_ptr<Node> deepCopy(const Node *node) {
         [&](const parser::CVar *cVar) { result = std::make_unique<CVar>(cVar->loc, cVar->name); },
         [&](const parser::CVarLhs *cVarLhs) { result = std::make_unique<CVarLhs>(cVarLhs->loc, cVarLhs->name); },
         [&](const parser::DefMethod *defMethod) {
-            result = std::make_unique<DefMethod>(defMethod->loc, defMethod->declLoc, defMethod->name,
-                                                 deepCopy(defMethod->params.get()), deepCopy(defMethod->body.get()));
+            result =
+                std::make_unique<DefMethod>(defMethod->loc, defMethod->declLoc, defMethod->nameLoc, defMethod->name,
+                                            deepCopy(defMethod->params.get()), deepCopy(defMethod->body.get()));
         },
         [&](const parser::Defined *defined) {
             result = std::make_unique<Defined>(defined->loc, deepCopy(defined->value.get()));
         },
-        [&](const parser::DefnHead *defnHead) { result = std::make_unique<DefnHead>(defnHead->loc, defnHead->name); },
+        [&](const parser::DefnHead *defnHead) {
+            result = std::make_unique<DefnHead>(defnHead->loc, defnHead->nameLoc, defnHead->name);
+        },
         [&](const parser::DefS *defS) {
-            result = std::make_unique<DefS>(defS->loc, defS->declLoc, deepCopy(defS->singleton.get()), defS->name,
-                                            deepCopy(defS->params.get()), deepCopy(defS->body.get()));
+            result = std::make_unique<DefS>(defS->loc, defS->declLoc, deepCopy(defS->singleton.get()), defS->nameLoc,
+                                            defS->name, deepCopy(defS->params.get()), deepCopy(defS->body.get()));
         },
         [&](const parser::DefsHead *defsHead) {
-            result = std::make_unique<DefsHead>(defsHead->loc, deepCopy(defsHead->definee.get()), defsHead->name);
+            result = std::make_unique<DefsHead>(defsHead->loc, deepCopy(defsHead->definee.get()), defsHead->nameLoc,
+                                                defsHead->name);
         },
         [&](const parser::DString *dString) {
             result = std::make_unique<DString>(dString->loc, deepCopyVec(dString->nodes));

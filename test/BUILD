@@ -80,7 +80,6 @@ cc_binary(
         "//ast/desugar",
         "//ast/treemap",
         "//cfg/builder",
-        "//class_flatten",
         "//common/web_tracer_framework:tracing",
         "//core/serialize",
         "//definition_validator",

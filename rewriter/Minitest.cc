@@ -841,7 +841,7 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::
             }
 
             auto classDef =
-                ast::MK::Class(send->loc, declLoc, testHelperNameLoc(*send), std::move(name), std::move(ancestors), std::move(classBody));
+                ast::MK::Class(send->loc, declLoc, std::move(name), std::move(ancestors), std::move(classBody));
 
             // Preserve the original constant reference in the tree so Sorbet can
             // resolve it for hover and go-to-definition.

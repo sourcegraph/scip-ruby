@@ -314,7 +314,7 @@ string Loc::showRawLineColumn(const core::GlobalState &gs) const {
     if (this->empty()) {
         return "<_>";
     }
-    auto [start, end] = this->position(gs);
+    auto [start, end] = this->toDetails(gs);
     return start.line == end.line ? fmt::format("{}:{}-{}", start.line, start.column, end.column)
                                   : fmt::format("{}:{}-{}:{}", start.line, start.column, end.line, end.column);
 }

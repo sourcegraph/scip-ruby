@@ -63,8 +63,8 @@ static uint32_t fnv1a_32(const string &s) {
 
 const char scip_ruby_version[] = "0.4.8";
 
-// Last updated: https://github.com/sourcegraph/scip-ruby/pull/217
-const char scip_ruby_sync_upstream_sorbet_sha[] = "0a7b175bc0bb41e2672369554f74364e83711a84";
+// Upstream revision used for this replay.
+const char scip_ruby_sync_upstream_sorbet_sha[] = "e8f0eb82de923877387fa02fd6bbb2aac4801a66";
 
 namespace sorbet::scip_indexer {
 
@@ -103,7 +103,7 @@ struct OwnedLocal {
 
 InlinedVector<int32_t, 4> fromSorbetLoc(const core::GlobalState &gs, core::Loc loc) {
     ENFORCE(!loc.empty());
-    auto [start, end] = loc.position(gs);
+    auto [start, end] = loc.toDetails(gs);
     ENFORCE(start.line <= INT32_MAX && start.column <= INT32_MAX);
     ENFORCE(end.line <= INT32_MAX && end.column <= INT32_MAX);
     InlinedVector<int32_t, 4> r;
@@ -132,7 +132,7 @@ core::Loc trimColonColonPrefix(const core::GlobalState &gs, core::Loc baseLoc) {
     ENFORCE(occLen < baseLoc.endPos());
     auto newBeginLoc = baseLoc.endPos() - uint32_t(occLen);
     ENFORCE(newBeginLoc > baseLoc.beginPos());
-    return core::Loc(baseLoc.file(), {.beginLoc = newBeginLoc, .endLoc = baseLoc.endPos()});
+    return core::Loc(baseLoc.file(), {newBeginLoc, baseLoc.endPos()});
 }
 
 enum class Emitted {
@@ -485,16 +485,16 @@ public:
     absl::Status saveQualifierReferences(const core::GlobalState &gs, core::FileRef file,
                                          const ast::ExpressionPtr &constantLitExpr) {
         auto *expr = &constantLitExpr;
-        while (auto *constantLit = ast::cast_tree<ast::ConstantLit>(*expr)) {
-            if (constantLit->symbol.exists() && constantLit->symbol.asClassOrModuleRef().exists()) {
-                core::Context ctx(gs, constantLit->symbol, file);
-                auto status = this->saveReference(ctx, GenericSymbolRef::classOrModule(constantLit->symbol),
-                                                  /*overrideType*/ std::nullopt, constantLit->loc, 0);
+        while (auto constantLit = ast::cast_tree<ast::ConstantLit>(*expr)) {
+            if (constantLit->symbol().exists() && constantLit->symbol().asClassOrModuleRef().exists()) {
+                core::Context ctx(gs, constantLit->symbol(), file);
+                auto status = this->saveReference(ctx, GenericSymbolRef::classOrModule(constantLit->symbol()),
+                                                  /*overrideType*/ std::nullopt, constantLit->loc(), 0);
                 if (!status.ok()) {
                     return status;
                 }
             }
-            if (auto *unresolved = ast::cast_tree<ast::UnresolvedConstantLit>(constantLit->original)) {
+            if (auto *unresolved = constantLit->original()) {
                 expr = &unresolved->scope;
                 continue;
             }
@@ -651,7 +651,7 @@ public:
         };
         for (auto &bb : cfg.basicBlocks) {
             for (auto &bind : bb->exprs) {
-                auto *instr = cfg::cast_instruction<cfg::Alias>(bind.value);
+                auto instr = cfg::cast_instruction<cfg::Alias>(bind.value);
                 if (!instr) {
                     continue;
                 }
@@ -1055,8 +1055,8 @@ public:
             if (send->fun != core::Names::keepForIde()) {
                 return true;
             }
-            ENFORCE(send->args.size() == 1);
-            auto &arg = send->args[0];
+            ENFORCE(send->numArgs == 1);
+            cfg::LocalOccurrence arg{send->argRefs()[0], send->argLocs()[0]};
             auto symRef = this->aliasMap.try_consume(arg.variable);
             ENFORCE(symRef.has_value());
             auto [namedSym, _] = symRef.value();
@@ -1144,7 +1144,8 @@ public:
                         }
 
                         // Emit references for arguments
-                        for (auto &arg : send->args) {
+                        for (uint32_t i = 0; i < send->numArgs; ++i) {
+                            cfg::LocalOccurrence arg{send->argRefs()[i], send->argLocs()[i]};
                             if (arg.loc == send->receiverLoc) { // See NOTE[implicit-arg-passing].
                                 continue;
                             }
@@ -1155,7 +1156,7 @@ public:
                             // a read, and the first one is a write. Instead of emitting two occurrences, it'd
                             // be nice to emit a combined read-write occurrence. However, that would require
                             // complicating the code a bit, so let's leave it as-is for now.
-                            this->emitLocalOccurrence(cfg, bb, arg.occurrence(), DefRefData::RValue(), arg.type);
+                            this->emitLocalOccurrence(cfg, bb, arg, DefRefData::RValue(), send->argTypes()[i]);
                         }
 
                         break;
@@ -1504,8 +1505,8 @@ public:
         auto status = scipState->saveDefinition(gs, file, sym, /*aliasedSymbol*/ nullopt, nameLoc, klassLoc);
         ENFORCE(status.ok());
         auto *expr = &klass.name;
-        if (auto *constantLit = ast::cast_tree<ast::ConstantLit>(*expr)) {
-            if (auto *unresolved = ast::cast_tree<ast::UnresolvedConstantLit>(constantLit->original)) {
+        if (auto constantLit = ast::cast_tree<ast::ConstantLit>(*expr)) {
+            if (auto *unresolved = constantLit->original()) {
                 auto status = scipState->saveQualifierReferences(gs, file, unresolved->scope);
                 ENFORCE(status.ok());
             }
@@ -1573,10 +1574,9 @@ public:
             // HACK: Just modify the version in place instead of duplicating the logic in sorbet_version.c
             // There is some 'sed' replacement going on in that file.
             fmt::print("scip-ruby {}\nBased on Sorbet {} {}\n",
-                       absl::StrReplaceAll(sorbet_full_version_string,
-                                           {{sorbet_version, scip_ruby_version},
-                                            {fmt::format(".{}", sorbet_build_scm_commit_count), ""}}),
-                       sorbet_version, scip_ruby_sync_upstream_sorbet_sha);
+                       absl::StrReplaceAll(full_version_string, {{SORBET_VERSION_MAJOR_MINOR, scip_ruby_version},
+                                                                 {fmt::format(".{}", build_scm_commit_count), ""}}),
+                       SORBET_VERSION_MAJOR_MINOR, scip_ruby_sync_upstream_sorbet_sha);
             throw sorbet::EarlyReturnWithCode(0);
         }
         string indexFilePath{};

@@ -4419,8 +4419,7 @@ class CollectUnresolvedFieldsWalk final {
     UnorderedMap<core::ClassOrModuleRef, UnorderedSet<core::NameRef>> unresolvedFields;
 
 public:
-    void postTransformUnresolvedIdent(core::Context ctx, ast::ExpressionPtr &tree) {
-        auto &unresolvedIdent = ast::cast_tree_nonnull<ast::UnresolvedIdent>(tree);
+    void postTransformUnresolvedIdent(core::Context ctx, const ast::UnresolvedIdent &unresolvedIdent) {
         using Kind = ast::UnresolvedIdent::Kind;
         core::ClassOrModuleRef klass;
         switch (unresolvedIdent.kind) {
@@ -4467,7 +4466,7 @@ public:
                     continue;
                 }
                 core::Context ictx(igs, core::Symbols::root(), job.file);
-                ast::TreeWalk::apply(ictx, collect, job.tree);
+                ast::ConstTreeWalk::apply(ictx, collect, job.tree);
                 collectedTrees.emplace_back(move(job));
             }
             if (!collectedTrees.empty()) {

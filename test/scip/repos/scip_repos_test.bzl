@@ -69,7 +69,7 @@ def scip_repos_test_suite(name, patch_paths):
         extra_deps = {}
         gem_dep = {}
         patch_arg = {}
-        for os in ["//tools/config:linux", "//tools/config:darwin"]:
+        for os in ["@platforms//os:linux", "@platforms//os:osx"]:
             candidates = [patch_basename + ".patch"]
             if "linux" in os:
                 candidates.append(patch_basename + "-linux.patch")

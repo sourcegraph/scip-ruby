@@ -92,7 +92,7 @@ utils::Result UntypedGenericSymbolRef::symbolForExpr(const core::GlobalState &gs
             case core::SymbolRef::Kind::ClassOrModule:
                 descriptor.set_suffix(scip::Descriptor::Type);
                 break;
-            case core::SymbolRef::Kind::TypeArgument:
+            case core::SymbolRef::Kind::TypeParameter:
                 descriptor.set_suffix(scip::Descriptor::TypeParameter);
                 break;
             case core::SymbolRef::Kind::FieldOrStaticField:
@@ -224,8 +224,7 @@ void GenericSymbolRef::saveDocStrings(const core::GlobalState &gs, core::TypePtr
             auto ref = this->selfOrOwner.asMethodRef();
             auto recvType = ref.data(gs)->owner.data(gs)->resultType;
             checkType(recvType, fmt::format("receiver type for {}", ref.showFullName(gs)));
-            markdown =
-                core::source_generator::prettyTypeForMethod(gs, ref, recvType, nullptr, nullptr, core::ShowOptions());
+            markdown = core::source_generator::prettyTypeForMethod(gs, ref, recvType, core::ShowOptions());
             // FIXME(varun): For some reason, it looks like a bunch of public methods
             // get marked as private here. Avoid printing misleading info until we fix that.
             // https://github.com/sourcegraph/scip-ruby/issues/33

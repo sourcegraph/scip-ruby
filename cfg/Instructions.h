@@ -397,6 +397,10 @@ public:
         return span<core::LocOffsets>();
     }
 
+    absl::Span<const core::LocOffsets> argLocs() const {
+        return span<core::LocOffsets>();
+    }
+
     core::ZippedPairSpan<LocalRef, core::TypePtr> argSpan() {
         return core::ZippedPairSpan<LocalRef, core::TypePtr>{argRefs(), argTypes()};
     }
