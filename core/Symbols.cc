@@ -2136,6 +2136,7 @@ Method Method::deepCopy(const GlobalState &to) const {
     result.flags = this->flags;
     result.resultType = this->resultType;
     result.name = NameRef(to, this->name);
+    result.nameLoc = this->nameLoc;
     result.locs_ = this->locs_;
     if (this->typeParams) {
         result.typeParams = make_unique<InlinedVector<TypeParameterRef, 4>>(*this->typeParams);

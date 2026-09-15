@@ -253,8 +253,12 @@ void CFGBuilder::dealias(core::Context ctx, CFG &cfg) {
                     v->what = maybeDealias(ctx, cfg, LocalOccurrence::synthetic(v->what), current).variable;
                 } else if (auto v = cast_instruction<Send>(bind.value)) {
                     v->recv = maybeDealias(ctx, cfg, v->recv.occurrence(), current);
-                    for (auto &arg : v->argRefs()) {
-                        arg = maybeDealias(ctx, cfg, LocalOccurrence::synthetic(arg), current).variable;
+                    for (uint32_t i = 0; i < v->numArgs; ++i) {
+                        auto occurrence = maybeDealias(ctx, cfg, {v->argRefs()[i], v->argLocs()[i]}, current);
+                        v->argRefs()[i] = occurrence.variable;
+                        if (ctx.state.isSCIPRuby) {
+                            v->argLocs()[i] = occurrence.loc;
+                        }
                     }
                 } else if (auto v = cast_instruction<TAbsurd>(bind.value)) {
                     v->what = maybeDealias(ctx, cfg, v->what.occurrence(), current);

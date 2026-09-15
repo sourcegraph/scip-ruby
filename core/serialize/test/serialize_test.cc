@@ -1,5 +1,8 @@
 #include "doctest/doctest.h"
 // has to go first as it violates our requirements
+#include "core/ErrorCollector.h"
+#include "core/ErrorQueue.h"
+#include "core/Unfreeze.h"
 #include "core/serialize/pickler.h"
 #include "core/serialize/serialize.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
@@ -10,6 +13,34 @@ using namespace std;
 namespace sorbet::core::serialize {
 
 auto logger = spdlog::stderr_color_mt("serialize_test");
+
+TEST_CASE("Method name locations survive copying and serialization") {
+    auto collector = make_shared<ErrorCollector>();
+    auto queue = make_shared<ErrorQueue>(*logger, *logger, collector);
+    GlobalState gs(queue);
+    gs.initEmpty();
+    MethodRef method;
+    Loc nameLoc;
+    {
+        UnfreezeFileTable files(gs);
+        UnfreezeNameTable names(gs);
+        UnfreezeSymbolTable symbols(gs);
+        auto file = gs.enterFile("location.rb", "def example; end");
+        nameLoc = Loc(file, LocOffsets(4, 11));
+        method =
+            gs.enterMethodSymbol(Loc(file, LocOffsets(0, 16)), Symbols::Object(), gs.enterNameUTF8("example"), nameLoc);
+        auto &block = gs.enterMethodParameter(Loc::none(), method, Names::blkArg());
+        block.flags.isBlock = true;
+    }
+    auto copy = gs.deepCopyGlobalState();
+    CHECK(method.data(*copy)->nameLoc == nameLoc);
+    auto stored = Serializer::store(gs);
+    GlobalState restored(queue);
+    Serializer::loadGlobalState(restored, stored.symbolTableData.data(), stored.nameTableData.data(),
+                                stored.fileTableData.data());
+    CHECK(method.data(restored)->nameLoc == nameLoc);
+    CHECK(method.data(restored)->nameLoc.source(restored) == "example");
+}
 
 TEST_CASE("U4") {
     Pickler p;

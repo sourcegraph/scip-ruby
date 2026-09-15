@@ -654,6 +654,7 @@ ParamInfo SerializerImpl::unpickleArgInfo(UnPickler &p, const GlobalState *gs) {
 }
 
 void SerializerImpl::pickle(Pickler &p, const Method &what) {
+    pickle(p, what.nameLoc);
     p.putU4(what.owner.id());
     p.putU4(what.name.rawId());
     p.putU4(what.rebind.id());
@@ -676,6 +677,7 @@ void SerializerImpl::pickle(Pickler &p, const Method &what) {
 
 Method SerializerImpl::unpickleMethod(UnPickler &p, const GlobalState *gs) {
     Method result;
+    result.nameLoc = unpickleLoc(p);
     result.owner = ClassOrModuleRef::fromRaw(p.getU4());
     result.name = NameRef::fromRaw(*gs, p.getU4());
     result.rebind = ClassOrModuleRef::fromRaw(p.getU4());
