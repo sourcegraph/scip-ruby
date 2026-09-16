@@ -10,6 +10,23 @@ core::LocOffsets RBSDeclaration::commentLoc() const {
     return comments.front().commentLoc.join(comments.back().commentLoc);
 }
 
+RBSDeclaration RBSDeclaration::withoutPrefix(size_t length) const {
+    ENFORCE(length <= string.size());
+    CommentsVector result;
+    for (auto &comment : comments) {
+        if (length >= comment.string.size() && &comment != &comments.back()) {
+            length -= comment.string.size();
+            continue;
+        }
+        auto remaining = comment;
+        remaining.typeLoc.beginLoc += length;
+        remaining.string.remove_prefix(length);
+        result.emplace_back(remaining);
+        length = 0;
+    }
+    return RBSDeclaration{std::move(result)};
+}
+
 core::LocOffsets RBSDeclaration::firstLineTypeLoc() const {
     return comments.front().typeLoc;
 }

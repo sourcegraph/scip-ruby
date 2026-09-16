@@ -54,6 +54,14 @@ pm_node_t *TypeToParserNode::namespaceConst(const rbs_namespace_t *rbsNamespace,
 
         auto *symbol = (rbs_ast_symbol_t *)node;
         auto nameStr = parser.resolveConstant(symbol);
+        if (ctx.state.isSCIPRuby) {
+            // The RBS parser records the following `::` as a namespace symbol's
+            // location. The identifier is immediately before it (no whitespace).
+            auto range = symbol->base.location;
+            range.end_byte = range.start_byte;
+            range.start_byte -= nameStr.size();
+            loc = declaration.typeLocFromRange(range);
+        }
 
         if (parent != nullptr || isAbsolute) {
             parent = prism.ConstantPathNode(loc, parent, nameStr);
@@ -67,7 +75,8 @@ pm_node_t *TypeToParserNode::namespaceConst(const rbs_namespace_t *rbsNamespace,
 
 pm_node_t *TypeToParserNode::typeNameType(const rbs_type_name_t *typeName, bool isGeneric,
                                           const RBSDeclaration &declaration) {
-    auto loc = declaration.typeLocFromRange(typeName->base.location);
+    auto loc =
+        declaration.typeLocFromRange(ctx.state.isSCIPRuby ? typeName->name->base.location : typeName->base.location);
 
     pm_node_t *parent = namespaceConst(typeName->rbs_namespace, declaration, loc);
     bool isAbsolute = typeName->rbs_namespace && typeName->rbs_namespace->absolute;
@@ -96,8 +105,16 @@ pm_node_t *TypeToParserNode::typeNameType(const rbs_type_name_t *typeName, bool 
                 return prism.T_Range(loc);
             }
         } else if (nameConstant == core::Names::Constants::Lazy() && isEnumerator(parent, prismParser, ctx.state)) {
+            if (ctx.state.isSCIPRuby) {
+                auto parentLoc = prismParser.translateLocation(parent->location);
+                return prism.ConstantPathNode(loc, prism.T_Enumerator(parentLoc), "Lazy"sv);
+            }
             return prism.T_Enumerator_Lazy(loc);
         } else if (nameConstant == core::Names::Constants::Chain() && isEnumerator(parent, prismParser, ctx.state)) {
+            if (ctx.state.isSCIPRuby) {
+                auto parentLoc = prismParser.translateLocation(parent->location);
+                return prism.ConstantPathNode(loc, prism.T_Enumerator(parentLoc), "Chain"sv);
+            }
             return prism.T_Enumerator_Chain(loc);
         }
     } else {
@@ -119,6 +136,9 @@ pm_node_t *TypeToParserNode::aliasType(const rbs_types_alias_t *node, core::LocO
     pm_node_t *parent = namespaceConst(node->name->rbs_namespace, declaration, loc);
     auto nameView = parser.resolveConstant(node->name->name);
     auto nameStr = "type " + string(nameView);
+    if (ctx.state.isSCIPRuby) {
+        loc = declaration.typeLocFromRange(node->name->name->base.location);
+    }
 
     if (parent != nullptr || (node->name->rbs_namespace && node->name->rbs_namespace->absolute)) {
         return prism.ConstantPathNode(loc, parent, nameStr);

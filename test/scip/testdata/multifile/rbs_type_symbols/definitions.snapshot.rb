@@ -5,10 +5,10 @@
  module RBSDefinitions
 #       ^^^^^^^^^^^^^^ definition [..] RBSDefinitions#
    #: type text = String
-#  ^^^^^^^^^^^^^^^^^^^^^ definition [..] RBSDefinitions#`type text`.
+#          ^^^^ definition [..] RBSDefinitions#`type text`.
 #                 ^^^^^^ reference [..] String#
    #: type copy = text
-#  ^^^^^^^^^^^^^^^^^^^ definition [..] RBSDefinitions#`type copy`.
+#          ^^^^ definition [..] RBSDefinitions#`type copy`.
 #                 ^^^^ reference [..] RBSDefinitions#`type text`.
  
    #: [Elem]
@@ -46,7 +46,7 @@
 #    ⌃ enclosing_range_end [..] RBSDefinitions#Box#
  
    #: [Elem < Numeric]
-#      ^^^^^^^^^^^^^^ definition [..] RBSDefinitions#Bounded#Elem#
+#      ^^^^ definition [..] RBSDefinitions#Bounded#Elem#
 #             ^^^^^^^ reference [..] Numeric#
 #  ⌄ enclosing_range_start [..] RBSDefinitions#Bounded#
    class Bounded

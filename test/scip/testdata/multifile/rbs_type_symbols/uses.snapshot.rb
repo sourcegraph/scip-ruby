@@ -19,9 +19,9 @@
 #  ⌃ enclosing_range_end [..] RBSDefinitions#
  
  #: (RBSDefinitions::text) -> RBSDefinitions::copy
-#                    ^^^^ reference [..] RBSDefinitions#
+#    ^^^^^^^^^^^^^^ reference [..] RBSDefinitions#
 #                    ^^^^ reference [..] RBSDefinitions#`type text`.
-#                                             ^^^^ reference [..] RBSDefinitions#
+#                             ^^^^^^^^^^^^^^ reference [..] RBSDefinitions#
 #                                             ^^^^ reference [..] RBSDefinitions#`type copy`.
 #⌄ enclosing_range_start [..] Object#alias_echo().
  def alias_echo(value)
@@ -36,9 +36,7 @@
  #: [Elem] (Elem) -> Elem
 #    ^^^^ definition [..] Object#generic_echo().[Elem]
 #           ^^^^ reference [..] Object#generic_echo().[Elem]
-#           ^^^^ reference [..] T#
 #                    ^^^^ reference [..] Object#generic_echo().[Elem]
-#                    ^^^^ reference [..] T#
 #⌄ enclosing_range_start [..] Object#generic_echo().
  def generic_echo(value)
 #    ^^^^^^^^^^^^ definition [..] Object#generic_echo().
@@ -52,9 +50,7 @@
  #: [Elem] (Elem) -> Elem
 #    ^^^^ definition [..] Object#other_echo().[Elem]
 #           ^^^^ reference [..] Object#other_echo().[Elem]
-#           ^^^^ reference [..] T#
 #                    ^^^^ reference [..] Object#other_echo().[Elem]
-#                    ^^^^ reference [..] T#
 #⌄ enclosing_range_start [..] Object#other_echo().
  def other_echo(value)
 #    ^^^^^^^^^^ definition [..] Object#other_echo().
@@ -78,24 +74,28 @@
 #               ^^^^ reference [..] `<Class:RBSDefinitions>`#echo().
 #                            ^^^^^^ reference [..] String#upcase().
  box = RBSDefinitions::Box.new #: RBSDefinitions::Box[String]
-#^^^ definition local 10$119448696
-#                                                 ^^^ reference [..] RBSDefinitions#
+#^^^ definition local 6$119448696
+#      ^^^^^^^^^^^^^^ reference [..] RBSDefinitions#
+#                      ^^^ reference [..] RBSDefinitions#Box#
+#                                 ^^^^^^^^^^^^^^ reference [..] RBSDefinitions#
 #                                                 ^^^ reference [..] RBSDefinitions#Box#
 #                                                     ^^^^^^ reference [..] String#
  box.echo("text").upcase
-#^^^ reference local 10$119448696
+#^^^ reference local 6$119448696
 #    ^^^^ reference [..] RBSDefinitions#Box#echo().
 #                 ^^^^^^ reference [..] String#upcase().
  box.generic_echo(1).abs
-#^^^ reference local 10$119448696
+#^^^ reference local 6$119448696
 #    ^^^^^^^^^^^^ reference [..] RBSDefinitions#Box#generic_echo().
 #                    ^^^ reference [..] Integer#abs().
  bounded = RBSDefinitions::Bounded.new #: RBSDefinitions::Bounded[Numeric]
-#^^^^^^^ definition local 15$119448696
-#                                                         ^^^^^^^ reference [..] RBSDefinitions#
+#^^^^^^^ definition local 11$119448696
+#          ^^^^^^^^^^^^^^ reference [..] RBSDefinitions#
+#                          ^^^^^^^ reference [..] RBSDefinitions#Bounded#
+#                                         ^^^^^^^^^^^^^^ reference [..] RBSDefinitions#
 #                                                         ^^^^^^^ reference [..] RBSDefinitions#Bounded#
 #                                                                 ^^^^^^^ reference [..] Numeric#
  bounded.echo(1).abs
-#^^^^^^^ reference local 15$119448696
+#^^^^^^^ reference local 11$119448696
 #        ^^^^ reference [..] RBSDefinitions#Bounded#echo().
 #                ^^^ reference [..] Numeric#abs().

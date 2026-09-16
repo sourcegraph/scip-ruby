@@ -1,6 +1,7 @@
 #ifndef RBS_METHOD_TYPE_TO_PARSER_NODE_H
 #define RBS_METHOD_TYPE_TO_PARSER_NODE_H
 
+#include "core/GlobalState.h"
 #include "parser/prism/Factory.h"
 #include "parser/prism/Parser.h"
 #include "rbs/rbs_common.h"
@@ -19,7 +20,7 @@ class MethodTypeToParserNode {
 
 public:
     MethodTypeToParserNode(core::MutableContext ctx, Parser parser, parser::Prism::Parser &prismParser)
-        : ctx(ctx), parser(parser), prismParser(prismParser), prism(prismParser) {}
+        : ctx(ctx), parser(parser), prismParser(prismParser), prism(prismParser, ctx.state.isSCIPRuby) {}
 
     /**
      * Create a Prism signature node from RBS method signature.

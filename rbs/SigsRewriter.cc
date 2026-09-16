@@ -79,7 +79,7 @@ vector<pm_node_t *> extractHelpers(core::MutableContext ctx, absl::Span<const Co
         return {};
     }
 
-    Factory prism{parser};
+    Factory prism{parser, ctx.state.isSCIPRuby};
     vector<pm_node_t *> helpers;
     helpers.reserve(annotations.size());
 
@@ -387,6 +387,11 @@ pm_node_t *SigsRewriter::replaceSyntheticTypeAlias(pm_node_t *node) {
                                     aliasDeclaration.fullTypeLoc().endPos()},
         .string = fullString.substr(typeBeginLoc + 1),
     }}};
+
+    if (ctx.state.isSCIPRuby) {
+        // Slicing one contiguous location loses the offsets of `#|` continuation lines.
+        typeDeclaration = aliasDeclaration.withoutPrefix(typeBeginLoc + 1);
+    }
 
     auto signatureTranslator = rbs::SignatureTranslator{ctx, parser};
     absl::Span<pair<core::LocOffsets, core::NameRef>> typeParams; // Empty for type aliases

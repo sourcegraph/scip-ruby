@@ -1,6 +1,7 @@
 #ifndef RBS_TYPE_TO_PARSER_NODE_H
 #define RBS_TYPE_TO_PARSER_NODE_H
 
+#include "core/GlobalState.h"
 #include "parser/prism/Factory.h"
 #include "parser/prism/Helpers.h"
 #include "parser/prism/Parser.h"
@@ -19,7 +20,8 @@ class TypeToParserNode {
 public:
     TypeToParserNode(core::MutableContext ctx, absl::Span<const std::pair<core::LocOffsets, core::NameRef>> typeParams,
                      Parser parser, parser::Prism::Parser &prismParser)
-        : ctx(ctx), typeParams(typeParams), parser(parser), prismParser(prismParser), prism(prismParser) {}
+        : ctx(ctx), typeParams(typeParams), parser(parser), prismParser(prismParser),
+          prism(prismParser, ctx.state.isSCIPRuby) {}
 
     /**
      * Convert an RBS type to a Prism `pm_node_t`.

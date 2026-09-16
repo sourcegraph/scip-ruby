@@ -1,6 +1,7 @@
 #ifndef SORBET_RBS_TYPE_PARAMS_TO_PARSER_NODES_H
 #define SORBET_RBS_TYPE_PARAMS_TO_PARSER_NODES_H
 
+#include "core/GlobalState.h"
 #include "parser/prism/Factory.h"
 #include "parser/prism/Parser.h"
 #include "rbs/rbs_common.h"
@@ -20,7 +21,7 @@ class TypeParamsToParserNodes {
 
 public:
     TypeParamsToParserNodes(core::MutableContext ctx, const Parser &parser, parser::Prism::Parser &prismParser)
-        : ctx(ctx), parser(parser), prismParser(prismParser), prism{prismParser} {}
+        : ctx(ctx), parser(parser), prismParser(prismParser), prism{prismParser, ctx.state.isSCIPRuby} {}
 
     std::vector<pm_node_t *> typeParams(const rbs_node_list_t *rbsTypeParams, const RBSDeclaration &declaration);
 };

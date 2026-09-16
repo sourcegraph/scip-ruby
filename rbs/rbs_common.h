@@ -108,6 +108,9 @@ public:
      */
     core::LocOffsets commentLoc() const;
 
+    // Remove bytes from the concatenated RBS text, retaining each comment's source mapping.
+    RBSDeclaration withoutPrefix(size_t length) const;
+
     /**
      * Returns entire type location
      *

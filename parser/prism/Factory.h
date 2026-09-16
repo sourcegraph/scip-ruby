@@ -18,9 +18,10 @@ class Parser;
 class Factory {
 private:
     Parser &parser;
+    bool isSCIPRuby;
 
 public:
-    Factory(Parser &parser) : parser(parser) {}
+    Factory(Parser &parser, bool isSCIPRuby = false) : parser(parser), isSCIPRuby(isSCIPRuby) {}
 
     template <typename T> T *allocateNode() const {
         void *memory = this->malloc(sizeof(T));

@@ -1899,8 +1899,8 @@ public:
         gs.scipRubyLegacyTModule = this->config.legacyTModule;
     }
     std::string_view cacheKey() const override {
-        // Include captured describe declarations and the runtime compatibility mode in cached trees.
-        return this->config.legacyTModule ? "scip-ruby:12:legacy-t-module" : "scip-ruby:12";
+        // Separate the additional RBS/type rewrites and each runtime compatibility mode.
+        return this->config.legacyTModule ? "scip-ruby:13:legacy-t-module" : "scip-ruby:13";
     }
 
     virtual void typecheckClass(const core::GlobalState &gs, core::FileRef file,
