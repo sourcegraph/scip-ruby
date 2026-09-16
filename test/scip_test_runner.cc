@@ -8,9 +8,12 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <optional>
+#include <regex>
 #include <sstream>
 #include <string>
 #include <sys/types.h>
+#include <unistd.h>
 #include <vector>
 
 #include "absl/strings/match.h"
@@ -21,6 +24,7 @@
 
 #include "ast/ast.h"
 #include "ast/desugar/Desugar.h"
+#include "ast/desugar/prism/Desugar.h"
 #include "ast/treemap/treemap.h"
 #include "cfg/CFG.h"
 #include "cfg/builder/builder.h"
@@ -40,6 +44,7 @@
 #include "main/autogen/autogen.h"
 #include "namer/namer.h"
 #include "parser/parser.h"
+#include "parser/prism/Parser.h"
 #include "payload/binary/binary.h"
 #include "resolver/resolver.h"
 #include "rewriter/rewriter.h"
@@ -72,6 +77,7 @@ using namespace std;
 bool update;
 string inputFileOrDir;
 bool onlyRunUnitTests;
+optional<realmain::options::Parser> requestedParser;
 
 TEST_CASE("GemMetadataInference") {
     if (!onlyRunUnitTests) {
@@ -274,21 +280,6 @@ unique_ptr<Diagnostic> errorToDiagnostic(const core::GlobalState &gs, const core
         return nullptr;
     }
     return make_unique<Diagnostic>(Range::fromLoc(gs, error.loc), error.header);
-}
-
-template <typename K, typename V, typename Fn> static string map_to_string(const sorbet::UnorderedMap<K, V> m, Fn f) {
-    ostringstream out;
-    out << "{";
-    auto i = -1;
-    for (auto &[k, v] : m) {
-        i++;
-        out << f(k, v);
-        if (i != m.size() - 1) {
-            out << ", ";
-        }
-    }
-    out << "}";
-    return out.str();
 }
 
 template <typename T> using Repeated = google::protobuf::RepeatedField<T>;
@@ -510,8 +501,45 @@ string snapshot_path(string source_file_path) {
 struct TestSettings {
     scip_indexer::Config config;
     UnorderedMap</*root-relative path*/ string, FormatOptions> formatOptions;
+    optional<realmain::options::Parser> parser;
     bool rspecRewriterEnabled = false;
+    bool checkErrors = false;
 };
+
+// Local IDs can differ between parsers. Normalize only occurrence marker symbols,
+// preserving a bijection across the entire document: merged scopes and references
+// to the wrong local still fail, while source lines and hover text remain literal.
+string normalizeLocalSymbols(const string &snapshot) {
+    static const regex marker(R"((# *\^+ (?:definition|reference(?: \([a-z+]+\))?) )local (\S+))");
+    UnorderedMap<string, size_t> locals;
+    istringstream input(snapshot);
+    ostringstream output;
+    for (string line; getline(input, line);) {
+        smatch match;
+        if (regex_match(line, match, marker)) {
+            auto [it, _] = locals.emplace(match[2].str(), locals.size());
+            output << match[1].str() << "local " << it->second << '\n';
+        } else {
+            output << line << '\n';
+        }
+    }
+    return output.str();
+}
+
+TEST_CASE("LocalSymbolNormalization") {
+    if (!onlyRunUnitTests) {
+        return;
+    }
+    const string expected = "#^^ definition local 1$100\n#^^ definition local 2$100\n#^^ reference local 1$100\n";
+    CHECK(normalizeLocalSymbols(expected) ==
+          normalizeLocalSymbols("#^^ definition local 7$200\n#^^ definition local 9$200\n#^^ reference local 7$200\n"));
+    CHECK(normalizeLocalSymbols(expected) !=
+          normalizeLocalSymbols("#^^ definition local 7$200\n#^^ definition local 9$200\n#^^ reference local 9$200\n"));
+    CHECK(normalizeLocalSymbols(expected) !=
+          normalizeLocalSymbols("#^^ definition local 7$200\n#^^ definition local 7$200\n#^^ reference local 7$200\n"));
+    const string literal = " puts('local 1$100')\n#| local 2$100\n";
+    CHECK(normalizeLocalSymbols(literal) == literal);
+}
 
 void updateSnapshots(const scip::Index &index, const TestSettings &settings, const std::filesystem::path &outputDir) {
     for (auto &doc : index.documents()) {
@@ -543,18 +571,26 @@ void compareSnapshots(const scip::Index &index, const TestSettings &settings,
         formatSnapshot(doc, it->second, out);
         auto result = out.str();
 
-        CHECK_EQ_DIFF(input.str(), result,
+        CHECK_EQ_DIFF(normalizeLocalSymbols(input.str()), normalizeLocalSymbols(result),
                       "snapshot comparison failed; did you forget to run `./bazel test //test/scip:update`?");
     }
 }
 
-pair<scip_indexer::Config, FormatOptions> readMagicComments(string_view path, bool &rspecRewriterEnabled) {
+pair<scip_indexer::Config, FormatOptions> readMagicComments(string_view path, TestSettings &settings) {
     scip_indexer::Config config;
     FormatOptions options{.showDocs = false};
     ifstream input(path);
     for (string line; getline(input, line);) {
         if (line == "# enable-experimental-rspec: true") {
-            rspecRewriterEnabled = true;
+            settings.rspecRewriterEnabled = true;
+        } else if (line == "# check-errors: true") {
+            settings.checkErrors = true;
+        } else if (absl::StartsWith(line, "# parser: ")) {
+            auto name = absl::StripPrefix(line, "# parser: ");
+            ENFORCE(name == "original" || name == "prism", "Unknown parser: {}", name);
+            auto selected = name == "prism" ? realmain::options::Parser::PRISM : realmain::options::Parser::ORIGINAL;
+            ENFORCE(!settings.parser.has_value() || settings.parser == selected, "Conflicting fixture parsers");
+            settings.parser = selected;
         } else if (absl::StrContains(line, "# gem-metadata: ")) {
             auto s = absl::StripPrefix(line, "# gem-metadata: ");
             ENFORCE(!s.empty());
@@ -574,11 +610,16 @@ pair<scip_indexer::Config, FormatOptions> readMagicComments(string_view path, bo
     return {config, options};
 }
 
-void test_one_gem(Expectations &test, const TestSettings &settings) {
+void test_one_gem(Expectations &test, const TestSettings &settings, realmain::options::Parser selectedParser,
+                  bool writeSnapshots) {
+    string parserName = selectedParser == realmain::options::Parser::PRISM ? "prism" : "original";
+    INFO("parser: " << parserName);
+    parser = selectedParser; // Used by upstream error assertions.
+
     vector<unique_ptr<core::Error>> errors;
 
-    auto logger =
-        spdlog::stderr_color_mt("fixtures: " + (test.isFolderTest ? test.folder + test.basename : test.folder));
+    auto logger = spdlog::stderr_color_mt("fixtures: " + parserName + ": " +
+                                          (test.isFolderTest ? test.folder + test.basename : test.folder));
     auto errorCollector = make_shared<core::ErrorCollector>();
     auto errorQueue = make_shared<core::ErrorQueue>(*logger, *logger, errorCollector);
     core::GlobalState gs(errorQueue);
@@ -588,6 +629,8 @@ void test_one_gem(Expectations &test, const TestSettings &settings) {
     // TODO(varun): Should we add the no-stdlib branch here?
     core::serialize::Serializer::loadGlobalState(gs, PAYLOAD_SYMBOL_TABLE, PAYLOAD_NAME_TABLE, PAYLOAD_FILE_TABLE);
     gs.cacheSensitiveOptions.rspecRewriterEnabled = settings.rspecRewriterEnabled;
+    gs.parseWithPrism = selectedParser == realmain::options::Parser::PRISM;
+    gs.unsilenceErrors = settings.checkErrors;
 
     vector<core::FileRef> files;
     {
@@ -601,7 +644,7 @@ void test_one_gem(Expectations &test, const TestSettings &settings) {
     using Provider = pipeline::semantic_extension::SemanticExtensionProvider;
 
     auto indexFilePath = filesystem::temp_directory_path();
-    indexFilePath.append(test.basename + ".scip");
+    indexFilePath.append(test.basename + "." + parserName + "." + to_string(getpid()) + ".scip");
 
     auto providers = Provider::getProviders();
     ENFORCE(providers.size() == 1);
@@ -626,10 +669,16 @@ void test_one_gem(Expectations &test, const TestSettings &settings) {
         sorbet::core::UnfreezeNameTable nt(gs);
         vector<ast::ParsedFile> trees;
         for (auto file : files) {
-            auto settings = parser::Parser::Settings{};
-            auto ast = parser::Parser::run(gs, file, settings);
             sorbet::core::MutableContext ctx(gs, core::Symbols::root(), file);
-            auto tree = ast::ParsedFile{ast::desugar::node2Tree(ctx, move(ast.tree)), file};
+            ast::ExpressionPtr desugared;
+            if (gs.parseWithPrism) {
+                auto parsed = parser::Prism::Parser::run(ctx);
+                desugared = ast::Desugar::Prism::node2Tree(ctx, move(parsed));
+            } else {
+                auto parsed = parser::Parser::run(gs, file, parser::Parser::Settings{});
+                desugared = ast::desugar::node2Tree(ctx, move(parsed.tree));
+            }
+            auto tree = ast::ParsedFile{move(desugared), file};
             tree.tree = rewriter::Rewriter::run(ctx, move(tree.tree));
             tree = local_vars::LocalVars::run(ctx, move(tree));
             trees.emplace_back(move(tree));
@@ -656,17 +705,41 @@ void test_one_gem(Expectations &test, const TestSettings &settings) {
         for (auto &extension : gs.semanticExtensions) {
             extension->finishTypecheck(gs);
         }
-        // TODO(varun): Should we be collecting these errors/what should we do with them?
         errorQueue->flushAllErrors(gs);
         auto newErrors = errorCollector->drainErrors();
         errors.insert(errors.end(), make_move_iterator(newErrors.begin()), make_move_iterator(newErrors.end()));
     }
 
-    auto s = map_to_string(test.expectations, [](const auto &s, const auto &m) -> std::string {
-        return fmt::format("{}: {}", s, map_to_string(m, [](const auto &k, const auto &v) -> std::string {
-                               return fmt::format("{}: {}", k, v);
-                           }));
-    });
+    if (settings.checkErrors) {
+        // The upstream assertion reader does not know SCIP fixture directives.
+        // Mask those comments while keeping source positions and error assertions intact.
+        UnorderedMap<string, shared_ptr<core::File>> assertionFiles;
+        for (const auto &[path, file] : test.sourceFileContents) {
+            istringstream input(string(file->source()));
+            ostringstream filtered;
+            for (string line; getline(input, line);) {
+                if (absl::StartsWith(line, "# parser:") || absl::StartsWith(line, "# check-errors:") ||
+                    absl::StartsWith(line, "# options:") || absl::StartsWith(line, "# gem-metadata:") ||
+                    absl::StartsWith(line, "# gem-map:")) {
+                    line.assign(line.size(), ' ');
+                }
+                filtered << line << '\n';
+            }
+            assertionFiles[path] = make_shared<core::File>(string(path), filtered.str(), core::File::Type::Normal);
+        }
+        auto assertions = RangeAssertion::parseAssertions(assertionFiles);
+        map<string, vector<unique_ptr<Diagnostic>>> diagnostics;
+        for (auto &error : errors) {
+            if (error->isSilenced) {
+                continue;
+            }
+            auto diagnostic = errorToDiagnostic(gs, *error);
+            REQUIRE_MESSAGE(diagnostic != nullptr, error->toString(gs));
+            diagnostics[string(error->loc.file().data(gs).path())].push_back(move(diagnostic));
+        }
+        REQUIRE(ErrorAssertion::checkAll(test.sourceFileContents,
+                                         RangeAssertion::getAssertions<ErrorAssertion>(assertions), diagnostics));
+    }
 
     ifstream indexFile(indexFilePath, ios::in | ios::binary);
     if (!indexFile.is_open()) {
@@ -675,15 +748,17 @@ void test_one_gem(Expectations &test, const TestSettings &settings) {
 
     scip::Index index;
     REQUIRE(index.ParseFromIstream(&indexFile));
+    indexFile.close();
+    filesystem::remove(indexFilePath);
     REQUIRE(index.documents_size() > 0);
 
-    if (update) {
+    if (writeSnapshots) {
         updateSnapshots(index, settings, test.folder);
     } else {
         compareSnapshots(index, settings, test.folder);
     }
 
-    MESSAGE("PASS");
+    MESSAGE("PASS (" << parserName << ")");
 }
 
 // There are several different kinds of tests that we are potentially
@@ -724,23 +799,34 @@ TEST_CASE("SCIPTest") {
     if (test.isFolderTest) {
         auto argsFilePath = test.folder + "scip-ruby-args.rb";
         if (FileOps::exists(argsFilePath)) {
-            settings.config = readMagicComments(argsFilePath, settings.rspecRewriterEnabled).first;
+            settings.config = readMagicComments(argsFilePath, settings).first;
         }
         ENFORCE(test.sourceFiles.size() > 0);
         for (auto &sourceFile : test.sourceFiles) {
             auto path = test.folder + sourceFile;
-            auto [_, inserted] =
-                settings.formatOptions.insert({path, readMagicComments(path, settings.rspecRewriterEnabled).second});
+            auto [_, inserted] = settings.formatOptions.insert({path, readMagicComments(path, settings).second});
             ENFORCE(inserted, "duplicate source file in Expectations struct?");
         }
     } else {
         ENFORCE(test.sourceFiles.size() == 1);
         auto path = test.folder + test.sourceFiles[0];
         auto &options = settings.formatOptions[path];
-        std::tie(settings.config, options) = readMagicComments(path, settings.rspecRewriterEnabled);
+        std::tie(settings.config, options) = readMagicComments(path, settings);
     }
 
-    test_one_gem(test, settings);
+    if (requestedParser.has_value()) {
+        REQUIRE_MESSAGE((!settings.parser.has_value() || requestedParser == settings.parser),
+                        "Requested parser conflicts with fixture's # parser setting");
+        settings.parser = requestedParser;
+    }
+    if (settings.parser.has_value()) {
+        test_one_gem(test, settings, *settings.parser, update);
+    } else {
+        test_one_gem(test, settings, realmain::options::Parser::ORIGINAL, update);
+        // The original parser owns the shared snapshot. Prism must agree with it
+        // even during updates, so an update cannot silently bless a parser regression.
+        test_one_gem(test, settings, realmain::options::Parser::PRISM, false);
+    }
 }
 
 } // namespace sorbet::test
@@ -765,6 +851,7 @@ int main(int argc, char *argv[]) {
     options.add_options()("input", "path to input file to directory", cxxopts::value<std::string>());
     options.add_options()("update-snapshots", "should the snapshot files be overwritten if there are changes");
     options.add_options()("only-unit-tests", "only run unit tests, skip snapshot tests");
+    options.add_options()("parser", "run one parser: original or prism", cxxopts::value<std::string>());
     auto res = options.parse(argc, argv);
 
     auto unmatched = res.unmatched();
@@ -774,6 +861,15 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    if (res.count("parser") > 0) {
+        auto selected = res["parser"].as<std::string>();
+        if (selected != "original" && selected != "prism") {
+            fmt::print(stderr, "error: parser must be original or prism\n");
+            return 1;
+        }
+        sorbet::test::requestedParser = selected == "prism" ? sorbet::realmain::options::Parser::PRISM
+                                                            : sorbet::realmain::options::Parser::ORIGINAL;
+    }
     if (res.count("only-unit-tests") > 0) {
         sorbet::test::onlyRunUnitTests = true;
         doctest::Context context(argc, argv);

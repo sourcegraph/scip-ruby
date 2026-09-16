@@ -78,6 +78,7 @@ cc_binary(
     deps = [
         # TODO(varun): Revisit dependencies after rewriting test runner.
         "//ast/desugar",
+        "//ast/desugar/prism",
         "//ast/treemap",
         "//cfg/builder",
         "//common/web_tracer_framework:tracing",
@@ -87,6 +88,7 @@ cc_binary(
         "//local_vars",
         "//main/autogen",  # TODO(varun): why is this needed?
         "//namer",
+        "//parser/prism",
         "//payload",
         "//proto",
         "//resolver",
