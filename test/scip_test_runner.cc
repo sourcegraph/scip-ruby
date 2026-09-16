@@ -510,6 +510,7 @@ string snapshot_path(string source_file_path) {
 struct TestSettings {
     scip_indexer::Config config;
     UnorderedMap</*root-relative path*/ string, FormatOptions> formatOptions;
+    bool rspecRewriterEnabled = false;
 };
 
 void updateSnapshots(const scip::Index &index, const TestSettings &settings, const std::filesystem::path &outputDir) {
@@ -547,12 +548,14 @@ void compareSnapshots(const scip::Index &index, const TestSettings &settings,
     }
 }
 
-pair<scip_indexer::Config, FormatOptions> readMagicComments(string_view path) {
+pair<scip_indexer::Config, FormatOptions> readMagicComments(string_view path, bool &rspecRewriterEnabled) {
     scip_indexer::Config config;
     FormatOptions options{.showDocs = false};
     ifstream input(path);
     for (string line; getline(input, line);) {
-        if (absl::StrContains(line, "# gem-metadata: ")) {
+        if (line == "# enable-experimental-rspec: true") {
+            rspecRewriterEnabled = true;
+        } else if (absl::StrContains(line, "# gem-metadata: ")) {
             auto s = absl::StripPrefix(line, "# gem-metadata: ");
             ENFORCE(!s.empty());
             config.gemMetadata = s;
@@ -584,6 +587,7 @@ void test_one_gem(Expectations &test, const TestSettings &settings) {
     gs.censorForSnapshotTests = true; // TODO(varun): Not 100% sure if this is needed?
     // TODO(varun): Should we add the no-stdlib branch here?
     core::serialize::Serializer::loadGlobalState(gs, PAYLOAD_SYMBOL_TABLE, PAYLOAD_NAME_TABLE, PAYLOAD_FILE_TABLE);
+    gs.cacheSensitiveOptions.rspecRewriterEnabled = settings.rspecRewriterEnabled;
 
     vector<core::FileRef> files;
     {
@@ -720,19 +724,20 @@ TEST_CASE("SCIPTest") {
     if (test.isFolderTest) {
         auto argsFilePath = test.folder + "scip-ruby-args.rb";
         if (FileOps::exists(argsFilePath)) {
-            settings.config = readMagicComments(argsFilePath).first;
+            settings.config = readMagicComments(argsFilePath, settings.rspecRewriterEnabled).first;
         }
         ENFORCE(test.sourceFiles.size() > 0);
         for (auto &sourceFile : test.sourceFiles) {
             auto path = test.folder + sourceFile;
-            auto [_, inserted] = settings.formatOptions.insert({path, readMagicComments(path).second});
+            auto [_, inserted] =
+                settings.formatOptions.insert({path, readMagicComments(path, settings.rspecRewriterEnabled).second});
             ENFORCE(inserted, "duplicate source file in Expectations struct?");
         }
     } else {
         ENFORCE(test.sourceFiles.size() == 1);
         auto path = test.folder + test.sourceFiles[0];
         auto &options = settings.formatOptions[path];
-        std::tie(settings.config, options) = readMagicComments(path);
+        std::tie(settings.config, options) = readMagicComments(path, settings.rspecRewriterEnabled);
     }
 
     test_one_gem(test, settings);

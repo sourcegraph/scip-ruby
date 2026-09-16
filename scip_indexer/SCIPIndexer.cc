@@ -437,6 +437,11 @@ public:
         // In practice, there doesn't seem to be any situation which triggers
         // a duplicate definition being emitted, so skip calling cacheOccurrence here.
         auto occLoc = loc.has_value() ? core::Loc(file, loc.value()) : symRef.symbolLoc(gs);
+        // Rewriters can create definitions without a source token, such as RSpec's
+        // generated described_class method. References to them can still be indexed.
+        if (!occLoc.exists() || occLoc.empty()) {
+            return absl::OkStatus();
+        }
         scip::Symbol symbol;
         auto untypedSymRef = symRef.withoutType();
         auto result = untypedSymRef.symbolForExpr(gs, this->gemMap, occLoc, symbol);
