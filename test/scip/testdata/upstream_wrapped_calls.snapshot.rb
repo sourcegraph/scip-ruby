@@ -1,4 +1,5 @@
  # typed: true
+ # check-errors: true
  # Adapted from test/testdata/infer/call_with_block.rb.
  
 #⌄ enclosing_range_start [..] WrappedCalls#

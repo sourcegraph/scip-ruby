@@ -91,6 +91,7 @@ cc_binary(
         "//parser/prism",
         "//payload",
         "//proto",
+        "//rbs",
         "//resolver",
         "//rewriter",
         "//scip_indexer:interface",

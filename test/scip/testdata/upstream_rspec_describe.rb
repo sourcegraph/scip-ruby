@@ -1,4 +1,5 @@
 # typed: true
+# check-errors: true
 # enable-experimental-rspec: true
 # Adapted from test/testdata/rewriter/rspec_describe.rb.
 # Generated describe classes and described_class methods can have empty name locations.

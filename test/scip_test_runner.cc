@@ -46,6 +46,7 @@
 #include "parser/parser.h"
 #include "parser/prism/Parser.h"
 #include "payload/binary/binary.h"
+#include "rbs/RBSRewriter.h"
 #include "resolver/resolver.h"
 #include "rewriter/rewriter.h"
 #include "scip_indexer/Debug.h"
@@ -549,6 +550,7 @@ struct TestSettings {
     UnorderedMap</*root-relative path*/ string, FormatOptions> formatOptions;
     optional<realmain::options::Parser> parser;
     bool rspecRewriterEnabled = false;
+    bool rbsEnabled = false;
     bool checkErrors = false;
 };
 
@@ -629,6 +631,9 @@ pair<scip_indexer::Config, FormatOptions> readMagicComments(string_view path, Te
     for (string line; getline(input, line);) {
         if (line == "# enable-experimental-rspec: true") {
             settings.rspecRewriterEnabled = true;
+        } else if (line == "# enable-experimental-rbs-comments: true") {
+            settings.rbsEnabled = true;
+            settings.checkErrors = true;
         } else if (line == "# check-errors: true") {
             settings.checkErrors = true;
         } else if (absl::StartsWith(line, "# parser: ")) {
@@ -675,6 +680,7 @@ void test_one_gem(Expectations &test, const TestSettings &settings, realmain::op
     // TODO(varun): Should we add the no-stdlib branch here?
     core::serialize::Serializer::loadGlobalState(gs, PAYLOAD_SYMBOL_TABLE, PAYLOAD_NAME_TABLE, PAYLOAD_FILE_TABLE);
     gs.cacheSensitiveOptions.rspecRewriterEnabled = settings.rspecRewriterEnabled;
+    gs.cacheSensitiveOptions.rbsEnabled = settings.rbsEnabled;
     gs.parseWithPrism = selectedParser == realmain::options::Parser::PRISM;
     gs.unsilenceErrors = settings.checkErrors;
 
@@ -720,6 +726,10 @@ void test_one_gem(Expectations &test, const TestSettings &settings, realmain::op
             ast::ExpressionPtr desugared;
             if (gs.parseWithPrism) {
                 auto parsed = parser::Prism::Parser::run(ctx);
+                if (settings.rbsEnabled) {
+                    rbs::runRBSRewrite(gs, file, parsed.getRawNodePointer(), parsed.getCommentLocations(), ctx,
+                                       parsed.getParser());
+                }
                 desugared = ast::Desugar::Prism::node2Tree(ctx, move(parsed));
             } else {
                 auto parsed = parser::Parser::run(gs, file, parser::Parser::Settings{});
@@ -865,6 +875,11 @@ TEST_CASE("SCIPTest") {
         REQUIRE_MESSAGE((!settings.parser.has_value() || requestedParser == settings.parser),
                         "Requested parser conflicts with fixture's # parser setting");
         settings.parser = requestedParser;
+    }
+    if (settings.rbsEnabled) {
+        REQUIRE_MESSAGE(settings.parser != realmain::options::Parser::ORIGINAL,
+                        "RBS comments require the Prism parser");
+        settings.parser = realmain::options::Parser::PRISM;
     }
     if (settings.parser.has_value()) {
         test_one_gem(test, settings, *settings.parser, update);

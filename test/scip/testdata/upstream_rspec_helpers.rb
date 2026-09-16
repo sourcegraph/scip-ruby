@@ -1,4 +1,5 @@
 # typed: true
+# check-errors: true
 # enable-experimental-rspec: true
 # Adapted from test/testdata/rewriter/minitest_let.rb and rspec_describe.rb.
 

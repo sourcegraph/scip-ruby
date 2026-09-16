@@ -1,4 +1,5 @@
  # typed: true
+ # check-errors: true
  # Adapted from test/testdata/rewriter/minitest_let.rb.
  
 #⌄ enclosing_range_start [..] Minitest#

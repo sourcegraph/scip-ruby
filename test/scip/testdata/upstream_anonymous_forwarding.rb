@@ -1,4 +1,5 @@
 # typed: true
+# check-errors: true
 # Adapted from resolver/sig_anon_block.rb and desugar/forwarded_restarg_and_kwrestarg.rb.
 
 class AnonymousForwarding
