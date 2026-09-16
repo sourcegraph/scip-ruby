@@ -64,9 +64,14 @@ string prettySigForMethod(const core::GlobalState &gs, core::MethodRef method, c
     for (auto &paramInfo : method.data(gs)->parameters) {
         // Don't display synthetic arguments (like blk).
         if (!paramInfo.isSyntheticBlockParameter()) {
-            typeAndArgNames.emplace_back(
-                absl::StrCat(paramInfo.parameterName(gs), ": ",
-                             getResultType(gs, paramInfo.type, method, receiver).show(gs, options)));
+            auto name = paramInfo.parameterName(gs);
+            auto type = getResultType(gs, paramInfo.type, method, receiver).show(gs, options);
+            if (gs.isSCIPRuby && (name == "*" || name == "**" || name == "&")) {
+                // Anonymous parameters use quoted symbol keys in a Sorbet signature.
+                typeAndArgNames.emplace_back(fmt::format("\"{}\": {}", name, type));
+            } else {
+                typeAndArgNames.emplace_back(absl::StrCat(name, ": ", type));
+            }
         }
     }
 
@@ -170,7 +175,12 @@ string prettyDefForMethod(const core::GlobalState &gs, core::MethodRef method, c
         } else if (argSym.flags.isDefault && !defaultArgumentPlaceholder.empty()) {
             suffix = fmt::format("={}", defaultArgumentPlaceholder);
         }
-        prettyArgs.emplace_back(fmt::format("{}{}{}", prefix, argSym.parameterName(gs), suffix));
+        auto name = argSym.parameterName(gs);
+        if (gs.isSCIPRuby && !prefix.empty() && name == prefix) {
+            // The declaration already supplies the anonymous *, **, or & token.
+            name = "";
+        }
+        prettyArgs.emplace_back(fmt::format("{}{}{}", prefix, name, suffix));
     }
 
     string argListPrefix = "";

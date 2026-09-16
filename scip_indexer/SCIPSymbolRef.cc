@@ -238,7 +238,9 @@ void GenericSymbolRef::saveDocStrings(const core::GlobalState &gs, core::TypePtr
         }
         case Kind::Method: {
             auto ref = this->selfOrOwner.asMethodRef();
-            auto recvType = ref.data(gs)->owner.data(gs)->resultType;
+            // A definition describes the method inside its declaring class. The
+            // external type erases unfixed class parameters to T.untyped.
+            auto recvType = ref.data(gs)->owner.data(gs)->selfType(gs);
             checkType(recvType, fmt::format("receiver type for {}", ref.showFullName(gs)));
             markdown = core::source_generator::prettyTypeForMethod(gs, ref, recvType, core::ShowOptions());
             // FIXME(varun): For some reason, it looks like a bunch of public methods

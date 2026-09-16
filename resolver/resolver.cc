@@ -3946,7 +3946,12 @@ private:
                     }
                     param.type = core::Types::untypedUntracked();
                 }
-                param.loc = ctx.locAt(spec->nameLoc);
+                // SCIP hovers need the Ruby parameter name. A signature's key may
+                // have an empty generated RBS location or include symbol delimiters.
+                // Preserve declaration locations, falling back for synthetic parameters.
+                if (!ctx.state.isSCIPRuby || !param.loc.exists() || param.loc.empty()) {
+                    param.loc = ctx.locAt(spec->nameLoc);
+                }
                 param.rebind = spec->rebind;
                 sig.argTypes.erase(spec);
                 // Since methods always have (synthesized if necessary) block arguments,
