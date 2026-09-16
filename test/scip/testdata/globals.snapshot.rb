@@ -39,7 +39,6 @@
  
  $d = T.let(0, Integer)
 #^^ definition [global] `<Class:<root>>`#$d.
-#              ^^^^^^^ definition local 3$119448696
 #              ^^^^^^^ reference [..] Integer#
  
 #⌄ enclosing_range_start [..] Object#g().

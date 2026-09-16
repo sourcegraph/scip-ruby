@@ -26,7 +26,6 @@
 #  ^^^ definition [..] X#All.
 #               ^ reference [..] X#A.
 #                  ^ reference [..] X#B.
-#                         ^^^^^^^^ definition local 4$119448696
 #                               ^ reference [..] X#
  end
 #  ⌃ enclosing_range_end [..] X#

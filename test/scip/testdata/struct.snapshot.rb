@@ -55,7 +55,7 @@
 #                                                               ^^^^ reference [..] Kernel#to_s().
    s.prop_i = 4
 #  ^ reference local 1$3809224601
-#    ^^^^^^^^ reference [..] S#`prop_i=`().
+#    ^^^^^^ reference [..] S#`prop_i=`().
    return
  end
 #  ⌃ enclosing_range_end [..] Object#f().

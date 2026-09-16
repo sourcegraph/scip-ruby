@@ -77,8 +77,9 @@ static bool isTemporary(const core::GlobalState &gs, const core::LocalVariable &
     }
     auto n = var._name;
     return n == Names::blockPreCallTemp() || n == Names::blockTemp() || n == Names::blockPassTemp() ||
-           n == Names::blkArg() || n == Names::blockCall() || n == Names::blockBreakAssign() ||
-           n == Names::argPresent() || n == Names::forTemp() || n == Names::keepForCfgTemp() ||
+           n == Names::blkArg() || n == Names::implicitYield() || n == Names::keepForIde() || n == Names::blockCall() ||
+           n == Names::blockBreakAssign() || n == Names::argPresent() || n == Names::forTemp() ||
+           n == Names::keepForCfgTemp() ||
            // Insert checks because sometimes temporaries are initialized with a 0 unique value. 😬
            n == Names::finalReturn() || n == NameRef::noName() || n == Names::blockCall() || n == Names::selfLocal() ||
            n == Names::unconditional();
@@ -1042,10 +1043,12 @@ public:
         auto file = this->ctx.file;
         auto method = this->ctx.owner;
         auto isMethodFileStaticInit = method == gs.lookupStaticInitForFile(file);
+        auto isStaticInit = isMethodFileStaticInit || method.name(gs) == core::Names::staticInit();
 
         // Returns true if the caller should not process the binding further.
         auto skipProcessing = [&](const cfg::Binding &binding) -> bool {
-            if (binding.loc.exists() && !binding.loc.empty()) {
+            if ((binding.loc.exists() && !binding.loc.empty()) ||
+                (binding.bind.loc.exists() && !binding.bind.loc.empty())) {
                 return false;
             }
             if (binding.value.tag() != cfg::Tag::Send) {
@@ -1112,6 +1115,10 @@ public:
                 };
                 switch (binding.value.tag()) {
                     case cfg::Tag::Ident: {
+                        if (isStaticInit &&
+                            binding.bind.variable.data(cfg)._name == core::Names::returnMethodTemp()) {
+                            break;
+                        }
                         auto ident = cfg::cast_instruction<cfg::Ident>(binding.value);
                         emitLocal(ident->what);
                         break;
@@ -1162,6 +1169,9 @@ public:
                         break;
                     }
                     case cfg::Tag::Return: {
+                        if (isStaticInit) {
+                            break;
+                        }
                         auto return_ = cfg::cast_instruction<cfg::Return>(binding.value);
                         emitLocal(return_->what.variable);
                         break;
@@ -1487,7 +1497,12 @@ public:
         }
     };
 
-    virtual void typecheckClass(const core::GlobalState &gs, core::FileRef file, const ast::ClassDef &klass) const override {
+    bool isSCIPRuby() const override {
+        return true;
+    }
+
+    virtual void typecheckClass(const core::GlobalState &gs, core::FileRef file,
+                                const ast::ClassDef &klass) const override {
         if (this->doNothing() || ast::isa_tree<ast::EmptyTree>(klass.name)) {
             return;
         }
@@ -1518,24 +1533,31 @@ public:
         }
     }
 
-    virtual void typecheck(const core::GlobalState &gs, core::FileRef file, cfg::CFG &cfg,
-                           const ast::MethodDef *methodDef) const override {
+    void typecheckMethod(const core::GlobalState &gs, core::FileRef file,
+                         const ast::MethodDef &methodDef) const override {
+        if (this->doNothing() || methodDef.name == core::Names::staticInit()) {
+            return;
+        }
+        auto scipState = this->getSCIPState();
+        auto methodLoc = core::Loc(file, methodDef.loc);
+        auto sym = scip_indexer::GenericSymbolRef::method(methodDef.symbol);
+        auto status = scipState->saveDefinition(gs, file, sym, /*aliasedSymbol*/ nullopt, /*loc*/ nullopt, methodLoc);
+        ENFORCE(status.ok());
+    }
+
+    void typecheck(const core::GlobalState &gs, core::FileRef file, cfg::CFG &cfg,
+                   const ast::MethodDef *methodDef) const override {
         if (this->doNothing()) {
             return;
         }
         auto scipState = this->getSCIPState();
-        if (methodDef != nullptr && methodDef->name != core::Names::staticInit()) {
-            auto methodLoc = core::Loc(file, methodDef->loc);
-            auto sym = scip_indexer::GenericSymbolRef::method(methodDef->symbol);
-            auto status = scipState->saveDefinition(gs, file, sym, /*aliasedSymbol*/ nullopt, /*loc*/ nullopt, methodLoc);
-            ENFORCE(status.ok());
-        }
-
         // It is not useful to emit occurrences for method bodies that are synthesized.
         //
         // However, some of these methods are synthesized based on code blocks, particularly
         // test code. For that code, continue emitting occurrence data.
-        if (methodDef != nullptr && methodDef->flags.isRewriterSynthesized && !isSyntheticMethodWithHandwrittenBody(gs, methodDef->name)) {
+        if (methodDef != nullptr &&
+            (methodDef->flags.isRewriterSynthesized || methodDef->flags.isAttrBestEffortUIOnly) &&
+            !isSyntheticMethodWithHandwrittenBody(gs, methodDef->name)) {
             return;
         }
 

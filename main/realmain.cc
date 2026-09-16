@@ -517,6 +517,9 @@ int realmain(int argc, char *argv[]) {
     }
 
     gs->semanticExtensions = move(extensions);
+    for (const auto &extension : gs->semanticExtensions) {
+        gs->isSCIPRuby |= extension->isSCIPRuby();
+    }
 
     logger->trace("done building initial global state");
 

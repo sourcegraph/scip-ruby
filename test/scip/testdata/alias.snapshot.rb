@@ -31,7 +31,6 @@
 #       ^^^^ definition [..] Mod1#
    ABC = 10
 #  ^^^ definition [..] Mod1#ABC.
-#  ^^^^^^^^ reference [..] Mod1#ABC.
  end
 #  ⌃ enclosing_range_end [..] Mod1#
  
@@ -43,7 +42,6 @@
 #  relation reference=[..] Mod1#ABC.
 #        ^^^^ reference [..] Mod1#
 #              ^^^ reference [..] Mod1#ABC.
-#              ^^^ reference [..] Mod2#FEG.
  end
 #  ⌃ enclosing_range_end [..] Mod2#
  
@@ -84,7 +82,6 @@
 #  ^^^ definition [..] X#All.
 #               ^ reference [..] X#A.
 #                  ^ reference [..] X#B.
-#                         ^^^^^^^^ definition local 4$119448696
 #                               ^ reference [..] X#
  end
 #  ⌃ enclosing_range_end [..] X#

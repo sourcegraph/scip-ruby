@@ -28,7 +28,7 @@
 #               ^^^ definition local 2$1182647655
 #               ^^^ definition local 3$1182647655
    loopyDoopy(...)
-#  ^^^^^^^^^^^^^^^ reference local 1$1182647655
+#  ^^^^^^^^^^^^^^^ reference local 3$1182647655
    return
  end
 #  ⌃ enclosing_range_end [..] Object#loopyDoopy().

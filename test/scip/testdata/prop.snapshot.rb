@@ -27,7 +27,6 @@
 #                     ^ reference [..] T#
 #                       ^^^^^^ reference [..] `<Class:T>`#unsafe().
 #                                    ^ reference [..] T#
-#                                    ^^^^^^^^^^^^^^^^^ definition local 1$1867563647
 #                                      ^^^^^^^ reference [..] `<Class:T>`#nilable().
 #                                              ^^^^^^ reference [..] String#
 #                                                          ⌃ enclosing_range_end [..] SomeODM#foo2().
@@ -37,7 +36,6 @@
 #    ⌄ enclosing_range_start [..] SomeODM#`foo2=`().
      def foo2=(arg0); T.cast(nil, String); end
 #        ^^^^^ definition [..] SomeODM#`foo2=`().
-#                                 ^^^^^^ definition local 1$2116144614
 #                                 ^^^^^^ reference [..] String#
 #                                            ⌃ enclosing_range_end [..] SomeODM#`foo2=`().
  end
@@ -120,56 +118,35 @@
 #                                                      ⌃ enclosing_range_end [..] AdvancedODM#enum_prop().
  
 #    ⌄ enclosing_range_start [..] AdvancedODM#`foreign_lazy=`().
-#    ⌄ enclosing_range_start [..] AdvancedODM#`foreign_lazy_!`().
 #    ⌄ enclosing_range_start [..] AdvancedODM#foreign_lazy().
-#    ⌄ enclosing_range_start [..] AdvancedODM#foreign_lazy_().
      prop :foreign_lazy, String, foreign: -> {ForeignClass}
-#    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Boolean.
-#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_lazy=`().
-#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_lazy_!`().
 #          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_lazy().
-#          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_lazy_().
+#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_lazy=`().
 #                        ^^^^^^ reference [..] String#
 #                                         ^^ reference [..] Kernel#
 #                                         ^^ reference [..] Kernel#lambda().
 #                                             ^^^^^^^^^^^^ reference [..] ForeignClass#
 #                                                         ⌃ enclosing_range_end [..] AdvancedODM#`foreign_lazy=`().
-#                                                         ⌃ enclosing_range_end [..] AdvancedODM#`foreign_lazy_!`().
 #                                                         ⌃ enclosing_range_end [..] AdvancedODM#foreign_lazy().
-#                                                         ⌃ enclosing_range_end [..] AdvancedODM#foreign_lazy_().
 #    ⌄ enclosing_range_start [..] AdvancedODM#`foreign_proc=`().
-#    ⌄ enclosing_range_start [..] AdvancedODM#`foreign_proc_!`().
 #    ⌄ enclosing_range_start [..] AdvancedODM#foreign_proc().
-#    ⌄ enclosing_range_start [..] AdvancedODM#foreign_proc_().
      prop :foreign_proc, String, foreign: proc {ForeignClass}
-#    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Boolean.
 #          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_proc=`().
-#          ^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_proc_!`().
 #          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_proc().
-#          ^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_proc_().
 #                        ^^^^^^ reference [..] String#
 #                                         ^^^^ reference [..] Kernel#proc().
 #                                               ^^^^^^^^^^^^ reference [..] ForeignClass#
 #                                                           ⌃ enclosing_range_end [..] AdvancedODM#`foreign_proc=`().
-#                                                           ⌃ enclosing_range_end [..] AdvancedODM#`foreign_proc_!`().
 #                                                           ⌃ enclosing_range_end [..] AdvancedODM#foreign_proc().
-#                                                           ⌃ enclosing_range_end [..] AdvancedODM#foreign_proc_().
 #    ⌄ enclosing_range_start [..] AdvancedODM#`foreign_invalid=`().
-#    ⌄ enclosing_range_start [..] AdvancedODM#`foreign_invalid_!`().
 #    ⌄ enclosing_range_start [..] AdvancedODM#foreign_invalid().
-#    ⌄ enclosing_range_start [..] AdvancedODM#foreign_invalid_().
      prop :foreign_invalid, String, foreign: proc { :not_a_type }
-#    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] T#Boolean.
 #          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_invalid=`().
-#          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#`foreign_invalid_!`().
 #          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_invalid().
-#          ^^^^^^^^^^^^^^^ definition [..] AdvancedODM#foreign_invalid_().
 #                           ^^^^^^ reference [..] String#
 #                                            ^^^^ reference [..] Kernel#proc().
 #                                                               ⌃ enclosing_range_end [..] AdvancedODM#`foreign_invalid=`().
-#                                                               ⌃ enclosing_range_end [..] AdvancedODM#`foreign_invalid_!`().
 #                                                               ⌃ enclosing_range_end [..] AdvancedODM#foreign_invalid().
-#                                                               ⌃ enclosing_range_end [..] AdvancedODM#foreign_invalid_().
  
 #    ⌄ enclosing_range_start [..] AdvancedODM#`ifunset=`().
 #    ⌄ enclosing_range_start [..] AdvancedODM#ifunset().
@@ -199,8 +176,8 @@
 #    ⌄ enclosing_range_start [..] AdvancedODM#`hash_rules=`().
 #    ⌄ enclosing_range_start [..] AdvancedODM#hash_rules().
      prop :hash_rules, String, { enum: ["hello", "goodbye" ] }
-#          ^^^^^^^^^^ definition [..] AdvancedODM#`hash_rules=`().
 #          ^^^^^^^^^^ definition [..] AdvancedODM#hash_rules().
+#          ^^^^^^^^^^ definition [..] AdvancedODM#`hash_rules=`().
 #                      ^^^^^^ reference [..] String#
 #                                                            ⌃ enclosing_range_end [..] AdvancedODM#`hash_rules=`().
 #                                                            ⌃ enclosing_range_end [..] AdvancedODM#hash_rules().
@@ -263,8 +240,8 @@
    timestamped_token_prop
 #  ^^^^^^^^^^^^^^^^^^^^^^ reference [..] `<Class:PropHelpers2>`#timestamped_token_prop().
 #  ^^^^^^^^^^^^^^^^^^^^^^ reference [..] String#
-#              ^^^^^ definition [..] PropHelpers2#`token=`().
 #              ^^^^^ definition [..] PropHelpers2#token().
+#              ^^^^^ definition [..] PropHelpers2#`token=`().
 #                       ⌃ enclosing_range_end [..] PropHelpers2#`token=`().
 #                       ⌃ enclosing_range_end [..] PropHelpers2#token().
 #  ⌄ enclosing_range_start [..] PropHelpers2#created().
@@ -286,7 +263,7 @@
      SomeODM.new.foo = 'b'
 #    ^^^^^^^ reference [..] SomeODM#
 #            ^^^ reference [..] Class#new().
-#                ^^^^^ reference [..] SomeODM#`foo=`().
+#                ^^^ reference [..] SomeODM#`foo=`().
      SomeODM.new.foo2
 #    ^^^^^^^ reference [..] SomeODM#
 #            ^^^ reference [..] Class#new().
@@ -294,7 +271,7 @@
      SomeODM.new.foo2 = 'b'
 #    ^^^^^^^ reference [..] SomeODM#
 #            ^^^ reference [..] Class#new().
-#                ^^^^^^ reference [..] SomeODM#`foo2=`().
+#                ^^^^ reference [..] SomeODM#`foo2=`().
  
      AdvancedODM.new.default
 #    ^^^^^^^^^^^ reference [..] AdvancedODM#
@@ -336,7 +313,7 @@
      AdvancedODM.new.enum_prop = "hello"
 #    ^^^^^^^^^^^ reference [..] AdvancedODM#
 #                ^^^ reference [..] Class#new().
-#                    ^^^^^^^^^^^ reference [..] AdvancedODM#`enum_prop=`().
+#                    ^^^^^^^^^ reference [..] AdvancedODM#`enum_prop=`().
  
      AdvancedODM.new.foreign_
 #    ^^^^^^^^^^^ reference [..] AdvancedODM#
@@ -347,13 +324,11 @@
      AdvancedODM.new.foreign_lazy_
 #    ^^^^^^^^^^^ reference [..] AdvancedODM#
 #                ^^^ reference [..] Class#new().
-#                    ^^^^^^^^^^^^^ reference [..] AdvancedODM#foreign_lazy_().
  
      # Check that the method still exists even if we can't parse the type
      AdvancedODM.new.foreign_invalid_
 #    ^^^^^^^^^^^ reference [..] AdvancedODM#
 #                ^^^ reference [..] Class#new().
-#                    ^^^^^^^^^^^^^^^^ reference [..] AdvancedODM#foreign_invalid_().
  
      PropHelpers.new.token
 #    ^^^^^^^^^^^ reference [..] PropHelpers#
@@ -362,11 +337,11 @@
      PropHelpers.new.token = "tok_token"
 #    ^^^^^^^^^^^ reference [..] PropHelpers#
 #                ^^^ reference [..] Class#new().
-#                    ^^^^^^^ reference [..] PropHelpers#`token=`().
+#                    ^^^^^ reference [..] PropHelpers#`token=`().
      PropHelpers.new.token = nil
 #    ^^^^^^^^^^^ reference [..] PropHelpers#
 #                ^^^ reference [..] Class#new().
-#                    ^^^^^^^ reference [..] PropHelpers#`token=`().
+#                    ^^^^^ reference [..] PropHelpers#`token=`().
  
      PropHelpers.new.created
 #    ^^^^^^^^^^^ reference [..] PropHelpers#
@@ -375,11 +350,11 @@
      PropHelpers.new.created = 0.0
 #    ^^^^^^^^^^^ reference [..] PropHelpers#
 #                ^^^ reference [..] Class#new().
-#                    ^^^^^^^^^ reference [..] PropHelpers#`created=`().
+#                    ^^^^^^^ reference [..] PropHelpers#`created=`().
      PropHelpers.new.created = nil
 #    ^^^^^^^^^^^ reference [..] PropHelpers#
 #                ^^^ reference [..] Class#new().
-#                    ^^^^^^^^^ reference [..] PropHelpers#`created=`().
+#                    ^^^^^^^ reference [..] PropHelpers#`created=`().
  
      PropHelpers2.new.token
 #    ^^^^^^^^^^^^ reference [..] PropHelpers2#
@@ -388,11 +363,11 @@
      PropHelpers2.new.token = "tok_token"
 #    ^^^^^^^^^^^^ reference [..] PropHelpers2#
 #                 ^^^ reference [..] Class#new().
-#                     ^^^^^^^ reference [..] PropHelpers2#`token=`().
+#                     ^^^^^ reference [..] PropHelpers2#`token=`().
      PropHelpers2.new.token = nil
 #    ^^^^^^^^^^^^ reference [..] PropHelpers2#
 #                 ^^^ reference [..] Class#new().
-#                     ^^^^^^^ reference [..] PropHelpers2#`token=`().
+#                     ^^^^^ reference [..] PropHelpers2#`token=`().
  
      PropHelpers2.new.created
 #    ^^^^^^^^^^^^ reference [..] PropHelpers2#
@@ -413,10 +388,10 @@
      AdvancedODM.new.ifunset = nil
 #    ^^^^^^^^^^^ reference [..] AdvancedODM#
 #                ^^^ reference [..] Class#new().
-#                    ^^^^^^^^^ reference [..] AdvancedODM#`ifunset=`().
+#                    ^^^^^^^ reference [..] AdvancedODM#`ifunset=`().
      AdvancedODM.new.ifunset_nilable = nil
 #    ^^^^^^^^^^^ reference [..] AdvancedODM#
 #                ^^^ reference [..] Class#new().
-#                    ^^^^^^^^^^^^^^^^^ reference [..] AdvancedODM#`ifunset_nilable=`().
+#                    ^^^^^^^^^^^^^^^ reference [..] AdvancedODM#`ifunset_nilable=`().
  end
 #  ⌃ enclosing_range_end [..] Object#main().

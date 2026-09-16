@@ -279,8 +279,6 @@
 #      ^^^ definition [..] DD1#
    @@x = T.let(0, Integer)
 #  ^^^ definition [..] `<Class:DD1>`#`@@x`.
-#  ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] `<Class:DD1>`#`@@x`.
-#                 ^^^^^^^ definition local 1$119448696
 #                 ^^^^^^^ reference [..] Integer#
  end
 #  ⌃ enclosing_range_end [..] DD1#
@@ -368,7 +366,6 @@
      @x = T.let(0, Integer)
 #    ^^ definition [..] F1#`@x`.
 #    ^^^^^^^^^^^^^^^^^^^^^^ reference [..] F1#`@x`.
-#                  ^^^^^^^ definition local 1$3465713227
 #                  ^^^^^^^ reference [..] Integer#
    end
 #    ⌃ enclosing_range_end [..] F1#initialize().

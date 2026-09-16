@@ -75,7 +75,6 @@
 #       ^^ definition [..] M4#
    K = 0
 #  ^ definition [..] M4#K.
-#  ^^^^^ reference [..] M4#K.
  end
 #  ⌃ enclosing_range_end [..] M4#
  

@@ -39,7 +39,6 @@
      @a = T.let(1, Integer)
 #    ^^ definition [..] MyTest#`@a`.
 #    ^^^^^^^^^^^^^^^^^^^^^^ reference [..] MyTest#`@a`.
-#                  ^^^^^^^ definition local 1$2938098190
 #                  ^^^^^^^ reference [..] Integer#
    end
 #    ⌃ enclosing_range_end [..] MyTest#`<before>`().
@@ -111,7 +110,6 @@
      @a = T.let(1, Integer)
 #    ^^ definition [..] NoParentClass#`@a`.
 #    ^^^^^^^^^^^^^^^^^^^^^^ reference [..] NoParentClass#`@a`.
-#                  ^^^^^^^ definition local 1$2938098190
 #                  ^^^^^^^ reference [..] Integer#
    end
 #    ⌃ enclosing_range_end [..] NoParentClass#`<before>`().

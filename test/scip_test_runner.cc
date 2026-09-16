@@ -128,6 +128,7 @@ TEST_CASE("GemMapParsing") {
     auto errorCollector = make_shared<core::ErrorCollector>();
     auto errorQueue = make_shared<core::ErrorQueue>(*logger, *logger, errorCollector);
     core::GlobalState gs(errorQueue);
+    gs.isSCIPRuby = true;
     gs.initEmpty(); // needed for proper file table access
 
     core::FileRef nested, flippedOrder, missing, absolute1, absolute2, absolute3, unnormalized1, unnormalized2;
@@ -189,6 +190,7 @@ TEST_CASE("GemInference") {
     auto errorCollector = make_shared<core::ErrorCollector>();
     auto errorQueue = make_shared<core::ErrorQueue>(*logger, *logger, errorCollector);
     core::GlobalState gs(errorQueue);
+    gs.isSCIPRuby = true;
     gs.initEmpty(); // needed for proper file table access
 
     core::FileRef externalGemRBI, annotationsRBI, dslRBI, todoRBI, hiddenDefsRBI, notSorbetRBI;
@@ -230,10 +232,28 @@ public:
         }
     }
 
+    void preTransformClassDef(core::Context ctx, const ast::ClassDef &c) {
+        auto symbol = c.symbol.lookupStaticInit(ctx);
+        if (!infer::Inference::willRun(ctx, c.declLoc, symbol)) {
+            return;
+        }
+        auto cfg = cfg::CFGBuilder::buildFor(ctx.withOwner(symbol), c, symbol);
+        cfg = infer::Inference::run(ctx.withOwner(symbol), move(cfg));
+        if (cfg) {
+            for (auto &extension : ctx.state.semanticExtensions) {
+                extension->typecheck(ctx, ctx.file, *cfg);
+            }
+        }
+        cfgs.push_back(move(cfg));
+    }
+
     vector<unique_ptr<cfg::CFG>> cfgs;
     void preTransformMethodDef(core::Context ctx, const ast::MethodDef &m) {
+        for (auto &extension : ctx.state.semanticExtensions) {
+            extension->typecheckMethod(ctx, ctx.file, m);
+        }
 
-        if (m.symbol.data(ctx)->flags.isOverloaded) {
+        if (!infer::Inference::willRun(ctx, m.declLoc, m.symbol)) {
             return;
         }
         auto cfg = cfg::CFGBuilder::buildFor(ctx.withOwner(m.symbol), m);
@@ -559,6 +579,7 @@ void test_one_gem(Expectations &test, const TestSettings &settings) {
     auto errorCollector = make_shared<core::ErrorCollector>();
     auto errorQueue = make_shared<core::ErrorQueue>(*logger, *logger, errorCollector);
     core::GlobalState gs(errorQueue);
+    gs.isSCIPRuby = true;
 
     gs.censorForSnapshotTests = true; // TODO(varun): Not 100% sure if this is needed?
     // TODO(varun): Should we add the no-stdlib branch here?
@@ -649,7 +670,8 @@ void test_one_gem(Expectations &test, const TestSettings &settings) {
     }
 
     scip::Index index;
-    index.ParseFromIstream(&indexFile);
+    REQUIRE(index.ParseFromIstream(&indexFile));
+    REQUIRE(index.documents_size() > 0);
 
     if (update) {
         updateSnapshots(index, settings, test.folder);

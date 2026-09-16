@@ -86,8 +86,8 @@
        x = 2
 #      ^ reference (write) local 1$2602907825
      when (3 == (x = 1))
-#               ^^^^^^^ reference local 1$2602907825
 #                ^ reference (write) local 1$2602907825
+#                ^^^^^ reference local 1$2602907825
        x = 0
 #      ^ reference (write) local 1$2602907825
      else
@@ -241,8 +241,10 @@
 #      ^ definition local 2$2191960030
 #           ^^ reference local 1$2191960030
      puts x if x==2..x==8
+#    ^^^^ reference [..] Kernel#puts().
 #         ^ reference local 2$2191960030
      puts x+1 if x==4...x==6
+#    ^^^^ reference [..] Kernel#puts().
 #         ^ reference local 2$2191960030
    end
  end

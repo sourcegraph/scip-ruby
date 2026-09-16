@@ -1344,6 +1344,9 @@ public:
     }
 
     void preTransformMethodDef(core::Context ctx, const ast::MethodDef &m) {
+        for (auto &extension : ctx.state.semanticExtensions) {
+            extension->typecheckMethod(ctx, ctx.file, m);
+        }
         if (!infer::Inference::willRun(ctx, m.declLoc, m.symbol)) {
             return;
         }

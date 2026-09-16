@@ -63,16 +63,16 @@
 #             ^^^ reference [..] Class#new().
  t.foo = t.foo + 1
 #^ reference local 1$119448696
-#  ^^^^^ reference [..] Flatfile#`foo=`().
+#  ^^^ reference [..] Flatfile#`foo=`().
 #        ^ reference local 1$119448696
 #          ^^^ reference [..] Flatfile#foo().
  t.bar = t.bar + 1
 #^ reference local 1$119448696
-#  ^^^^^ reference [..] Flatfile#`bar=`().
+#  ^^^ reference [..] Flatfile#`bar=`().
 #        ^ reference local 1$119448696
 #          ^^^ reference [..] Flatfile#bar().
  t.baz = t.baz + 1
 #^ reference local 1$119448696
-#  ^^^^^ reference [..] Flatfile#`baz=`().
+#  ^^^ reference [..] Flatfile#`baz=`().
 #        ^ reference local 1$119448696
 #          ^^^ reference [..] Flatfile#baz().

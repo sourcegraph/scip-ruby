@@ -40,8 +40,6 @@
 #      ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Kernel#
 #      ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Kernel#raise().
 #      ^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Module#
-#                     ^^^^^^^ definition local 1$95163902
-#                     ^^^^^^^ definition local 3$119448696
 #                     ^^^^^^^ reference [..] Integer#
      end
 #      ⌃ enclosing_range_end [..] MyTest#`<it 'allows let-ed constants inside of IT'>`().
@@ -92,7 +90,6 @@
 #    ^^^^^^ definition [..] MyTest#`<before>`().
          @foo = T.let(3, Integer)
 #        ^^^^ definition [..] MyTest#`@foo`.
-#                        ^^^^^^^ definition local 1$2938098190
 #                        ^^^^^^^ reference [..] Integer#
          instance_helper
 #        ^^^^^^^^^^^^^^^ reference [..] MyTest#instance_helper().
@@ -104,7 +101,6 @@
 #       ^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'can read foo'>`().
          T.assert_type!(@foo, Integer)
 #                       ^^^^ reference [..] MyTest#`@foo`.
-#                             ^^^^^^^ definition local 1$3909275672
 #                             ^^^^^^^ reference [..] Integer#
          instance_helper
 #        ^^^^^^^^^^^^^^^ reference [..] MyTest#instance_helper().
@@ -121,6 +117,7 @@
      describe Object do
 #             ^^^^^^ reference [..] MyTest#
 #             ^^^^^^ definition [..] MyTest#`<describe 'Object'>`#
+#             ^^^^^^ reference [..] Object#
 #        ⌄ enclosing_range_start [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
          it Object do
 #           ^^^^^^ definition [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().

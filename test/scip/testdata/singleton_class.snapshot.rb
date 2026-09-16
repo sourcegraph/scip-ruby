@@ -52,7 +52,7 @@
 #        ^^^^^^^^^^^^ reference [..] `<Class:K>`#read_counter().
    K.name = "k"
 #  ^ reference [..] K#
-#    ^^^^^^ reference [..] `<Class:K>`#`name=`().
+#    ^^^^ reference [..] `<Class:K>`#`name=`().
    _ = K.name
 #  ^ reference (write) local 2$2530843406
 #      ^ reference [..] K#

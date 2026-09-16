@@ -38,6 +38,7 @@
 #  ⌄ enclosing_range_start [..] EncryptedProp#encrypted_foo().
 #  ⌄ enclosing_range_start [..] EncryptedProp#foo().
    encrypted_prop :foo
+#  ^^^^^^^^^^^^^^ reference [..] `<Class:EncryptedProp>`#encrypted_prop().
 #  ^^^^^^^^^^^^^^^^^^^ reference [..] String#
 #  ^^^^^^^^^^^^^^^^^^^ reference [..] Opus#DB#
 #  ^^^^^^^^^^^^^^^^^^^ reference [..] Opus#DB#Model#
@@ -56,6 +57,7 @@
 #  ⌄ enclosing_range_start [..] EncryptedProp#bar().
 #  ⌄ enclosing_range_start [..] EncryptedProp#encrypted_bar().
    encrypted_prop :bar, migrating: true, immutable: true
+#  ^^^^^^^^^^^^^^ reference [..] `<Class:EncryptedProp>`#encrypted_prop().
 #  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Opus#DB#Model#Mixins#Encryptable#
 #  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Opus#DB#
 #  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] Opus#DB#Model#
@@ -77,11 +79,11 @@
    EncryptedProp.new.foo = "hello"
 #  ^^^^^^^^^^^^^ reference [..] EncryptedProp#
 #                ^^^ reference [..] Class#new().
-#                    ^^^^^ reference [..] EncryptedProp#`foo=`().
+#                    ^^^ reference [..] EncryptedProp#`foo=`().
    EncryptedProp.new.foo = nil
 #  ^^^^^^^^^^^^^ reference [..] EncryptedProp#
 #                ^^^ reference [..] Class#new().
-#                    ^^^^^ reference [..] EncryptedProp#`foo=`().
+#                    ^^^ reference [..] EncryptedProp#`foo=`().
    return EncryptedProp.new.encrypted_foo
 #         ^^^^^^^^^^^^^ reference [..] EncryptedProp#
 #                       ^^^ reference [..] Class#new().

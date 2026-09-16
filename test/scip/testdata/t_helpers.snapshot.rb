@@ -32,7 +32,6 @@
 #                      ^ definition local 1$3012239264
      T.assert_type!(x, Integer)
 #                   ^ reference local 1$3012239264
-#                      ^^^^^^^ definition local 2$3012239264
 #                      ^^^^^^^ reference [..] Integer#
      x + 1
 #    ^ reference local 1$3012239264
@@ -74,10 +73,9 @@
      proc do
 #    ^^^^ reference [..] Kernel#proc().
        T.bind(self, Integer)
-#                   ^^^^^^^ definition local 1$1938721546
 #                   ^^^^^^^ reference [..] Integer#
        _ = self + 1
-#      ^ definition local 3$1938721546
+#      ^ definition local 2$1938721546
 #               ^ reference [..] Integer#+().
        nil
      end

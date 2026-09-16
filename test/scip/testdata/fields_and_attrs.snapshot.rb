@@ -136,10 +136,10 @@
    def init
 #      ^^^^ definition [..] P#init().
      self.a = self.r
-#         ^^^ reference [..] P#`a=`().
+#         ^ reference [..] P#`a=`().
 #                  ^ reference [..] P#r().
      self.w = self.a
-#         ^^^ reference [..] P#`w=`().
+#         ^ reference [..] P#`w=`().
 #                  ^ reference [..] P#a().
    end
 #    ⌃ enclosing_range_end [..] P#init().
@@ -169,12 +169,12 @@
 #        ^^^ reference [..] Class#new().
    p.a = p.r
 #  ^ reference local 1$2121829932
-#    ^^^ reference [..] P#`a=`().
+#    ^ reference [..] P#`a=`().
 #        ^ reference local 1$2121829932
 #          ^ reference [..] P#r().
    p.w = p.a
 #  ^ reference local 1$2121829932
-#    ^^^ reference [..] P#`w=`().
+#    ^ reference [..] P#`w=`().
 #        ^ reference local 1$2121829932
 #          ^ reference [..] P#a().
  end

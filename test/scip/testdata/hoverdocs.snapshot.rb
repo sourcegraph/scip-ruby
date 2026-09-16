@@ -249,7 +249,7 @@
  
  # Yet another global function
  sig { returns(T::Integer) }
-#^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
+#^^^ reference [..] T#Sig#sig().
 #      ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #              ^ reference [..] T#
 #⌄ enclosing_range_start [..] Object#f2().
@@ -283,7 +283,7 @@
 #          ^^^ reference [..] T#Sig#
  
  sig { returns(T::Integer) }
-#^^^ reference [..] Sorbet#Private#`<Class:Static>`#sig().
+#^^^ reference [..] T#Sig#sig().
 #      ^^^^^^^ reference [..] T#Private#Methods#DeclBuilder#returns().
 #              ^ reference [..] T#
 #⌄ enclosing_range_start [..] Object#f4().

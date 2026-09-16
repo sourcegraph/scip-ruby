@@ -83,16 +83,16 @@
    def usages
 #      ^^^^^^ definition [..] MW#usages().
      self.both = 1
-#         ^^^^^^ reference [..] MW#`both=`().
+#         ^^^^ reference [..] MW#`both=`().
    end
 #    ⌃ enclosing_range_end [..] MW#usages().
  
    self.both = 1
-#       ^^^^^^ reference [..] `<Class:MW>`#`both=`().
+#       ^^^^ reference [..] `<Class:MW>`#`both=`().
    self.no_instance = 1
-#       ^^^^^^^^^^^^^ reference [..] `<Class:MW>`#`no_instance=`().
+#       ^^^^^^^^^^^ reference [..] `<Class:MW>`#`no_instance=`().
    self.no_instance_writer = 1
-#       ^^^^^^^^^^^^^^^^^^^^ reference [..] `<Class:MW>`#`no_instance_writer=`().
+#       ^^^^^^^^^^^^^^^^^^ reference [..] `<Class:MW>`#`no_instance_writer=`().
  end
 #  ⌃ enclosing_range_end [..] MW#
  
@@ -170,10 +170,10 @@
      both
 #    ^^^^ reference [..] MA#both().
      self.both = 1
-#         ^^^^^^ reference [..] MA#`both=`().
+#         ^^^^ reference [..] MA#`both=`().
  
      self.no_instance_reader= 1
-#         ^^^^^^^^^^^^^^^^^^^ reference [..] MA#`no_instance_reader=`().
+#         ^^^^^^^^^^^^^^^^^^ reference [..] MA#`no_instance_reader=`().
  
      no_instance_writer
 #    ^^^^^^^^^^^^^^^^^^ reference [..] MA#no_instance_writer().
@@ -183,21 +183,21 @@
    both
 #  ^^^^ reference [..] `<Class:MA>`#both().
    self.both = 1
-#       ^^^^^^ reference [..] `<Class:MA>`#`both=`().
+#       ^^^^ reference [..] `<Class:MA>`#`both=`().
  
    no_instance
 #  ^^^^^^^^^^^ reference [..] `<Class:MA>`#no_instance().
    self.no_instance = 1
-#       ^^^^^^^^^^^^^ reference [..] `<Class:MA>`#`no_instance=`().
+#       ^^^^^^^^^^^ reference [..] `<Class:MA>`#`no_instance=`().
  
    no_instance_reader
 #  ^^^^^^^^^^^^^^^^^^ reference [..] `<Class:MA>`#no_instance_reader().
    self.no_instance_reader = 1
-#       ^^^^^^^^^^^^^^^^^^^^ reference [..] `<Class:MA>`#`no_instance_reader=`().
+#       ^^^^^^^^^^^^^^^^^^ reference [..] `<Class:MA>`#`no_instance_reader=`().
  
    no_instance_writer
 #  ^^^^^^^^^^^^^^^^^^ reference [..] `<Class:MA>`#no_instance_writer().
    self.no_instance_writer = 1
-#       ^^^^^^^^^^^^^^^^^^^^ reference [..] `<Class:MA>`#`no_instance_writer=`().
+#       ^^^^^^^^^^^^^^^^^^ reference [..] `<Class:MA>`#`no_instance_writer=`().
  end
 #  ⌃ enclosing_range_end [..] MA#

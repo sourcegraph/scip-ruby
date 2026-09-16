@@ -16,7 +16,6 @@
 #  ^^^^ definition local 3$119448696
  
    sig { params(x: Elem).void }
-#                  ^^^^ definition local 2$3465713227
 #  ⌄ enclosing_range_start [..] GenericBox#initialize().
    def initialize(x)
 #      ^^^^^^^^^^ definition [..] GenericBox#initialize().

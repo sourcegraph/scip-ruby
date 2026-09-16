@@ -17,13 +17,13 @@
 #^ definition [..] A.
 #documentation
 #| ```ruby
-#| A (T.untyped)
+#| A ([String, String])
 #| ```
  B = %W[#{X} Y].freeze
 #^ definition [..] B.
 #documentation
 #| ```ruby
-#| B (T.untyped)
+#| B ([String, String])
 #| ```
 #         ^ reference [..] X.
  
@@ -44,13 +44,13 @@
 #  ^ definition [..] M#A.
 #  documentation
 #  | ```ruby
-#  | A (T.untyped)
+#  | A ([String, String, String])
 #  | ```
    B = %W[#{X} Y Z].freeze
 #  ^ definition [..] M#B.
 #  documentation
 #  | ```ruby
-#  | B (T.untyped)
+#  | B ([String, String, String])
 #  | ```
 #           ^ reference [..] X.
  end
