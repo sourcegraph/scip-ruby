@@ -15,11 +15,11 @@
 #  ⌄ enclosing_range_start [..] Container#use_must().
    def use_must(x)
 #      ^^^^^^^^ definition [..] Container#use_must().
-#               ^ definition local 1$2138952860
+#               ^ definition local 1$1571081736
      T.must(x).length
 #    ^ reference [..] T#
 #      ^^^^ reference [..] `<Class:T>`#must().
-#           ^ reference local 1$2138952860
+#           ^ reference local 1$1571081736
 #              ^^^^^^ reference [..] String#length().
    end
 #    ⌃ enclosing_range_end [..] Container#use_must().
@@ -29,12 +29,12 @@
 #  ⌄ enclosing_range_start [..] Container#use_assert_type().
    def use_assert_type(x)
 #      ^^^^^^^^^^^^^^^ definition [..] Container#use_assert_type().
-#                      ^ definition local 1$3012239264
+#                      ^ definition local 1$1026988420
      T.assert_type!(x, Integer)
-#                   ^ reference local 1$3012239264
+#                   ^ reference local 1$1026988420
 #                      ^^^^^^^ reference [..] Integer#
      x + 1
-#    ^ reference local 1$3012239264
+#    ^ reference local 1$1026988420
    end
 #    ⌃ enclosing_range_end [..] Container#use_assert_type().
  
@@ -49,16 +49,16 @@
 #  ⌄ enclosing_range_start [..] Container#use_absurd().
    def use_absurd(x)
 #      ^^^^^^^^^^ definition [..] Container#use_absurd().
-#                 ^ definition local 1$4004738816
+#                 ^ definition local 1$908790020
      case x
-#         ^ reference local 1$4004738816
+#         ^ reference local 1$908790020
      when Integer then x + 1
 #         ^^^^^^^ reference [..] Integer#
-#                      ^ reference local 1$4004738816
+#                      ^ reference local 1$908790020
 #                        ^ reference [..] Integer#+().
      when String  then x.length
 #         ^^^^^^ reference [..] String#
-#                      ^ reference local 1$4004738816
+#                      ^ reference local 1$908790020
 #                        ^^^^^^ reference [..] String#length().
      else
        T.absurd(x)
@@ -75,7 +75,7 @@
        T.bind(self, Integer)
 #                   ^^^^^^^ reference [..] Integer#
        _ = self + 1
-#      ^ definition local 2$1938721546
+#      ^ definition local 2$1609525774
 #               ^ reference [..] Integer#+().
        nil
      end

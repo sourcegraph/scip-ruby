@@ -421,6 +421,98 @@ ast::ExpressionPtr prepareParameterizedBody(core::MutableContext ctx, core::Name
 ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::ExpressionPtr &maybeSharedExamplesName,
                              ast::Send *send, bool insideDescribe);
 
+// A Ruby block can capture a local from an enclosing block. Replacing either
+// side with a class or method loses that binding. Keep these blocks intact when
+// indexing; ordinary Sorbet continues to use its test DSL rewrites.
+class CapturedTestLocals {
+    struct Scope {
+        UnorderedMap<core::NameRef, size_t> bindings;
+        bool crossesRewrite = false;
+        bool inRoot = true;
+    };
+    vector<Scope> scopes;
+    UnorderedSet<const ast::Block *> rewrittenBlocks;
+
+    void define(const ast::ExpressionPtr &expr, bool shadow = false) {
+        if (auto local = ast::cast_tree<ast::UnresolvedIdent>(expr)) {
+            if (local->kind == ast::UnresolvedIdent::Kind::Local) {
+                auto &bindings = scopes.back().bindings;
+                if (shadow || !bindings.contains(local->name)) {
+                    bindings[local->name] = scopes.size() - 1;
+                }
+            }
+        } else if (auto rest = ast::cast_tree<ast::RestParam>(expr)) {
+            define(rest->expr, shadow);
+        } else if (auto keyword = ast::cast_tree<ast::KeywordArg>(expr)) {
+            define(keyword->expr, shadow);
+        } else if (auto optional = ast::cast_tree<ast::OptionalParam>(expr)) {
+            define(optional->expr, shadow);
+        } else if (auto block = ast::cast_tree<ast::BlockParam>(expr)) {
+            define(block->expr, shadow);
+        } else if (auto local = ast::cast_tree<ast::ShadowArg>(expr)) {
+            define(local->expr, shadow);
+        }
+    }
+
+public:
+    bool captures = false;
+
+    void preTransformSend(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        auto &send = ast::cast_tree_nonnull<ast::Send>(tree);
+        if (!send.hasBlock()) {
+            return;
+        }
+        if (nameForTestHelperMethod(ctx, send, true).exists() ||
+            send.fun == core::Names::let() || send.fun == core::Names::let_bang() ||
+            send.fun == core::Names::subject() || send.fun == core::Names::describe() ||
+            send.fun == core::Names::context() || send.fun == core::Names::exampleGroup() ||
+            send.fun == core::Names::xdescribe() || send.fun == core::Names::fdescribe() ||
+            send.fun == core::Names::xcontext() || send.fun == core::Names::fcontext() ||
+            send.fun == core::Names::its() || isSharedExamplesName(send.fun)) {
+            rewrittenBlocks.insert(send.block());
+        }
+    }
+
+    void preTransformBlock(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        auto &block = ast::cast_tree_nonnull<ast::Block>(tree);
+        Scope scope = scopes.empty() ? Scope{} : scopes.back();
+        scope.crossesRewrite |= !scopes.empty() && rewrittenBlocks.contains(&block);
+        scopes.emplace_back(std::move(scope));
+        for (const auto &param : block.params) {
+            define(param, true);
+        }
+    }
+    void postTransformBlock(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        scopes.pop_back();
+    }
+    void preTransformClassDef(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        scopes.emplace_back(Scope{{}, false, false});
+    }
+    void postTransformClassDef(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        scopes.pop_back();
+    }
+    void preTransformMethodDef(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        scopes.emplace_back(Scope{{}, false, false});
+    }
+    void postTransformMethodDef(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        scopes.pop_back();
+    }
+    void preTransformAssign(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        define(ast::cast_tree_nonnull<ast::Assign>(tree).lhs);
+    }
+    void postTransformUnresolvedIdent(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        auto &local = ast::cast_tree_nonnull<ast::UnresolvedIdent>(tree);
+        if (!scopes.back().inRoot || local.kind != ast::UnresolvedIdent::Kind::Local ||
+            local.name.kind() != core::NameKind::UTF8 ||
+            ctx.locAt(local.loc).source(ctx) != local.name.show(ctx)) {
+            return;
+        }
+        const auto &scope = scopes.back();
+        auto binding = scope.bindings.find(local.name);
+        captures |= binding == scope.bindings.end() || (binding->second == 0 && scope.crossesRewrite);
+    }
+};
+
 ast::ExpressionPtr invalidUnderParameterizedBody(core::MutableContext ctx, core::NameRef eachName,
                                                  ast::ExpressionPtr stmt) {
     if (isSharedExamplesName(eachName)) {
@@ -681,9 +773,51 @@ ast::ExpressionPtr prepareBody(core::MutableContext ctx, bool isClass,
     return body;
 }
 
+ast::ExpressionPtr runSingleImpl(core::MutableContext ctx, bool isClass,
+                                 const ast::ExpressionPtr &maybeSharedExamplesName, ast::Send *send,
+                                 bool insideDescribe);
+
 ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::ExpressionPtr &maybeSharedExamplesName,
                              ast::Send *send, bool insideDescribe) {
+    if (ctx.state.isSCIPRuby && send->flags.isRewriterSynthesized) {
+        return nullptr;
+    }
+    ast::ExpressionPtr originalCall;
+    if (ctx.state.isSCIPRuby) {
+        // Replacing the DSL call with a class/method must not erase navigation
+        // on `context`, `specify`, etc. Keep its receiver and arguments in their
+        // original scope. The rewritten node owns the handwritten block body.
+        ast::Send::ARGS_store args;
+        for (const auto &arg : send->nonBlockArgs()) {
+            args.emplace_back(arg.deepCopy());
+        }
+        if (auto block = send->block()) {
+            args.emplace_back(ast::MK::Block(block->loc, ast::MK::EmptyTree(), {}));
+        }
+        auto flags = send->flags;
+        flags.isRewriterSynthesized = true;
+        originalCall = ast::MK::Send(send->loc, send->recv.deepCopy(), send->fun, send->funLoc,
+                                    send->numPosArgs(), std::move(args), flags);
+    }
+    auto result = runSingleImpl(ctx, isClass, maybeSharedExamplesName, send, insideDescribe);
+    if (result && originalCall) {
+        return ast::MK::InsSeq1(send->loc, std::move(originalCall), std::move(result));
+    }
+    return result;
+}
+
+ast::ExpressionPtr runSingleImpl(core::MutableContext ctx, bool isClass,
+                                 const ast::ExpressionPtr &maybeSharedExamplesName, ast::Send *send,
+                                 bool insideDescribe) {
     auto *block = send->block();
+    if (ctx.state.isSCIPRuby && block != nullptr && send->fun != core::Names::testEach() &&
+        send->fun != core::Names::testEachHash()) {
+        CapturedTestLocals locals;
+        ast::TreeWalk::apply(ctx, locals, *send->rawBlock());
+        if (locals.captures) {
+            return nullptr;
+        }
+    }
 
     switch (send->fun.rawId()) {
         case core::Names::testEach().rawId():

@@ -20,7 +20,7 @@
 #  ⌄ enclosing_range_start [..] MyTest#assert().
    def assert(test)
 #      ^^^^^^ definition [..] MyTest#assert().
-#             ^^^^ definition local 1$2774883451
+#             ^^^^ definition local 1$1811994350
      test ? true : false
    end
 #    ⌃ enclosing_range_end [..] MyTest#assert().

@@ -48,9 +48,9 @@
 #⌄ enclosing_range_start [..] Object#myfunction().
  def myfunction(myparam)
 #    ^^^^^^^^^^ definition [..] Object#myfunction().
-#               ^^^^^^^ definition local 1$3083414419
+#               ^^^^^^^ definition local 1$4057864661
    myparam + Mod2::FEG
-#  ^^^^^^^ reference local 1$3083414419
+#  ^^^^^^^ reference local 1$4057864661
 #            ^^^^ reference [..] Mod2#
 #                  ^^^ reference [..] Mod2#FEG.
  end

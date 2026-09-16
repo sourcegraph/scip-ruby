@@ -74,14 +74,14 @@
  def use_nested
 #    ^^^^^^^^^^ definition [..] Object#use_nested().
    _ = Outer::Inner::Deep::Base.new
-#  ^ definition local 1$4031378110
+#  ^ definition local 1$919653660
 #      ^^^^^ reference [..] Outer#
 #             ^^^^^ reference [..] Outer#Inner#
 #                    ^^^^ reference [..] Outer#Inner#Deep#
 #                          ^^^^ reference [..] Outer#Inner#Deep#Base#
 #                               ^^^ reference [..] Class#new().
    _ = WithDeepMixin.new.helper
-#  ^ reference (write) local 1$4031378110
+#  ^ reference (write) local 1$919653660
 #      ^^^^^^^^^^^^^ reference [..] WithDeepMixin#
 #                    ^^^ reference [..] Class#new().
 #                        ^^^^^^ reference [..] Outer#Inner#Deep#Mixin#helper().

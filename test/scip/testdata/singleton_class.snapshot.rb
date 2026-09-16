@@ -47,14 +47,14 @@
 #  ^ reference [..] K#
 #    ^^^^^^^^^^^^ reference [..] `<Class:K>`#class_method().
    _ = K.read_counter
-#  ^ definition local 2$2530843406
+#  ^ definition local 2$4203159244
 #      ^ reference [..] K#
 #        ^^^^^^^^^^^^ reference [..] `<Class:K>`#read_counter().
    K.name = "k"
 #  ^ reference [..] K#
 #    ^^^^ reference [..] `<Class:K>`#`name=`().
    _ = K.name
-#  ^ reference (write) local 2$2530843406
+#  ^ reference (write) local 2$4203159244
 #      ^ reference [..] K#
 #        ^^^^ reference [..] `<Class:K>`#name().
    return

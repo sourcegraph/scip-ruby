@@ -48,16 +48,19 @@
 #  ⌃ enclosing_range_end [..] Billing#
  
  RSpec.describe Customer do
+#^^^^^ reference [..] RSpec#
+#      ^^^^^^^^ reference [..] `<Class:RSpec>`#describe().
+#               ^^^^^^^^ reference [..] Customer#
 #               ^^^^^^^^ reference [..] Customer#
 #  ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<it 'indexes a constant description'>`().
    it("indexes a constant description") do
 #     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] `<describe 'Customer'>`#`<it 'indexes a constant description'>`().
      customer = Customer.new
-#    ^^^^^^^^ definition local 1$3093204817
+#    ^^^^^^^^ definition local 1$1350504531
 #               ^^^^^^^^ reference [..] Customer#
 #                        ^^^ reference [..] Class#new().
      customer.name
-#    ^^^^^^^^ reference local 1$3093204817
+#    ^^^^^^^^ reference local 1$1350504531
 #             ^^^^ reference [..] Customer#name().
      described_class.new.name
 #    ^^^^^^^^^^^^^^^ reference [..] `<describe 'Customer'>`#described_class().
@@ -84,6 +87,7 @@
    context Billing::Customer do
 #          ^^^^^^^ reference [..] Billing#
 #                   ^^^^^^^^ reference [..] Billing#Customer#
+#                   ^^^^^^^^ reference [..] Billing#Customer#
 #                   ^^^^^^^^ reference [..] `<describe 'Customer'>`#
 #                   ^^^^^^^^ definition [..] `<describe 'Customer'>`#`<context 'Billing::Customer'>`#
 #    ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<context 'Billing::Customer'>`#`<it 'uses the nested described class'>`().
@@ -99,6 +103,7 @@
 #  ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<describe 'Customer'>`#
    describe Customer do
 #           ^^^^^^^^ reference [..] Customer#
+#           ^^^^^^^^ reference [..] Customer#
 #           ^^^^^^^^ reference [..] `<describe 'Customer'>`#
 #           ^^^^^^^^ definition [..] `<describe 'Customer'>`#`<describe 'Customer'>`#
 #    ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<describe 'Customer'>`#`<it 'indexes a nested describe'>`().
@@ -113,7 +118,10 @@
  end
  
  RSpec.describe Billing::Customer do
+#^^^^^ reference [..] RSpec#
+#      ^^^^^^^^ reference [..] `<Class:RSpec>`#describe().
 #               ^^^^^^^ reference [..] Billing#
+#                        ^^^^^^^^ reference [..] Billing#Customer#
 #                        ^^^^^^^^ reference [..] Billing#Customer#
 #  ⌄ enclosing_range_start [..] `<describe 'Billing::Customer'>`#`<it 'indexes a namespaced description'>`().
    it("indexes a namespaced description") do
@@ -138,6 +146,9 @@
 #                                   ⌃ enclosing_range_end [..] CustomCustomer#
  
  RSpec.describe CustomCustomer do
+#^^^^^ reference [..] RSpec#
+#      ^^^^^^^^ reference [..] `<Class:RSpec>`#describe().
+#               ^^^^^^^^^^^^^^ reference [..] CustomCustomer#
 #               ^^^^^^^^^^^^^^ reference [..] CustomCustomer#
    extend T::Sig
 #  ^^^^^^ reference [..] Kernel#extend().

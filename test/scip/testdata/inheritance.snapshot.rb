@@ -11,11 +11,11 @@
 #  ⌄ enclosing_range_start [..] Z1#write_f().
    def write_f(a)
 #      ^^^^^^^ definition [..] Z1#write_f().
-#              ^ definition local 1$1000661517
+#              ^ definition local 1$2164578509
      @f = a
 #    ^^ definition [..] Z1#`@f`.
 #    ^^^^^^ reference [..] Z1#`@f`.
-#         ^ reference local 1$1000661517
+#         ^ reference local 1$2164578509
    end
 #    ⌃ enclosing_range_end [..] Z1#write_f().
  
@@ -52,11 +52,11 @@
 #  ⌄ enclosing_range_start [..] Z2#write_f().
    def write_f(a)
 #      ^^^^^^^ definition [..] Z2#write_f().
-#              ^ definition local 1$1000661517
+#              ^ definition local 1$893072280
      @f = a
 #    ^^ definition [..] Z2#`@f`.
 #    ^^^^^^ reference [..] Z2#`@f`.
-#         ^ reference local 1$1000661517
+#         ^ reference local 1$893072280
    end
 #    ⌃ enclosing_range_end [..] Z2#write_f().
  end
@@ -94,10 +94,10 @@
 #  ⌄ enclosing_range_start [..] Z4#write_f_plus_1().
    def write_f_plus_1(a)
 #      ^^^^^^^^^^^^^^ definition [..] Z4#write_f_plus_1().
-#                     ^ definition local 1$3337417690
+#                     ^ definition local 1$4007839855
      write_f(a)
 #    ^^^^^^^ reference [..] Z1#write_f().
-#            ^ reference local 1$3337417690
+#            ^ reference local 1$4007839855
      @f = read_f_plus_1?
 #    ^^ definition [..] Z4#`@f`.
 #    relation definition=[..] Z1#`@f`.

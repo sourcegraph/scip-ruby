@@ -9,21 +9,21 @@
 #    | sig { params(b: T.untyped).returns(T.untyped) }
 #    | def assign_different_branches(b)
 #    | ```
-#                              ^ definition local 1$3317016627
+#                              ^ definition local 1$1762868633
 #                              documentation
 #                              | ```ruby
 #                              | b (T.untyped)
 #                              | ```
    if b
      x = 1
-#    ^ definition local 2$3317016627
+#    ^ definition local 2$1762868633
 #    documentation
 #    | ```ruby
 #    | x (Integer(1))
 #    | ```
    else
      x = nil
-#    ^ definition local 2$3317016627
+#    ^ definition local 2$1762868633
 #    documentation
 #    | ```ruby
 #    | x (Integer(1))
@@ -41,27 +41,27 @@
 #    | sig { params(b: T.untyped).returns(T.untyped) }
 #    | def change_different_branches(b)
 #    | ```
-#                              ^ definition local 1$2122680152
+#                              ^ definition local 1$721065234
 #                              documentation
 #                              | ```ruby
 #                              | b (T.untyped)
 #                              | ```
    x = 'foo'
-#  ^ definition local 2$2122680152
+#  ^ definition local 2$721065234
 #  documentation
 #  | ```ruby
 #  | x (String("foo"))
 #  | ```
    if b
      x = 1
-#    ^ reference (write) local 2$2122680152
+#    ^ reference (write) local 2$721065234
 #    override_documentation
 #    | ```ruby
 #    | x (Integer(1))
 #    | ```
    else
      x = nil
-#    ^ reference (write) local 2$2122680152
+#    ^ reference (write) local 2$721065234
 #    override_documentation
 #    | ```ruby
 #    | x (NilClass)
@@ -79,47 +79,47 @@
 #    | sig { params(bs: T.untyped).returns(T.untyped) }
 #    | def loop_type_change(bs)
 #    | ```
-#                     ^^ definition local 1$4057334513
+#                     ^^ definition local 1$2927231059
 #                     documentation
 #                     | ```ruby
 #                     | bs (T.untyped)
 #                     | ```
    x = nil
-#  ^ definition local 2$4057334513
+#  ^ definition local 2$2927231059
 #  documentation
 #  | ```ruby
 #  | x (NilClass)
 #  | ```
    for b in bs
-#      ^ definition local 3$4057334513
+#      ^ definition local 3$2927231059
 #      documentation
 #      | ```ruby
 #      | b (T.untyped)
 #      | ```
-#           ^^ reference local 1$4057334513
+#           ^^ reference local 1$2927231059
      puts x
 #    ^^^^ reference [..] Kernel#puts().
-#         ^ reference local 2$4057334513
+#         ^ reference local 2$2927231059
      if b
        x = 1
-#      ^ reference (write) local 2$4057334513
+#      ^ reference (write) local 2$2927231059
 #      override_documentation
 #      | ```ruby
 #      | x (T.untyped)
 #      | ```
-#      ^^^^^ reference local 2$4057334513
+#      ^^^^^ reference local 2$2927231059
 #      override_documentation
 #      | ```ruby
 #      | x = 1 (T.untyped)
 #      | ```
      else
        x = 's'
-#      ^ reference (write) local 2$4057334513
+#      ^ reference (write) local 2$2927231059
 #      override_documentation
 #      | ```ruby
 #      | x (T.untyped)
 #      | ```
-#      ^^^^^^^ reference local 2$4057334513
+#      ^^^^^^^ reference local 2$2927231059
 #      override_documentation
 #      | ```ruby
 #      | x = 's' (T.untyped)
@@ -152,7 +152,7 @@
 #      | sig { params(b: T.untyped).returns(T.untyped) }
 #      | def change_type(b)
 #      | ```
-#                  ^ definition local 1$2066187318
+#                  ^ definition local 1$2789762576
 #                  documentation
 #                  | ```ruby
 #                  | b (T.untyped)
@@ -233,14 +233,14 @@
 #      | sig { params(b: T.untyped).returns(T.untyped) }
 #      | def change_type(b)
 #      | ```
-#                  ^ definition local 1$2066187318
+#                  ^ definition local 1$458340941
 #                  documentation
 #                  | ```ruby
 #                  | b (T.untyped)
 #                  | ```
      if !b
 #       ^ reference [..] BasicObject#`!`().
-#        ^ reference local 1$2066187318
+#        ^ reference local 1$458340941
        @f = 1
 #      ^^ definition [..] D#`@f`.
 #      documentation

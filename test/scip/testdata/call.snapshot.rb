@@ -28,11 +28,11 @@
    def call()
 #      ^^^^ definition [..] Opus#MyThing#Command#GetThing#call().
      x = 1
-#    ^ definition local 1$3018949801
+#    ^ definition local 1$389224586
      y = x
-#    ^ definition local 2$3018949801
-#    ^^^^^ reference local 2$3018949801
-#        ^ reference local 1$3018949801
+#    ^ definition local 2$389224586
+#    ^^^^^ reference local 2$389224586
+#        ^ reference local 1$389224586
    end
  end
 #  ⌃ enclosing_range_end [..] Opus#MyThing#Command#GetThing#
@@ -48,11 +48,11 @@
    def call()
 #      ^^^^ definition [..] Opus#MyThing#BadCommand#GetThing#call().
      x = 1
-#    ^ definition local 1$3018949801
+#    ^ definition local 1$421098321
      y = x
-#    ^ definition local 2$3018949801
-#    ^^^^^ reference local 2$3018949801
-#        ^ reference local 1$3018949801
+#    ^ definition local 2$421098321
+#    ^^^^^ reference local 2$421098321
+#        ^ reference local 1$421098321
    end
 #    ⌃ enclosing_range_end [..] Opus#MyThing#BadCommand#GetThing#call().
  end
@@ -68,11 +68,11 @@
    def self.call()
 #           ^^^^ definition [..] NotOpus#Command1#`<Class:GetThing>`#call().
      x = 1
-#    ^ definition local 1$3018949801
+#    ^ definition local 1$2188143778
      y = x
-#    ^ definition local 2$3018949801
-#    ^^^^^ reference local 2$3018949801
-#        ^ reference local 1$3018949801
+#    ^ definition local 2$2188143778
+#    ^^^^^ reference local 2$2188143778
+#        ^ reference local 1$2188143778
    end
 #    ⌃ enclosing_range_end [..] NotOpus#Command1#`<Class:GetThing>`#call().
  end
@@ -88,11 +88,11 @@
    def call()
 #      ^^^^ definition [..] NotOpus#Command2#GetThing#call().
      x = 1
-#    ^ definition local 1$3018949801
+#    ^ definition local 1$3064334709
      y = x
-#    ^ definition local 2$3018949801
-#    ^^^^^ reference local 2$3018949801
-#        ^ reference local 1$3018949801
+#    ^ definition local 2$3064334709
+#    ^^^^^ reference local 2$3064334709
+#        ^ reference local 1$3064334709
    end
 #    ⌃ enclosing_range_end [..] NotOpus#Command2#GetThing#call().
  end

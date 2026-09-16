@@ -34,27 +34,27 @@
  def f
 #    ^ definition [..] Object#f().
    s = S.new(prop_i: 3)
-#  ^ definition local 1$3809224601
+#  ^ definition local 1$2046155767
 #      ^ reference [..] S#
-#        ^^^ reference [..] Class#new().
+#        ^^^ reference [..] S#initialize().
    _ = s.prop_i.to_s + s.const_s + s.const_f.to_s + s.serialize.to_s
-#  ^ definition local 3$3809224601
-#      ^ reference local 1$3809224601
+#  ^ definition local 3$2046155767
+#      ^ reference local 1$2046155767
 #        ^^^^^^ reference [..] S#prop_i().
 #               ^^^^ reference [..] Integer#to_s().
 #                    ^ reference [..] String#+().
-#                      ^ reference local 1$3809224601
+#                      ^ reference local 1$2046155767
 #                        ^^^^^^^ reference [..] S#const_s().
 #                                ^ reference [..] String#+().
-#                                  ^ reference local 1$3809224601
+#                                  ^ reference local 1$2046155767
 #                                    ^^^^^^^ reference [..] S#const_f().
 #                                            ^^^^ reference [..] Float#to_s().
 #                                                 ^ reference [..] String#+().
-#                                                   ^ reference local 1$3809224601
+#                                                   ^ reference local 1$2046155767
 #                                                     ^^^^^^^^^ reference [..] T#Props#Serializable#serialize().
 #                                                               ^^^^ reference [..] Kernel#to_s().
    s.prop_i = 4
-#  ^ reference local 1$3809224601
+#  ^ reference local 1$2046155767
 #    ^^^^^^ reference [..] S#`prop_i=`().
    return
  end
@@ -96,16 +96,16 @@
  def g
 #    ^ definition [..] Object#g().
    p = POINT.new(0, 1)
-#  ^ definition local 1$3792446982
+#  ^ definition local 1$2029378148
 #      ^^^^^ reference [..] POINT#
-#            ^^^ reference [..] Class#new().
+#            ^^^ reference [..] POINT#initialize().
    a = p.array
-#  ^ definition local 3$3792446982
-#      ^ reference local 1$3792446982
+#  ^ definition local 3$2029378148
+#      ^ reference local 1$2029378148
 #        ^^^^^ reference [..] POINT#array().
    px = p.x
-#  ^^ definition local 4$3792446982
-#       ^ reference local 1$3792446982
+#  ^^ definition local 4$2029378148
+#       ^ reference local 1$2029378148
 #         ^ reference [..] POINT#x().
    return
  end

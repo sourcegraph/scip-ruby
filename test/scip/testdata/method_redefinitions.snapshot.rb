@@ -37,7 +37,7 @@
  
  Exception.new.message
 #^^^^^^^^^ reference [..] Exception#
-#          ^^^ reference [..] Class#new().
+#          ^^^ reference [..] Exception#initialize().
 #              ^^^^^^^ reference [..] Exception#message().
  RedefinedMethod.new.value
 #^^^^^^^^^^^^^^^ reference [..] RedefinedMethod#

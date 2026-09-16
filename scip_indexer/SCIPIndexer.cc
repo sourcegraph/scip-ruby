@@ -98,7 +98,10 @@ struct OwnedLocal {
     string toSCIPString(const core::GlobalState &gs, core::FileRef file) {
         // 32-bits => if there are 10k methods in a single file, the chance of at least one
         // colliding pair is about 1.1%, assuming even distribution. That seems OK.
-        return fmt::format("local {}${}", counter, ::fnv1a_32(owner.name(gs).show(gs)));
+        // Different classes can have the same method name (especially
+        // <static-init> and generated example names). Include the owning scope
+        // so their unrelated locals do not share one navigation target.
+        return fmt::format("local {}${}", counter, ::fnv1a_32(owner.showFullName(gs)));
     }
 };
 
@@ -1151,6 +1154,22 @@ private:
             return;
         }
         auto funSym = recv.data(gs)->findMethodTransitive(gs, fun);
+        if (funSym.exists() && fun == core::Names::new_() &&
+            funSym.data(gs)->owner == core::Symbols::Class()) {
+            // Class#new dispatches to the receiver's initialize. Upstream RBIs
+            // increasingly describe constructors that way instead of self.new.
+            // Keep explicit new overrides, and use a concrete initializer when
+            // available rather than losing navigation to a generic Class#new.
+            auto instance = recv.data(gs)->attachedClass(gs);
+            if (instance.exists()) {
+                auto initializer = instance.data(gs)->findMethodTransitive(gs, core::Names::initialize());
+                if (initializer.exists() && initializer.data(gs)->owner != core::Symbols::BasicObject() &&
+                    initializer.data(gs)->owner != core::Symbols::Object() &&
+                    !GenericSymbolRef::method(initializer).isSorbetInternalClassOrMethod(gs)) {
+                    funSym = initializer;
+                }
+            }
+        }
         if (funSym.exists()) {
             auto status = this->scipState.saveReference(ctx, GenericSymbolRef::method(funSym), nullopt, funLoc, 0);
             ENFORCE(status.ok());
@@ -1644,8 +1663,8 @@ public:
         return true;
     }
     std::string_view cacheKey() const override {
-        // Version 2 records source ranges and handwritten test-body markers needed after the replay.
-        return "scip-ruby:3";
+        // Preserve closure scopes and calls when rewriting test DSLs for indexing.
+        return "scip-ruby:4";
     }
 
     virtual void typecheckClass(const core::GlobalState &gs, core::FileRef file,

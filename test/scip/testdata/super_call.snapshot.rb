@@ -9,10 +9,10 @@
 #  ⌄ enclosing_range_start [..] Parent#greet().
    def greet(name)
 #      ^^^^^ definition [..] Parent#greet().
-#            ^^^^ definition local 1$4213039946
+#            ^^^^ definition local 1$3728988031
      "Hi, " + name
 #           ^ reference [..] String#+().
-#             ^^^^ reference local 1$4213039946
+#             ^^^^ reference local 1$3728988031
    end
 #    ⌃ enclosing_range_end [..] Parent#greet().
  end
@@ -25,9 +25,9 @@
 #  ⌄ enclosing_range_start [..] Child#greet().
    def greet(name)
 #      ^^^^^ definition [..] Child#greet().
-#            ^^^^ definition local 1$4213039946
+#            ^^^^ definition local 1$1120953439
      super(name)
-#          ^^^^ reference local 1$4213039946
+#          ^^^^ reference local 1$1120953439
    end
 #    ⌃ enclosing_range_end [..] Child#greet().
  end
@@ -40,13 +40,13 @@
 #  ⌄ enclosing_range_start [..] GrandChild#greet().
    def greet(name)
 #      ^^^^^ definition [..] GrandChild#greet().
-#            ^^^^ definition local 1$4213039946
+#            ^^^^ definition local 1$2273071383
      base = super("child of " + name)
-#    ^^^^ definition local 2$4213039946
+#    ^^^^ definition local 2$2273071383
 #                             ^ reference [..] String#+().
-#                               ^^^^ reference local 1$4213039946
+#                               ^^^^ reference local 1$2273071383
      base + "!"
-#    ^^^^ reference local 2$4213039946
+#    ^^^^ reference local 2$2273071383
    end
 #    ⌃ enclosing_range_end [..] GrandChild#greet().
  end
@@ -56,7 +56,7 @@
  def trigger
 #    ^^^^^^^ definition [..] Object#trigger().
    _ = GrandChild.new.greet("x")
-#  ^ definition local 2$1967206915
+#  ^ definition local 2$326825877
 #      ^^^^^^^^^^ reference [..] GrandChild#
 #                 ^^^ reference [..] Class#new().
 #                     ^^^^^ reference [..] GrandChild#greet().

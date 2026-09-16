@@ -30,28 +30,28 @@
 #⌄ enclosing_range_start [..] Object#optional_receiver().
  def optional_receiver(receiver)
 #    ^^^^^^^^^^^^^^^^^ definition [..] Object#optional_receiver().
-#                      ^^^^^^^^ definition local 1$2598614927
+#                      ^^^^^^^^ definition local 1$4254723801
    receiver&.value
-#  ^^^^^^^^ reference local 1$2598614927
+#  ^^^^^^^^ reference local 1$4254723801
 #            ^^^^^ reference [..] SafeNavigationReceiver#value().
    receiver&.value&.upcase
-#  ^^^^^^^^ reference local 1$2598614927
+#  ^^^^^^^^ reference local 1$4254723801
 #            ^^^^^ reference [..] SafeNavigationReceiver#value().
 #                   ^^^^^^ reference [..] String#upcase().
    value = T.let(nil, T.nilable(String))
-#  ^^^^^ definition local 4$2598614927
+#  ^^^^^ definition local 4$4254723801
 #                     ^ reference [..] T#
 #                       ^^^^^^^ reference [..] `<Class:T>`#nilable().
 #                               ^^^^^^ reference [..] String#
    value ||= receiver&.value
-#  ^^^^^ reference (write) local 4$2598614927
-#            ^^^^^^^^ reference local 1$2598614927
+#  ^^^^^ reference (write) local 4$4254723801
+#            ^^^^^^^^ reference local 1$4254723801
 #                      ^^^^^ reference [..] SafeNavigationReceiver#value().
    value &&= receiver&.value
-#  ^^^^^ reference (write) local 4$2598614927
-#  ^^^^^ reference local 4$2598614927
-#  ^^^^^^^^^^^^^^^^^^^^^^^^^ reference local 4$2598614927
-#            ^^^^^^^^ reference local 1$2598614927
+#  ^^^^^ reference (write) local 4$4254723801
+#  ^^^^^ reference local 4$4254723801
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^ reference local 4$4254723801
+#            ^^^^^^^^ reference local 1$4254723801
 #                      ^^^^^ reference [..] SafeNavigationReceiver#value().
  end
 #  ⌃ enclosing_range_end [..] Object#optional_receiver().
@@ -64,15 +64,15 @@
 #⌄ enclosing_range_start [..] Object#known_receiver().
  def known_receiver(receiver)
 #    ^^^^^^^^^^^^^^ definition [..] Object#known_receiver().
-#                   ^^^^^^^^ definition local 1$283871188
+#                   ^^^^^^^^ definition local 1$884724490
    receiver&.value
-#  ^^^^^^^^ reference local 1$283871188
+#  ^^^^^^^^ reference local 1$884724490
 #            ^^^^^ reference [..] SafeNavigationReceiver#value().
    (receiver)&.value
-#   ^^^^^^^^ reference local 1$283871188
+#   ^^^^^^^^ reference local 1$884724490
 #              ^^^^^ reference [..] SafeNavigationReceiver#value().
    receiver.value&.upcase
-#  ^^^^^^^^ reference local 1$283871188
+#  ^^^^^^^^ reference local 1$884724490
 #           ^^^^^ reference [..] SafeNavigationReceiver#value().
 #                  ^^^^^^ reference [..] String#upcase().
    SafeNavigationReceiver.new&.value

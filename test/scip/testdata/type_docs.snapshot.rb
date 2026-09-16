@@ -22,35 +22,35 @@
 #      | sig { params(x: Integer, y: String).returns(String) }
 #      | def js_add(x, y)
 #      | ```
-#             ^ definition local 1$1239553962
+#             ^ definition local 1$194175550
 #             documentation
 #             | ```ruby
 #             | x (Integer)
 #             | ```
-#                ^ definition local 2$1239553962
+#                ^ definition local 2$194175550
 #                documentation
 #                | ```ruby
 #                | y (String)
 #                | ```
      xs = x.to_s
-#    ^^ definition local 3$1239553962
+#    ^^ definition local 3$194175550
 #    documentation
 #    | ```ruby
 #    | xs (String)
 #    | ```
-#         ^ reference local 1$1239553962
+#         ^ reference local 1$194175550
 #           ^^^^ reference [..] Integer#to_s().
      ret = xs + y
-#    ^^^ definition local 4$1239553962
+#    ^^^ definition local 4$194175550
 #    documentation
 #    | ```ruby
 #    | ret (String)
 #    | ```
-#          ^^ reference local 3$1239553962
+#          ^^ reference local 3$194175550
 #             ^ reference [..] String#+().
-#               ^ reference local 2$1239553962
+#               ^ reference local 2$194175550
      return ret
-#    ^^^^^^^^^^ reference local 4$1239553962
+#    ^^^^^^^^^^ reference local 4$194175550
 #    override_documentation
 #    | ```ruby
 #    | return ret (T.noreturn)

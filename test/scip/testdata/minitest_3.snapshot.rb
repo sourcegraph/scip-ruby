@@ -25,10 +25,10 @@
  
    test_each([[1,2], [3,4]]) do |(a,b)|
 #  ^^^^^^^^^ reference [..] `<Class:Test>`#test_each().
-#                                 ^ definition local 1$2288740619
-#                                 ^ definition local 1$416088458
-#                                   ^ definition local 2$2288740619
-#                                   ^ definition local 2$416088458
+#                                 ^ definition local 1$4260082600
+#                                 ^ definition local 1$960236125
+#                                   ^ definition local 2$4260082600
+#                                   ^ definition local 2$960236125
  
      describe "d" do
 #      ⌄ enclosing_range_start [..] Test#`<before>`().
@@ -47,7 +47,7 @@
          T.reveal_type(a) # error: Revealed type: `Integer`
 #        ^ reference [..] T#
 #          ^^^^^^^^^^^ reference [..] `<Class:T>`#reveal_type().
-#                      ^ reference local 1$416088458
+#                      ^ reference local 1$960236125
        end
 #        ⌃ enclosing_range_end [..] Test#`<it 'b'>`().
      end
@@ -58,7 +58,7 @@
        T.reveal_type(a) # error: Revealed type: `Integer`
 #      ^ reference [..] T#
 #        ^^^^^^^^^^^ reference [..] `<Class:T>`#reveal_type().
-#                    ^ reference local 1$2288740619
+#                    ^ reference local 1$4260082600
      end
 #      ⌃ enclosing_range_end [..] Test#`<it 'a'>`().
  

@@ -13,17 +13,17 @@
 #  ^^^^^^ reference [..] Kernel#extend().
  
    Elem = type_member
-#  ^^^^ definition local 3$119448696
+#  ^^^^ definition local 3$1176505055
  
    sig { params(x: Elem).void }
 #  ⌄ enclosing_range_start [..] GenericBox#initialize().
    def initialize(x)
 #      ^^^^^^^^^^ definition [..] GenericBox#initialize().
-#                 ^ definition local 1$3465713227
+#                 ^ definition local 1$3822075154
      @x = x
 #    ^^ definition [..] GenericBox#`@x`.
 #    ^^^^^^ reference [..] GenericBox#`@x`.
-#         ^ reference local 1$3465713227
+#         ^ reference local 1$3822075154
    end
 #    ⌃ enclosing_range_end [..] GenericBox#initialize().
  
@@ -45,7 +45,7 @@
 #  ^^^^^^ reference [..] Kernel#extend().
  
    Item = type_member
-#  ^^^^ definition local 2$119448696
+#  ^^^^ definition local 2$2929037345
  end
 #  ⌃ enclosing_range_end [..] MyGenericMixin#
  
@@ -56,7 +56,7 @@
 #  ^^^^^^ reference [..] Kernel#extend().
  
    Tag = type_template
-#  ^^^ definition local 2$119448696
+#  ^^^ definition local 2$2494098751
  end
 #  ⌃ enclosing_range_end [..] WithTypeTemplate#
  
@@ -70,9 +70,9 @@
 #  ⌄ enclosing_range_start [..] WithTypeParameters#identity().
    def identity(x)
 #      ^^^^^^^^ definition [..] WithTypeParameters#identity().
-#               ^ definition local 1$2839884955
+#               ^ definition local 1$2783489928
      x
-#    ^ reference local 1$2839884955
+#    ^ reference local 1$2783489928
    end
 #    ⌃ enclosing_range_end [..] WithTypeParameters#identity().
  end
@@ -82,15 +82,15 @@
  def use_generics
 #    ^^^^^^^^^^^^ definition [..] Object#use_generics().
    box = GenericBox.new(1)
-#  ^^^ definition local 1$1376823943
+#  ^^^ definition local 1$22993433
 #        ^^^^^^^^^^ reference [..] GenericBox#
-#                   ^^^ reference [..] Class#new().
+#                   ^^^ reference [..] GenericBox#initialize().
    _ = box.get
-#  ^ definition local 3$1376823943
-#      ^^^ reference local 1$1376823943
+#  ^ definition local 3$22993433
+#      ^^^ reference local 1$22993433
 #          ^^^ reference [..] GenericBox#get().
    _ = WithTypeParameters.new.identity(42)
-#  ^ reference (write) local 3$1376823943
+#  ^ reference (write) local 3$22993433
 #      ^^^^^^^^^^^^^^^^^^ reference [..] WithTypeParameters#
 #                         ^^^ reference [..] Class#new().
 #                             ^^^^^^^^ reference [..] WithTypeParameters#identity().

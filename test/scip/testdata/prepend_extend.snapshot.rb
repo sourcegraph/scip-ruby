@@ -88,24 +88,24 @@
  def use_combined
 #    ^^^^^^^^^^^^ definition [..] Object#use_combined().
    c = CombinedMix.new
-#  ^ definition local 1$1415327550
+#  ^ definition local 1$1390655124
 #      ^^^^^^^^^^^ reference [..] CombinedMix#
 #                  ^^^ reference [..] Class#new().
    c.set_via_greeter
-#  ^ reference local 1$1415327550
+#  ^ reference local 1$1390655124
 #    ^^^^^^^^^^^^^^^ reference [..] Greeter#set_via_greeter().
    c.set_via_prepend
-#  ^ reference local 1$1415327550
+#  ^ reference local 1$1390655124
    _ = c.hello
-#  ^ definition local 3$1415327550
-#      ^ reference local 1$1415327550
+#  ^ definition local 3$1390655124
+#      ^ reference local 1$1390655124
 #        ^^^^^ reference [..] Greeter#hello().
    _ = c.read_field
-#  ^ reference (write) local 3$1415327550
-#      ^ reference local 1$1415327550
+#  ^ reference (write) local 3$1390655124
+#      ^ reference local 1$1390655124
 #        ^^^^^^^^^^ reference [..] CombinedMix#read_field().
    _ = CombinedMix.klass_hi
-#  ^ reference (write) local 3$1415327550
+#  ^ reference (write) local 3$1390655124
 #      ^^^^^^^^^^^ reference [..] CombinedMix#
 #                  ^^^^^^^^ reference [..] ClassyMethods#klass_hi().
    return

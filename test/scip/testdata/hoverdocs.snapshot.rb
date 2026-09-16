@@ -50,19 +50,19 @@
 #      | sig { params(c: T.untyped, b: T.untyped).returns(T::Boolean) }
 #      | def m3(c, b)
 #      | ```
-#         ^ definition local 1$2519626513
+#         ^ definition local 1$1371439374
 #         documentation
 #         | ```ruby
 #         | c (T.untyped)
 #         | ```
-#            ^ definition local 2$2519626513
+#            ^ definition local 2$1371439374
 #            documentation
 #            | ```ruby
 #            | b (T.untyped)
 #            | ```
      c.m2 || b
-#    ^ reference local 1$2519626513
-#            ^ reference local 2$2519626513
+#    ^ reference local 1$1371439374
+#            ^ reference local 2$1371439374
    end
 #    ⌃ enclosing_range_end [..] C1#m3().
  
@@ -79,13 +79,13 @@
 #      documentation
 #      | _This_ is a
 #      | **doc comment.**
-#         ^^ definition local 1$2536404132
+#         ^^ definition local 1$1421772231
 #         documentation
 #         | ```ruby
 #         | xs (T.untyped)
 #         | ```
      xs[0]
-#    ^^ reference local 1$2536404132
+#    ^^ reference local 1$1421772231
    end
 #    ⌃ enclosing_range_end [..] C1#m4().
  
@@ -124,19 +124,19 @@
 #      documentation
 #      | And...
 #      | ...one more doc comment
-#         ^ definition local 1$2569959370
+#         ^ definition local 1$1455327469
 #         documentation
 #         | ```ruby
 #         | c (T.untyped)
 #         | ```
-#            ^ definition local 2$2569959370
+#            ^ definition local 2$1455327469
 #            documentation
 #            | ```ruby
 #            | b (T.untyped)
 #            | ```
      c.m2 || b
-#    ^ reference local 1$2569959370
-#            ^ reference local 2$2569959370
+#    ^ reference local 1$1455327469
+#            ^ reference local 2$1455327469
    end
 #    ⌃ enclosing_range_end [..] C1#m6().
  end

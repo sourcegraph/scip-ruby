@@ -9,18 +9,18 @@
 #      ^^^^^^ definition [..] Dynamo#
    define_method(:dynamic) do |x|
 #  ^^^^^^^^^^^^^ reference [..] Module#define_method().
-#                              ^ definition local 1$119448696
+#                              ^ definition local 1$647687335
      x + 1
-#    ^ reference local 1$119448696
+#    ^ reference local 1$647687335
    end
  
 #  ⌄ enclosing_range_start [..] Dynamo#method_missing().
    def method_missing(name, *args, &blk)
 #      ^^^^^^^^^^^^^^ definition [..] Dynamo#method_missing().
-#                     ^^^^ definition local 1$2090704463
+#                     ^^^^ definition local 1$2691938922
      "missed " + name.to_s
 #              ^ reference [..] String#+().
-#                ^^^^ reference local 1$2090704463
+#                ^^^^ reference local 1$2691938922
 #                     ^^^^ reference [..] Kernel#to_s().
    end
 #    ⌃ enclosing_range_end [..] Dynamo#method_missing().

@@ -51,6 +51,9 @@
 #  ⌃ enclosing_range_end [..] GeneratedAccessor#
  
  RSpec.describe Customer do
+#^^^^^ reference [..] RSpec#
+#      ^^^^^^^^ reference [..] `<Class:RSpec>`#describe().
+#               ^^^^^^^^ reference [..] Customer#
 #               ^^^^^^^^ reference [..] Customer#
 #  ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<describe 'helpers'>`#
    describe("helpers") do
@@ -60,11 +63,11 @@
      let(:ordinary) do
 #        ^^^^^^^^^ definition [..] `<describe 'Customer'>`#`<describe 'helpers'>`#ordinary().
        customer = Customer.new
-#      ^^^^^^^^ definition local 1$1152480723
+#      ^^^^^^^^ definition local 1$2169803137
 #                 ^^^^^^^^ reference [..] Customer#
 #                          ^^^ reference [..] Class#new().
        customer.name
-#      ^^^^^^^^ reference local 1$1152480723
+#      ^^^^^^^^ reference local 1$2169803137
 #               ^^^^ reference [..] Customer#name().
      end
 #      ⌃ enclosing_range_end [..] `<describe 'Customer'>`#`<describe 'helpers'>`#ordinary().
@@ -88,22 +91,22 @@
      subject do
 #    ^^^^^^^ definition [..] `<describe 'Customer'>`#`<describe 'helpers'>`#subject().
        customer = Customer.new
-#      ^^^^^^^^ definition local 1$2300378703
+#      ^^^^^^^^ definition local 1$3578397073
 #                 ^^^^^^^^ reference [..] Customer#
 #                          ^^^ reference [..] Class#new().
        customers = T.let([customer], T::Array[Customer])
-#      ^^^^^^^^^ definition local 5$2300378703
-#                         ^^^^^^^^ reference local 1$2300378703
+#      ^^^^^^^^^ definition local 5$3578397073
+#                         ^^^^^^^^ reference local 1$3578397073
 #                                    ^ reference [..] T#
 #                                       ^^^^^ reference [..] T#Array#
 #                                            ^ reference [..] T#`<Class:Array>`#`[]`().
 #                                             ^^^^^^^^ reference [..] Customer#
        customers.map do |customer|
-#      ^^^^^^^^^ reference local 5$2300378703
+#      ^^^^^^^^^ reference local 5$3578397073
 #                ^^^ reference [..] Array#map().
-#                        ^^^^^^^^ definition local 6$2300378703
+#                        ^^^^^^^^ definition local 6$3578397073
          customer.name
-#        ^^^^^^^^ reference local 6$2300378703
+#        ^^^^^^^^ reference local 6$3578397073
 #                 ^^^^ reference [..] Customer#name().
        end
      end
@@ -148,8 +151,8 @@
  
    test_each([1]) do |unused|
 #  ^^^^^^^^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#test_each().
-#                     ^^^^^^ definition local 1$119448696
-#                     ^^^^^^ definition local 1$1835867214
+#                     ^^^^^^ definition local 1$1432872668
+#                     ^^^^^^ definition local 1$2970130940
      describe("parameterized helpers") do
 #      ⌄ enclosing_range_start [..] `<describe 'Customer'>`#ordinary().
        let(:ordinary) { Customer.new.name }

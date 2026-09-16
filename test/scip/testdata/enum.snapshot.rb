@@ -54,7 +54,7 @@
  def use_abc
 #    ^^^^^^^ definition [..] Object#use_abc().
    x = X::A
-#  ^ definition local 1$1971237871
+#  ^ definition local 1$3549954977
 #      ^ reference [..] X#
 #         ^ reference [..] X#A.
    return

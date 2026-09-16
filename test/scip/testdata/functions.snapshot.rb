@@ -4,9 +4,9 @@
  def globalFn1()
 #    ^^^^^^^^^ definition [..] Object#globalFn1().
    x = 10
-#  ^ definition local 1$3846536873
+#  ^ definition local 1$2784507535
    x
-#  ^ reference local 1$3846536873
+#  ^ reference local 1$2784507535
  end
 #  ⌃ enclosing_range_end [..] Object#globalFn1().
  
@@ -14,8 +14,8 @@
  def globalFn2()
 #    ^^^^^^^^^ definition [..] Object#globalFn2().
    x = globalFn1()
-#  ^ definition local 1$3796204016
-#  ^^^^^^^^^^^^^^^ reference local 1$3796204016
+#  ^ definition local 1$2801285154
+#  ^^^^^^^^^^^^^^^ reference local 1$2801285154
 #      ^^^^^^^^^ reference [..] Object#globalFn1().
  end
 #  ⌃ enclosing_range_end [..] Object#globalFn2().
@@ -24,10 +24,10 @@
 #⌄ enclosing_range_start [..] Object#loopyDoopy().
  def loopyDoopy(...)
 #    ^^^^^^^^^^ definition [..] Object#loopyDoopy().
-#               ^^^ definition local 1$1182647655
+#               ^^^ definition local 1$470257005
    loopyDoopy(...)
 #  ^^^^^^^^^^ reference [..] Object#loopyDoopy().
-#             ^^^ reference local 1$1182647655
+#             ^^^ reference local 1$470257005
    return
  end
 #  ⌃ enclosing_range_end [..] Object#loopyDoopy().

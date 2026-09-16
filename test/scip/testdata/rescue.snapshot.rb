@@ -10,10 +10,10 @@
 #⌄ enclosing_range_start [..] Object#handle().
  def handle(e)
 #    ^^^^^^ definition [..] Object#handle().
-#           ^ definition local 1$780127187
+#           ^ definition local 1$2155487517
    puts e.inspect.to_s 
 #  ^^^^ reference [..] Kernel#puts().
-#       ^ reference local 1$780127187
+#       ^ reference local 1$2155487517
 #         ^^^^^^^ reference [..] Kernel#inspect().
 #                 ^^^^ reference [..] Kernel#to_s().
  end
@@ -27,16 +27,16 @@
 #    ^^^^^ reference [..] Kernel#raise().
    rescue MyError => e1
 #         ^^^^^^^ reference [..] MyError#
-#                    ^^ definition local 2$3809224601
+#                    ^^ definition local 2$2046155767
      handle(e1)
 #    ^^^^^^ reference [..] Object#handle().
-#           ^^ reference local 2$3809224601
+#           ^^ reference local 2$2046155767
    rescue StandardError => e2
 #         ^^^^^^^^^^^^^ reference [..] StandardError#
-#                          ^^ definition local 4$3809224601
+#                          ^^ definition local 4$2046155767
      handle(e2)
 #    ^^^^^^ reference [..] Object#handle().
-#           ^^ reference local 4$3809224601
+#           ^^ reference local 4$2046155767
    end
  end
 #  ⌃ enclosing_range_end [..] Object#f().

@@ -15,9 +15,9 @@
 #  ⌄ enclosing_range_start [..] C#g().
    def g(x)
 #      ^ definition [..] C#g().
-#        ^ definition local 1$3792446982
+#        ^ definition local 1$4038050940
      x + @f + f
-#    ^ reference local 1$3792446982
+#    ^ reference local 1$4038050940
 #        ^^ reference [..] C#`@f`.
 #             ^ reference [..] C#f().
    end

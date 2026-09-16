@@ -24,8 +24,8 @@
 #  ⌄ enclosing_range_start [..] C#f().
    def f(a, b)
 #      ^ definition [..] C#f().
-#        ^ definition local 1$3809224601
-#           ^ definition local 2$3809224601
+#        ^ definition local 1$4054828559
+#           ^ definition local 2$4054828559
      super
    end
 #    ⌃ enclosing_range_end [..] C#f().

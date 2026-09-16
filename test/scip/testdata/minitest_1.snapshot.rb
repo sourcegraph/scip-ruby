@@ -10,19 +10,21 @@
  
 #    ⌄ enclosing_range_start [..] MyTest#`<it 'works outside'>`().
      it "works outside" do
+#    ^^ reference [..] `<Class:MyTest>`#it().
 #       ^^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'works outside'>`().
          x = outside_method
-#        ^ definition local 1$1914741329
+#        ^ definition local 1$473791060
 #            ^^^^^^^^^^^^^^ reference [..] MyTest#outside_method().
          x = x + 1
-#        ^ reference (write) local 1$1914741329
-#            ^ reference local 1$1914741329
+#        ^ reference (write) local 1$473791060
+#            ^ reference local 1$473791060
          return
      end
 #      ⌃ enclosing_range_end [..] MyTest#`<it 'works outside'>`().
  
 #    ⌄ enclosing_range_start [..] MyTest#`<it 'allows constants inside of IT'>`().
      it "allows constants inside of IT" do
+#    ^^ reference [..] `<Class:MyTest>`#it().
 #       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'allows constants inside of IT'>`().
        CONST = 10
 #      ^^^^^ definition [..] MyTest#CONST.
@@ -34,6 +36,7 @@
  
 #    ⌄ enclosing_range_start [..] MyTest#`<it 'allows let-ed constants inside of IT'>`().
      it "allows let-ed constants inside of IT" do
+#    ^^ reference [..] `<Class:MyTest>`#it().
 #       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'allows let-ed constants inside of IT'>`().
        C2 = T.let(10, Integer)
 #      ^^ definition [..] MyTest#C2.
@@ -46,6 +49,7 @@
  
 #    ⌄ enclosing_range_start [..] MyTest#`<it 'allows path constants inside of IT'>`().
      it "allows path constants inside of IT" do
+#    ^^ reference [..] `<Class:MyTest>`#it().
 #       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'allows path constants inside of IT'>`().
        C3 = Mod::C
 #      ^^ definition [..] MyTest#C3.
@@ -70,6 +74,7 @@
  
 #        ⌄ enclosing_range_start [..] MyTest#`<describe 'some inner tests'>`#`<it 'works inside'>`().
          it "works inside" do
+#        ^^ reference [..] `<Class:MyTest>`#it().
 #           ^^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'some inner tests'>`#`<it 'works inside'>`().
              outside_method
 #            ^^^^^^^^^^^^^^ reference [..] MyTest#outside_method().
@@ -98,6 +103,7 @@
  
 #    ⌄ enclosing_range_start [..] MyTest#`<it 'can read foo'>`().
      it 'can read foo' do
+#    ^^ reference [..] `<Class:MyTest>`#it().
 #       ^^^^^^^^^^^^^^ definition [..] MyTest#`<it 'can read foo'>`().
          T.assert_type!(@foo, Integer)
 #                       ^^^^ reference [..] MyTest#`@foo`.
@@ -118,15 +124,20 @@
 #             ^^^^^^ reference [..] MyTest#
 #             ^^^^^^ definition [..] MyTest#`<describe 'Object'>`#
 #             ^^^^^^ reference [..] Object#
+#             ^^^^^^ reference [..] Object#
 #        ⌄ enclosing_range_start [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
          it Object do
+#        ^^ reference [..] `<Class:MyTest>`#it().
 #           ^^^^^^ definition [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
+#           ^^^^^^ reference [..] Object#
 #           ^^^^^^ reference [..] Object#
          end
 #          ⌃ enclosing_range_end [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
 #        ⌄ enclosing_range_start [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
          it Object do
+#        ^^ reference [..] `<Class:MyTest>`#it().
 #           ^^^^^^ definition [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
+#           ^^^^^^ reference [..] Object#
 #           ^^^^^^ reference [..] Object#
          end
 #          ⌃ enclosing_range_end [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
@@ -153,6 +164,7 @@
 #             ^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'a non-ideal situation'>`#
 #      ⌄ enclosing_range_start [..] MyTest#`<describe 'a non-ideal situation'>`#`<it 'contains nested describes'>`().
        it "contains nested describes" do
+#      ^^ reference [..] `<Class:MyTest>`#it().
 #         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] MyTest#`<describe 'a non-ideal situation'>`#`<it 'contains nested describes'>`().
 #        ⌄ enclosing_range_start [..] MyTest#`<describe 'a non-ideal situation'>`#`<describe 'nobody should write this but we should still parse it'>`#
          describe "nobody should write this but we should still parse it" do

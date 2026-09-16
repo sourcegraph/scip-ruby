@@ -51,17 +51,18 @@
 #                               ^^^^ reference [..] Minitest#Spec#
 #  ⌄ enclosing_range_start [..] CustomerSpec#`<describe 'helpers'>`#
    describe("helpers") do
+#  ^^^^^^^^ reference [..] Minitest#`<Class:Spec>`#describe().
 #           ^^^^^^^^^ reference [..] CustomerSpec#
 #           ^^^^^^^^^ definition [..] CustomerSpec#`<describe 'helpers'>`#
 #    ⌄ enclosing_range_start [..] CustomerSpec#`<describe 'helpers'>`#ordinary().
      let(:ordinary) do
 #        ^^^^^^^^^ definition [..] CustomerSpec#`<describe 'helpers'>`#ordinary().
        customer = Customer.new
-#      ^^^^^^^^ definition local 1$1152480723
+#      ^^^^^^^^ definition local 1$3706689357
 #                 ^^^^^^^^ reference [..] Customer#
 #                          ^^^ reference [..] Class#new().
        customer.name
-#      ^^^^^^^^ reference local 1$1152480723
+#      ^^^^^^^^ reference local 1$3706689357
 #               ^^^^ reference [..] Customer#name().
      end
 #      ⌃ enclosing_range_end [..] CustomerSpec#`<describe 'helpers'>`#ordinary().
@@ -85,22 +86,22 @@
      subject do
 #    ^^^^^^^ definition [..] CustomerSpec#`<describe 'helpers'>`#subject().
        customer = Customer.new
-#      ^^^^^^^^ definition local 1$2300378703
+#      ^^^^^^^^ definition local 1$1550327077
 #                 ^^^^^^^^ reference [..] Customer#
 #                          ^^^ reference [..] Class#new().
        customers = T.let([customer], T::Array[Customer])
-#      ^^^^^^^^^ definition local 5$2300378703
-#                         ^^^^^^^^ reference local 1$2300378703
+#      ^^^^^^^^^ definition local 5$1550327077
+#                         ^^^^^^^^ reference local 1$1550327077
 #                                    ^ reference [..] T#
 #                                       ^^^^^ reference [..] T#Array#
 #                                            ^ reference [..] T#`<Class:Array>`#`[]`().
 #                                             ^^^^^^^^ reference [..] Customer#
        customers.map do |customer|
-#      ^^^^^^^^^ reference local 5$2300378703
+#      ^^^^^^^^^ reference local 5$1550327077
 #                ^^^ reference [..] Array#map().
-#                        ^^^^^^^^ definition local 6$2300378703
+#                        ^^^^^^^^ definition local 6$1550327077
          customer.name
-#        ^^^^^^^^ reference local 6$2300378703
+#        ^^^^^^^^ reference local 6$1550327077
 #                 ^^^^ reference [..] Customer#name().
        end
      end
@@ -123,6 +124,7 @@
  
 #    ⌄ enclosing_range_start [..] CustomerSpec#`<describe 'helpers'>`#`<describe 'nested helpers'>`#
      describe("nested helpers") do
+#    ^^^^^^^^ reference [..] Minitest#`<Class:Spec>`#describe().
 #             ^^^^^^^^^^^^^^^^ reference [..] CustomerSpec#`<describe 'helpers'>`#
 #             ^^^^^^^^^^^^^^^^ definition [..] CustomerSpec#`<describe 'helpers'>`#`<describe 'nested helpers'>`#
 #      ⌄ enclosing_range_start [..] CustomerSpec#`<describe 'helpers'>`#`<describe 'nested helpers'>`#ordinary().
@@ -145,8 +147,8 @@
  
    test_each([1]) do |unused|
 #  ^^^^^^^^^ reference [..] Minitest#`<Class:Spec>`#test_each().
-#                     ^^^^^^ definition local 1$119448696
-#                     ^^^^^^ definition local 1$1835867214
+#                     ^^^^^^ definition local 1$1969966160
+#                     ^^^^^^ definition local 1$2433650648
      describe("parameterized helpers") do
 #      ⌄ enclosing_range_start [..] CustomerSpec#ordinary().
        let(:ordinary) { Customer.new.name }

@@ -43,13 +43,13 @@
 #⌄ enclosing_range_start [..] Object#union_receiver().
  def union_receiver(animal)
 #    ^^^^^^^^^^^^^^ definition [..] Object#union_receiver().
-#                   ^^^^^^ definition local 1$3616517420
+#                   ^^^^^^ definition local 1$1635871106
    animal.sound
-#  ^^^^^^ reference local 1$3616517420
+#  ^^^^^^ reference local 1$1635871106
 #         ^^^^^ reference [..] Cat#sound().
 #         ^^^^^ reference [..] Dog#sound().
    animal.inspect
-#  ^^^^^^ reference local 1$3616517420
+#  ^^^^^^ reference local 1$1635871106
 #         ^^^^^^^ reference [..] Kernel#inspect().
  end
 #  ⌃ enclosing_range_end [..] Object#union_receiver().
@@ -65,9 +65,9 @@
 #⌄ enclosing_range_start [..] Object#shared_method().
  def shared_method(dog)
 #    ^^^^^^^^^^^^^ definition [..] Object#shared_method().
-#                  ^^^ definition local 1$3318648468
+#                  ^^^ definition local 1$3604507294
    dog.sound
-#  ^^^ reference local 1$3318648468
+#  ^^^ reference local 1$3604507294
 #      ^^^^^ reference [..] Dog#sound().
  end
 #  ⌃ enclosing_range_end [..] Object#shared_method().

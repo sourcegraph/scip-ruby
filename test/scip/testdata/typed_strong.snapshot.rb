@@ -15,9 +15,9 @@
 #  ⌄ enclosing_range_start [..] StrongClass#add_one().
    def add_one(x)
 #      ^^^^^^^ definition [..] StrongClass#add_one().
-#              ^ definition local 1$272034907
+#              ^ definition local 1$678439201
      x + 1
-#    ^ reference local 1$272034907
+#    ^ reference local 1$678439201
 #      ^ reference [..] Integer#+().
    end
 #    ⌃ enclosing_range_end [..] StrongClass#add_one().
@@ -28,9 +28,9 @@
 #  ⌄ enclosing_range_start [..] StrongClass#shout().
    def shout(x)
 #      ^^^^^ definition [..] StrongClass#shout().
-#            ^ definition local 1$3089998242
+#            ^ definition local 1$1681820628
      x.upcase
-#    ^ reference local 1$3089998242
+#    ^ reference local 1$1681820628
 #      ^^^^^^ reference [..] String#upcase().
    end
 #    ⌃ enclosing_range_end [..] StrongClass#shout().
@@ -48,16 +48,16 @@
    def call_them
 #      ^^^^^^^^^ definition [..] StrongUse#call_them().
      s = StrongClass.new
-#    ^ definition local 1$1369514212
+#    ^ definition local 1$2784501873
 #        ^^^^^^^^^^^ reference [..] StrongClass#
 #                    ^^^ reference [..] Class#new().
      _ = s.add_one(1)
-#    ^ definition local 3$1369514212
-#        ^ reference local 1$1369514212
+#    ^ definition local 3$2784501873
+#        ^ reference local 1$2784501873
 #          ^^^^^^^ reference [..] StrongClass#add_one().
      _ = s.shout("hi")
-#    ^ reference (write) local 3$1369514212
-#        ^ reference local 1$1369514212
+#    ^ reference (write) local 3$2784501873
+#        ^ reference local 1$2784501873
 #          ^^^^^ reference [..] StrongClass#shout().
      nil
    end
