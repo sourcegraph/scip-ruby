@@ -10,6 +10,9 @@ end
 # NOTE: This is nested inside Opus as a convention,
 # but the key thing is the subclassing relationship.
 class Opus::MyThing::Command::GetThing < Opus::Command
+  extend T::Sig
+
+  sig { void }
   def call()
     x = 1
     y = x

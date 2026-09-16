@@ -21,7 +21,10 @@
 #                              ^^^^^^^^ definition [..] Opus#MyThing#Command#GetThing#
 #                                         ^^^^ reference [..] Opus#
 #                                               ^^^^^^^ reference [..] Opus#Command#
-#  ⌄ enclosing_range_start [..] Opus#MyThing#Command#GetThing#call().
+   extend T::Sig
+#  ^^^^^^ reference [..] Kernel#extend().
+ 
+   sig { void }
    def call()
 #      ^^^^ definition [..] Opus#MyThing#Command#GetThing#call().
      x = 1
@@ -31,7 +34,6 @@
 #    ^^^^^ reference local 2$3018949801
 #        ^ reference local 1$3018949801
    end
-#    ⌃ enclosing_range_end [..] Opus#MyThing#Command#GetThing#call().
  end
 #  ⌃ enclosing_range_end [..] Opus#MyThing#Command#GetThing#
  

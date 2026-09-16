@@ -121,12 +121,12 @@
 #        ⌄ enclosing_range_start [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
          it Object do
 #           ^^^^^^ definition [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
-#           ^^^^^^ definition [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
 #           ^^^^^^ reference [..] Object#
          end
 #          ⌃ enclosing_range_end [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
 #        ⌄ enclosing_range_start [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
          it Object do
+#           ^^^^^^ definition [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().
 #           ^^^^^^ reference [..] Object#
          end
 #          ⌃ enclosing_range_end [..] MyTest#`<describe 'Object'>`#`<it 'Object'>`().

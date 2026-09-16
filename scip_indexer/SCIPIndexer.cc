@@ -1568,9 +1568,27 @@ public:
         }
         auto scipState = this->getSCIPState();
         auto methodLoc = core::Loc(file, methodDef.loc);
-        auto sym = scip_indexer::GenericSymbolRef::method(methodDef.symbol);
-        auto status = scipState->saveDefinition(gs, file, sym, /*aliasedSymbol*/ nullopt, /*loc*/ nullopt, methodLoc);
-        ENFORCE(status.ok());
+        // A discardable method without a source name only exists for typechecking.
+        auto hasSourceDefinition = !methodDef.flags.discardDef || methodDef.nameLoc.exists();
+        if (hasSourceDefinition) {
+            auto sym = scip_indexer::GenericSymbolRef::method(methodDef.symbol);
+            // Symbols can be shared by definitions in different files. This AST's offsets belong to this file.
+            auto nameLoc = core::Loc(file, methodDef.nameLoc.exists() ? methodDef.nameLoc : methodDef.declLoc);
+            // Rewriters can hide a handwritten method by zeroing its locations while retaining its original start.
+            if (nameLoc.exists() && nameLoc.empty() && methodDef.nameLoc.exists()) {
+                auto methodName = methodDef.name.shortName(gs);
+                auto sourceNameLoc = core::Loc(file, methodDef.nameLoc).adjustLen(gs, 0, methodName.size());
+                auto source = sourceNameLoc.source(gs);
+                if (source.has_value() && source.value() == methodName) {
+                    nameLoc = sourceNameLoc;
+                }
+            }
+            if (nameLoc.exists() && !nameLoc.empty()) {
+                auto status =
+                    scipState->saveDefinition(gs, file, sym, /*aliasedSymbol*/ nullopt, nameLoc.offsets(), methodLoc);
+                ENFORCE(status.ok());
+            }
+        }
     }
 
     void typecheck(const core::GlobalState &gs, core::FileRef file, cfg::CFG &cfg,
