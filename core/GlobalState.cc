@@ -1053,8 +1053,12 @@ bool matchesArityHash(const GlobalState &gs, ArityHash arityHash, MethodRef meth
     auto methodData = method.data(gs);
     // lookupMethodSymbolWithHash is called from namer, before resolver enters overloads.
     // It wants to be able to find the "namer version" of the method, not the overload.
+    // Intrinsics start as location-less stubs with only a synthetic block argument. Allow the first real definition
+    // to find and fill in that stub regardless of its arity. Once the stub has been defined, require subsequent
+    // definitions to match its actual arity so that incompatible MethodDefs receive distinct symbols.
+    auto isUninitializedIntrinsic = methodData->hasIntrinsic() && !methodData->hasSig() && !methodData->loc().exists();
     return !methodData->name.isOverloadName(gs) &&
-           (methodData->methodArityHash(gs) == arityHash || (methodData->hasIntrinsic() && !methodData->hasSig()));
+           (methodData->methodArityHash(gs) == arityHash || isUninitializedIntrinsic);
 }
 } // namespace
 

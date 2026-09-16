@@ -1096,14 +1096,12 @@ private:
                 // existing one and create a new one
                 if (!isIntrinsic(sym.data(ctx))) {
                     paramMismatchErrors(ctx.withOwner(sym), declLoc, parsedParams);
-                    ctx.state.mangleRenameMethod(sym, method.name);
-                    // Re-enter a new symbol.
-                    sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name, ctx.locAt(method.nameLoc));
-                } else {
-                    // ...unless it's an intrinsic, because we allow multiple incompatible definitions of those in code
-                    // TODO(jvilk): Wouldn't this always fail since `!sym.exists()`?
-                    matchingSym.data(ctx)->addLoc(ctx, declLoc);
                 }
+                // Incompatible intrinsic definitions are allowed without an error, but still need distinct symbols so
+                // that every MethodDef has the same argument shape as its symbol.
+                ctx.state.mangleRenameMethod(sym, method.name);
+                // Re-enter a new symbol.
+                sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name, ctx.locAt(method.nameLoc));
             } else {
                 // if the symbol does exist, then we're running in incremental mode, and we need to compare it to
                 // the previously defined equivalent to re-report any errors
