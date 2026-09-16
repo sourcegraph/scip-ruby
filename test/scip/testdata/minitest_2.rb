@@ -1,4 +1,6 @@
 # typed: true
+# parser: original
+# Prism recovers this malformed class with a different enclosing range.
 
 class Test
   extend T::Sig

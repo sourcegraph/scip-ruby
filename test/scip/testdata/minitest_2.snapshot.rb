@@ -1,4 +1,6 @@
  # typed: true
+ # parser: original
+ # Prism recovers this malformed class with a different enclosing range.
  
 #⌄ enclosing_range_start [..] Test#
  class Test
