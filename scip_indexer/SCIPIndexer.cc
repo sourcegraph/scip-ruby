@@ -1068,6 +1068,15 @@ private:
         if (!symRef.has_value() && isTemporary(ctx.state, localVar)) {
             return false;
         }
+        if (!symRef.has_value()) {
+            // Keyword parameter definitions and shorthand keyword arguments carry
+            // the trailing colon in their parser location. Index just the local name.
+            auto source = ctx.locAt(loc).source(ctx);
+            if (source.has_value() && absl::EndsWith(*source, ":") &&
+                source->substr(0, source->size() - 1) == localVar._name.shortName(ctx)) {
+                loc = core::LocOffsets{loc.beginPos(), loc.endPos() - 1};
+            }
+        }
         scip::SymbolRole referenceRole;
         bool isDefinition = false;
         switch (defRefData.valueCategory) {
