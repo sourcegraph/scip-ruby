@@ -25,6 +25,7 @@
 #include "cfg/CFG.h"
 #include "common/EarlyReturnWithCode.h"
 #include "common/common.h"
+#include "common/counters/Counters.h"
 #include "common/sort/sort.h"
 #include "core/Error.h"
 #include "core/ErrorQueue.h"
@@ -296,6 +297,12 @@ private:
                                     const SmallVec<scip::Relationship> &rels,
                                     optional<core::Loc> enclosingLoc = nullopt) {
         ENFORCE(!symbolString.empty());
+        if (!occLoc.exists() || occLoc.empty()) {
+            // Callers recover source locations where possible. As a last resort, skip just this definition
+            // rather than letting an unlocatable synthetic definition discard the entire file's index.
+            prodCounterInc("scip.definitions.skipped_invalid_loc");
+            return absl::OkStatus();
+        }
         occLoc = trimColonColonPrefix(gs, occLoc);
         auto range = sorbet::scip_indexer::fromSorbetLoc(gs, occLoc);
         if (range.size() == 4) {
@@ -444,6 +451,7 @@ public:
         // Rewriters can create definitions without a source token, such as RSpec's
         // generated described_class method. References to them can still be indexed.
         if (!occLoc.exists() || occLoc.empty()) {
+            prodCounterInc("scip.definitions.skipped_invalid_loc");
             return absl::OkStatus();
         }
         scip::Symbol symbol;

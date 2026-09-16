@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <regex>
@@ -30,6 +31,7 @@
 #include "cfg/builder/builder.h"
 #include "common/FileOps.h"
 #include "common/common.h"
+#include "common/counters/Counters.h"
 #include "common/sort/sort.h"
 #include "common/strings/formatting.h"
 #include "common/web_tracer_framework/tracing.h"
@@ -277,8 +279,12 @@ TEST_CASE("GemInference") {
 }
 
 // Based on a mix of pipeline_test_runner.cc and pipeline.cc
+using BeforeIndex = function<void(core::Context, cfg::CFG &)>;
+
 class CFGCollectorAndTyper {
 public:
+    BeforeIndex beforeIndex;
+
     void postTransformClassDef(core::Context ctx, const ast::ClassDef &c) {
         for (auto &extension : ctx.state.semanticExtensions) {
             extension->typecheckClass(ctx, ctx.file, c);
@@ -293,6 +299,9 @@ public:
         auto cfg = cfg::CFGBuilder::buildFor(ctx.withOwner(symbol), c, symbol);
         cfg = infer::Inference::run(ctx.withOwner(symbol), move(cfg));
         if (cfg) {
+            if (beforeIndex) {
+                beforeIndex(ctx, *cfg);
+            }
             for (auto &extension : ctx.state.semanticExtensions) {
                 extension->typecheck(ctx, ctx.file, *cfg);
             }
@@ -313,6 +322,9 @@ public:
         auto symbol = cfg->symbol;
         cfg = infer::Inference::run(ctx.withOwner(symbol), move(cfg));
         if (cfg) {
+            if (beforeIndex) {
+                beforeIndex(ctx, *cfg);
+            }
             for (auto &extension : ctx.state.semanticExtensions) {
                 extension->typecheck(ctx, ctx.file, *cfg, &m);
             }
@@ -661,8 +673,8 @@ pair<scip_indexer::Config, FormatOptions> readMagicComments(string_view path, Te
     return {config, options};
 }
 
-void test_one_gem(Expectations &test, const TestSettings &settings, realmain::options::Parser selectedParser,
-                  bool writeSnapshots) {
+scip::Index indexOneGem(Expectations &test, const TestSettings &settings, realmain::options::Parser selectedParser,
+                        BeforeIndex beforeIndex = {}) {
     string parserName = selectedParser == realmain::options::Parser::PRISM ? "prism" : "original";
     INFO("parser: " << parserName);
     parser = selectedParser; // Used by upstream error assertions.
@@ -754,6 +766,7 @@ void test_one_gem(Expectations &test, const TestSettings &settings, realmain::op
         for (auto &resolvedTree : trees) {
             sorbet::core::MutableContext ctx(gs, core::Symbols::root(), resolvedTree.file);
             CFGCollectorAndTyper collector;
+            collector.beforeIndex = beforeIndex;
             ast::ConstShallowWalk::apply(ctx, collector, resolvedTree.tree);
             for (auto &extension : ctx.state.semanticExtensions) {
                 extension->finishTypecheckFile(ctx, resolvedTree.file);
@@ -808,7 +821,14 @@ void test_one_gem(Expectations &test, const TestSettings &settings, realmain::op
     indexFile.close();
     filesystem::remove(indexFilePath);
     REQUIRE(index.documents_size() > 0);
+    return index;
+}
 
+void test_one_gem(Expectations &test, const TestSettings &settings, realmain::options::Parser selectedParser,
+                  bool writeSnapshots) {
+    auto index = indexOneGem(test, settings, selectedParser);
+    string parserName = selectedParser == realmain::options::Parser::PRISM ? "prism" : "original";
+    INFO("parser: " << parserName);
     if (writeSnapshots) {
         updateSnapshots(index, settings, test.folder);
     } else {
@@ -816,6 +836,93 @@ void test_one_gem(Expectations &test, const TestSettings &settings, realmain::op
     }
 
     MESSAGE("PASS (" << parserName << ")");
+}
+
+TEST_CASE("Missing definition locations do not discard a file's index") {
+    if (!onlyRunUnitTests) {
+        return;
+    }
+
+    Expectations test{};
+    test.basename = "missing-definition-locations";
+    test.isFolderTest = true;
+    test.sourceFiles = {"example.rb"};
+    test.sourceFileContents["example.rb"] = make_shared<core::File>("example.rb", R"(# typed: true
+class Example
+  def value
+    7
+  end
+end
+Example.new.value
+)",
+                                                                    core::File::Type::Normal);
+
+    for (auto selectedParser : {realmain::options::Parser::ORIGINAL, realmain::options::Parser::PRISM}) {
+        INFO("parser: " << string(selectedParser == realmain::options::Parser::PRISM ? "prism" : "original"));
+        auto previousCounters = getAndClearThreadCounters();
+        int injectedDefinitions = 0;
+        auto index = indexOneGem(test, TestSettings{}, selectedParser, [&](core::Context ctx, cfg::CFG &graph) {
+            if (graph.symbol != ctx.state.lookupStaticInitForFile(ctx.file)) {
+                return;
+            }
+            for (auto &bb : graph.basicBlocks) {
+                for (auto &binding : bb->exprs) {
+                    auto alias = cfg::cast_instruction<cfg::Alias>(binding.value);
+                    if (!alias || alias->what.name(ctx).shortName(ctx) != "Example") {
+                        continue;
+                    }
+                    // Simulate synthetic definition markers whose source locations were lost upstream.
+                    // Keep the alias's valid location so only the definition writer sees the missing ranges.
+                    auto local = binding.bind.variable;
+                    vector<cfg::Binding> definitions;
+                    for (auto loc :
+                         {core::LocOffsets::none(), core::LocOffsets{0, 0}, binding.loc.copyWithZeroLength()}) {
+                        auto send = cfg::Send::make(local, core::LocOffsets::none(), core::Names::keepForIde(),
+                                                    core::LocOffsets::none(), 1, false, 1);
+                        *send.refs = local;
+                        *send.locs = loc;
+                        ++send.refs;
+                        ++send.locs;
+                        definitions.emplace_back(cfg::LocalOccurrence::synthetic(local), core::LocOffsets::none(),
+                                                 move(send).asInsnPtr());
+                        injectedDefinitions++;
+                    }
+                    bb->exprs.insert(bb->exprs.begin(), make_move_iterator(definitions.begin()),
+                                     make_move_iterator(definitions.end()));
+                    return;
+                }
+            }
+        });
+        CHECK(injectedDefinitions == 3);
+        auto counters = getCounterStatistics();
+        counterConsume(move(previousCounters));
+        CHECK(absl::StrContains(counters, fmt::format("{:>40} :{:15}\n", "scip.definitions.skipped_invalid_loc", 3)));
+
+        REQUIRE(index.documents_size() == 1);
+        const auto &document = index.documents(0);
+        CHECK(document.relative_path() == "example.rb");
+        int classDefinitions = 0;
+        int methodDefinitions = 0;
+        int methodReferences = 0;
+        for (const auto &occurrence : document.occurrences()) {
+            REQUIRE(occurrence.range_size() == 3);
+            CHECK(occurrence.range(1) < occurrence.range(2));
+            bool definition = (occurrence.symbol_roles() & scip::SymbolRole::Definition) != 0;
+            if (absl::EndsWith(occurrence.symbol(), " Example#") && definition) {
+                classDefinitions++;
+            }
+            if (absl::EndsWith(occurrence.symbol(), " Example#value().")) {
+                if (definition) {
+                    methodDefinitions++;
+                } else {
+                    methodReferences++;
+                }
+            }
+        }
+        CHECK(classDefinitions == 1);
+        CHECK(methodDefinitions == 1);
+        CHECK(methodReferences == 1);
+    }
 }
 
 // There are several different kinds of tests that we are potentially
