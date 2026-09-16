@@ -30,15 +30,15 @@
 #⌄ enclosing_range_start [..] Object#keyword_args().
  def keyword_args(w:, x: 3, y: [], **kwargs)
 #    ^^^^^^^^^^^^ definition [..] Object#keyword_args().
-#                 ^^ definition local 1$3994954926
-#                     ^^ definition local 2$3994954926
-#                           ^^ definition local 3$3994954926
+#                 ^ definition [..] Object#keyword_args().(w)
+#                     ^ definition [..] Object#keyword_args().(x)
+#                           ^ definition [..] Object#keyword_args().(y)
    y << w + x
-#  ^ reference local 3$3994954926
-#       ^ reference local 1$3994954926
-#           ^ reference local 2$3994954926
+#  ^ reference [..] Object#keyword_args().(y)
+#       ^ reference [..] Object#keyword_args().(w)
+#           ^ reference [..] Object#keyword_args().(x)
    y << [a]
-#  ^ reference local 3$3994954926
+#  ^ reference [..] Object#keyword_args().(y)
    return
  end
 #  ⌃ enclosing_range_end [..] Object#keyword_args().

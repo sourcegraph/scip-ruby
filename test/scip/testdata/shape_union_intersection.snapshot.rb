@@ -22,23 +22,23 @@
 #  ⌄ enclosing_range_start [..] `<Class:ToyLabels>`#describe().
    def self.describe(item, candidate)
 #           ^^^^^^^^ definition [..] `<Class:ToyLabels>`#describe().
-#                    ^^^^ definition local 1$1360419304
-#                          ^^^^^^^^^ definition local 2$1360419304
+#                    ^^^^ definition local 1$1004766010
+#                          ^^^^^^^^^ definition local 2$1004766010
      if item == candidate
-#       ^^^^ reference local 1$1360419304
+#       ^^^^ reference local 1$1004766010
 #            ^^ reference [..] Hash#`==`().
 #            ^^ reference [..] Integer#`==`().
 #            ^^ reference [..] Symbol#`==`().
-#               ^^^^^^^^^ reference local 2$1360419304
+#               ^^^^^^^^^ reference local 2$1004766010
        if candidate.is_a?(Hash)
-#         ^^^^^^^^^ reference local 2$1360419304
+#         ^^^^^^^^^ reference local 2$1004766010
 #                   ^^^^^ reference [..] Kernel#`is_a?`().
 #                         ^^^^ reference [..] Hash#
          ToyPrinter.new.print_label(candidate[:label])
 #        ^^^^^^^^^^ reference [..] ToyPrinter#
 #                   ^^^ reference [..] Class#new().
 #                       ^^^^^^^^^^^ reference [..] ToyPrinter#print_label().
-#                                   ^^^^^^^^^ reference local 2$1360419304
+#                                   ^^^^^^^^^ reference local 2$1004766010
 #                                            ^ reference [..] Hash#`[]`().
        end
      end
@@ -59,9 +59,9 @@
 #  ⌄ enclosing_range_start [..] ToyPrinter#print_label().
    def print_label(value)
 #      ^^^^^^^^^^^ definition [..] ToyPrinter#print_label().
-#                  ^^^^^ definition local 1$1435598925
+#                  ^^^^^ definition local 1$1351426504
      value.upcase
-#    ^^^^^ reference local 1$1435598925
+#    ^^^^^ reference local 1$1351426504
 #          ^^^^^^ reference [..] String#upcase().
    end
 #    ⌃ enclosing_range_end [..] ToyPrinter#print_label().

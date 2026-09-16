@@ -27,9 +27,9 @@
 #  ⌄ enclosing_range_start [..] IntersectionLeft#shared().
    def shared(key:)
 #      ^^^^^^ definition [..] IntersectionLeft#shared().
-#             ^^^^ definition local 1$3329898867
+#             ^^^ definition [..] IntersectionLeft#shared().(key)
      key
-#    ^^^ reference local 1$3329898867
+#    ^^^ reference [..] IntersectionLeft#shared().(key)
    end
 #    ⌃ enclosing_range_end [..] IntersectionLeft#shared().
  
@@ -80,9 +80,9 @@
 #  ⌄ enclosing_range_start [..] IntersectionRight#shared().
    def shared(key:)
 #      ^^^^^^ definition [..] IntersectionRight#shared().
-#             ^^^^ definition local 1$98738482
+#             ^^^ definition [..] IntersectionRight#shared().(key)
      key
-#    ^^^ reference local 1$98738482
+#    ^^^ reference [..] IntersectionRight#shared().(key)
    end
 #    ⌃ enclosing_range_end [..] IntersectionRight#shared().
  
@@ -108,9 +108,9 @@
 #  ⌄ enclosing_range_start [..] IntersectionThird#shared().
    def shared(key:)
 #      ^^^^^^ definition [..] IntersectionThird#shared().
-#             ^^^^ definition local 1$745923691
+#             ^^^ definition [..] IntersectionThird#shared().(key)
      key
-#    ^^^ reference local 1$745923691
+#    ^^^ reference [..] IntersectionThird#shared().(key)
    end
 #    ⌃ enclosing_range_end [..] IntersectionThird#shared().
  end
@@ -183,6 +183,8 @@
 #    ^^^^^ reference local 1$1164048121
 #          ^^^^^^ reference [..] IntersectionLeft#shared().
 #          ^^^^^^ reference [..] IntersectionRight#shared().
+#                 ^^^ reference [..] IntersectionLeft#shared().(key)
+#                 ^^^ reference [..] IntersectionRight#shared().(key)
 #                                 ^^^^^^ reference [..] String#upcase().
      value.copied("c")
 #    ^^^^^ reference local 1$1164048121
@@ -212,10 +214,13 @@
    def incomplete_branch(value)
 #      ^^^^^^^^^^^^^^^^^ definition [..] IntersectionCalls#incomplete_branch().
 #                        ^^^^^ definition local 1$3666353779
-     # The left union cannot resolve shared on every branch. Only Right survives.
+     # Distribution keeps Right in both branches and Left in the overlapping branch.
      value.shared(key: "discard-left")
 #    ^^^^^ reference local 1$3666353779
+#          ^^^^^^ reference [..] IntersectionLeft#shared().
 #          ^^^^^^ reference [..] IntersectionRight#shared().
+#                 ^^^ reference [..] IntersectionLeft#shared().(key)
+#                 ^^^ reference [..] IntersectionRight#shared().(key)
    end
 #    ⌃ enclosing_range_end [..] IntersectionCalls#incomplete_branch().
  
@@ -229,7 +234,10 @@
 #                                 ^^^^^ definition local 1$2865993482
      value.shared(key: "discard-reversed")
 #    ^^^^^ reference local 1$2865993482
+#          ^^^^^^ reference [..] IntersectionLeft#shared().
 #          ^^^^^^ reference [..] IntersectionRight#shared().
+#                 ^^^ reference [..] IntersectionLeft#shared().(key)
+#                 ^^^ reference [..] IntersectionRight#shared().(key)
    end
 #    ⌃ enclosing_range_end [..] IntersectionCalls#reversed_incomplete_branch().
  
@@ -246,6 +254,9 @@
 #          ^^^^^^ reference [..] IntersectionLeft#shared().
 #          ^^^^^^ reference [..] IntersectionRight#shared().
 #          ^^^^^^ reference [..] IntersectionThird#shared().
+#                 ^^^ reference [..] IntersectionLeft#shared().(key)
+#                 ^^^ reference [..] IntersectionRight#shared().(key)
+#                 ^^^ reference [..] IntersectionThird#shared().(key)
    end
 #    ⌃ enclosing_range_end [..] IntersectionCalls#complete_branches().
  
@@ -262,6 +273,9 @@
 #          ^^^^^^ reference [..] IntersectionLeft#shared().
 #          ^^^^^^ reference [..] IntersectionRight#shared().
 #          ^^^^^^ reference [..] IntersectionThird#shared().
+#                 ^^^ reference [..] IntersectionLeft#shared().(key)
+#                 ^^^ reference [..] IntersectionRight#shared().(key)
+#                 ^^^ reference [..] IntersectionThird#shared().(key)
    end
 #    ⌃ enclosing_range_end [..] IntersectionCalls#nested_union().
  
@@ -276,6 +290,8 @@
 #    ^^^^^ reference local 1$1328153896
 #          ^^^^^^ reference [..] IntersectionLeft#shared().
 #          ^^^^^^ reference [..] IntersectionThird#shared().
+#                 ^^^ reference [..] IntersectionLeft#shared().(key)
+#                 ^^^ reference [..] IntersectionThird#shared().(key)
    end
 #    ⌃ enclosing_range_end [..] IntersectionCalls#ordinary_union().
  
@@ -375,11 +391,12 @@
    extend T::Generic
 #  ^^^^^^ reference [..] Kernel#extend().
    Elem = type_member { {upper: T.all(IntersectionLeft, IntersectionRight)} }
-#  ^^^^ definition local 6$1610908813
+#  ^^^^ definition [..] IntersectionBox#Elem#
 #                                     ^^^^^^^^^^^^^^^^ reference [..] IntersectionLeft#
 #                                                       ^^^^^^^^^^^^^^^^^ reference [..] IntersectionRight#
  
    sig { params(value: Elem).void }
+#                      ^^^^ reference [..] IntersectionBox#Elem#
 #  ⌄ enclosing_range_start [..] IntersectionBox#bounded().
    def bounded(value)
 #      ^^^^^^^ definition [..] IntersectionBox#bounded().
@@ -394,6 +411,8 @@
 #    ^^^^^ reference local 1$1790903679
 #          ^^^^^^ reference [..] IntersectionLeft#shared().
 #          ^^^^^^ reference [..] IntersectionRight#shared().
+#                 ^^^ reference [..] IntersectionLeft#shared().(key)
+#                 ^^^ reference [..] IntersectionRight#shared().(key)
      value.left(*["bounded-splat"])
 #    ^^^^^ reference local 1$1790903679
 #          ^^^^ reference [..] IntersectionLeft#left().

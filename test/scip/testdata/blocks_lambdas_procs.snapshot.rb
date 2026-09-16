@@ -60,7 +60,7 @@
 #  ^^ definition local 9$3374022419
 #       ^^ reference [..] Kernel#
 #       ^^ reference [..] Kernel#lambda().
-#          ^^ definition local 8$3374022419
+#          ^ definition local 8$3374022419
      y += x
 #    ^ reference (write) local 1$3374022419
 #    ^ reference local 1$3374022419
@@ -71,7 +71,7 @@
    l4 = lambda { |x:|
 #  ^^ definition local 11$3374022419
 #       ^^^^^^ reference [..] Kernel#lambda().
-#                 ^^ definition local 10$3374022419
+#                 ^ definition local 10$3374022419
      y += x
 #    ^ reference (write) local 1$3374022419
 #    ^ reference local 1$3374022419
@@ -126,7 +126,7 @@
 #  ^^ definition local 9$1364318174
 #       ^^^^ reference [..] Proc#
 #            ^^^ reference [..] `<Class:Proc>`#new().
-#                   ^^ definition local 8$1364318174
+#                   ^ definition local 8$1364318174
      y += x
 #    ^ reference (write) local 1$1364318174
 #    ^ reference local 1$1364318174
@@ -137,7 +137,7 @@
    p4 = proc { |x:|
 #  ^^ definition local 11$1364318174
 #       ^^^^ reference [..] Kernel#proc().
-#               ^^ definition local 10$1364318174
+#               ^ definition local 10$1364318174
      y += x
 #    ^ reference (write) local 1$1364318174
 #    ^ reference local 1$1364318174
@@ -174,7 +174,7 @@
 #    ^^^^^^^^^^^^^^^^^^^^^^^ definition [..] Object#use_block_with_defaults().
    call_block do |oops: nil|
 #  ^^^^^^^^^^ reference [..] Object#call_block().
-#                 ^^^^^ definition local 1$1358758412
+#                 ^^^^ definition local 1$1358758412
    end
  
    call_block do |oops = "nil"|

@@ -16,6 +16,22 @@
      def self.test_each(values, &block); end
 #             ^^^^^^^^^ definition [..] Minitest#`<Class:Spec>`#test_each().
 #                                          ⌃ enclosing_range_end [..] Minitest#`<Class:Spec>`#test_each().
+#    ⌄ enclosing_range_start [..] Minitest#`<Class:Spec>`#let().
+     def self.let(name, &block); end
+#             ^^^ definition [..] Minitest#`<Class:Spec>`#let().
+#                                  ⌃ enclosing_range_end [..] Minitest#`<Class:Spec>`#let().
+#    ⌄ enclosing_range_start [..] Minitest#`<Class:Spec>`#`let!`().
+     def self.let!(name, &block); end
+#             ^^^^ definition [..] Minitest#`<Class:Spec>`#`let!`().
+#                                   ⌃ enclosing_range_end [..] Minitest#`<Class:Spec>`#`let!`().
+#    ⌄ enclosing_range_start [..] Minitest#`<Class:Spec>`#subject().
+     def self.subject(name = nil, &block); end
+#             ^^^^^^^ definition [..] Minitest#`<Class:Spec>`#subject().
+#                                            ⌃ enclosing_range_end [..] Minitest#`<Class:Spec>`#subject().
+#    ⌄ enclosing_range_start [..] Minitest#`<Class:Spec>`#it().
+     def self.it(name, &block); end
+#             ^^ definition [..] Minitest#`<Class:Spec>`#it().
+#                                 ⌃ enclosing_range_end [..] Minitest#`<Class:Spec>`#it().
    end
 #    ⌃ enclosing_range_end [..] Minitest#Spec#
  end
@@ -57,6 +73,7 @@
 #           ^^^^^^^^^ definition [..] CustomerSpec#`<describe 'helpers'>`#
 #    ⌄ enclosing_range_start [..] CustomerSpec#`<describe 'helpers'>`#ordinary().
      let(:ordinary) do
+#    ^^^ reference [..] Minitest#`<Class:Spec>`#let().
 #        ^^^^^^^^^ definition [..] CustomerSpec#`<describe 'helpers'>`#ordinary().
        customer = Customer.new
 #      ^^^^^^^^ definition local 1$3706689357
@@ -70,6 +87,7 @@
  
 #    ⌄ enclosing_range_start [..] CustomerSpec#`<describe 'helpers'>`#eager().
      let!("eager") { Customer.new.name }
+#    ^^^^ reference [..] Minitest#`<Class:Spec>`#`let!`().
 #         ^^^^^^^ definition [..] CustomerSpec#`<describe 'helpers'>`#eager().
 #                    ^^^^^^^^ reference [..] Customer#
 #                             ^^^ reference [..] Class#new().
@@ -77,6 +95,7 @@
 #                                      ⌃ enclosing_range_end [..] CustomerSpec#`<describe 'helpers'>`#eager().
 #    ⌄ enclosing_range_start [..] CustomerSpec#`<describe 'helpers'>`#named().
      subject(:named) { Customer.new.name }
+#    ^^^^^^^ reference [..] Minitest#`<Class:Spec>`#subject().
 #            ^^^^^^ definition [..] CustomerSpec#`<describe 'helpers'>`#named().
 #                      ^^^^^^^^ reference [..] Customer#
 #                               ^^^ reference [..] Class#new().
@@ -86,6 +105,7 @@
 #    ⌄ enclosing_range_start [..] CustomerSpec#`<describe 'helpers'>`#subject().
      subject do
 #    ^^^^^^^ definition [..] CustomerSpec#`<describe 'helpers'>`#subject().
+#    ^^^^^^^ reference [..] Minitest#`<Class:Spec>`#subject().
        customer = Customer.new
 #      ^^^^^^^^ definition local 1$1550327077
 #                 ^^^^^^^^ reference [..] Customer#
@@ -110,11 +130,13 @@
  
 #    ⌄ enclosing_range_start [..] CustomerSpec#`<describe 'helpers'>`#empty().
      let(:empty) {}
+#    ^^^ reference [..] Minitest#`<Class:Spec>`#let().
 #        ^^^^^^ definition [..] CustomerSpec#`<describe 'helpers'>`#empty().
 #                 ⌃ enclosing_range_end [..] CustomerSpec#`<describe 'helpers'>`#empty().
  
 #    ⌄ enclosing_range_start [..] CustomerSpec#`<describe 'helpers'>`#`<it 'uses the helpers'>`().
      it("uses the helpers") { ordinary; eager; named; subject; empty }
+#    ^^ reference [..] Minitest#`<Class:Spec>`#it().
 #       ^^^^^^^^^^^^^^^^^^ definition [..] CustomerSpec#`<describe 'helpers'>`#`<it 'uses the helpers'>`().
 #                             ^^^^^^^^ reference [..] CustomerSpec#`<describe 'helpers'>`#ordinary().
 #                                       ^^^^^ reference [..] CustomerSpec#`<describe 'helpers'>`#eager().
@@ -130,6 +152,7 @@
 #             ^^^^^^^^^^^^^^^^ definition [..] CustomerSpec#`<describe 'helpers'>`#`<describe 'nested helpers'>`#
 #      ⌄ enclosing_range_start [..] CustomerSpec#`<describe 'helpers'>`#`<describe 'nested helpers'>`#ordinary().
        let("ordinary") { Customer.new.name }
+#      ^^^ reference [..] Minitest#`<Class:Spec>`#let().
 #          ^^^^^^^^^^ definition [..] CustomerSpec#`<describe 'helpers'>`#`<describe 'nested helpers'>`#ordinary().
 #                        ^^^^^^^^ reference [..] Customer#
 #                                 ^^^ reference [..] Class#new().
@@ -137,6 +160,7 @@
 #                                          ⌃ enclosing_range_end [..] CustomerSpec#`<describe 'helpers'>`#`<describe 'nested helpers'>`#ordinary().
 #      ⌄ enclosing_range_start [..] CustomerSpec#`<describe 'helpers'>`#`<describe 'nested helpers'>`#`<it 'uses the nested helper'>`().
        it("uses the nested helper") { ordinary; subject }
+#      ^^ reference [..] Minitest#`<Class:Spec>`#it().
 #         ^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] CustomerSpec#`<describe 'helpers'>`#`<describe 'nested helpers'>`#`<it 'uses the nested helper'>`().
 #                                     ^^^^^^^^ reference [..] CustomerSpec#`<describe 'helpers'>`#`<describe 'nested helpers'>`#ordinary().
 #                                               ^^^^^^^ reference [..] CustomerSpec#`<describe 'helpers'>`#subject().

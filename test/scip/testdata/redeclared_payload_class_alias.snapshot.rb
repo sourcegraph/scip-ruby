@@ -87,5 +87,5 @@
  Net::HTTPServerException.new("", nil).qualified_alias_method
 #^^^ reference [..] Net#
 #     ^^^^^^^^^^^^^^^^^^^ reference [..] Net#HTTPServerException#
-#                         ^^^ reference [..] Class#new().
+#                         ^^^ reference [..] Net#HTTPExceptions#initialize().
 #                                      ^^^^^^^^^^^^^^^^^^^^^^ reference [..] Net#HTTPServerException#qualified_alias_method().

@@ -13,24 +13,24 @@
 #  ⌄ enclosing_range_start [..] `<Class:ToyCatalog>`#record().
    def self.record(count)
 #           ^^^^^^ definition [..] `<Class:ToyCatalog>`#record().
-#                  ^^^^^ definition local 1$1496340684
+#                  ^^^^^ definition local 1$1653839060
      entry = nil
-#    ^^^^^ definition local 2$1496340684
+#    ^^^^^ definition local 2$1653839060
      begin
        entry = [7, {"label" => "toy"}, "ready"]
-#      ^^^^^ reference (write) local 2$1496340684
+#      ^^^^^ reference (write) local 2$1653839060
      rescue StandardError
 #           ^^^^^^^^^^^^^ reference [..] StandardError#
        entry = [count, {"label" => "toy"}, "fallback"]
-#      ^^^^^ reference (write) local 2$1496340684
-#               ^^^^^ reference local 1$1496340684
+#      ^^^^^ reference (write) local 2$1653839060
+#               ^^^^^ reference local 1$1653839060
      end
  
      ToyReporter.new.describe(entry)
 #    ^^^^^^^^^^^ reference [..] ToyReporter#
 #                ^^^ reference [..] Class#new().
 #                    ^^^^^^^^ reference [..] ToyReporter#describe().
-#                             ^^^^^ reference local 2$1496340684
+#                             ^^^^^ reference local 2$1653839060
    end
 #    ⌃ enclosing_range_end [..] `<Class:ToyCatalog>`#record().
  end
@@ -43,9 +43,9 @@
 #  ⌄ enclosing_range_start [..] ToyReporter#describe().
    def describe(value)
 #      ^^^^^^^^ definition [..] ToyReporter#describe().
-#               ^^^^^ definition local 1$1360419304
+#               ^^^^^ definition local 1$3208356302
      value.to_s
-#    ^^^^^ reference local 1$1360419304
+#    ^^^^^ reference local 1$3208356302
 #          ^^^^ reference [..] Kernel#to_s().
    end
 #    ⌃ enclosing_range_end [..] ToyReporter#describe().

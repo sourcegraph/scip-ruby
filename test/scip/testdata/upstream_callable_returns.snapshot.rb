@@ -20,44 +20,44 @@
 #  ⌃ enclosing_range_end [..] InferredProduct#
  
  arrow_factory = -> { InferredProduct.new }
-#^^^^^^^^^^^^^ definition local 3$119448696
+#^^^^^^^^^^^^^ definition local 3$217974539
 #                ^^ reference [..] Kernel#
 #                ^^ reference [..] Kernel#lambda().
 #                     ^^^^^^^^^^^^^^^ reference [..] InferredProduct#
 #                                     ^^^ reference [..] Class#new().
  arrow_factory.call.name.upcase
-#^^^^^^^^^^^^^ reference local 3$119448696
+#^^^^^^^^^^^^^ reference local 3$217974539
 #              ^^^^ reference [..] Proc0#call().
 #                   ^^^^ reference [..] InferredProduct#name().
 #                        ^^^^^^ reference [..] String#upcase().
  
  lambda_factory = lambda { InferredProduct.new }
-#^^^^^^^^^^^^^^ definition local 5$119448696
+#^^^^^^^^^^^^^^ definition local 5$217974539
 #                 ^^^^^^ reference [..] Kernel#lambda().
 #                          ^^^^^^^^^^^^^^^ reference [..] InferredProduct#
 #                                          ^^^ reference [..] Class#new().
  lambda_factory.call.name.upcase
-#^^^^^^^^^^^^^^ reference local 5$119448696
+#^^^^^^^^^^^^^^ reference local 5$217974539
 #               ^^^^ reference [..] Proc0#call().
 #                    ^^^^ reference [..] InferredProduct#name().
 #                         ^^^^^^ reference [..] String#upcase().
  
  proc_factory = proc { InferredProduct.new }
-#^^^^^^^^^^^^ definition local 7$119448696
+#^^^^^^^^^^^^ definition local 7$217974539
 #               ^^^^ reference [..] Kernel#proc().
 #                      ^^^^^^^^^^^^^^^ reference [..] InferredProduct#
 #                                      ^^^ reference [..] Class#new().
  proc_factory.call.name.upcase
-#^^^^^^^^^^^^ reference local 7$119448696
+#^^^^^^^^^^^^ reference local 7$217974539
 #             ^^^^ reference [..] Proc0#call().
 #                  ^^^^ reference [..] InferredProduct#name().
 #                       ^^^^^^ reference [..] String#upcase().
  
  return_factory = ->(early) do
-#^^^^^^^^^^^^^^ definition local 12$119448696
+#^^^^^^^^^^^^^^ definition local 12$217974539
 #                 ^^ reference [..] Kernel#
 #                 ^^ reference [..] Kernel#lambda().
-#                    ^^^^^ definition local 9$119448696
+#                    ^^^^^ definition local 9$217974539
    return InferredProduct.new if early
 #         ^^^^^^^^^^^^^^^ reference [..] InferredProduct#
 #                         ^^^ reference [..] Class#new().
@@ -66,15 +66,15 @@
 #                  ^^^ reference [..] Class#new().
  end
  return_factory.call(true).name.upcase
-#^^^^^^^^^^^^^^ reference local 12$119448696
+#^^^^^^^^^^^^^^ reference local 12$217974539
 #               ^^^^ reference [..] Proc1#call().
 #                          ^^^^ reference [..] InferredProduct#name().
 #                               ^^^^^^ reference [..] String#upcase().
  
  next_factory = proc do |early|
-#^^^^^^^^^^^^ definition local 16$119448696
+#^^^^^^^^^^^^ definition local 16$217974539
 #               ^^^^ reference [..] Kernel#proc().
-#                        ^^^^^ definition local 13$119448696
+#                        ^^^^^ definition local 13$217974539
    next InferredProduct.new if early
 #       ^^^^^^^^^^^^^^^ reference [..] InferredProduct#
 #                       ^^^ reference [..] Class#new().
@@ -83,7 +83,7 @@
 #                  ^^^ reference [..] Class#new().
  end
  next_factory.call(false).name.upcase
-#^^^^^^^^^^^^ reference local 16$119448696
+#^^^^^^^^^^^^ reference local 16$217974539
 #             ^^^^ reference [..] Proc1#call().
 #                         ^^^^ reference [..] InferredProduct#name().
 #                              ^^^^^^ reference [..] String#upcase().

@@ -15,7 +15,7 @@
 #  ^^^^ definition [..] LegacySingleArgumentUnion#Name.
 #  documentation
 #  | ```ruby
-#  | Name (Runtime object representing type: T.any(String, Symbol))
+#  | Name = T.type_alias { T.any(String, Symbol) }
 #  | ```
 #                              ^^^^^^ reference [..] String#
 #                                      ^^^^^^ reference [..] Symbol#

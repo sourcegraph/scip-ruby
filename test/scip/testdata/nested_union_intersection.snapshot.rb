@@ -57,20 +57,20 @@
 #  ⌄ enclosing_range_start [..] `<Class:ToySelection>`#describe().
    def self.describe(entry, fallback)
 #           ^^^^^^^^ definition [..] `<Class:ToySelection>`#describe().
-#                    ^^^^^ definition local 1$1360419304
-#                           ^^^^^^^^ definition local 2$1360419304
+#                    ^^^^^ definition local 1$3187496317
+#                           ^^^^^^^^ definition local 2$3187496317
      selected = if entry.nil?
-#    ^^^^^^^^ definition local 3$1360419304
-#                  ^^^^^ reference local 1$1360419304
+#    ^^^^^^^^ definition local 3$3187496317
+#                  ^^^^^ reference local 1$3187496317
 #                        ^^^^ reference [..] Kernel#`nil?`().
        entry
-#      ^^^^^ reference local 1$1360419304
+#      ^^^^^ reference local 1$3187496317
      else
        fallback
-#      ^^^^^^^^ reference local 2$1360419304
+#      ^^^^^^^^ reference local 2$3187496317
      end
      selected.label
-#    ^^^^^^^^ reference local 3$1360419304
+#    ^^^^^^^^ reference local 3$3187496317
 #             ^^^^^ reference [..] Labeled#label().
 #             ^^^^^ reference [..] Tagged#label().
    end

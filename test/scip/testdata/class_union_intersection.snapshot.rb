@@ -37,20 +37,20 @@
 #  ⌄ enclosing_range_start [..] `<Class:ToyFactory>`#build().
    def self.build(entry)
 #           ^^^^^ definition [..] `<Class:ToyFactory>`#build().
-#                 ^^^^^ definition local 1$3281777315
+#                 ^^^^^ definition local 1$3855116076
      klass = if entry.is_a?(Class)
-#    ^^^^^ definition local 3$3281777315
-#               ^^^^^ reference local 1$3281777315
+#    ^^^^^ definition local 3$3855116076
+#               ^^^^^ reference local 1$3855116076
 #                     ^^^^^ reference [..] Kernel#`is_a?`().
 #                           ^^^^^ reference [..] Class#
        entry
-#      ^^^^^ reference local 1$3281777315
+#      ^^^^^ reference local 1$3855116076
      else
        ToyShelf
 #      ^^^^^^^^ reference [..] ToyShelf#
      end
      klass.new.mark
-#    ^^^^^ reference local 3$3281777315
+#    ^^^^^ reference local 3$3855116076
 #          ^^^ reference [..] Class#new().
 #              ^^^^ reference [..] ToyBox#mark().
 #              ^^^^ reference [..] ToyShelf#mark().

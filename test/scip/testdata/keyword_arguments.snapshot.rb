@@ -44,12 +44,12 @@
 #                        ^^^^^^^^ reference [..] String#downcase().
      ["shadow"].each { |customer| customer.upcase }
 #               ^^^^ reference [..] Array#each().
-#                       ^^^^^^^^ definition local 1$3266635022
+#                       ^^^^^^^^ definition local 1$720076859
 #                       documentation
 #                       | ```ruby
 #                       | customer (String)
 #                       | ```
-#                                 ^^^^^^^^ reference local 1$3266635022
+#                                 ^^^^^^^^ reference local 1$720076859
 #                                          ^^^^^^ reference [..] String#upcase().
      customer
 #    ^^^^^^^^ reference [..] KeywordReceiver#deliver().(customer)
@@ -121,13 +121,13 @@
 #                       | ```ruby
 #                       | customer (String)
 #                       | ```
-#                                   ^^^^^ definition local 1$2896464142
+#                                   ^^^^^ definition local 1$2727688631
 #                                   documentation
 #                                   | ```ruby
 #                                   | block (T.nilable(T.proc.void))
 #                                   | ```
      block.call if block
-#    ^^^^^ reference local 1$2896464142
+#    ^^^^^ reference local 1$2727688631
 #    override_documentation
 #    | ```ruby
 #    | block (T.proc.void)
@@ -330,7 +330,7 @@
 #      | end
 #      | def union(receiver, customer:)
 #      | ```
-#            ^^^^^^^^ definition local 1$3688814324
+#            ^^^^^^^^ definition local 1$956405319
 #            documentation
 #            | ```ruby
 #            | receiver (T.any(KeywordReceiver, OtherKeywordReceiver))
@@ -341,7 +341,7 @@
 #                      | customer (String)
 #                      | ```
      receiver.deliver(customer:)
-#    ^^^^^^^^ reference local 1$3688814324
+#    ^^^^^^^^ reference local 1$956405319
 #             ^^^^^^^ reference [..] KeywordReceiver#deliver().
 #             ^^^^^^^ reference [..] OtherKeywordReceiver#deliver().
 #                     ^^^^^^^^ reference [..] KeywordCaller#union().(customer)
@@ -368,7 +368,7 @@
 #      | end
 #      | def inherited_union(receiver, customer:)
 #      | ```
-#                      ^^^^^^^^ definition local 1$638571497
+#                      ^^^^^^^^ definition local 1$3194558502
 #                      documentation
 #                      | ```ruby
 #                      | receiver (T.any(KeywordChild, KeywordSibling))
@@ -379,7 +379,7 @@
 #                                | customer (String)
 #                                | ```
      receiver.deliver(customer:)
-#    ^^^^^^^^ reference local 1$638571497
+#    ^^^^^^^^ reference local 1$3194558502
 #             ^^^^^^^ reference [..] KeywordReceiver#deliver().
 #                     ^^^^^^^^ reference [..] KeywordCaller#inherited_union().(customer)
 #                     ^^^^^^^^ reference [..] KeywordReceiver#deliver().(customer)
@@ -421,7 +421,7 @@
 #      | sig { params(receiver: T.untyped, customer: String).void }
 #      | def dynamic(receiver, customer:)
 #      | ```
-#              ^^^^^^^^ definition local 1$1330812590
+#              ^^^^^^^^ definition local 1$2222812673
 #              documentation
 #              | ```ruby
 #              | receiver (T.untyped)
@@ -432,7 +432,7 @@
 #                        | customer (String)
 #                        | ```
      receiver.deliver(customer:)
-#    ^^^^^^^^ reference local 1$1330812590
+#    ^^^^^^^^ reference local 1$2222812673
 #                     ^^^^^^^^ reference [..] KeywordCaller#dynamic().(customer)
    end
 #    ⌃ enclosing_range_end [..] KeywordCaller#dynamic().
@@ -440,7 +440,7 @@
 #  ⌃ enclosing_range_end [..] KeywordCaller#
  
  receiver = KeywordReceiver.new
-#^^^^^^^^ definition local 1$119448696
+#^^^^^^^^ definition local 1$217974539
 #documentation
 #| ```ruby
 #| receiver (KeywordReceiver)
@@ -448,67 +448,67 @@
 #           ^^^^^^^^^^^^^^^ reference [..] KeywordReceiver#
 #                           ^^^ reference [..] Class#new().
  customer = "Ada"
-#^^^^^^^^ definition local 3$119448696
+#^^^^^^^^ definition local 3$217974539
 #documentation
 #| ```ruby
 #| customer (String("Ada"))
 #| ```
  receiver.deliver(customer: customer, enabled: true)
-#^^^^^^^^ reference local 1$119448696
+#^^^^^^^^ reference local 1$217974539
 #         ^^^^^^^ reference [..] KeywordReceiver#deliver().
 #                 ^^^^^^^^ reference [..] KeywordReceiver#deliver().(customer)
-#                           ^^^^^^^^ reference local 3$119448696
+#                           ^^^^^^^^ reference local 3$217974539
 #                                     ^^^^^^^ reference [..] KeywordReceiver#deliver().(enabled)
  receiver.deliver(customer:)
-#^^^^^^^^ reference local 1$119448696
+#^^^^^^^^ reference local 1$217974539
 #         ^^^^^^^ reference [..] KeywordReceiver#deliver().
-#                 ^^^^^^^^ reference local 3$119448696
+#                 ^^^^^^^^ reference local 3$217974539
 #                 ^^^^^^^^ reference [..] KeywordReceiver#deliver().(customer)
  receiver.deliver(:customer => customer)
-#^^^^^^^^ reference local 1$119448696
+#^^^^^^^^ reference local 1$217974539
 #         ^^^^^^^ reference [..] KeywordReceiver#deliver().
 #                  ^^^^^^^^ reference [..] KeywordReceiver#deliver().(customer)
-#                              ^^^^^^^^ reference local 3$119448696
+#                              ^^^^^^^^ reference local 3$217974539
  receiver.deliver("customer": customer)
-#^^^^^^^^ reference local 1$119448696
+#^^^^^^^^ reference local 1$217974539
 #         ^^^^^^^ reference [..] KeywordReceiver#deliver().
 #                  ^^^^^^^^ reference [..] KeywordReceiver#deliver().(customer)
-#                             ^^^^^^^^ reference local 3$119448696
+#                             ^^^^^^^^ reference local 3$217974539
  receiver.copied(customer:)
-#^^^^^^^^ reference local 1$119448696
+#^^^^^^^^ reference local 1$217974539
 #         ^^^^^^ reference [..] KeywordReceiver#deliver().
-#                ^^^^^^^^ reference local 3$119448696
+#                ^^^^^^^^ reference local 3$217974539
 #                ^^^^^^^^ reference [..] KeywordReceiver#deliver().(customer)
  KeywordChild.new.deliver(customer:)
 #^^^^^^^^^^^^ reference [..] KeywordChild#
 #             ^^^ reference [..] Class#new().
 #                 ^^^^^^^ reference [..] KeywordReceiver#deliver().
-#                         ^^^^^^^^ reference local 3$119448696
+#                         ^^^^^^^^ reference local 3$217974539
 #                         ^^^^^^^^ reference [..] KeywordReceiver#deliver().(customer)
  KeywordReceiver.deliver(customer:)
 #^^^^^^^^^^^^^^^ reference [..] KeywordReceiver#
 #                ^^^^^^^ reference [..] `<Class:KeywordReceiver>`#deliver().
-#                        ^^^^^^^^ reference local 3$119448696
+#                        ^^^^^^^^ reference local 3$217974539
 #                        ^^^^^^^^ reference [..] `<Class:KeywordReceiver>`#deliver().(customer)
  receiver.unused(customer:)
-#^^^^^^^^ reference local 1$119448696
+#^^^^^^^^ reference local 1$217974539
 #         ^^^^^^ reference [..] KeywordReceiver#unused().
-#                ^^^^^^^^ reference local 3$119448696
+#                ^^^^^^^^ reference local 3$217974539
 #                ^^^^^^^^ reference [..] KeywordReceiver#unused().(customer)
  KeywordConstructor.new(customer:)
 #^^^^^^^^^^^^^^^^^^ reference [..] KeywordConstructor#
-#                   ^^^ reference [..] Class#new().
-#                       ^^^^^^^^ reference local 3$119448696
+#                   ^^^ reference [..] KeywordConstructor#initialize().
+#                       ^^^^^^^^ reference local 3$217974539
 #                       ^^^^^^^^ reference [..] KeywordConstructor#initialize().(customer)
  KeywordOverride.new.deliver(customer:)
 #^^^^^^^^^^^^^^^ reference [..] KeywordOverride#
 #                ^^^ reference [..] Class#new().
 #                    ^^^^^^^ reference [..] KeywordOverride#deliver().
-#                            ^^^^^^^^ reference local 3$119448696
+#                            ^^^^^^^^ reference local 3$217974539
 #                            ^^^^^^^^ reference [..] KeywordOverride#deliver().(customer)
  
  block = T.let(-> {}, T.proc.void)
-#^^^^^ definition local 10$119448696
+#^^^^^ definition local 10$217974539
 #documentation
 #| ```ruby
 #| block (T.proc.void)
@@ -517,51 +517,51 @@
 #                     ^ reference [..] T#
 #                       ^^^^ reference [..] `<Class:T>`#proc().
  receiver.wrapped(customer:, &block)
-#^^^^^^^^ reference local 1$119448696
+#^^^^^^^^ reference local 1$217974539
 #         ^^^^^^^ reference [..] KeywordReceiver#wrapped().
-#                 ^^^^^^^^ reference local 3$119448696
+#                 ^^^^^^^^ reference local 3$217974539
 #                 ^^^^^^^^ reference [..] KeywordReceiver#wrapped().(customer)
-#                             ^^^^^ reference local 10$119448696
+#                             ^^^^^ reference local 10$217974539
  receiver.wrapped(*[1, 2], customer: customer)
-#^^^^^^^^ reference local 1$119448696
+#^^^^^^^^ reference local 1$217974539
 #         ^^^^^^^ reference [..] KeywordReceiver#wrapped().
 #                          ^^^^^^^^ reference [..] KeywordReceiver#wrapped().(customer)
-#                                    ^^^^^^^^ reference local 3$119448696
+#                                    ^^^^^^^^ reference local 3$217974539
  receiver.wrapped(*[1, 2], customer:, &block)
-#^^^^^^^^ reference local 1$119448696
+#^^^^^^^^ reference local 1$217974539
 #         ^^^^^^^ reference [..] KeywordReceiver#wrapped().
-#                          ^^^^^^^^ reference local 3$119448696
+#                          ^^^^^^^^ reference local 3$217974539
 #                          ^^^^^^^^ reference [..] KeywordReceiver#wrapped().(customer)
-#                                      ^^^^^ reference local 10$119448696
+#                                      ^^^^^ reference local 10$217974539
  receiver.wrapped(*[1, 2], customer:) { customer.upcase }
-#^^^^^^^^ reference local 1$119448696
+#^^^^^^^^ reference local 1$217974539
 #         ^^^^^^^ reference [..] KeywordReceiver#wrapped().
-#                          ^^^^^^^^ reference local 3$119448696
+#                          ^^^^^^^^ reference local 3$217974539
 #                          ^^^^^^^^ reference [..] KeywordReceiver#wrapped().(customer)
-#                                       ^^^^^^^^ reference local 3$119448696
+#                                       ^^^^^^^^ reference local 3$217974539
 #                                                ^^^^^^ reference [..] String#upcase().
  
  # These keys are data, not named parameter references.
  receiver.extras(customer: customer)
-#^^^^^^^^ reference local 1$119448696
+#^^^^^^^^ reference local 1$217974539
 #         ^^^^^^ reference [..] KeywordReceiver#extras().
-#                          ^^^^^^^^ reference local 3$119448696
+#                          ^^^^^^^^ reference local 3$217974539
  receiver.positional(customer: customer)
-#^^^^^^^^ reference local 1$119448696
+#^^^^^^^^ reference local 1$217974539
 #         ^^^^^^^^^^ reference [..] KeywordReceiver#positional().
-#                              ^^^^^^^^ reference local 3$119448696
+#                              ^^^^^^^^ reference local 3$217974539
  keywords = {customer: customer}
-#^^^^^^^^ definition local 11$119448696
+#^^^^^^^^ definition local 11$217974539
 #documentation
 #| ```ruby
 #| keywords ({customer: String("Ada")})
 #| ```
-#                      ^^^^^^^^ reference local 3$119448696
+#                      ^^^^^^^^ reference local 3$217974539
  receiver.deliver(**keywords)
-#^^^^^^^^ reference local 1$119448696
+#^^^^^^^^ reference local 1$217974539
 #         ^^^^^^^ reference [..] KeywordReceiver#deliver().
-#                   ^^^^^^^^ reference local 11$119448696
+#                   ^^^^^^^^ reference local 11$217974539
  receiver.deliver(**{customer: customer})
-#^^^^^^^^ reference local 1$119448696
+#^^^^^^^^ reference local 1$217974539
 #         ^^^^^^^ reference [..] KeywordReceiver#deliver().
-#                              ^^^^^^^^ reference local 3$119448696
+#                              ^^^^^^^^ reference local 3$217974539

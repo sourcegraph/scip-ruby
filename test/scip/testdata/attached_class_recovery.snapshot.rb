@@ -136,7 +136,7 @@
 #                          ^^^^ reference [..] DeclaresAttachedClass#copy().
  ModuleSubclass.new.copy
 #^^^^^^^^^^^^^^ reference [..] ModuleSubclass#
-#               ^^^ reference [..] Class#new().
+#               ^^^ reference [..] Module#initialize().
 #                   ^^^^ reference [..] ModuleSubclass#copy().
  IncludesAttachedClass.new.copy
 #^^^^^^^^^^^^^^^^^^^^^ reference [..] IncludesAttachedClass#

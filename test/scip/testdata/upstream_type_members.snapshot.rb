@@ -56,9 +56,9 @@
 #  ⌄ enclosing_range_start [..] Lower#identity().
    def identity(x)
 #      ^^^^^^^^ definition [..] Lower#identity().
-#               ^ definition local 1$2839884955
+#               ^ definition local 1$835964821
      T.let(x, X)
-#          ^ reference local 1$2839884955
+#          ^ reference local 1$835964821
 #             ^ reference [..] Lower#X#
    end
 #    ⌃ enclosing_range_end [..] Lower#identity().
@@ -99,9 +99,9 @@
 #  ⌄ enclosing_range_start [..] Plain#identity().
    def identity(x)
 #      ^^^^^^^^ definition [..] Plain#identity().
-#               ^ definition local 1$2839884955
+#               ^ definition local 1$861111766
      x
-#    ^ reference local 1$2839884955
+#    ^ reference local 1$861111766
    end
 #    ⌃ enclosing_range_end [..] Plain#identity().
  end

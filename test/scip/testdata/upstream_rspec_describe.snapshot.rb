@@ -11,9 +11,22 @@
    module Core
 #         ^^^^ definition [..] RSpec#Core#
 #    ⌄ enclosing_range_start [..] RSpec#Core#ExampleGroup#
-     class ExampleGroup; end
+     class ExampleGroup
 #          ^^^^^^^^^^^^ definition [..] RSpec#Core#ExampleGroup#
-#                          ⌃ enclosing_range_end [..] RSpec#Core#ExampleGroup#
+#      ⌄ enclosing_range_start [..] RSpec#Core#`<Class:ExampleGroup>`#it().
+       def self.it(name, &block); end
+#               ^^ definition [..] RSpec#Core#`<Class:ExampleGroup>`#it().
+#                                   ⌃ enclosing_range_end [..] RSpec#Core#`<Class:ExampleGroup>`#it().
+#      ⌄ enclosing_range_start [..] RSpec#Core#`<Class:ExampleGroup>`#context().
+       def self.context(name, &block); end
+#               ^^^^^^^ definition [..] RSpec#Core#`<Class:ExampleGroup>`#context().
+#                                        ⌃ enclosing_range_end [..] RSpec#Core#`<Class:ExampleGroup>`#context().
+#      ⌄ enclosing_range_start [..] RSpec#Core#`<Class:ExampleGroup>`#describe().
+       def self.describe(name, &block); end
+#               ^^^^^^^^ definition [..] RSpec#Core#`<Class:ExampleGroup>`#describe().
+#                                         ⌃ enclosing_range_end [..] RSpec#Core#`<Class:ExampleGroup>`#describe().
+     end
+#      ⌃ enclosing_range_end [..] RSpec#Core#ExampleGroup#
    end
 #    ⌃ enclosing_range_end [..] RSpec#Core#
 #  ⌄ enclosing_range_start [..] `<Class:RSpec>`#describe().
@@ -55,6 +68,7 @@
 #               ^^^^^^^^ reference [..] Customer#
 #  ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<it 'indexes a constant description'>`().
    it("indexes a constant description") do
+#  ^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#it().
 #     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] `<describe 'Customer'>`#`<it 'indexes a constant description'>`().
      customer = Customer.new
 #    ^^^^^^^^ definition local 1$1350504531
@@ -72,10 +86,12 @@
  
 #  ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<context 'inherits the described class'>`#
    context("inherits the described class") do
+#  ^^^^^^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#context().
 #          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] `<describe 'Customer'>`#
 #          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] `<describe 'Customer'>`#`<context 'inherits the described class'>`#
 #    ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<context 'inherits the described class'>`#`<it 'indexes a nested example'>`().
      it("indexes a nested example") { described_class.new.name }
+#    ^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#it().
 #       ^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] `<describe 'Customer'>`#`<context 'inherits the described class'>`#`<it 'indexes a nested example'>`().
 #                                     ^^^^^^^^^^^^^^^ reference [..] `<describe 'Customer'>`#described_class().
 #                                                     ^^^ reference [..] Class#new().
@@ -86,6 +102,7 @@
  
 #  ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<context 'Billing::Customer'>`#
    context Billing::Customer do
+#  ^^^^^^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#context().
 #          ^^^^^^^ reference [..] Billing#
 #                   ^^^^^^^^ reference [..] Billing#Customer#
 #                   ^^^^^^^^ reference [..] Billing#Customer#
@@ -93,6 +110,7 @@
 #                   ^^^^^^^^ definition [..] `<describe 'Customer'>`#`<context 'Billing::Customer'>`#
 #    ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<context 'Billing::Customer'>`#`<it 'uses the nested described class'>`().
      it("uses the nested described class") { described_class.new.account }
+#    ^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#it().
 #       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] `<describe 'Customer'>`#`<context 'Billing::Customer'>`#`<it 'uses the nested described class'>`().
 #                                            ^^^^^^^^^^^^^^^ reference [..] `<describe 'Customer'>`#`<context 'Billing::Customer'>`#described_class().
 #                                                            ^^^ reference [..] Class#new().
@@ -103,12 +121,14 @@
  
 #  ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<describe 'Customer'>`#
    describe Customer do
+#  ^^^^^^^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#describe().
 #           ^^^^^^^^ reference [..] Customer#
 #           ^^^^^^^^ reference [..] Customer#
 #           ^^^^^^^^ reference [..] `<describe 'Customer'>`#
 #           ^^^^^^^^ definition [..] `<describe 'Customer'>`#`<describe 'Customer'>`#
 #    ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<describe 'Customer'>`#`<it 'indexes a nested describe'>`().
      it("indexes a nested describe") { described_class.new.name }
+#    ^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#it().
 #       ^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] `<describe 'Customer'>`#`<describe 'Customer'>`#`<it 'indexes a nested describe'>`().
 #                                      ^^^^^^^^^^^^^^^ reference [..] `<describe 'Customer'>`#`<describe 'Customer'>`#described_class().
 #                                                      ^^^ reference [..] Class#new().
@@ -126,6 +146,7 @@
 #                        ^^^^^^^^ reference [..] Billing#Customer#
 #  ⌄ enclosing_range_start [..] `<describe 'Billing::Customer'>`#`<it 'indexes a namespaced description'>`().
    it("indexes a namespaced description") do
+#  ^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#it().
 #     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] `<describe 'Billing::Customer'>`#`<it 'indexes a namespaced description'>`().
      Billing::Customer.new.account
 #    ^^^^^^^ reference [..] Billing#
@@ -162,6 +183,7 @@
 #                                         ⌃ enclosing_range_end [..] `<describe 'CustomCustomer'>`#described_class().
 #  ⌄ enclosing_range_start [..] `<describe 'CustomCustomer'>`#`<it 'keeps a handwritten definition'>`().
    it("keeps a handwritten definition") { described_class.new.name }
+#  ^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#it().
 #     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] `<describe 'CustomCustomer'>`#`<it 'keeps a handwritten definition'>`().
 #                                         ^^^^^^^^^^^^^^^ reference [..] `<describe 'CustomCustomer'>`#described_class().
 #                                                         ^^^ reference [..] Class#new().

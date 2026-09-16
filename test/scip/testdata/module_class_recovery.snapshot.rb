@@ -53,9 +53,9 @@
 #  ⌄ enclosing_range_start [..] `<Class:ClassQueries>`#direct().
    def self.direct(item)
 #           ^^^^^^ definition [..] `<Class:ClassQueries>`#direct().
-#                  ^^^^ definition local 1$1608975516
+#                  ^^^^ definition local 1$1085818803
      item.class.new.marker
-#    ^^^^ reference local 1$1608975516
+#    ^^^^ reference local 1$1085818803
 #               ^^^ reference [..] Class#new().
 #                   ^^^^^^ reference [..] ObjectAncestor#marker().
    end
@@ -67,9 +67,9 @@
 #  ⌄ enclosing_range_start [..] `<Class:ClassQueries>`#indirect().
    def self.indirect(item)
 #           ^^^^^^^^ definition [..] `<Class:ClassQueries>`#indirect().
-#                    ^^^^ definition local 1$2847369447
+#                    ^^^^ definition local 1$287058180
      item.class.new.marker
-#    ^^^^ reference local 1$2847369447
+#    ^^^^ reference local 1$287058180
 #               ^^^ reference [..] Class#new().
 #                   ^^^^^^ reference [..] ObjectAncestor#marker().
    end
@@ -82,9 +82,9 @@
 #  ⌄ enclosing_range_start [..] `<Class:ClassQueries>`#singleton_label().
    def self.singleton_label(item)
 #           ^^^^^^^^^^^^^^^ definition [..] `<Class:ClassQueries>`#singleton_label().
-#                           ^^^^ definition local 1$1223203295
+#                           ^^^^ definition local 1$47917698
      item.singleton_class.name
-#    ^^^^ reference local 1$1223203295
+#    ^^^^ reference local 1$47917698
 #                         ^^^^ reference [..] Class#name().
    end
 #    ⌃ enclosing_range_end [..] `<Class:ClassQueries>`#singleton_label().
@@ -96,9 +96,9 @@
 #  ⌄ enclosing_range_start [..] `<Class:ClassQueries>`#concrete().
    def self.concrete(item)
 #           ^^^^^^^^ definition [..] `<Class:ClassQueries>`#concrete().
-#                    ^^^^ definition local 1$1914782654
+#                    ^^^^ definition local 1$3912789345
      item.class.new.marker
-#    ^^^^ reference local 1$1914782654
+#    ^^^^ reference local 1$3912789345
 #               ^^^ reference [..] Class#new().
 #                   ^^^^^^ reference [..] ObjectAncestor#marker().
    end

@@ -17,18 +17,18 @@
 #  ⌄ enclosing_range_start [..] `<Class:ToyCards>`#compare_optional().
    def self.compare_optional(card, candidate)
 #           ^^^^^^^^^^^^^^^^ definition [..] `<Class:ToyCards>`#compare_optional().
-#                            ^^^^ definition local 1$3768739597
-#                                  ^^^^^^^^^ definition local 2$3768739597
+#                            ^^^^ definition local 1$2431538817
+#                                  ^^^^^^^^^ definition local 2$2431538817
      if candidate == card
-#       ^^^^^^^^^ reference local 2$3768739597
+#       ^^^^^^^^^ reference local 2$2431538817
 #                 ^^ reference [..] BasicObject#`==`().
 #                 ^^ reference [..] Hash#`==`().
-#                    ^^^^ reference local 1$3768739597
+#                    ^^^^ reference local 1$2431538817
        ToyPrinter.new.print_card(card)
 #      ^^^^^^^^^^ reference [..] ToyPrinter#
 #                 ^^^ reference [..] Class#new().
 #                     ^^^^^^^^^^ reference [..] ToyPrinter#print_card().
-#                                ^^^^ reference local 1$3768739597
+#                                ^^^^ reference local 1$2431538817
      end
    end
 #    ⌃ enclosing_range_end [..] `<Class:ToyCards>`#compare_optional().
@@ -44,22 +44,22 @@
 #  ⌄ enclosing_range_start [..] `<Class:ToyCards>`#compare_required().
    def self.compare_required(card, candidate)
 #           ^^^^^^^^^^^^^^^^ definition [..] `<Class:ToyCards>`#compare_required().
-#                            ^^^^ definition local 1$1404237388
-#                                  ^^^^^^^^^ definition local 2$1404237388
+#                            ^^^^ definition local 1$3800903272
+#                                  ^^^^^^^^^ definition local 2$3800903272
      card = T.must(card)
-#    ^^^^ reference (write) local 1$1404237388
+#    ^^^^ reference (write) local 1$3800903272
 #           ^ reference [..] T#
 #             ^^^^ reference [..] `<Class:T>`#must().
-#                  ^^^^ reference local 1$1404237388
+#                  ^^^^ reference local 1$3800903272
      if card == candidate
-#       ^^^^ reference local 1$1404237388
+#       ^^^^ reference local 1$3800903272
 #            ^^ reference [..] Hash#`==`().
-#               ^^^^^^^^^ reference local 2$1404237388
+#               ^^^^^^^^^ reference local 2$3800903272
        ToyPrinter.new.print_card(card)
 #      ^^^^^^^^^^ reference [..] ToyPrinter#
 #                 ^^^ reference [..] Class#new().
 #                     ^^^^^^^^^^ reference [..] ToyPrinter#print_card().
-#                                ^^^^ reference local 1$1404237388
+#                                ^^^^ reference local 1$3800903272
      end
    end
 #    ⌃ enclosing_range_end [..] `<Class:ToyCards>`#compare_required().
@@ -77,9 +77,9 @@
 #  ⌄ enclosing_range_start [..] ToyPrinter#print_card().
    def print_card(card)
 #      ^^^^^^^^^^ definition [..] ToyPrinter#print_card().
-#                 ^^^^ definition local 1$2589086447
+#                 ^^^^ definition local 1$2636574632
      card.inspect
-#    ^^^^ reference local 1$2589086447
+#    ^^^^ reference local 1$2636574632
 #         ^^^^^^^ reference [..] Hash#inspect().
 #         ^^^^^^^ reference [..] NilClass#inspect().
    end
@@ -98,9 +98,9 @@
  # This models a mixed-input validation loop, including empty aggregates.
  [7, true, {}, [], 0.5].each do |value|
 #                       ^^^^ reference [..] Array#each().
-#                                ^^^^^ definition local 3$119448696
+#                                ^^^^^ definition local 3$217974539
    value.inspect
-#  ^^^^^ reference local 3$119448696
+#  ^^^^^ reference local 3$217974539
 #        ^^^^^^^ reference [..] Array#inspect().
 #        ^^^^^^^ reference [..] Float#inspect().
 #        ^^^^^^^ reference [..] Hash#inspect().

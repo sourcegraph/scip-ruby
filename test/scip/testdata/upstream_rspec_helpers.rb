@@ -7,6 +7,11 @@ module RSpec
   module Core
     class ExampleGroup
       def self.test_each(values, &block); end
+      def self.describe(name, &block); end
+      def self.let(name, &block); end
+      def self.let!(name, &block); end
+      def self.subject(name = nil, &block); end
+      def self.it(name, &block); end
     end
   end
   def self.describe(description, *args, &block); end

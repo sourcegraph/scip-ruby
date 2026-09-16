@@ -18,14 +18,14 @@
 #  ⌃ enclosing_range_end [..] KeywordErrors#
  
  receiver = KeywordErrors.new
-#^^^^^^^^ definition local 1$119448696
+#^^^^^^^^ definition local 1$217974539
 #           ^^^^^^^^^^^^^ reference [..] KeywordErrors#
 #                         ^^^ reference [..] Class#new().
  receiver.deliver(customer: "Ada", missing: "x") # error: Unrecognized keyword argument `missing` passed for method `KeywordErrors#deliver`
-#^^^^^^^^ reference local 1$119448696
+#^^^^^^^^ reference local 1$217974539
 #         ^^^^^^^ reference [..] KeywordErrors#deliver().
 #                 ^^^^^^^^ reference [..] KeywordErrors#deliver().(customer)
  receiver.deliver(customer: 1) # error: Expected `String` but found `Integer(1)` for argument `customer`
-#^^^^^^^^ reference local 1$119448696
+#^^^^^^^^ reference local 1$217974539
 #         ^^^^^^^ reference [..] KeywordErrors#deliver().
 #                 ^^^^^^^^ reference [..] KeywordErrors#deliver().(customer)

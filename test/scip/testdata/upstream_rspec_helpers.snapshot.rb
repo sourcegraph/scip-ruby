@@ -16,6 +16,26 @@
        def self.test_each(values, &block); end
 #               ^^^^^^^^^ definition [..] RSpec#Core#`<Class:ExampleGroup>`#test_each().
 #                                            ⌃ enclosing_range_end [..] RSpec#Core#`<Class:ExampleGroup>`#test_each().
+#      ⌄ enclosing_range_start [..] RSpec#Core#`<Class:ExampleGroup>`#describe().
+       def self.describe(name, &block); end
+#               ^^^^^^^^ definition [..] RSpec#Core#`<Class:ExampleGroup>`#describe().
+#                                         ⌃ enclosing_range_end [..] RSpec#Core#`<Class:ExampleGroup>`#describe().
+#      ⌄ enclosing_range_start [..] RSpec#Core#`<Class:ExampleGroup>`#let().
+       def self.let(name, &block); end
+#               ^^^ definition [..] RSpec#Core#`<Class:ExampleGroup>`#let().
+#                                    ⌃ enclosing_range_end [..] RSpec#Core#`<Class:ExampleGroup>`#let().
+#      ⌄ enclosing_range_start [..] RSpec#Core#`<Class:ExampleGroup>`#`let!`().
+       def self.let!(name, &block); end
+#               ^^^^ definition [..] RSpec#Core#`<Class:ExampleGroup>`#`let!`().
+#                                     ⌃ enclosing_range_end [..] RSpec#Core#`<Class:ExampleGroup>`#`let!`().
+#      ⌄ enclosing_range_start [..] RSpec#Core#`<Class:ExampleGroup>`#subject().
+       def self.subject(name = nil, &block); end
+#               ^^^^^^^ definition [..] RSpec#Core#`<Class:ExampleGroup>`#subject().
+#                                              ⌃ enclosing_range_end [..] RSpec#Core#`<Class:ExampleGroup>`#subject().
+#      ⌄ enclosing_range_start [..] RSpec#Core#`<Class:ExampleGroup>`#it().
+       def self.it(name, &block); end
+#               ^^ definition [..] RSpec#Core#`<Class:ExampleGroup>`#it().
+#                                   ⌃ enclosing_range_end [..] RSpec#Core#`<Class:ExampleGroup>`#it().
      end
 #      ⌃ enclosing_range_end [..] RSpec#Core#ExampleGroup#
    end
@@ -58,10 +78,12 @@
 #               ^^^^^^^^ reference [..] Customer#
 #  ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<describe 'helpers'>`#
    describe("helpers") do
+#  ^^^^^^^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#describe().
 #           ^^^^^^^^^ reference [..] `<describe 'Customer'>`#
 #           ^^^^^^^^^ definition [..] `<describe 'Customer'>`#`<describe 'helpers'>`#
 #    ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<describe 'helpers'>`#ordinary().
      let(:ordinary) do
+#    ^^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#let().
 #        ^^^^^^^^^ definition [..] `<describe 'Customer'>`#`<describe 'helpers'>`#ordinary().
        customer = Customer.new
 #      ^^^^^^^^ definition local 1$2169803137
@@ -75,6 +97,7 @@
  
 #    ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<describe 'helpers'>`#eager().
      let!("eager") { Customer.new.name }
+#    ^^^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#`let!`().
 #         ^^^^^^^ definition [..] `<describe 'Customer'>`#`<describe 'helpers'>`#eager().
 #                    ^^^^^^^^ reference [..] Customer#
 #                             ^^^ reference [..] Class#new().
@@ -82,6 +105,7 @@
 #                                      ⌃ enclosing_range_end [..] `<describe 'Customer'>`#`<describe 'helpers'>`#eager().
 #    ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<describe 'helpers'>`#named().
      subject(:named) { Customer.new.name }
+#    ^^^^^^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#subject().
 #            ^^^^^^ definition [..] `<describe 'Customer'>`#`<describe 'helpers'>`#named().
 #                      ^^^^^^^^ reference [..] Customer#
 #                               ^^^ reference [..] Class#new().
@@ -90,6 +114,7 @@
  
 #    ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<describe 'helpers'>`#subject().
      subject do
+#    ^^^^^^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#subject().
 #    ^^^^^^^ definition [..] `<describe 'Customer'>`#`<describe 'helpers'>`#subject().
        customer = Customer.new
 #      ^^^^^^^^ definition local 1$3578397073
@@ -115,11 +140,13 @@
  
 #    ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<describe 'helpers'>`#empty().
      let(:empty) {}
+#    ^^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#let().
 #        ^^^^^^ definition [..] `<describe 'Customer'>`#`<describe 'helpers'>`#empty().
 #                 ⌃ enclosing_range_end [..] `<describe 'Customer'>`#`<describe 'helpers'>`#empty().
  
 #    ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<describe 'helpers'>`#`<it 'uses the helpers'>`().
      it("uses the helpers") { ordinary; eager; named; subject; empty }
+#    ^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#it().
 #       ^^^^^^^^^^^^^^^^^^ definition [..] `<describe 'Customer'>`#`<describe 'helpers'>`#`<it 'uses the helpers'>`().
 #                             ^^^^^^^^ reference [..] `<describe 'Customer'>`#`<describe 'helpers'>`#ordinary().
 #                                       ^^^^^ reference [..] `<describe 'Customer'>`#`<describe 'helpers'>`#eager().
@@ -130,10 +157,12 @@
  
 #    ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<describe 'helpers'>`#`<describe 'nested helpers'>`#
      describe("nested helpers") do
+#    ^^^^^^^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#describe().
 #             ^^^^^^^^^^^^^^^^ reference [..] `<describe 'Customer'>`#`<describe 'helpers'>`#
 #             ^^^^^^^^^^^^^^^^ definition [..] `<describe 'Customer'>`#`<describe 'helpers'>`#`<describe 'nested helpers'>`#
 #      ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<describe 'helpers'>`#`<describe 'nested helpers'>`#ordinary().
        let("ordinary") { Customer.new.name }
+#      ^^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#let().
 #          ^^^^^^^^^^ definition [..] `<describe 'Customer'>`#`<describe 'helpers'>`#`<describe 'nested helpers'>`#ordinary().
 #                        ^^^^^^^^ reference [..] Customer#
 #                                 ^^^ reference [..] Class#new().
@@ -141,6 +170,7 @@
 #                                          ⌃ enclosing_range_end [..] `<describe 'Customer'>`#`<describe 'helpers'>`#`<describe 'nested helpers'>`#ordinary().
 #      ⌄ enclosing_range_start [..] `<describe 'Customer'>`#`<describe 'helpers'>`#`<describe 'nested helpers'>`#`<it 'uses the nested helper'>`().
        it("uses the nested helper") { ordinary; subject }
+#      ^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#it().
 #         ^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] `<describe 'Customer'>`#`<describe 'helpers'>`#`<describe 'nested helpers'>`#`<it 'uses the nested helper'>`().
 #                                     ^^^^^^^^ reference [..] `<describe 'Customer'>`#`<describe 'helpers'>`#`<describe 'nested helpers'>`#ordinary().
 #                                               ^^^^^^^ reference [..] `<describe 'Customer'>`#`<describe 'helpers'>`#subject().

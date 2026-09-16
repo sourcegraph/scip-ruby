@@ -6,6 +6,10 @@ module Minitest
   class Spec
     def self.describe(name, &block); end
     def self.test_each(values, &block); end
+    def self.let(name, &block); end
+    def self.let!(name, &block); end
+    def self.subject(name = nil, &block); end
+    def self.it(name, &block); end
   end
 end
 

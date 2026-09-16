@@ -16,9 +16,9 @@
 #  ⌄ enclosing_range_start [..] `<Class:Types>`#echo().
    def self.echo(value)
 #           ^^^^ definition [..] `<Class:Types>`#echo().
-#                ^^^^^ definition local 1$3567113348
+#                ^^^^^ definition local 1$1967217148
      T.let(value, Renamed).upcase
-#          ^^^^^ reference local 1$3567113348
+#          ^^^^^ reference local 1$1967217148
 #                 ^^^^^^^ reference [..] Types#Renamed.
 #                          ^^^^^^ reference [..] String#upcase().
    end
@@ -33,9 +33,9 @@
 #    ⌄ enclosing_range_start [..] Types#Box#echo().
      def echo(value)
 #        ^^^^ definition [..] Types#Box#echo().
-#             ^^^^^ definition local 1$3567113348
+#             ^^^^^ definition local 1$4114529897
        T.let(value, Elem)
-#            ^^^^^ reference local 1$3567113348
+#            ^^^^^ reference local 1$4114529897
 #                   ^^^^ reference [..] Types#Box#Elem#
      end
 #      ⌃ enclosing_range_end [..] Types#Box#echo().
@@ -58,9 +58,9 @@
 #  ⌄ enclosing_range_start [..] AliasConsumer#echo().
    def echo(value)
 #      ^^^^ definition [..] AliasConsumer#echo().
-#           ^^^^^ definition local 1$3567113348
+#           ^^^^^ definition local 1$1027927589
      T.let(value, Types::Renamed).upcase
-#          ^^^^^ reference local 1$3567113348
+#          ^^^^^ reference local 1$1027927589
 #                 ^^^^^ reference [..] Types#
 #                        ^^^^^^^ reference [..] Types#Renamed.
 #                                 ^^^^^^ reference [..] String#upcase().
@@ -75,9 +75,9 @@
 #  ⌄ enclosing_range_start [..] AliasConsumer#numeric().
    def numeric(value)
 #      ^^^^^^^ definition [..] AliasConsumer#numeric().
-#              ^^^^^ definition local 1$1761125480
+#              ^^^^^ definition local 1$3320123079
      value.abs
-#    ^^^^^ reference local 1$1761125480
+#    ^^^^^ reference local 1$3320123079
 #          ^^^ reference [..] Integer#abs().
    end
 #    ⌃ enclosing_range_end [..] AliasConsumer#numeric().

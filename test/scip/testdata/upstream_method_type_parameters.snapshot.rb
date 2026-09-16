@@ -14,19 +14,19 @@
 #  ⌄ enclosing_range_start [..] GenericMethods#identity().
    def identity(value)
 #      ^^^^^^^^ definition [..] GenericMethods#identity().
-#               ^^^^^ definition local 1$2839884955
+#               ^^^^^ definition local 1$2281432467
      result = T.let(value, T.type_parameter(:U))
-#    ^^^^^^ definition local 2$2839884955
-#                   ^^^^^ reference local 1$2839884955
+#    ^^^^^^ definition local 2$2281432467
+#                   ^^^^^ reference local 1$2281432467
 #                                            ^ reference [..] GenericMethods#identity().[U]
      1.times { result = T.let(value, T.type_parameter(:U)) }
 #      ^^^^^ reference [..] Integer#times().
-#              ^^^^^^ reference (write) local 2$2839884955
-#              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference local 2$2839884955
-#                             ^^^^^ reference local 1$2839884955
+#              ^^^^^^ reference (write) local 2$2281432467
+#              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference local 2$2281432467
+#                             ^^^^^ reference local 1$2281432467
 #                                                      ^ reference [..] GenericMethods#identity().[U]
      result
-#    ^^^^^^ reference local 2$2839884955
+#    ^^^^^^ reference local 2$2281432467
    end
 #    ⌃ enclosing_range_end [..] GenericMethods#identity().
  
@@ -43,9 +43,9 @@
 #  ⌄ enclosing_range_start [..] GenericMethods#second().
    def second(first, second)
 #      ^^^^^^ definition [..] GenericMethods#second().
-#                    ^^^^^^ definition local 1$2885211357
+#                    ^^^^^^ definition local 1$4131987957
      second
-#    ^^^^^^ reference local 1$2885211357
+#    ^^^^^^ reference local 1$4131987957
    end
 #    ⌃ enclosing_range_end [..] GenericMethods#second().
  
@@ -63,9 +63,9 @@
 #  ⌄ enclosing_range_start [..] `<Class:GenericMethods>`#identity().
    def self.identity(value)
 #           ^^^^^^^^ definition [..] `<Class:GenericMethods>`#identity().
-#                    ^^^^^ definition local 1$2839884955
+#                    ^^^^^ definition local 1$67679633
      T.let(value, T.type_parameter(:'U'))
-#          ^^^^^ reference local 1$2839884955
+#          ^^^^^ reference local 1$67679633
 #                                    ^ reference [..] `<Class:GenericMethods>`#identity().[U]
    end
 #    ⌃ enclosing_range_end [..] `<Class:GenericMethods>`#identity().
@@ -85,9 +85,9 @@
 #  ⌄ enclosing_range_start [..] OtherGenericMethods#identity().
    def identity(value)
 #      ^^^^^^^^ definition [..] OtherGenericMethods#identity().
-#               ^^^^^ definition local 1$2839884955
+#               ^^^^^ definition local 1$2273237859
      value
-#    ^^^^^ reference local 1$2839884955
+#    ^^^^^ reference local 1$2273237859
    end
 #    ⌃ enclosing_range_end [..] OtherGenericMethods#identity().
  end

@@ -31,7 +31,7 @@
 #      | sig { params(value: HoverBox::Elem).void }
 #      | def initialize(value)
 #      | ```
-#                 ^^^^^ definition local 1$3465713227
+#                 ^^^^^ definition local 1$2532515985
 #                 documentation
 #                 | ```ruby
 #                 | value (HoverBox::Elem)
@@ -39,7 +39,7 @@
      @value = value
 #    ^^^^^^ definition [..] HoverBox#`@value`.
 #    ^^^^^^^^^^^^^^ reference [..] HoverBox#`@value`.
-#             ^^^^^ reference local 1$3465713227
+#             ^^^^^ reference local 1$2532515985
    end
 #    ⌃ enclosing_range_end [..] HoverBox#initialize().
  
@@ -54,13 +54,13 @@
 #      | sig { params(value: HoverBox::Elem).returns(HoverBox::Elem) }
 #      | def echo(value)
 #      | ```
-#           ^^^^^ definition local 1$3567113348
+#           ^^^^^ definition local 1$2191231058
 #           documentation
 #           | ```ruby
 #           | value (HoverBox::Elem)
 #           | ```
      value
-#    ^^^^^ reference local 1$3567113348
+#    ^^^^^ reference local 1$2191231058
    end
 #    ⌃ enclosing_range_end [..] HoverBox#echo().
  
@@ -88,13 +88,13 @@
 #      | end
 #      | def generic(value, other)
 #      | ```
-#                     ^^^^^ definition local 1$1372385274
+#                     ^^^^^ definition local 1$3595372148
 #                     documentation
 #                     | ```ruby
 #                     | other (T.type_parameter(:Item) (of HoverBox#generic))
 #                     | ```
      other
-#    ^^^^^ reference local 1$1372385274
+#    ^^^^^ reference local 1$3595372148
    end
 #    ⌃ enclosing_range_end [..] HoverBox#generic().
  
@@ -132,13 +132,13 @@
 #      | sig { params(value: Integer).returns(Integer) }
 #      | def echo(value)
 #      | ```
-#           ^^^^^ definition local 1$3567113348
+#           ^^^^^ definition local 1$529720711
 #           documentation
 #           | ```ruby
-#           | value (HoverBox::Elem)
+#           | value (Integer)
 #           | ```
      value
-#    ^^^^^ reference local 1$3567113348
+#    ^^^^^ reference local 1$529720711
    end
 #    ⌃ enclosing_range_end [..] HoverFixed#echo().
  end
@@ -178,13 +178,13 @@
 #           | end
 #           | def self.echo(value)
 #           | ```
-#                ^^^^^ definition local 1$3567113348
+#                ^^^^^ definition local 1$876828381
 #                documentation
 #                | ```ruby
-#                | value (HoverBox::Elem)
+#                | value (T.class_of(HoverTemplate)::Elem)
 #                | ```
      value
-#    ^^^^^ reference local 1$3567113348
+#    ^^^^^ reference local 1$876828381
    end
 #    ⌃ enclosing_range_end [..] `<Class:HoverTemplate>`#echo().
  end
@@ -211,13 +211,13 @@
 #           | sig { params(value: String).returns(String) }
 #           | def self.quoted(value)
 #           | ```
-#                  ^^^^^ definition local 1$3218782921
+#                  ^^^^^ definition local 1$3183951499
 #                  documentation
 #                  | ```ruby
 #                  | value (String)
 #                  | ```
      value
-#    ^^^^^ reference local 1$3218782921
+#    ^^^^^ reference local 1$3183951499
    end
 #    ⌃ enclosing_range_end [..] `<Class:OrdinaryHovers>`#quoted().
  
@@ -232,17 +232,17 @@
 #           | sig { params("*": Integer, "**": String, "&": T.proc.void).void }
 #           | def self.anonymous(*, **, &)
 #           | ```
-#                     ^ definition local 1$1926879790
+#                     ^ definition local 1$2225683292
 #                     documentation
 #                     | ```ruby
 #                     | * (T::Array[Integer])
 #                     | ```
-#                        ^^ definition local 2$1926879790
+#                        ^^ definition local 2$2225683292
 #                        documentation
 #                        | ```ruby
 #                        | ** (T::Hash[Symbol, String])
 #                        | ```
-#                            ^ definition local 3$1926879790
+#                            ^ definition local 3$2225683292
 #                            documentation
 #                            | ```ruby
 #                            | & (T.proc.void)
@@ -288,7 +288,7 @@
 #           | )
 #           | end
 #           | ```
-#                 ^^^^^ definition local 1$3845391352
+#                 ^^^^^ definition local 1$2645842298
 #                 documentation
 #                 | ```ruby
 #                 | value (String)
@@ -303,22 +303,22 @@
 #                                                 | ```ruby
 #                                                 | label (String)
 #                                                 | ```
-#                                                                       ^^^^^ definition local 2$3845391352
+#                                                                       ^^^^^ definition local 2$2645842298
 #                                                                       documentation
 #                                                                       | ```ruby
 #                                                                       | block (T.proc.params(arg0: String).returns(String))
 #                                                                       | ```
      block.call(value)
-#    ^^^^^ reference local 2$3845391352
+#    ^^^^^ reference local 2$2645842298
 #          ^^^^ reference [..] Proc1#call().
-#               ^^^^^ reference local 1$3845391352
+#               ^^^^^ reference local 1$2645842298
    end
 #    ⌃ enclosing_range_end [..] `<Class:OrdinaryHovers>`#mixed().
  end
 #  ⌃ enclosing_range_end [..] OrdinaryHovers#
  
  box = HoverBox[Integer].new(1)
-#^^^ definition local 3$119448696
+#^^^ definition local 3$217974539
 #documentation
 #| ```ruby
 #| box (HoverBox[Integer])
@@ -327,15 +327,15 @@
 #              ^ reference [..] T#Generic#`[]`().
 #               ^^^^^^^ reference [..] Integer#
  box.echo(1).abs
-#^^^ reference local 3$119448696
+#^^^ reference local 3$217974539
 #    ^^^^ reference [..] HoverBox#echo().
 #            ^^^ reference [..] Integer#abs().
  box.copied(1).abs
-#^^^ reference local 3$119448696
+#^^^ reference local 3$217974539
 #    ^^^^^^ reference [..] HoverBox#echo().
 #              ^^^ reference [..] Integer#abs().
  box.generic(1, "a").upcase
-#^^^ reference local 3$119448696
+#^^^ reference local 3$217974539
 #    ^^^^^^^ reference [..] HoverBox#generic().
 #                    ^^^^^^ reference [..] String#upcase().
  HoverFixed.new.echo(1).abs
@@ -351,10 +351,10 @@
 #^^^^^^^^^^^^^^ reference [..] OrdinaryHovers#
 #               ^^^^^ reference [..] `<Class:OrdinaryHovers>`#mixed().
 #                          ^^^^ reference [..] `<Class:OrdinaryHovers>`#mixed().(flag)
-#                                         ^^^^^ definition local 7$119448696
+#                                         ^^^^^ definition local 7$217974539
 #                                         documentation
 #                                         | ```ruby
 #                                         | value (String)
 #                                         | ```
-#                                                ^^^^^ reference local 7$119448696
+#                                                ^^^^^ reference local 7$217974539
 #                                                      ^^^^^^ reference [..] String#upcase().

@@ -82,7 +82,7 @@
 #  ⌃ enclosing_range_end [..] RBSKeywordReceiver#
  
  customer = "Ada"
-#^^^^^^^^ definition local 1$119448696
+#^^^^^^^^ definition local 1$217974539
 #documentation
 #| ```ruby
 #| customer (String("Ada"))
@@ -91,7 +91,7 @@
 #^^^^^^^^^^^^^^^^^^ reference [..] RBSKeywordReceiver#
 #                   ^^^ reference [..] Class#new().
 #                       ^^^^^^^ reference [..] RBSKeywordReceiver#deliver().
-#                               ^^^^^^^^ reference local 1$119448696
+#                               ^^^^^^^^ reference local 1$217974539
 #                               ^^^^^^^^ reference [..] RBSKeywordReceiver#deliver().(customer)
 #                                          ^^^^^^^ reference [..] RBSKeywordReceiver#deliver().(enabled)
  RBSKeywordReceiver.new.unused(customer: customer)
@@ -99,9 +99,9 @@
 #                   ^^^ reference [..] Class#new().
 #                       ^^^^^^ reference [..] RBSKeywordReceiver#unused().
 #                              ^^^^^^^^ reference [..] RBSKeywordReceiver#unused().(customer)
-#                                        ^^^^^^^^ reference local 1$119448696
+#                                        ^^^^^^^^ reference local 1$217974539
  RBSKeywordReceiver.deliver(customer:)
 #^^^^^^^^^^^^^^^^^^ reference [..] RBSKeywordReceiver#
 #                   ^^^^^^^ reference [..] `<Class:RBSKeywordReceiver>`#deliver().
-#                           ^^^^^^^^ reference local 1$119448696
+#                           ^^^^^^^^ reference local 1$217974539
 #                           ^^^^^^^^ reference [..] `<Class:RBSKeywordReceiver>`#deliver().(customer)

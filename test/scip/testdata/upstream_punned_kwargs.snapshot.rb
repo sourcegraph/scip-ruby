@@ -32,16 +32,16 @@
 #  ⌃ enclosing_range_end [..] Object#takes_string().
  
  xyz = "hello"
-#^^^ definition local 4$119448696
+#^^^ definition local 4$217974539
 #documentation
 #| ```ruby
 #| xyz (String("hello"))
 #| ```
  takes_string(xyz:)
 #^^^^^^^^^^^^ reference [..] Object#takes_string().
-#             ^^^ reference local 4$119448696
+#             ^^^ reference local 4$217974539
 #             ^^^ reference [..] Object#takes_string().(xyz)
  takes_string(xyz: xyz)
 #^^^^^^^^^^^^ reference [..] Object#takes_string().
 #             ^^^ reference [..] Object#takes_string().(xyz)
-#                  ^^^ reference local 4$119448696
+#                  ^^^ reference local 4$217974539

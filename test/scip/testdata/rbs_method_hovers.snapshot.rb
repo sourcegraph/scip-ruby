@@ -22,13 +22,13 @@
 #      | ```
 #      documentation
 #      | : (String) -> String
-#              ^^^^^^^^ definition local 1$4207552351
+#              ^^^^^^^^ definition local 1$4061099770
 #              documentation
 #              | ```ruby
 #              | customer (String)
 #              | ```
      customer
-#    ^^^^^^^^ reference local 1$4207552351
+#    ^^^^^^^^ reference local 1$4061099770
    end
 #    ⌃ enclosing_range_end [..] RBSHovers#unnamed().
  
@@ -45,13 +45,13 @@
 #      | ```
 #      documentation
 #      | : (String customer) -> String
-#            ^^^^^^^^ definition local 1$3555021734
+#            ^^^^^^^^ definition local 1$3963293111
 #            documentation
 #            | ```ruby
 #            | customer (String)
 #            | ```
      customer
-#    ^^^^^^^^ reference local 1$3555021734
+#    ^^^^^^^^ reference local 1$3963293111
    end
 #    ⌃ enclosing_range_end [..] RBSHovers#named().
  
@@ -107,7 +107,7 @@
 #      | |   ?label: String,
 #      | |   **Integer extras
 #      | | ) { (String) -> String } -> String
-#            ^^^^^ definition local 1$3845391352
+#            ^^^^^ definition local 1$2111338461
 #            documentation
 #            | ```ruby
 #            | first (String)
@@ -122,15 +122,15 @@
 #                                               | ```ruby
 #                                               | label (String)
 #                                               | ```
-#                                                                       ^^^^^^^^^ definition local 2$3845391352
+#                                                                       ^^^^^^^^^ definition local 2$2111338461
 #                                                                       documentation
 #                                                                       | ```ruby
 #                                                                       | transform (T.proc.params(arg0: String).returns(String))
 #                                                                       | ```
      transform.call(first)
-#    ^^^^^^^^^ reference local 2$3845391352
+#    ^^^^^^^^^ reference local 2$2111338461
 #              ^^^^ reference [..] Proc1#call().
-#                   ^^^^^ reference local 1$3845391352
+#                   ^^^^^ reference local 1$2111338461
    end
 #    ⌃ enclosing_range_end [..] RBSHovers#mixed().
  
@@ -197,13 +197,13 @@
 #           | ```
 #           documentation
 #           | : (String) -> String
-#                     ^^^^^^^^ definition local 1$622135554
+#                     ^^^^^^^^ definition local 1$3788565703
 #                     documentation
 #                     | ```ruby
 #                     | customer (String)
 #                     | ```
      customer
-#    ^^^^^^^^ reference local 1$622135554
+#    ^^^^^^^^ reference local 1$3788565703
    end
 #    ⌃ enclosing_range_end [..] `<Class:RBSHovers>`#singleton().
  
@@ -225,13 +225,13 @@
 #      | ```
 #      documentation
 #      | : [Item] (Item) -> Item
-#               ^^^^^ definition local 1$2839884955
+#               ^^^^^ definition local 1$2925205560
 #               documentation
 #               | ```ruby
 #               | value (T.type_parameter(:Item) (of RBSHovers#identity))
 #               | ```
      value
-#    ^^^^^ reference local 1$2839884955
+#    ^^^^^ reference local 1$2925205560
    end
 #    ⌃ enclosing_range_end [..] RBSHovers#identity().
  
@@ -288,7 +288,7 @@
 #      | ```
 #      documentation
 #      | : (*Integer) -> void
-#                     ^ definition local 1$3430227973
+#                     ^ definition local 1$2251842686
 #                     documentation
 #                     | ```ruby
 #                     | * (T::Array[Integer])
@@ -308,7 +308,7 @@
 #      | ```
 #      documentation
 #      | : (**String) -> void
-#                         ^^ definition local 1$1395658551
+#                         ^^ definition local 1$2809051248
 #                         documentation
 #                         | ```ruby
 #                         | ** (T::Hash[Symbol, String])
@@ -327,7 +327,7 @@
 #      | ```
 #      documentation
 #      | : { -> void } -> void
-#                      ^ definition local 1$380570012
+#                      ^ definition local 1$1086852417
 #                      documentation
 #                      | ```ruby
 #                      | & (T.proc.void)
@@ -365,7 +365,7 @@
 #      | ```
 #      documentation
 #      | : (Elem) -> void
-#                 ^^^^^ definition local 1$3465713227
+#                 ^^^^^ definition local 1$2346203408
 #                 documentation
 #                 | ```ruby
 #                 | value (RBSHoverBox::Elem)
@@ -373,7 +373,7 @@
      @value = value
 #    ^^^^^^ definition [..] RBSHoverBox#`@value`.
 #    ^^^^^^^^^^^^^^ reference [..] RBSHoverBox#`@value`.
-#             ^^^^^ reference local 1$3465713227
+#             ^^^^^ reference local 1$2346203408
    end
 #    ⌃ enclosing_range_end [..] RBSHoverBox#initialize().
  
@@ -404,13 +404,13 @@
 #      | ```
 #      documentation
 #      | : (Elem) -> Elem
-#           ^^^^^ definition local 1$3567113348
+#           ^^^^^ definition local 1$2704174523
 #           documentation
 #           | ```ruby
-#           | value (Integer)
+#           | value (RBSHoverBox::Elem)
 #           | ```
      value
-#    ^^^^^ reference local 1$3567113348
+#    ^^^^^ reference local 1$2704174523
    end
 #    ⌃ enclosing_range_end [..] RBSHoverBox#echo().
  
@@ -440,13 +440,13 @@
 #      | ```
 #      documentation
 #      | : [Item] (Elem, Item) -> Item
-#                     ^^^^^ definition local 1$1372385274
+#                     ^^^^^ definition local 1$1966082323
 #                     documentation
 #                     | ```ruby
 #                     | other (T.type_parameter(:Item) (of RBSHoverBox#generic))
 #                     | ```
      other
-#    ^^^^^ reference local 1$1372385274
+#    ^^^^^ reference local 1$1966082323
    end
 #    ⌃ enclosing_range_end [..] RBSHoverBox#generic().
  end
@@ -481,20 +481,20 @@
 #      | ```
 #      documentation
 #      | : (Elem) -> Elem
-#           ^^^^^ definition local 1$3567113348
+#           ^^^^^ definition local 1$807747950
 #           documentation
 #           | ```ruby
 #           | value (Integer)
 #           | ```
      value
-#    ^^^^^ reference local 1$3567113348
+#    ^^^^^ reference local 1$807747950
    end
 #    ⌃ enclosing_range_end [..] RBSHoverFixed#echo().
  end
 #  ⌃ enclosing_range_end [..] RBSHoverFixed#
  
  hovers = RBSHovers.new
-#^^^^^^ definition local 1$119448696
+#^^^^^^ definition local 1$217974539
 #documentation
 #| ```ruby
 #| hovers (RBSHovers)
@@ -502,35 +502,35 @@
 #         ^^^^^^^^^ reference [..] RBSHovers#
 #                   ^^^ reference [..] Class#new().
  hovers.unnamed("a").upcase
-#^^^^^^ reference local 1$119448696
+#^^^^^^ reference local 1$217974539
 #       ^^^^^^^ reference [..] RBSHovers#unnamed().
 #                    ^^^^^^ reference [..] String#upcase().
  hovers.named("b").upcase
-#^^^^^^ reference local 1$119448696
+#^^^^^^ reference local 1$217974539
 #       ^^^^^ reference [..] RBSHovers#named().
 #                  ^^^^^^ reference [..] String#upcase().
  hovers.copied("c").upcase
-#^^^^^^ reference local 1$119448696
+#^^^^^^ reference local 1$217974539
 #       ^^^^^^ reference [..] RBSHovers#unnamed().
 #                   ^^^^^^ reference [..] String#upcase().
  hovers.mixed("a", 1, :x, enabled: true, label: "b", x: 2) { |value| value.upcase }
-#^^^^^^ reference local 1$119448696
+#^^^^^^ reference local 1$217974539
 #       ^^^^^ reference [..] RBSHovers#mixed().
 #                         ^^^^^^^ reference [..] RBSHovers#mixed().(enabled)
 #                                        ^^^^^ reference [..] RBSHovers#mixed().(label)
-#                                                             ^^^^^ definition local 3$119448696
+#                                                             ^^^^^ definition local 3$217974539
 #                                                             documentation
 #                                                             | ```ruby
 #                                                             | value (String)
 #                                                             | ```
-#                                                                    ^^^^^ reference local 3$119448696
+#                                                                    ^^^^^ reference local 3$217974539
 #                                                                          ^^^^^^ reference [..] String#upcase().
  hovers.unnamed_mixed("a", 1, 2, flag: true)
-#^^^^^^ reference local 1$119448696
+#^^^^^^ reference local 1$217974539
 #       ^^^^^^^^^^^^^ reference [..] RBSHovers#unnamed_mixed().
 #                                ^^^^ reference [..] RBSHovers#unnamed_mixed().(flag)
  hovers.identity(1).abs
-#^^^^^^ reference local 1$119448696
+#^^^^^^ reference local 1$217974539
 #       ^^^^^^^^ reference [..] RBSHovers#identity().
 #                   ^^^ reference [..] Integer#abs().
  RBSHovers.singleton("a").upcase
@@ -538,17 +538,17 @@
 #          ^^^^^^^^^ reference [..] `<Class:RBSHovers>`#singleton().
 #                         ^^^^^^ reference [..] String#upcase().
  hovers.title = "a"
-#^^^^^^ reference local 1$119448696
+#^^^^^^ reference local 1$217974539
 #       ^^^^^ reference [..] RBSHovers#`title=`().
  hovers.label = "b"
-#^^^^^^ reference local 1$119448696
+#^^^^^^ reference local 1$217974539
 #       ^^^^^ reference [..] RBSHovers#`label=`().
  hovers.label.upcase
-#^^^^^^ reference local 1$119448696
+#^^^^^^ reference local 1$217974539
 #       ^^^^^ reference [..] RBSHovers#label().
 #             ^^^^^^ reference [..] String#upcase().
  box = RBSHoverBox.new(1) #: RBSHoverBox[Integer]
-#^^^ definition local 9$119448696
+#^^^ definition local 9$217974539
 #documentation
 #| ```ruby
 #| box (RBSHoverBox[Integer])
@@ -557,15 +557,15 @@
 #                            ^^^^^^^^^^^ reference [..] RBSHoverBox#
 #                                        ^^^^^^^ reference [..] Integer#
  box.echo(1).abs
-#^^^ reference local 9$119448696
+#^^^ reference local 9$217974539
 #    ^^^^ reference [..] RBSHoverBox#echo().
 #            ^^^ reference [..] Integer#abs().
  box.value.abs
-#^^^ reference local 9$119448696
+#^^^ reference local 9$217974539
 #    ^^^^^ reference [..] RBSHoverBox#value().
 #          ^^^ reference [..] Integer#abs().
  box.generic(1, "a").upcase
-#^^^ reference local 9$119448696
+#^^^ reference local 9$217974539
 #    ^^^^^^^ reference [..] RBSHoverBox#generic().
 #                    ^^^^^^ reference [..] String#upcase().
  RBSHoverFixed.new.echo(1).abs

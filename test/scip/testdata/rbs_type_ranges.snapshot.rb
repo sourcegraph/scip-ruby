@@ -76,11 +76,11 @@
 #    ⌄ enclosing_range_start [..] Ranges#Box#initialize().
      def initialize(value)
 #        ^^^^^^^^^^ definition [..] Ranges#Box#initialize().
-#                   ^^^^^ definition local 1$3465713227
+#                   ^^^^^ definition local 1$621587515
        @value = value
 #      ^^^^^^ definition [..] Ranges#Box#`@value`.
 #      ^^^^^^^^^^^^^^ reference [..] Ranges#Box#`@value`.
-#               ^^^^^ reference local 1$3465713227
+#               ^^^^^ reference local 1$621587515
      end
 #      ⌃ enclosing_range_end [..] Ranges#Box#initialize().
    end
@@ -115,11 +115,11 @@
 #    ⌄ enclosing_range_start [..] Ranges#Reader#initialize().
      def initialize(customer)
 #        ^^^^^^^^^^ definition [..] Ranges#Reader#initialize().
-#                   ^^^^^^^^ definition local 1$3465713227
+#                   ^^^^^^^^ definition local 1$2389659779
        @customer = customer
 #      ^^^^^^^^^ definition [..] Ranges#Reader#`@customer`.
 #      ^^^^^^^^^^^^^^^^^^^^ reference [..] Ranges#Reader#`@customer`.
-#                  ^^^^^^^^ reference local 1$3465713227
+#                  ^^^^^^^^ reference local 1$2389659779
      end
 #      ⌃ enclosing_range_end [..] Ranges#Reader#initialize().
    end
@@ -135,9 +135,9 @@
 #⌄ enclosing_range_start [..] Object#customer_echo().
  def customer_echo(value)
 #    ^^^^^^^^^^^^^ definition [..] Object#customer_echo().
-#                  ^^^^^ definition local 1$277292739
+#                  ^^^^^ definition local 1$1878604689
    value
-#  ^^^^^ reference local 1$277292739
+#  ^^^^^ reference local 1$1878604689
  end
 #  ⌃ enclosing_range_end [..] Object#customer_echo().
  
@@ -156,11 +156,11 @@
 #⌄ enclosing_range_start [..] Object#pair().
  def pair(first, second)
 #    ^^^^ definition [..] Object#pair().
-#         ^^^^^ definition local 1$2084854449
-#                ^^^^^^ definition local 2$2084854449
+#         ^^^^^ definition local 1$2485926875
+#                ^^^^^^ definition local 2$2485926875
    [first, second]
-#   ^^^^^ reference local 1$2084854449
-#          ^^^^^^ reference local 2$2084854449
+#   ^^^^^ reference local 1$2485926875
+#          ^^^^^^ reference local 2$2485926875
  end
 #  ⌃ enclosing_range_end [..] Object#pair().
  
@@ -172,9 +172,9 @@
 #⌄ enclosing_range_start [..] Object#optional().
  def optional(value)
 #    ^^^^^^^^ definition [..] Object#optional().
-#             ^^^^^ definition local 1$1237702905
+#             ^^^^^ definition local 1$3023001291
    value
-#  ^^^^^ reference local 1$1237702905
+#  ^^^^^ reference local 1$3023001291
  end
 #  ⌃ enclosing_range_end [..] Object#optional().
  
@@ -185,9 +185,9 @@
 #⌄ enclosing_range_start [..] Object#generic().
  def generic(value)
 #    ^^^^^^^ definition [..] Object#generic().
-#            ^^^^^ definition local 1$1372385274
+#            ^^^^^ definition local 1$1084842404
    value #: Elem?
-#  ^^^^^ reference local 1$1372385274
+#  ^^^^^ reference local 1$1084842404
 #           ^^^^ reference [..] Object#generic().[Elem]
  end
 #  ⌃ enclosing_range_end [..] Object#generic().
@@ -204,9 +204,9 @@
 #⌄ enclosing_range_start [..] Object#customers().
  def customers(values)
 #    ^^^^^^^^^ definition [..] Object#customers().
-#              ^^^^^^ definition local 1$3230876894
+#              ^^^^^^ definition local 1$3950896148
    values
-#  ^^^^^^ reference local 1$3230876894
+#  ^^^^^^ reference local 1$3950896148
  end
 #  ⌃ enclosing_range_end [..] Object#customers().
  
@@ -222,9 +222,9 @@
 #⌄ enclosing_range_start [..] Object#lazy().
  def lazy(values)
 #    ^^^^ definition [..] Object#lazy().
-#         ^^^^^^ definition local 1$1791761615
+#         ^^^^^^ definition local 1$8220481
    values
-#  ^^^^^^ reference local 1$1791761615
+#  ^^^^^^ reference local 1$8220481
  end
 #  ⌃ enclosing_range_end [..] Object#lazy().
  
@@ -240,76 +240,76 @@
 #⌄ enclosing_range_start [..] Object#chain().
  def chain(values)
 #    ^^^^^ definition [..] Object#chain().
-#          ^^^^^^ definition local 1$1622451158
+#          ^^^^^^ definition local 1$2236280368
    values
-#  ^^^^^^ reference local 1$1622451158
+#  ^^^^^^ reference local 1$2236280368
  end
 #  ⌃ enclosing_range_end [..] Object#chain().
  
  customer = Ranges::Models::Customer.new
-#^^^^^^^^ definition local 9$119448696
+#^^^^^^^^ definition local 9$217974539
 #           ^^^^^^ reference [..] Ranges#
 #                   ^^^^^^ reference [..] Ranges#Models#
 #                           ^^^^^^^^ reference [..] Ranges#Models#Customer#
 #                                    ^^^ reference [..] Class#new().
  customer_echo(customer).name
 #^^^^^^^^^^^^^ reference [..] Object#customer_echo().
-#              ^^^^^^^^ reference local 9$119448696
+#              ^^^^^^^^ reference local 9$217974539
 #                        ^^^^ reference [..] Ranges#Models#Customer#name().
  Ranges::Reader.new(customer).customer.name
 #^^^^^^ reference [..] Ranges#
 #        ^^^^^^ reference [..] Ranges#Reader#
-#               ^^^ reference [..] Class#new().
-#                   ^^^^^^^^ reference local 9$119448696
+#               ^^^ reference [..] Ranges#Reader#initialize().
+#                   ^^^^^^^^ reference local 9$217974539
 #                             ^^^^^^^^ reference [..] Ranges#Reader#customer().
 #                                      ^^^^ reference [..] Ranges#Models#Customer#name().
  pair(customer, customer)
 #^^^^ reference [..] Object#pair().
-#     ^^^^^^^^ reference local 9$119448696
-#               ^^^^^^^^ reference local 9$119448696
+#     ^^^^^^^^ reference local 9$217974539
+#               ^^^^^^^^ reference local 9$217974539
  optional(customer)
 #^^^^^^^^ reference [..] Object#optional().
-#         ^^^^^^^^ reference local 9$119448696
+#         ^^^^^^^^ reference local 9$217974539
  generic(customer)
 #^^^^^^^ reference [..] Object#generic().
-#        ^^^^^^^^ reference local 9$119448696
+#        ^^^^^^^^ reference local 9$217974539
  customers([customer])
 #^^^^^^^^^ reference [..] Object#customers().
-#           ^^^^^^^^ reference local 9$119448696
+#           ^^^^^^^^ reference local 9$217974539
  box = Ranges::Box.new(customer) #: Ranges::Box[Ranges::Models::Customer]
-#^^^ definition local 16$119448696
+#^^^ definition local 16$217974539
 #      ^^^^^^ reference [..] Ranges#
 #              ^^^ reference [..] Ranges#Box#
-#                      ^^^^^^^^ reference local 9$119448696
+#                      ^^^^^^^^ reference local 9$217974539
 #                                   ^^^^^^ reference [..] Ranges#
 #                                           ^^^ reference [..] Ranges#Box#
 #                                               ^^^^^^ reference [..] Ranges#
 #                                                       ^^^^^^ reference [..] Ranges#Models#
 #                                                               ^^^^^^^^ reference [..] Ranges#Models#Customer#
  box.value.name
-#^^^ reference local 16$119448696
+#^^^ reference local 16$217974539
 #    ^^^^^ reference [..] Ranges#Box#value().
 #          ^^^^ reference [..] Ranges#Models#Customer#name().
  fixed = Ranges::Fixed.new #: Ranges::Fixed
-#^^^^^ definition local 19$119448696
+#^^^^^ definition local 19$217974539
 #        ^^^^^^ reference [..] Ranges#
 #                ^^^^^ reference [..] Ranges#Fixed#
 #                      ^^^ reference [..] Class#new().
 #                             ^^^^^^ reference [..] Ranges#
 #                                     ^^^^^ reference [..] Ranges#Fixed#
  value = customer #: Ranges::Models::customer
-#^^^^^ definition local 20$119448696
-#        ^^^^^^^^ reference local 9$119448696
+#^^^^^ definition local 20$217974539
+#        ^^^^^^^^ reference local 9$217974539
 #                    ^^^^^^ reference [..] Ranges#
 #                            ^^^^^^ reference [..] Ranges#Models#
 #                                    ^^^^^^^^ reference [..] Ranges#Models#`type customer`.
  value.name
-#^^^^^ reference local 20$119448696
+#^^^^^ reference local 20$217974539
 #      ^^^^ reference [..] Ranges#Models#Customer#name().
  
  # Handwritten Sorbet syntax must keep its own T and type references.
  T.let(customer, T.nilable(Ranges::Models::Customer))
-#      ^^^^^^^^ reference local 9$119448696
+#      ^^^^^^^^ reference local 9$217974539
 #                ^ reference [..] T#
 #                  ^^^^^^^ reference [..] `<Class:T>`#nilable().
 #                          ^^^^^^ reference [..] Ranges#

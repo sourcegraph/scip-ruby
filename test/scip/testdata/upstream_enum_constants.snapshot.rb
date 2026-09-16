@@ -55,9 +55,9 @@
 #  ⌄ enclosing_range_start [..] `<Class:CardSuit>`#describe_red().
    def self.describe_red(suit)
 #           ^^^^^^^^^^^^ definition [..] `<Class:CardSuit>`#describe_red().
-#                        ^^^^ definition local 1$2318149932
+#                        ^^^^ definition local 1$4021756224
      suit.serialize
-#    ^^^^ reference local 1$2318149932
+#    ^^^^ reference local 1$4021756224
 #         ^^^^^^^^^ reference [..] CardSuit#serialize().
    end
 #    ⌃ enclosing_range_end [..] `<Class:CardSuit>`#describe_red().
@@ -73,8 +73,8 @@
 #^^^^^^^^ reference [..] CardSuit#
 #          ^^^^ reference [..] CardSuit#Reds.
 #               ^^^^ reference [..] Array#each().
-#                       ^^^^ definition local 3$119448696
-#                             ^^^^ reference local 3$119448696
+#                       ^^^^ definition local 3$217974539
+#                             ^^^^ reference local 3$217974539
 #                                  ^^^^ reference [..] CardSuit#`red?`().
  CardSuit::Description.upcase
 #^^^^^^^^ reference [..] CardSuit#

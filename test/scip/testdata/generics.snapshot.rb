@@ -1,6 +1,7 @@
  # typed: true
+ # check-errors: true
  
- # Exercises the TypeArgument / TypeMember descriptor branches in
+ # Exercises the TypeParameter / TypeMember descriptor branches in
  # scip_indexer/SCIPSymbolRef.cc symbolForExpr (Descriptor::TypeParameter,
  # Descriptor::Type).
  
@@ -13,9 +14,10 @@
 #  ^^^^^^ reference [..] Kernel#extend().
  
    Elem = type_member
-#  ^^^^ definition local 3$1176505055
+#  ^^^^ definition [..] GenericBox#Elem#
  
    sig { params(x: Elem).void }
+#                  ^^^^ reference [..] GenericBox#Elem#
 #  ⌄ enclosing_range_start [..] GenericBox#initialize().
    def initialize(x)
 #      ^^^^^^^^^^ definition [..] GenericBox#initialize().
@@ -28,6 +30,7 @@
 #    ⌃ enclosing_range_end [..] GenericBox#initialize().
  
    sig { returns(Elem) }
+#                ^^^^ reference [..] GenericBox#Elem#
 #  ⌄ enclosing_range_start [..] GenericBox#get().
    def get
 #      ^^^ definition [..] GenericBox#get().
@@ -45,7 +48,7 @@
 #  ^^^^^^ reference [..] Kernel#extend().
  
    Item = type_member
-#  ^^^^ definition local 2$2929037345
+#  ^^^^ definition [..] MyGenericMixin#Item#
  end
 #  ⌃ enclosing_range_end [..] MyGenericMixin#
  
@@ -56,7 +59,7 @@
 #  ^^^^^^ reference [..] Kernel#extend().
  
    Tag = type_template
-#  ^^^ definition local 2$2494098751
+#  ^^^ definition [..] `<Class:WithTypeTemplate>`#Tag#
  end
 #  ⌃ enclosing_range_end [..] WithTypeTemplate#
  
@@ -67,6 +70,9 @@
 #  ^^^^^^ reference [..] Kernel#extend().
  
    sig { type_parameters(:U).params(x: T.type_parameter(:U)).returns(T.type_parameter(:U)) }
+#                         ^ definition [..] WithTypeParameters#identity().[U]
+#                                                        ^ reference [..] WithTypeParameters#identity().[U]
+#                                                                                      ^ reference [..] WithTypeParameters#identity().[U]
 #  ⌄ enclosing_range_start [..] WithTypeParameters#identity().
    def identity(x)
 #      ^^^^^^^^ definition [..] WithTypeParameters#identity().

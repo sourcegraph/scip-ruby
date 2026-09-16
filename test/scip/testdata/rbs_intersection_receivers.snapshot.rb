@@ -35,13 +35,13 @@
 #⌄ enclosing_range_start [..] Object#rbs_intersection().
  def rbs_intersection(value)
 #    ^^^^^^^^^^^^^^^^ definition [..] Object#rbs_intersection().
-#                     ^^^^^ definition local 1$342360874
+#                     ^^^^^ definition local 1$785385480
    value.left.upcase
-#  ^^^^^ reference local 1$342360874
+#  ^^^^^ reference local 1$785385480
 #        ^^^^ reference [..] RBSIntersectionLeft#left().
 #             ^^^^^^ reference [..] String#upcase().
    value.right.upcase
-#  ^^^^^ reference local 1$342360874
+#  ^^^^^ reference local 1$785385480
 #        ^^^^^ reference [..] RBSIntersectionRight#right().
 #              ^^^^^^ reference [..] String#upcase().
  end

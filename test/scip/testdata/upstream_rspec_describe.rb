@@ -6,7 +6,11 @@
 
 module RSpec
   module Core
-    class ExampleGroup; end
+    class ExampleGroup
+      def self.it(name, &block); end
+      def self.context(name, &block); end
+      def self.describe(name, &block); end
+    end
   end
   def self.describe(description, *args, &block); end
 end
