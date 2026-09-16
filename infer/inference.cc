@@ -31,7 +31,9 @@ bool Inference::willRun(core::Context ctx, core::LocOffsets loc, core::MethodRef
         return false;
     }
 
-    if (methodData->flags.isAbstract) {
+    // Bundled RBIs can mark a method abstract even when an indexed Ruby file supplies a body.
+    // Keep that source navigable, including bodies that Sorbet diagnoses as invalid.
+    if (methodData->flags.isAbstract && (!ctx.state.isSCIPRuby || ctx.file.data(ctx).isRBI())) {
         return false;
     }
 

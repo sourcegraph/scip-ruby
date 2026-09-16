@@ -94,7 +94,7 @@ unique_ptr<CFG> CFGBuilder::buildFor(CFGContext cctx, unique_ptr<CFG> res, absl:
         BasicBlock *defaultCont = nullptr;
 
         auto &paramInfos = res->symbol.data(ctx)->parameters;
-        bool isAbstract = res->symbol.data(ctx)->flags.isAbstract;
+        bool isAbstract = res->symbol.data(ctx)->flags.isAbstract && !ctx.state.isSCIPRuby;
         bool seenKeyword = false;
         int i = -1;
         for (auto &paramExpr : params) {
