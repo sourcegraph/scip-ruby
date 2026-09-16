@@ -11,6 +11,7 @@
      value = "outer"
 #    ^^^^^ definition local 1$4220414333
      [1, 2].each do |; value|
+#           ^^^^ reference [..] Array#each().
 #                      ^^^^^ definition local 2$4220414333
        value = 1
 #      ^^^^^ reference (write) local 2$4220414333

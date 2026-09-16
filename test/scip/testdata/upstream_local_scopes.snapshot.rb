@@ -10,6 +10,7 @@
      variable = "outer"
 #    ^^^^^^^^ definition local 1$1102583359
      [1, 2, 3].map do |variable|
+#              ^^^ reference [..] Array#map().
 #                      ^^^^^^^^ definition local 2$1102583359
        variable.to_s
 #      ^^^^^^^^ reference local 2$1102583359

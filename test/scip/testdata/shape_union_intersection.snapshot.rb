@@ -26,6 +26,7 @@
 #                          ^^^^^^^^^ definition local 2$1360419304
      if item == candidate
 #       ^^^^ reference local 1$1360419304
+#            ^^ reference [..] Hash#`==`().
 #            ^^ reference [..] Integer#`==`().
 #            ^^ reference [..] Symbol#`==`().
 #               ^^^^^^^^^ reference local 2$1360419304
@@ -38,6 +39,7 @@
 #                   ^^^ reference [..] Class#new().
 #                       ^^^^^^^^^^^ reference [..] ToyPrinter#print_label().
 #                                   ^^^^^^^^^ reference local 2$1360419304
+#                                            ^ reference [..] Hash#`[]`().
        end
      end
    end

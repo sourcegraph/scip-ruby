@@ -39,9 +39,11 @@
 #               ^^^^^^^^ reference [..] KeywordReceiver#deliver().(customer)
 #                        ^^^^^^ reference [..] String#upcase().
      [1].each { customer.downcase }
+#        ^^^^ reference [..] Array#each().
 #               ^^^^^^^^ reference [..] KeywordReceiver#deliver().(customer)
 #                        ^^^^^^^^ reference [..] String#downcase().
      ["shadow"].each { |customer| customer.upcase }
+#               ^^^^ reference [..] Array#each().
 #                       ^^^^^^^^ definition local 1$3266635022
 #                       documentation
 #                       | ```ruby

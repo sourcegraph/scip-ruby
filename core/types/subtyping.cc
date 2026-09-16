@@ -961,6 +961,21 @@ TypePtr Types::glb(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) 
             }
 
             if (score > 0) {
+                if (gs.isSCIPRuby) {
+                    // These branches form an intersection, so their union must not widen. In particular,
+                    // lubbing distinct shapes can produce Hash[untyped], which is not a subtype of either
+                    // input union. Eliminate empty and identical branches without merging aggregates.
+                    auto exactUnion = [](const TypePtr &left, const TypePtr &right) {
+                        if (left.isBottom() || left == right) {
+                            return right;
+                        }
+                        if (right.isBottom()) {
+                            return left;
+                        }
+                        return OrType::make_shared(left, right);
+                    };
+                    return exactUnion(exactUnion(t11, t12), exactUnion(t21, t22));
+                }
                 return Types::any(gs, Types::any(gs, t11, t12), Types::any(gs, t21, t22));
             }
         }

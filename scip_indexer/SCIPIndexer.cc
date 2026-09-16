@@ -1012,6 +1012,11 @@ core::ClassOrModuleRef computeReceiver(const core::GlobalState &gs, core::TypePt
     // Literal values dispatch to methods on their underlying class. Only widen
     // this lookup type, preserving the inferred literal type for hover information.
     recvType = core::Types::dropLiteral(gs, recvType);
+    // Aggregate-preserving unions can retain shapes and tuples here. Resolve their
+    // methods on Hash/Array without widening the inferred receiver or hover type.
+    if (core::isa_type<core::ShapeType>(recvType) || core::isa_type<core::TupleType>(recvType)) {
+        recvType = recvType.underlying(gs);
+    }
     // NOTE(varun): Based on core::Types::getRepresentedClass. Trying to use it directly
     // didn't quite work properly, but we might want to consolidate the implementation. I
     // didn't quite understand the bit about attachedClass.

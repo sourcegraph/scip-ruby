@@ -4,25 +4,30 @@
  # test/testdata/resolver/it_param_method_vs_local.rb / it_param_method_vs_param.rb.
  
  [1, 2].map { it + it }
+#       ^^^ reference [..] Array#map().
 #             ^^ definition local 1$119448696
 #             ^^ reference local 1$119448696
 #                ^ reference [..] Integer#+().
 #                  ^^ reference local 1$119448696
  ["a", "b"].map { it.upcase }
+#           ^^^ reference [..] Array#map().
 #                 ^^ definition local 2$119448696
 #                 ^^ reference local 2$119448696
 #                    ^^^^^^ reference [..] String#upcase().
  
  [[1, 2], [3, 4]].map do
+#                 ^^^ reference [..] Array#map().
    it.map { it + it }
 #  ^^ definition local 3$119448696
 #  ^^ reference local 3$119448696
+#     ^^^ reference [..] Array#map().
 #           ^^ definition local 4$119448696
 #           ^^ reference local 4$119448696
 #              ^ reference [..] Integer#+().
 #                ^^ reference local 4$119448696
    it.length
 #  ^^ reference local 3$119448696
+#     ^^^^^^ reference [..] Array#length().
  end
  
 #⌄ enclosing_range_start [..] ImplicitItPrecedence#
@@ -48,16 +53,19 @@
    def implicit_parameter
 #      ^^^^^^^^^^^^^^^^^^ definition [..] ImplicitItPrecedence#implicit_parameter().
      [1, 2].map { it + it }
+#           ^^^ reference [..] Array#map().
 #                 ^^ definition local 1$1457465026
 #                 ^^ reference local 1$1457465026
 #                    ^ reference [..] Integer#+().
 #                      ^^ reference local 1$1457465026
      [1, 2].map { it(it).upcase }
+#           ^^^ reference [..] Array#map().
 #                 ^^ reference [..] ImplicitItPrecedence#it().
 #                    ^^ definition local 2$1457465026
 #                    ^^ reference local 2$1457465026
 #                        ^^^^^^ reference [..] String#upcase().
      [1, 2].map { self.it(it).upcase }
+#           ^^^ reference [..] Array#map().
 #                      ^^ reference [..] ImplicitItPrecedence#it().
 #                         ^^ definition local 3$1457465026
 #                         ^^ reference local 3$1457465026
@@ -74,9 +82,11 @@
      it = "outer"
 #    ^^ definition local 1$3790959852
      [1, 2].map { it.upcase }
+#           ^^^ reference [..] Array#map().
 #                 ^^ reference local 1$3790959852
 #                    ^^^^^^ reference [..] String#upcase().
      [1, 2].map { it(it.length).upcase }
+#           ^^^ reference [..] Array#map().
 #                 ^^ reference [..] ImplicitItPrecedence#it().
 #                    ^^ reference local 1$3790959852
 #                       ^^^^^^ reference [..] String#length().

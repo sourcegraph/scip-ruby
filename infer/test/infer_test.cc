@@ -249,6 +249,71 @@ TEST_CASE("Infer") {
         }
     }
 
+    SUBCASE("SCIPUnionIntersectionPreservesAggregates") {
+        gs.isSCIPRuby = true;
+        core::UnfreezeNameTable names(gs);
+        core::UnfreezeSymbolTable symbols(gs);
+        // initEmpty does not load generic parameters from the RBI payload.
+        for (auto klass : {core::Symbols::Hash(), core::Symbols::Array()}) {
+            for (auto name : {"K", "V", "Elem"}) {
+                if (klass == core::Symbols::Array() && string_view(name) != "Elem") {
+                    continue;
+                }
+                auto member =
+                    gs.enterTypeMember(core::Loc::none(), klass, gs.enterNameConstant(name), core::Variance::CoVariant);
+                member.data(gs)->resultType =
+                    core::make_type<core::LambdaParam>(member, core::Types::bottom(), core::Types::top());
+            }
+        }
+        auto label = core::make_type<core::NamedLiteralType>(core::Symbols::Symbol(), gs.enterNameUTF8("label"));
+        auto count = core::make_type<core::NamedLiteralType>(core::Symbols::Symbol(), gs.enterNameUTF8("count"));
+        auto shape1 = core::make_type<core::ShapeType>(vector<core::TypePtr>{label},
+                                                       vector<core::TypePtr>{core::Types::String()});
+        auto shape2 = core::make_type<core::ShapeType>(vector<core::TypePtr>{count},
+                                                       vector<core::TypePtr>{core::Types::Integer()});
+        auto nestedShape = core::make_type<core::ShapeType>(vector<core::TypePtr>{label, count},
+                                                            vector<core::TypePtr>{core::Types::String(), shape2});
+        auto tuple1 = core::make_type<core::TupleType>(vector<core::TypePtr>{core::Types::String()});
+        auto tuple2 =
+            core::make_type<core::TupleType>(vector<core::TypePtr>{core::Types::String(), core::Types::Integer()});
+
+        for (auto &aggregates : {pair{shape1, shape2}, pair{shape1, nestedShape}}) {
+            auto &[first, second] = aggregates;
+            auto container = core::Types::hashOfUntyped();
+            auto nil = core::Types::nilClass();
+            // Adding a shape to a nilable shape preserves both branches, unlike directly lubbing two shapes.
+            for (auto &nilable : {core::Types::any(gs, core::Types::any(gs, nil, first), second),
+                                  core::Types::any(gs, core::Types::any(gs, nil, second), first)}) {
+                for (auto &precise : {nilable, core::Types::dropNil(gs, nilable)}) {
+                    CAPTURE(precise.toString(gs));
+                    for (auto &general : {core::Types::any(gs, nil, container), core::Types::any(gs, container, nil)}) {
+                        auto intersection = core::Types::all(gs, precise, general);
+                        auto reversed = core::Types::all(gs, general, precise);
+                        CHECK(core::Types::isSubType(gs, intersection, precise));
+                        CHECK(core::Types::isSubType(gs, intersection, general));
+                        CHECK(core::Types::equiv(gs, intersection, precise));
+                        CHECK(core::Types::equiv(gs, reversed, precise));
+                        CHECK_FALSE(core::Types::isSubType(gs, container, intersection));
+                    }
+                }
+            }
+        }
+
+        // Existing nilable tuple intersections should still collapse in both SCIP and ordinary Sorbet modes.
+        auto array = core::Types::arrayOfUntyped(core::Symbols::Array());
+        auto nilableArray = core::Types::any(gs, core::Types::nilClass(), array);
+        for (auto scipMode : {false, true}) {
+            gs.isSCIPRuby = scipMode;
+            CAPTURE(scipMode);
+            for (auto &tuple : {tuple1, tuple2}) {
+                auto nilableTuple = core::Types::any(gs, core::Types::nilClass(), tuple);
+                auto intersection = core::Types::all(gs, nilableTuple, nilableArray);
+                CHECK(core::Types::equiv(gs, intersection, nilableTuple));
+                CHECK(core::Types::equiv(gs, core::Types::all(gs, nilableArray, nilableTuple), nilableTuple));
+            }
+        }
+    }
+
     SUBCASE("ClassesSubtyping") {
         processSource(gs, "class Bar; end; class Foo < Bar; end");
         const auto &rootScope = core::Symbols::root().data(gs);
