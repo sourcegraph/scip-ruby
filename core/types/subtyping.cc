@@ -926,6 +926,12 @@ TypePtr Types::glb(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) 
             if (rght.isBottom()) {
                 return lft;
             }
+            if (gs.isSCIPRuby) {
+                // Keep the narrowed branches: nested unions can contain impossible intersections that
+                // were eliminated above. Reusing the original union hides that simplification from
+                // subtype checks. Build an exact union, without lub's literal/aggregate widening.
+                return OrType::make_shared(lft, rght);
+            }
         }
 
         if (auto o1 = cast_type<OrType>(t1)) { // 6

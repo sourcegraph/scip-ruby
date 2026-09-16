@@ -185,6 +185,70 @@ TEST_CASE("Infer") {
         CHECK(core::Types::equiv(gs, intersection, core::Types::all(gs, precise, general)));
     }
 
+    SUBCASE("NestedUnionIntersections") {
+        processSource(gs, "module Labeled; end; module Tagged; end; class Spare; end");
+        const auto &root = core::Symbols::root().data(gs);
+        auto labeled = core::make_type<core::ClassType>(
+            root->findMember(gs, gs.enterNameConstant("Labeled")).asClassOrModuleRef());
+        auto tagged =
+            core::make_type<core::ClassType>(root->findMember(gs, gs.enterNameConstant("Tagged")).asClassOrModuleRef());
+        auto spare =
+            core::make_type<core::ClassType>(root->findMember(gs, gs.enterNameConstant("Spare")).asClassOrModuleRef());
+        auto common = core::Types::any(gs, labeled, tagged);
+        vector<core::TypePtr> nestedUnions{core::Types::any(gs, core::Types::any(gs, labeled, spare), tagged),
+                                           core::Types::any(gs, labeled, core::Types::any(gs, tagged, spare))};
+
+        for (auto scipMode : {false, true}) {
+            gs.isSCIPRuby = scipMode;
+            CAPTURE(scipMode);
+            for (auto &nested : nestedUnions) {
+                CAPTURE(nested.toString(gs));
+                auto narrowed = core::Types::all(gs, core::Types::nilClass(), nested);
+                if (!scipMode) {
+                    // Preserve the original intersection representation outside SCIP mode.
+                    REQUIRE(core::isa_type<core::AndType>(narrowed));
+                    CHECK(core::cast_type_nonnull<core::AndType>(narrowed).right == nested);
+                    continue;
+                }
+                auto expected = core::Types::any(gs, core::Types::all(gs, core::Types::nilClass(), labeled),
+                                                 core::Types::all(gs, core::Types::nilClass(), tagged));
+                CHECK_FALSE(narrowed.isBottom());
+                CHECK(core::Types::equiv(gs, narrowed, expected));
+                CHECK(core::Types::equiv(gs, narrowed, core::Types::all(gs, nested, core::Types::nilClass())));
+                CHECK(core::Types::isSubType(gs, narrowed, core::Types::nilClass()));
+                CHECK(core::Types::isSubType(gs, narrowed, nested));
+                auto joined = core::Types::any(gs, common, narrowed);
+                CHECK(core::Types::equiv(gs, joined, common));
+                CHECK(core::Types::isSubType(gs, narrowed, joined));
+                CHECK(core::Types::equiv(gs, core::Types::any(gs, narrowed, common), joined));
+            }
+        }
+    }
+
+    SUBCASE("SCIPDistributedIntersectionPreservesAggregates") {
+        processSource(gs, "module Tagged; end");
+        gs.isSCIPRuby = true;
+        core::UnfreezeNameTable names(gs);
+        auto tagged = core::make_type<core::ClassType>(
+            core::Symbols::root().data(gs)->findMember(gs, gs.enterNameConstant("Tagged")).asClassOrModuleRef());
+        auto label = core::make_type<core::NamedLiteralType>(core::Symbols::Symbol(), gs.enterNameUTF8("label"));
+        auto shape = core::make_type<core::ShapeType>(vector<core::TypePtr>{label},
+                                                      vector<core::TypePtr>{core::Types::String()});
+        auto tuple = core::make_type<core::TupleType>(vector<core::TypePtr>{core::Types::String()});
+        for (auto &aggregate : {shape, tuple}) {
+            CAPTURE(aggregate.toString(gs));
+            auto container =
+                core::make_type<core::ClassType>(aggregate == shape ? core::Symbols::Hash() : core::Symbols::Array());
+            auto source = core::Types::any(gs, aggregate, tagged);
+            auto narrowed = core::Types::all(gs, container, source);
+            CHECK(core::Types::isSubType(gs, aggregate, narrowed));
+            CHECK(core::Types::isSubType(gs, core::Types::all(gs, container, tagged), narrowed));
+            CHECK(core::Types::isSubType(gs, narrowed, source));
+            CHECK(core::Types::isSubType(gs, narrowed, container));
+            CHECK_FALSE(core::Types::isSubType(gs, container, narrowed));
+        }
+    }
+
     SUBCASE("ClassesSubtyping") {
         processSource(gs, "class Bar; end; class Foo < Bar; end");
         const auto &rootScope = core::Symbols::root().data(gs);

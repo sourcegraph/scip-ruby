@@ -91,7 +91,7 @@ class IntersectionCalls
 
   sig { params(value: T.all(T.any(IntersectionLeft, IntersectionMarker), IntersectionRight)).void }
   def incomplete_branch(value)
-    # The left union cannot resolve shared on every branch. Only Right survives.
+    # Distribution keeps Right in both branches and Left in the overlapping branch.
     value.shared(key: "discard-left")
   end
 
