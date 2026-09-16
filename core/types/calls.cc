@@ -2319,8 +2319,12 @@ public:
         ClassOrModuleRef self = unwrapSymbol(gs, args.thisType, mustExist);
         auto tClassSelfType = Types::tClass(Types::widen(gs, args.selfType));
         if (self.data(gs)->isModule()) {
-            ENFORCE(gs.cacheSensitiveOptions.requiresAncestorEnabled,
-                    "Congrats, you've found a test case. Please add it, then delete this.");
+            // SCIP-only: error recovery can retain Object in a module's ancestry after an invalid class inclusion.
+            // Dispatch can then reach this intrinsic without requires_ancestor; use the existing module result type.
+            if (!gs.isSCIPRuby) {
+                ENFORCE(gs.cacheSensitiveOptions.requiresAncestorEnabled,
+                        "Congrats, you've found a test case. Please add it, then delete this.");
+            }
             // This normally can't happen, because `Object` is not an ancestor of any module
             // instance by default. But Sorbet supports requires ancestor in a really weird way (by
             // simply dispatching to a completely unrelated method) which means that sometimes we
