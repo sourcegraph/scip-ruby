@@ -914,6 +914,12 @@ class CFGTraversal final {
     UnorderedMap<uint32_t, core::TypePtr> localDefinitionType;
     AliasMap aliasMap;
 
+    struct AnonymousParameter {
+        uint32_t id;
+        core::LocOffsets loc;
+    };
+    UnorderedMap<core::NameRef, AnonymousParameter> anonymousParameters;
+
     // Local variable counter that is reset for every function.
     uint32_t counter = 0;
     SCIPState &scipState;
@@ -953,6 +959,57 @@ private:
         }
     };
 
+    void defineAnonymousParameters(const ast::MethodDef *methodDef) {
+        if (methodDef == nullptr) {
+            return;
+        }
+        auto &gs = ctx.state;
+        auto method = ctx.owner.asMethodRef();
+        const auto &params = method.data(gs)->parameters;
+        for (size_t i = 0; i < methodDef->params.size() && i < params.size(); ++i) {
+            auto local = ast::cast_tree<ast::Local>(methodDef->params[i]);
+            if (local == nullptr) {
+                continue;
+            }
+            const auto &param = params[i];
+            // ParamInfo's location can point into a sig. Use the declaration's
+            // AST location to identify the anonymous token and its definition.
+            auto source = ctx.locAt(local->loc).source(gs);
+            if (source != "&" && source != "*" && source != "**" && source != "...") {
+                continue;
+            }
+            // Sorbet expands ... into three parameters. They describe one source
+            // declaration, so all three components share a SCIP local symbol.
+            if (source == "..." && anonymousParameters.contains(core::Names::fwdArgs())) {
+                continue;
+            }
+            AnonymousParameter parameter{++counter, local->loc};
+            if (source == "&") {
+                anonymousParameters[core::Names::ampersand()] = parameter;
+            } else if (source == "*") {
+                anonymousParameters[core::Names::star()] = parameter;
+                anonymousParameters[core::Names::fwdArgs()] = parameter;
+            } else if (source == "**") {
+                anonymousParameters[core::Names::starStar()] = parameter;
+                anonymousParameters[core::Names::fwdKwargs()] = parameter;
+            } else {
+                anonymousParameters[core::Names::fwdArgs()] = parameter;
+                anonymousParameters[core::Names::fwdKwargs()] = parameter;
+                anonymousParameters[core::Names::fwdBlock()] = parameter;
+            }
+            auto type = core::Types::resultTypeAsSeenFromSelf(ctx, param.type, method.data(gs)->owner);
+            if (!type || source == "...") {
+                type = core::Types::untyped(method);
+            }
+            if (param.flags.isRepeated && source != "...") {
+                type = param.flags.isKeyword ? core::Types::hashOf(gs, type) : core::Types::arrayOf(gs, type);
+            }
+            auto status =
+                scipState.saveDefinition(gs, ctx.file, OwnedLocal{ctx.owner, parameter.id, parameter.loc}, type);
+            ENFORCE(status.ok());
+        }
+    }
+
     // Emit an occurrence for a local variable if applicable.
     //
     // Returns true if an occurrence was emitted.
@@ -961,6 +1018,28 @@ private:
     bool emitLocalOccurrence(const cfg::CFG &cfg, const cfg::BasicBlock *bb, cfg::LocalOccurrence local,
                              DefRefData defRefData, core::TypePtr type) {
         auto loc = local.loc;
+        auto localRef = local.variable;
+        auto localVar = localRef.data(cfg);
+        auto anonymous = anonymousParameters.find(localVar._name);
+        if (localVar.unique == 0 && anonymous != anonymousParameters.end()) {
+            // Definitions also survive when CFG optimization removes an unused
+            // parameter. Do not emit another definition or a write for LoadArg.
+            if (defRefData.valueCategory == ValueCategory::LValue) {
+                return false;
+            }
+            if (loc.exists() && loc.empty() && loc.beginPos() > 0 && localVar._name == core::Names::ampersand()) {
+                // An anonymous block use is located just after its & token.
+                loc = ctx.locAt(loc).adjustLen(ctx, -1, 1).offsets();
+            }
+            const auto &parameter = anonymous->second;
+            if (!loc.exists() || loc.empty() || ctx.locAt(loc).source(ctx) != ctx.locAt(parameter.loc).source(ctx)) {
+                return false;
+            }
+            auto status = scipState.saveReference(ctx, ctx.file, OwnedLocal{ctx.owner, parameter.id, loc}, nullopt,
+                                                  scip::SymbolRole::ReadAccess);
+            ENFORCE(status.ok());
+            return true;
+        }
         if (!loc.exists() || loc.empty()) {
             // Safeguard against incorrect merges from upstream Sorbet, where
             // some changes cause empty source locations to propagate down here.
@@ -970,8 +1049,6 @@ private:
             // triggered on some private code.
             return false;
         }
-        auto localRef = local.variable;
-        auto localVar = localRef.data(cfg);
         auto symRef = this->aliasMap.try_consume(localRef);
         if (!symRef.has_value() && isTemporary(ctx.state, localVar)) {
             return false;
@@ -1099,8 +1176,8 @@ private:
     }
 
 public:
-    void traverse(const cfg::CFG &cfg) {
-        auto abc = std::vector<int>();
+    void traverse(const cfg::CFG &cfg, const ast::MethodDef *methodDef) {
+        defineAnonymousParameters(methodDef);
         this->aliasMap.populate(this->ctx, cfg, this->scipState.fieldResolver,
                                 this->scipState.relationshipsMap[ctx.file]);
         auto &gs = this->ctx.state;
@@ -1657,7 +1734,7 @@ public:
 
         auto &scipStateRef = *scipState.get();
         sorbet::scip_indexer::CFGTraversal traversal(scipStateRef, core::Context(gs, cfg.symbol, file));
-        traversal.traverse(cfg);
+        traversal.traverse(cfg, methodDef);
         scipStateRef.clearFunctionLocalCaches();
     }
 };

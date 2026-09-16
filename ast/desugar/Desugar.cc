@@ -866,6 +866,7 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
                 auto hasFwdArgs = false;
                 auto hasFwdRestArg = false;
                 auto hasSplat = false;
+                auto forwardedLoc = loc;
                 auto newEndIt = remove_if(send->args.begin(), send->args.end(), [&](auto &arg) {
                     bool eraseFromArgs = false;
 
@@ -874,7 +875,10 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
 
                         ENFORCE(blockPassArg == nullptr, "The parser should have rejected `foo(&, ...)`");
                         // Desugar a call like `foo(...)` so it has a block argument like `foo(..., &<fwd-block>)`.
-                        blockPassArg = MK::Local(loc, core::Names::fwdBlock());
+                        if (dctx.ctx.state.isSCIPRuby) {
+                            forwardedLoc = arg->loc;
+                        }
+                        blockPassArg = MK::Local(forwardedLoc, core::Names::fwdBlock());
                         blockPassLoc = loc.copyEndWithZeroLength();
 
                         hasFwdArgs = true;
@@ -882,6 +886,9 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
                     } else if (parser::isa_node<parser::ForwardedRestArg>(arg.get())) {
                         // Pull out the ForwardedRestArg (an anonymous splat like `f(*)`)
                         hasFwdRestArg = true;
+                        if (dctx.ctx.state.isSCIPRuby) {
+                            forwardedLoc = arg->loc;
+                        }
                         eraseFromArgs = true;
                     } else if (parser::isa_node<parser::Splat>(arg.get())) {
                         // Detect if there's a splat in the argument list
@@ -908,13 +915,13 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
                     auto args = node2TreeImpl(dctx, array);
 
                     if (hasFwdArgs) {
-                        auto fwdArgs = MK::Local(loc, core::Names::fwdArgs());
+                        auto fwdArgs = MK::Local(forwardedLoc, core::Names::fwdArgs());
                         auto argsSplat = MK::Splat(loc, move(fwdArgs));
                         auto argsConcat =
                             argsEmpty ? move(argsSplat)
                                       : MK::Send1(loc, move(args), core::Names::concat(), locZeroLen, move(argsSplat));
 
-                        auto fwdKwargs = MK::Local(loc, core::Names::fwdKwargs());
+                        auto fwdKwargs = MK::Local(forwardedLoc, core::Names::fwdKwargs());
                         auto kwargsSplat =
                             MK::Send1(loc, MK::Magic(loc), core::Names::toHashDup(), locZeroLen, move(fwdKwargs));
 
@@ -927,9 +934,12 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
 
                         args = move(argsConcat);
                     } else if (hasFwdRestArg) {
-                        auto fwdArgs = MK::Local(loc, core::Names::fwdArgs());
+                        auto fwdArgs = MK::Local(forwardedLoc, core::Names::fwdArgs());
                         auto argsSplat = MK::Send0(loc, move(fwdArgs), core::Names::toA(), locZeroLen);
-                        auto tUnsafe = MK::Unsafe(loc, move(argsSplat));
+                        // Preserve the forwarding token without indexing the generated T.unsafe.
+                        auto unsafeLoc = dctx.ctx.state.isSCIPRuby ? locZeroLen : loc;
+                        auto tUnsafe =
+                            MK::Send1(loc, MK::T(unsafeLoc), core::Names::unsafe(), unsafeLoc, move(argsSplat));
                         auto argsConcat = MK::Send1(loc, move(args), core::Names::concat(), locZeroLen, move(tUnsafe));
 
                         args = move(argsConcat);
@@ -1126,8 +1136,10 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
                         auto *fwdKwrestArg = parser::cast_node<parser::ForwardedKwrestArg>(pairAsExpression.get());
                         ENFORCE(fwdKwrestArg != nullptr, "kwsplat and fwdkwrestarg cast failed");
 
-                        auto fwdKwargs = MK::Local(loc, core::Names::fwdKwargs());
-                        expr = MK::Unsafe(loc, move(fwdKwargs));
+                        auto argLoc = dctx.ctx.state.isSCIPRuby ? fwdKwrestArg->loc : loc;
+                        auto unsafeLoc = dctx.ctx.state.isSCIPRuby ? locZeroLen : loc;
+                        auto fwdKwargs = MK::Local(argLoc, core::Names::fwdKwargs());
+                        expr = MK::Send1(loc, MK::T(unsafeLoc), core::Names::unsafe(), unsafeLoc, move(fwdKwargs));
                     }
 
                     if (havePairsToMerge) {
