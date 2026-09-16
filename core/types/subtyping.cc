@@ -1,5 +1,6 @@
 #include "common/common.h"
 #include "common/typecase.h"
+#include "core/GlobalState.h"
 #include "core/Symbols.h"
 #include "core/TypeConstraint.h"
 #include "core/Types.h"
@@ -355,6 +356,15 @@ TypePtr Types::lub(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) 
         if (is_proxy_type(t2)) {
             categoryCounterInc("lub", "proxy>");
             // both are proxy
+            auto lubLiteralWithProxy = [&](const TypePtr &literalUnderlying) {
+                // SCIP-only: preserve shapes and tuples when widening a literal, just as when joining its class
+                // type. Widening the aggregate too can make a narrower tuple's underlying Array type broader than
+                // that of its supertype, violating the upper-bound invariant when merging nilable tuples.
+                if (gs.isSCIPRuby && (isa_type<ShapeType>(t2) || isa_type<TupleType>(t2))) {
+                    return lub(gs, literalUnderlying, t2);
+                }
+                return lub(gs, literalUnderlying, t2.underlying(gs));
+            };
             TypePtr result;
             typecase(
                 t1,
@@ -442,7 +452,7 @@ TypePtr Types::lub(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) 
                             result = lubGround(gs, l1.underlying(gs), l2.underlying(gs));
                         }
                     } else {
-                        result = lub(gs, l1.underlying(gs), t2.underlying(gs));
+                        result = lubLiteralWithProxy(l1.underlying(gs));
                     }
                 },
                 [&](const IntegerLiteralType &l1) {
@@ -454,7 +464,7 @@ TypePtr Types::lub(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) 
                             result = l1.underlying(gs);
                         }
                     } else {
-                        result = lub(gs, l1.underlying(gs), t2.underlying(gs));
+                        result = lubLiteralWithProxy(l1.underlying(gs));
                     }
                 },
                 [&](const FloatLiteralType &l1) {
@@ -466,7 +476,7 @@ TypePtr Types::lub(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) 
                             result = l1.underlying(gs);
                         }
                     } else {
-                        result = lub(gs, l1.underlying(gs), t2.underlying(gs));
+                        result = lubLiteralWithProxy(l1.underlying(gs));
                     }
                 });
             ENFORCE(result != nullptr);

@@ -73,6 +73,64 @@ TEST_CASE("Infer") {
         REQUIRE(core::Types::isSubType(gs, core::Types::untypedUntracked(), core::Types::top()));
     }
 
+    SUBCASE("LiteralAggregateLubs") {
+        core::UnfreezeNameTable names(gs);
+        auto label = core::make_type<core::NamedLiteralType>(core::Symbols::String(), gs.enterNameUTF8("label"));
+        auto text = core::make_type<core::NamedLiteralType>(core::Symbols::String(), gs.enterNameUTF8("toy"));
+        auto symbol = core::make_type<core::NamedLiteralType>(core::Symbols::Symbol(), gs.enterNameUTF8("sample"));
+        auto shape = core::make_type<core::ShapeType>(vector<core::TypePtr>{label}, vector<core::TypePtr>{text});
+        auto tuple = core::make_type<core::TupleType>(vector<core::TypePtr>{core::Types::Integer(), text});
+        vector<core::TypePtr> literals{core::make_type<core::IntegerLiteralType>(int64_t(7)),
+                                       core::make_type<core::FloatLiteralType>(0.5), text, symbol};
+
+        for (auto scipMode : {false, true}) {
+            gs.isSCIPRuby = scipMode;
+            CAPTURE(scipMode);
+            for (auto &literal : literals) {
+                CAPTURE(literal.toString(gs));
+                for (auto &aggregate : {shape, tuple}) {
+                    CAPTURE(aggregate.toString(gs));
+                    // SCIP joins must agree with joining the widened literal while keeping the aggregate.
+                    // Outside SCIP mode, preserve the existing widening of both proxy types.
+                    auto expected =
+                        core::Types::any(gs, literal.underlying(gs), scipMode ? aggregate : aggregate.underlying(gs));
+                    auto joined = core::Types::any(gs, literal, aggregate);
+                    auto reversed = core::Types::any(gs, aggregate, literal);
+                    CHECK(core::Types::equiv(gs, joined, expected));
+                    CHECK(core::Types::equiv(gs, reversed, expected));
+                    CHECK(core::Types::isSubType(gs, literal, joined));
+                    CHECK(core::Types::isSubType(gs, aggregate, joined));
+                }
+            }
+        }
+    }
+
+    SUBCASE("SCIPNilableTupleLub") {
+        gs.isSCIPRuby = true;
+        core::UnfreezeNameTable names(gs);
+        core::UnfreezeSymbolTable symbols(gs);
+        // initEmpty does not load Array's generic parameter from the RBI payload.
+        auto elem = gs.enterTypeMember(core::Loc::none(), core::Symbols::Array(), gs.enterNameConstant("Elem"),
+                                       core::Variance::CoVariant);
+        elem.data(gs)->resultType = core::make_type<core::LambdaParam>(elem, core::Types::bottom(), core::Types::top());
+
+        auto label = core::make_type<core::NamedLiteralType>(core::Symbols::String(), gs.enterNameUTF8("label"));
+        auto text = core::make_type<core::NamedLiteralType>(core::Symbols::String(), gs.enterNameUTF8("toy"));
+        auto shape = core::make_type<core::ShapeType>(vector<core::TypePtr>{label}, vector<core::TypePtr>{text});
+        auto precise = core::make_type<core::TupleType>(
+            vector<core::TypePtr>{core::make_type<core::IntegerLiteralType>(int64_t(7)), shape, text});
+        auto general = core::make_type<core::TupleType>(
+            vector<core::TypePtr>{core::Types::Integer(), shape, core::Types::String()});
+
+        REQUIRE(core::Types::isSubType(gs, precise, general));
+        CHECK(core::Types::isSubType(gs, precise, general.underlying(gs)));
+        auto nilable = core::Types::any(gs, core::Types::nilClass(), precise);
+        auto joined = core::Types::any(gs, nilable, general);
+        CHECK(core::Types::isSubType(gs, nilable, joined));
+        CHECK(core::Types::isSubType(gs, general, joined));
+        CHECK(core::Types::equiv(gs, joined, core::Types::any(gs, general, nilable)));
+    }
+
     SUBCASE("ClassesSubtyping") {
         processSource(gs, "class Bar; end; class Foo < Bar; end");
         const auto &rootScope = core::Symbols::root().data(gs);
