@@ -172,11 +172,13 @@ struct FoundMethod final {
         bool isAttrBestEffortUIOnly : 1 = false;
         bool discardDef : 1 = false;
         bool genericPropGetter : 1 = false;
+        // Marks generated methods that retain handwritten code, so SCIP can index their bodies.
+        bool hasHandwrittenBody : 1 = false;
 
         bool operator==(const Flags &other) const noexcept {
             return isSelfMethod == other.isSelfMethod && isRewriterSynthesized == other.isRewriterSynthesized &&
                    isAttrBestEffortUIOnly == other.isAttrBestEffortUIOnly && discardDef == other.discardDef &&
-                   genericPropGetter == other.genericPropGetter;
+                   genericPropGetter == other.genericPropGetter && hasHandwrittenBody == other.hasHandwrittenBody;
         }
 
         bool operator!=(const Flags &other) const noexcept {

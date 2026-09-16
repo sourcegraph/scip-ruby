@@ -1346,7 +1346,11 @@ private:
 
 using LocalSymbolTable = UnorderedMap<core::LocalVariable, core::Loc>;
 
-bool isSyntheticMethodWithHandwrittenBody(const core::GlobalState &gs, core::NameRef name) {
+bool isSyntheticMethodWithHandwrittenBody(const core::GlobalState &gs, const ast::MethodDef &method) {
+    if (method.flags.hasHandwrittenBody) {
+        return true;
+    }
+    auto name = method.name;
     // The list of names is taken from:
     // 1. The test case rewriter/minitest.rb.
     // 2. https://ruby-doc.org/stdlib-3.0.1/libdoc/minitest/rdoc/Minitest/Spec/DSL/InstanceMethods.html
@@ -1603,7 +1607,7 @@ public:
         // test code. For that code, continue emitting occurrence data.
         if (methodDef != nullptr &&
             (methodDef->flags.isRewriterSynthesized || methodDef->flags.isAttrBestEffortUIOnly) &&
-            !isSyntheticMethodWithHandwrittenBody(gs, methodDef->name)) {
+            !isSyntheticMethodWithHandwrittenBody(gs, *methodDef)) {
             return;
         }
 

@@ -499,7 +499,9 @@ ast::ExpressionPtr runUnderParameterized(core::MutableContext ctx, core::NameRef
                                         send->loc.copyWithZeroLength(), move(blk));
         // put that into a method def named the appropriate thing
         auto declLoc = declLocForSendWithBlock(*send);
-        auto method = addSigVoid(ctx, ast::MK::SyntheticMethod0(send->loc, declLoc, testHelperNameLoc(*send), move(name), move(each)));
+        auto method = ast::MK::SyntheticMethod0(send->loc, declLoc, testHelperNameLoc(*send), move(name), move(each));
+        ast::cast_tree_nonnull<ast::MethodDef>(method).flags.hasHandwrittenBody = true;
+        method = addSigVoid(ctx, move(method));
         // add back any moved constants
         return constantMover.addConstantsToExpression(send->loc, move(method));
     }
@@ -885,6 +887,7 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::
             // defined methods, we don't actually need to care about the RuntimeMethodDefinition, and
             // omitting it saves memory.
             ast::cast_tree_nonnull<ast::MethodDef>(method).flags.discardDef = true;
+            ast::cast_tree_nonnull<ast::MethodDef>(method).flags.hasHandwrittenBody = true;
             method = addSigVoid(ctx, move(method));
             if (send->numPosArgs() > 0 && !ast::isa_tree<ast::Literal>(send->getPosArg(0))) {
                 method = ast::MK::InsSeq1(send->loc, send->getPosArg(0).deepCopy(), move(method));
@@ -933,6 +936,7 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::
                                                       prepareBody(ctx, /* isClass */ true, maybeSharedExamplesName,
                                                                   std::move(itBody), /* insideDescribe */ true));
             ast::cast_tree_nonnull<ast::MethodDef>(itMethod).flags.discardDef = true;
+            ast::cast_tree_nonnull<ast::MethodDef>(itMethod).flags.hasHandwrittenBody = true;
             itMethod = addSigVoid(ctx, move(itMethod));
             itMethod = constantMover.addConstantsToExpression(send->loc, move(itMethod));
 
