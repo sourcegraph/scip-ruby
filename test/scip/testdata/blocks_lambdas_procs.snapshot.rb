@@ -11,6 +11,7 @@
 #    ^ reference (write) local 1$1472469056
 #    ^ reference local 1$1472469056
 #    ^^^^^^ reference local 1$1472469056
+#      ^^ reference [..] Integer#+().
 #         ^ reference local 2$1472469056
    }
    [].each do |x|
@@ -19,6 +20,7 @@
 #    ^ reference (write) local 1$1472469056
 #    ^ reference local 1$1472469056
 #    ^^^^^^ reference local 1$1472469056
+#      ^^ reference [..] Integer#+().
 #         ^ reference local 3$1472469056
    end
  end
@@ -38,6 +40,7 @@
 #    ^ reference (write) local 1$1499497673
 #    ^ reference local 1$1499497673
 #    ^^^^^^ reference local 1$1499497673
+#      ^^ reference [..] Integer#+().
 #         ^ reference local 3$1499497673
    }
    l2 = lambda { |x|
@@ -48,6 +51,7 @@
 #    ^ reference (write) local 1$1499497673
 #    ^ reference local 1$1499497673
 #    ^^^^^^ reference local 1$1499497673
+#      ^^ reference [..] Integer#+().
 #         ^ reference local 5$1499497673
    }
    l3 = ->(x:) {
@@ -59,6 +63,7 @@
 #    ^ reference (write) local 1$1499497673
 #    ^ reference local 1$1499497673
 #    ^^^^^^ reference local 1$1499497673
+#      ^^ reference [..] Integer#+().
 #         ^ reference local 8$1499497673
    }
    l4 = lambda { |x:|
@@ -69,6 +74,7 @@
 #    ^ reference (write) local 1$1499497673
 #    ^ reference local 1$1499497673
 #    ^^^^^^ reference local 1$1499497673
+#      ^^ reference [..] Integer#+().
 #         ^ reference local 10$1499497673
    }
    l1.call(1)
@@ -100,6 +106,7 @@
 #    ^ reference (write) local 1$1283111692
 #    ^ reference local 1$1283111692
 #    ^^^^^^ reference local 1$1283111692
+#      ^^ reference [..] Integer#+().
 #         ^ reference local 3$1283111692
    }
    p2 = proc { |x|
@@ -110,6 +117,7 @@
 #    ^ reference (write) local 1$1283111692
 #    ^ reference local 1$1283111692
 #    ^^^^^^ reference local 1$1283111692
+#      ^^ reference [..] Integer#+().
 #         ^ reference local 5$1283111692
    }
    p3 = Proc.new { |x:|
@@ -121,6 +129,7 @@
 #    ^ reference (write) local 1$1283111692
 #    ^ reference local 1$1283111692
 #    ^^^^^^ reference local 1$1283111692
+#      ^^ reference [..] Integer#+().
 #         ^ reference local 8$1283111692
    }
    p4 = proc { |x:|
@@ -131,6 +140,7 @@
 #    ^ reference (write) local 1$1283111692
 #    ^ reference local 1$1283111692
 #    ^^^^^^ reference local 1$1283111692
+#      ^^ reference [..] Integer#+().
 #         ^ reference local 10$1283111692
    }
    p1.call(1)

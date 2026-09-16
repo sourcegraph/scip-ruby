@@ -33,6 +33,7 @@
    def hello
 #      ^^^^^ definition [..] PrependedMod#hello().
      "prepended " + super
+#                 ^ reference [..] String#+().
    end
 #    ⌃ enclosing_range_end [..] PrependedMod#hello().
  

@@ -799,13 +799,32 @@ optional<core::TypePtr> computeOverrideType(core::TypePtr definitionType, core::
     return {newType};
 }
 
-core::ClassOrModuleRef computeReceiver(const core::GlobalState &gs, const cfg::Send &send) {
+core::LocOffsets computeMethodLoc(core::Context ctx, const cfg::Send &send) {
+    auto loc = send.funLoc;
+    if (!loc.exists() || !loc.empty() || send.fun != core::Names::squareBracketsEq()) {
+        return loc;
+    }
+    // Indexed assignments use a zero-length method location for diagnostics. Give
+    // SCIP a navigable range on the opening bracket without changing that location.
+    auto bracketLoc = ctx.locAt(loc).adjustLen(ctx, 0, 1);
+    if (bracketLoc.source(ctx) != "[") {
+        return loc;
+    }
+    // Prism also uses a zero-length location for explicit calls like hash.[]=(...).
+    auto explicitLoc = ctx.locAt(loc).adjustLen(ctx, 0, 3);
+    return explicitLoc.source(ctx) == "[]=" ? explicitLoc.offsets() : bracketLoc.offsets();
+}
+
+core::ClassOrModuleRef computeReceiver(const core::GlobalState &gs, const cfg::Send &send, core::LocOffsets funLoc) {
     auto recvType = send.recv.type;
     // TODO(varun): When is the isTemporary check going to succeed?
-    if (!recvType || !send.fun.exists() || !send.funLoc.exists() || send.funLoc.empty() ||
+    if (!recvType || !send.fun.exists() || !funLoc.exists() || funLoc.empty() ||
         isTemporary(gs, core::LocalVariable(send.fun, 1))) {
         return core::ClassOrModuleRef();
     }
+    // Literal values dispatch to methods on their underlying class. Only widen
+    // this lookup type, preserving the inferred literal type for hover information.
+    recvType = core::Types::dropLiteral(gs, recvType);
     // NOTE(varun): Based on core::Types::getRepresentedClass. Trying to use it directly
     // didn't quite work properly, but we might want to consolidate the implementation. I
     // didn't quite understand the bit about attachedClass.
@@ -1135,8 +1154,8 @@ public:
                         }
 
                         // Emit reference for the method being called
-                        auto recvType = send->recv.type;
-                        auto recv = computeReceiver(gs, *send);
+                        auto funLoc = computeMethodLoc(ctx, *send);
+                        auto recv = computeReceiver(gs, *send, funLoc);
                         if (recv.exists()) {
                             auto funSym = recv.data(gs)->findMethodTransitive(gs, send->fun);
                             auto funName = send->fun.showRaw(gs);
@@ -1145,7 +1164,7 @@ public:
                                 // matches a known operator (e.g. []=), and emit an appropriate
                                 // 'WriteAccess' symbol role for it.
                                 auto status = this->scipState.saveReference(ctx, GenericSymbolRef::method(funSym),
-                                                                            nullopt, send->funLoc, 0);
+                                                                            nullopt, funLoc, 0);
                                 ENFORCE(status.ok());
                             }
                         }

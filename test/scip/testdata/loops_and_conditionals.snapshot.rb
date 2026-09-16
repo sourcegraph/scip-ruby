@@ -10,10 +10,12 @@
    # Basic stuff
    if x == 1
 #     ^ reference local 1$2393773952
+#       ^^ reference [..] Integer#`==`().
      y = 2
 #    ^ reference (write) local 2$2393773952
    elsif x == 2
 #        ^ reference local 1$2393773952
+#          ^^ reference [..] Integer#`==`().
      y = 3
 #    ^ reference (write) local 2$2393773952
    else
@@ -27,14 +29,18 @@
 #  ^ definition local 3$2393773952
      if if x == 0 then x+1 else x+2 end == 1
 #          ^ reference local 1$2393773952
+#            ^^ reference [..] Integer#`==`().
 #                      ^ reference local 1$2393773952
+#                       ^ reference [..] Integer#+().
 #                               ^ reference local 1$2393773952
+#                                ^ reference [..] Integer#+().
 #                                       ^^ reference [..] Integer#`==`().
        x
 #      ^ reference local 1$2393773952
      else
        x+1
 #      ^ reference local 1$2393773952
+#       ^ reference [..] Integer#+().
      end
    z = z if z != 10
 #  ^ reference (write) local 3$2393773952
@@ -55,12 +61,14 @@
 #  ^ definition local 2$2827997891
    unless z == 9
 #         ^ reference local 1$2827997891
+#           ^^ reference [..] Integer#`==`().
      z = 9
 #    ^ reference (write) local 1$2827997891
    end
  
    unless x == 10
 #         ^ reference local 2$2827997891
+#           ^^ reference [..] Integer#`==`().
      x = 3
 #    ^ reference (write) local 2$2827997891
    else
@@ -86,6 +94,7 @@
        x = 2
 #      ^ reference (write) local 1$2602907825
      when (3 == (x = 1))
+#            ^^ reference [..] Integer#`==`().
 #                ^ reference (write) local 1$2602907825
 #                ^^^^^ reference local 1$2602907825
        x = 0
@@ -121,6 +130,7 @@
 #              ^^ reference [..] BasicObject#`==`().
      next g+1 if g == 1
 #         ^ reference local 4$2901640080
+#          ^ reference [..] Integer#+().
 #                ^ reference local 4$2901640080
 #                  ^^ reference [..] BasicObject#`==`().
      break if g == 2
@@ -128,6 +138,7 @@
 #               ^^ reference [..] BasicObject#`==`().
      break g+1 if g == 3
 #          ^ reference local 4$2901640080
+#           ^ reference [..] Integer#+().
 #                 ^ reference local 4$2901640080
 #                   ^^ reference [..] BasicObject#`==`().
      # NOTE: redo is unsupported (https://srb.help/3003)
@@ -147,6 +158,7 @@
 #  ^ definition local 2$231090382
    while i < 10
 #        ^ reference local 2$231090382
+#          ^ reference [..] Integer#`<`().
      puts xs[i]
 #    ^^^^ reference [..] Kernel#puts().
 #         ^^ reference local 1$231090382
@@ -157,6 +169,7 @@
 #  ^ definition local 3$231090382
    while j < 10
 #        ^ reference local 3$231090382
+#          ^ reference [..] Integer#`<`().
      g = xs[j]
 #    ^ definition local 4$231090382
 #        ^^ reference local 1$231090382
@@ -166,6 +179,7 @@
 #              ^^ reference [..] BasicObject#`==`().
      next g+1 if g == 1
 #         ^ reference local 4$231090382
+#          ^ reference [..] Integer#+().
 #                ^ reference local 4$231090382
 #                  ^^ reference [..] BasicObject#`==`().
      break if g == 2
@@ -173,6 +187,7 @@
 #               ^^ reference [..] BasicObject#`==`().
      break g+1 if g == 3
 #          ^ reference local 4$231090382
+#           ^ reference [..] Integer#+().
 #                 ^ reference local 4$231090382
 #                   ^^ reference [..] BasicObject#`==`().
      # NOTE: redo is unsupported (https://srb.help/3003)
@@ -192,6 +207,7 @@
 #  ^ definition local 2$3132432719
    until i > 10
 #        ^ reference local 2$3132432719
+#          ^ reference [..] Integer#`>`().
      puts xs[i]
 #    ^^^^ reference [..] Kernel#puts().
 #         ^^ reference local 1$3132432719
@@ -202,6 +218,7 @@
 #  ^ definition local 3$3132432719
    until j > 10
 #        ^ reference local 3$3132432719
+#          ^ reference [..] Integer#`>`().
      g = xs[j]
 #    ^ definition local 4$3132432719
 #        ^^ reference local 1$3132432719
@@ -211,6 +228,7 @@
 #              ^^ reference [..] BasicObject#`==`().
      next g+1 if g == 1
 #         ^ reference local 4$3132432719
+#          ^ reference [..] Integer#+().
 #                ^ reference local 4$3132432719
 #                  ^^ reference [..] BasicObject#`==`().
      break if g == 2
@@ -218,6 +236,7 @@
 #               ^^ reference [..] BasicObject#`==`().
      break g+1 if g == 3
 #          ^ reference local 4$3132432719
+#           ^ reference [..] Integer#+().
 #                 ^ reference local 4$3132432719
 #                   ^^ reference [..] BasicObject#`==`().
      # NOTE: redo is unsupported (https://srb.help/3003)

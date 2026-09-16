@@ -35,6 +35,7 @@
 #    ^^^^^ reference (write) local 1$1737801135
 #    ^^^^^ reference local 1$1737801135
 #    ^^^^^^^^^^ reference local 1$1737801135
+#          ^^ reference [..] Integer#+().
 #             ^ reference local 2$1737801135
    end
    with_yield_no_args { total += 1 }
@@ -42,6 +43,7 @@
 #                       ^^^^^ reference (write) local 1$1737801135
 #                       ^^^^^ reference local 1$1737801135
 #                       ^^^^^^^^^^ reference local 1$1737801135
+#                             ^^ reference [..] Integer#+().
    total
 #  ^^^^^ reference local 1$1737801135
  end

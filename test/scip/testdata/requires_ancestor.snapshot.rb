@@ -26,6 +26,7 @@
    def greet
 #      ^^^^^ definition [..] Greetable#greet().
      puts("Hello, " + name)
+#                   ^ reference [..] String#+().
 #                     ^^^^ reference [..] Greetable#name().
    end
 #    ⌃ enclosing_range_end [..] Greetable#greet().

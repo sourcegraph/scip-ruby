@@ -11,6 +11,7 @@
 #      ^^^^^ definition [..] Parent#greet().
 #            ^^^^ definition local 1$4213039946
      "Hi, " + name
+#           ^ reference [..] String#+().
 #             ^^^^ reference local 1$4213039946
    end
 #    ⌃ enclosing_range_end [..] Parent#greet().
@@ -42,6 +43,7 @@
 #            ^^^^ definition local 1$4213039946
      base = super("child of " + name)
 #    ^^^^ definition local 2$4213039946
+#                             ^ reference [..] String#+().
 #                               ^^^^ reference local 1$4213039946
      base + "!"
 #    ^^^^ reference local 2$4213039946

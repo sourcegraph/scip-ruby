@@ -7,12 +7,14 @@
 #| ```ruby
 #| X (T.untyped)
 #| ```
+#        ^^^^^^ reference [..] String#freeze().
  Y = 'Y'.freeze
 #^ definition [..] Y.
 #documentation
 #| ```ruby
 #| Y (T.untyped)
 #| ```
+#        ^^^^^^ reference [..] String#freeze().
  A = %w[X Y].freeze
 #^ definition [..] A.
 #documentation
@@ -40,6 +42,7 @@
 #  | ```ruby
 #  | Z (T.untyped)
 #  | ```
+#          ^^^^^^ reference [..] String#freeze().
    A = %w[X Y Z].freeze
 #  ^ definition [..] M#A.
 #  documentation
