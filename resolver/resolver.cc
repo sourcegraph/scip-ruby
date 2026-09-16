@@ -2472,6 +2472,13 @@ class ResolveTypeMembersAndFieldsWalk {
             return false;
         }
 
+        if (gs.isSCIPRuby && job.cast->cast == core::Names::syntheticBind() && core::isa_type<core::SelfType>(type)) {
+            // Minitest keeps captured example bodies as blocks, but they run
+            // on instances. Resolve its synthetic self binding before static
+            // initializers are created, when the owner is the instance class.
+            type = ctx.owner.enclosingClass(gs).data(gs)->selfType(gs);
+        }
+
         job.cast->type = move(type);
 
         if (auto *kernelLambda = isKernelProcOrLambda(job.cast->arg)) {

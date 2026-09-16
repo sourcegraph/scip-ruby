@@ -149,6 +149,10 @@
 #  ^^^^^^^^^ reference [..] Minitest#`<Class:Spec>`#test_each().
 #                     ^^^^^^ definition local 1$1969966160
 #                     ^^^^^^ definition local 1$2433650648
+#                     ^^^^^^ definition local 1$2465397301
+#                     ^^^^^^ definition local 1$3117968889
+#                     ^^^^^^ definition local 1$3610460969
+#                     ^^^^^^ definition local 1$620777916
      describe("parameterized helpers") do
 #      ⌄ enclosing_range_start [..] CustomerSpec#ordinary().
        let(:ordinary) { Customer.new.name }

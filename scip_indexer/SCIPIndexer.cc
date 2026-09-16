@@ -1685,8 +1685,8 @@ public:
         return true;
     }
     std::string_view cacheKey() const override {
-        // Preserve closure scopes, DSL calls, and desugared block_given? calls.
-        return "scip-ruby:5";
+        // Include captured describe declarations in cached trees.
+        return "scip-ruby:12";
     }
 
     virtual void typecheckClass(const core::GlobalState &gs, core::FileRef file,

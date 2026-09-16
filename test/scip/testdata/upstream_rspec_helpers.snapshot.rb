@@ -151,8 +151,12 @@
  
    test_each([1]) do |unused|
 #  ^^^^^^^^^ reference [..] RSpec#Core#`<Class:ExampleGroup>`#test_each().
+#                     ^^^^^^ definition local 1$1322963360
 #                     ^^^^^^ definition local 1$1432872668
+#                     ^^^^^^ definition local 1$2619393233
 #                     ^^^^^^ definition local 1$2970130940
+#                     ^^^^^^ definition local 1$2972872101
+#                     ^^^^^^ definition local 1$3614200013
      describe("parameterized helpers") do
 #      ⌄ enclosing_range_start [..] `<describe 'Customer'>`#ordinary().
        let(:ordinary) { Customer.new.name }
