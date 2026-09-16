@@ -55,7 +55,7 @@ public:
         return H::combine(std::move(h), x.selfOrOwner, x.name);
     }
 
-    static UntypedGenericSymbolRef methodOrClassOrModule(sorbet::core::SymbolRef sym) {
+    static UntypedGenericSymbolRef symbol(sorbet::core::SymbolRef sym) {
         ENFORCE(sym.exists());
         return UntypedGenericSymbolRef(sym, {});
     }
@@ -103,6 +103,7 @@ public:
         ClassOrModule,
         Field,
         Method,
+        Type,
     };
 
 private:
@@ -119,6 +120,10 @@ private:
                 return;
             case Kind::Method:
                 ENFORCE(s.isMethod());
+                ENFORCE(!n.exists());
+                return;
+            case Kind::Type:
+                ENFORCE(s.isTypeMember() || s.isTypeParameter() || s.isFieldOrStaticField());
                 ENFORCE(!n.exists());
         }
     }
@@ -154,6 +159,10 @@ public:
         return GenericSymbolRef(self, {}, {}, Kind::Method);
     }
 
+    static GenericSymbolRef typeSymbol(core::SymbolRef self) {
+        return GenericSymbolRef(self, {}, {}, Kind::Type);
+    }
+
     core::TypePtr definitionType() const {
         return this->_definitionType;
     }
@@ -164,6 +173,9 @@ public:
         }
         if (this->selfOrOwner.isMethod()) {
             return Kind::Method;
+        }
+        if (!this->selfOrOwner.isClassOrModule()) {
+            return Kind::Type;
         }
         return Kind::ClassOrModule;
     }
@@ -185,9 +197,10 @@ public:
             case Kind::Field:
                 ENFORCE(this->selfOrOwner.isClassOrModule());
                 return UntypedGenericSymbolRef::field(this->selfOrOwner.asClassOrModuleRef(), this->name);
+            case Kind::Type:
             case Kind::Method:
             case Kind::ClassOrModule:
-                return UntypedGenericSymbolRef::methodOrClassOrModule(this->selfOrOwner);
+                return UntypedGenericSymbolRef::symbol(this->selfOrOwner);
         }
     }
 
@@ -207,6 +220,7 @@ public:
         switch (this->kind()) {
             case Kind::Field:
                 return false;
+            case Kind::Type:
             case Kind::ClassOrModule:
             case Kind::Method:
                 return isSorbetInternal(gs, this->asSymbolRef());

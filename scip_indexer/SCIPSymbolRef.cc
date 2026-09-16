@@ -98,7 +98,7 @@ utils::Result UntypedGenericSymbolRef::symbolForExpr(const core::GlobalState &gs
             case core::SymbolRef::Kind::FieldOrStaticField:
                 descriptor.set_suffix(scip::Descriptor::Term);
                 break;
-            case core::SymbolRef::Kind::TypeMember: // TODO: What does TypeMember mean?
+            case core::SymbolRef::Kind::TypeMember:
                 descriptor.set_suffix(scip::Descriptor::Type);
                 break;
             default:
@@ -172,6 +172,8 @@ string GenericSymbolRef::showRaw(const core::GlobalState &gs) const {
             return fmt::format("ClassOrModule {}", this->selfOrOwner.showFullName(gs));
         case Kind::Method:
             return fmt::format("Method {}", this->selfOrOwner.showFullName(gs));
+        case Kind::Type:
+            return fmt::format("Type {}", this->selfOrOwner.showFullName(gs));
     }
 }
 
@@ -203,6 +205,20 @@ void GenericSymbolRef::saveDocStrings(const core::GlobalState &gs, core::TypePtr
             auto name = this->name.show(gs);
             checkType(fieldType, name);
             markdown = fmt::format("{} ({})", name, fieldType.show(gs));
+            break;
+        }
+        case Kind::Type: {
+            auto sym = this->selfOrOwner;
+            if (sym.isTypeAlias(gs)) {
+                markdown =
+                    fmt::format("{} = T.type_alias {{ {} }}", sym.name(gs).show(gs), sym.resultType(gs).show(gs));
+            } else if (sym.isTypeParameter()) {
+                markdown = fmt::format("T.type_parameter({})", sym.name(gs).showAsSymbolLiteral(gs));
+            } else {
+                auto owner = sym.owner(gs).asClassOrModuleRef();
+                auto keyword = owner.data(gs)->isSingletonClass(gs) ? "type_template" : "type_member";
+                markdown = fmt::format("{} = {}", sym.name(gs).show(gs), keyword);
+            }
             break;
         }
         case Kind::ClassOrModule: {
@@ -252,6 +268,7 @@ core::Loc GenericSymbolRef::symbolLoc(const core::GlobalState &gs) const {
             }
             return method->nameLoc;
         }
+        case Kind::Type:
         case Kind::ClassOrModule:
             return this->selfOrOwner.loc(gs);
         case Kind::Field:

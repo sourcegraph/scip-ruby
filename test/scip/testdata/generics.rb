@@ -1,6 +1,7 @@
 # typed: true
+# check-errors: true
 
-# Exercises the TypeArgument / TypeMember descriptor branches in
+# Exercises the TypeParameter / TypeMember descriptor branches in
 # scip_indexer/SCIPSymbolRef.cc symbolForExpr (Descriptor::TypeParameter,
 # Descriptor::Type).
 

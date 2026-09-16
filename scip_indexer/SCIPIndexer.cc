@@ -538,6 +538,7 @@ public:
         SmallVec<string> overrideDocs{};
         using Kind = GenericSymbolRef::Kind;
         switch (symRef.kind()) {
+            case Kind::Type:
             case Kind::ClassOrModule:
             case Kind::Method:
                 break;
@@ -633,6 +634,138 @@ string format_ancestry(const core::GlobalState &gs, core::SymbolRef sym) {
     return out.str();
 }
 
+// Type expressions survive in the resolved AST even when CFG optimization drops
+// their aliases. Collect them once per file, preserving the resolver's identities
+// instead of treating type declarations as control-flow locals.
+bool isTypeSymbol(const core::GlobalState &gs, core::SymbolRef sym) {
+    return sym.exists() && (sym.isTypeMember() || sym.isTypeParameter() || sym.isTypeAlias(gs));
+}
+
+class TypeSymbolCollector final {
+    SCIPState &state;
+    UnorderedSet<const ast::ConstantLit *> definitions;
+    UnorderedSet<pair<core::SymbolRef, core::LocOffsets>> emittedDefinitions;
+    UnorderedMap<const ast::Send *, core::MethodRef> signatureMethods;
+    vector<core::MethodRef> signatureStack;
+
+    static core::LocOffsets parameterLoc(core::Context ctx, core::NameRef name, core::LocOffsets loc) {
+        auto text = name.shortName(ctx);
+        // RBS generates symbol literals with an empty location at the start of
+        // the type token. Recover only that known name, within the source file.
+        if (loc.exists() && loc.empty() && ctx.state.cacheSensitiveOptions.rbsEnabled &&
+            loc.beginPos() + text.size() <= ctx.file.data(ctx).source().size()) {
+            auto token = core::LocOffsets{loc.beginPos(), loc.beginPos() + static_cast<uint32_t>(text.size())};
+            if (ctx.locAt(token).source(ctx) == text) {
+                return token;
+            }
+        }
+        auto source = ctx.locAt(loc).source(ctx);
+        if (!source || source->empty()) {
+            return core::LocOffsets::none();
+        }
+        if (*source == text) { // RBS parameter token.
+            return loc;
+        }
+        if (*source == absl::StrCat(":", text)) {
+            return {loc.beginPos() + 1, loc.endPos()};
+        }
+        if (*source == absl::StrCat(":\"", text, "\"") || *source == absl::StrCat(":'", text, "'")) {
+            return {loc.beginPos() + 2, loc.endPos() - 1};
+        }
+        return core::LocOffsets::none();
+    }
+
+    void define(core::Context ctx, core::SymbolRef sym, core::LocOffsets loc) {
+        if (!loc.exists() || loc.empty() || !emittedDefinitions.emplace(sym, loc).second) {
+            return;
+        }
+        auto status = state.saveDefinition(ctx, ctx.file, GenericSymbolRef::typeSymbol(sym), nullopt, loc);
+        ENFORCE(status.ok());
+    }
+
+public:
+    explicit TypeSymbolCollector(SCIPState &state) : state(state) {}
+
+    void preTransformClassDef(core::Context ctx, const ast::ClassDef &klass) {
+        // Flatten keeps signatures adjacent to their methods. Associate each sig
+        // with its resolved method before visiting its type_parameter calls.
+        vector<const ast::Send *> sigs;
+        for (const auto &stat : klass.rhs) {
+            if (auto send = ast::cast_tree<ast::Send>(stat);
+                send && send->fun == core::Names::sig() && send->hasBlock()) {
+                sigs.push_back(send);
+            } else if (auto method = ast::cast_tree<ast::MethodDef>(stat)) {
+                for (auto sig : sigs) {
+                    signatureMethods.emplace(sig, method->symbol);
+                }
+                sigs.clear();
+            }
+        }
+    }
+
+    // ConstTreeWalk's direct ClassDef entry point calls both class hooks.
+    void postTransformClassDef(core::Context ctx, const ast::ClassDef &klass) {}
+
+    void preTransformMethodDef(core::Context ctx, const ast::MethodDef &method) {
+        for (auto param : method.symbol.data(ctx)->typeParameters()) {
+            auto loc = param.data(ctx)->loc();
+            if (loc.file() == ctx.file) {
+                define(ctx, param, parameterLoc(ctx, param.data(ctx)->name, loc.offsets()));
+            }
+        }
+    }
+
+    void preTransformAssign(core::Context ctx, const ast::Assign &assign) {
+        auto constant = ast::cast_tree<ast::ConstantLit>(assign.lhs);
+        if (constant && isTypeSymbol(ctx, constant->symbol())) {
+            definitions.insert(constant);
+            define(ctx, constant->symbol(), constant->loc());
+        }
+    }
+
+    void postTransformConstantLit(core::Context ctx, const ast::ConstantLit &constant) {
+        if (isTypeSymbol(ctx, constant.symbol()) && !definitions.contains(&constant) && constant.loc().exists() &&
+            !constant.loc().empty()) {
+            auto status = state.saveReference(ctx, GenericSymbolRef::typeSymbol(constant.symbol()), nullopt,
+                                              constant.loc(), scip::SymbolRole::ReadAccess);
+            ENFORCE(status.ok());
+        }
+    }
+
+    void preTransformSend(core::Context ctx, const ast::Send &send) {
+        if (auto it = signatureMethods.find(&send); it != signatureMethods.end()) {
+            signatureStack.push_back(it->second);
+        }
+    }
+
+    void postTransformSend(core::Context ctx, const ast::Send &send) {
+        auto recv = ast::cast_tree<ast::ConstantLit>(send.recv);
+        if (send.fun == core::Names::typeParameter() && recv && recv->symbol() == core::Symbols::T() &&
+            send.numPosArgs() == 1 && !send.hasKwArgs()) {
+            auto arg = ast::cast_tree<ast::Literal>(send.getPosArg(0));
+            auto owner = signatureStack.empty() ? ctx.owner : core::SymbolRef(signatureStack.back());
+            if (arg && arg->isSymbol() && owner.isMethod()) {
+                auto name = arg->asSymbol();
+                for (auto param : owner.asMethodRef().data(ctx)->typeParameters()) {
+                    if (param.data(ctx)->name.shortName(ctx) != name.shortName(ctx)) {
+                        continue;
+                    }
+                    auto loc = parameterLoc(ctx, name, arg->loc);
+                    if (loc.exists() && !loc.empty()) {
+                        auto status = state.saveReference(ctx, GenericSymbolRef::typeSymbol(param), nullopt, loc,
+                                                          scip::SymbolRole::ReadAccess);
+                        ENFORCE(status.ok());
+                    }
+                    break;
+                }
+            }
+        }
+        if (signatureMethods.contains(&send)) {
+            signatureStack.pop_back();
+        }
+    }
+};
+
 // Loosely inspired by AliasesAndKeywords in IREmitterContext.cc
 class AliasMap final {
 public:
@@ -668,6 +801,10 @@ public:
                         "Overwriting an entry in the aliases map");
                 auto sym = instr->what;
                 if (!sym.exists() || sym == core::Symbols::Magic()) {
+                    continue;
+                }
+                if (isTypeSymbol(gs, sym)) {
+                    this->map.insert({bind.bind.variable, {GenericSymbolRef::typeSymbol(sym), bind.loc, true}});
                     continue;
                 }
                 if (sym == core::Symbols::Magic_undeclaredFieldStub()) {
@@ -1065,6 +1202,10 @@ private:
             return false;
         }
         auto symRef = this->aliasMap.try_consume(localRef);
+        if (symRef && symRef->first.kind() == GenericSymbolRef::Kind::Type) {
+            // TypeSymbolCollector emits these directly from the resolved AST.
+            return false;
+        }
         if (!symRef.has_value() && isTemporary(ctx.state, localVar)) {
             return false;
         }
@@ -1301,6 +1442,9 @@ public:
             auto symRef = this->aliasMap.try_consume(arg.variable);
             ENFORCE(symRef.has_value());
             auto [namedSym, _] = symRef.value();
+            if (namedSym.kind() == GenericSymbolRef::Kind::Type) {
+                return true;
+            }
             auto isDefinition =
                 isMethodFileStaticInit ||
                 (namedSym.kind() != GenericSymbolRef::Kind::Field &&
@@ -1761,7 +1905,15 @@ public:
 
     virtual void typecheckClass(const core::GlobalState &gs, core::FileRef file,
                                 const ast::ClassDef &klass) const override {
-        if (this->doNothing() || ast::isa_tree<ast::EmptyTree>(klass.name)) {
+        if (this->doNothing()) {
+            return;
+        }
+        if (klass.symbol == core::Symbols::root()) {
+            auto scipState = this->getSCIPState();
+            scip_indexer::TypeSymbolCollector collector(*scipState);
+            ast::ConstTreeWalk::apply(core::Context(gs, klass.symbol, file), collector, klass);
+        }
+        if (ast::isa_tree<ast::EmptyTree>(klass.name)) {
             return;
         }
         auto nameLoc = klass.name.loc();
