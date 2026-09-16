@@ -129,10 +129,17 @@ TypePtr lubDistributeOr(const GlobalState &gs, const TypePtr &t1, const TypePtr 
             typesConsumed.emplace_back(component);
         }
     }
+    // SCIP-only: keep shapes precise when adding them to a union, as lub does for non-union operands.
+    // glb also uses this helper to rebuild distributed intersections; widening a shape to Hash[untyped]
+    // there can produce a result that is no longer a subtype of the original shape-containing union.
+    auto unionWithT2 = [&](const TypePtr &other) {
+        auto component = gs.isSCIPRuby && isa_type<ShapeType>(t2) ? t2 : underlying(gs, t2);
+        return OrType::make_shared(other, component);
+    };
     if (typesConsumed.empty()) {
         // t1 has no components that overlap with t2
         categoryCounterInc("lubDistributeOr.outcome", "worst");
-        return OrType::make_shared(t1, underlying(gs, t2));
+        return unionWithT2(t1);
     }
     // lub back everything except typesConsumed
     auto remainingTypes = filterOrComponents(t1, typesConsumed);
@@ -142,7 +149,7 @@ TypePtr lubDistributeOr(const GlobalState &gs, const TypePtr &t1, const TypePtr 
         return t2;
     }
     categoryCounterInc("lubDistributeOr.outcome", "consumedComponent");
-    return OrType::make_shared(move(remainingTypes), underlying(gs, t2));
+    return unionWithT2(remainingTypes);
 }
 
 TypePtr glbDistributeAnd(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) {

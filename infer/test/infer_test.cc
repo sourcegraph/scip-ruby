@@ -131,6 +131,60 @@ TEST_CASE("Infer") {
         CHECK(core::Types::equiv(gs, joined, core::Types::any(gs, general, nilable)));
     }
 
+    SUBCASE("ShapeUnionLubs") {
+        core::UnfreezeNameTable names(gs);
+        auto label = core::make_type<core::NamedLiteralType>(core::Symbols::Symbol(), gs.enterNameUTF8("label"));
+        auto text = core::make_type<core::NamedLiteralType>(core::Symbols::String(), gs.enterNameUTF8("sample"));
+        auto shape = core::make_type<core::ShapeType>(vector<core::TypePtr>{label},
+                                                      vector<core::TypePtr>{core::Types::String()});
+        auto narrowShape = core::make_type<core::ShapeType>(vector<core::TypePtr>{label}, vector<core::TypePtr>{text});
+        auto common = core::Types::any(gs, core::Types::Integer(), core::Types::Symbol());
+        auto overlapping = core::Types::any(gs, core::Types::Integer(), narrowShape);
+
+        for (auto scipMode : {false, true}) {
+            gs.isSCIPRuby = scipMode;
+            CAPTURE(scipMode);
+            auto shapeInUnion = scipMode ? shape : shape.underlying(gs);
+            for (auto &other : {common, overlapping}) {
+                CAPTURE(other.toString(gs));
+                auto expected = core::Types::any(gs, core::Types::Integer(), shapeInUnion);
+                if (other == common) {
+                    expected = core::Types::any(gs, expected, core::Types::Symbol());
+                }
+                auto joined = core::Types::any(gs, other, shape);
+                CHECK(core::Types::equiv(gs, joined, expected));
+                CHECK(core::Types::equiv(gs, core::Types::any(gs, shape, other), expected));
+                CHECK(core::Types::isSubType(gs, other, joined));
+                CHECK(core::Types::isSubType(gs, shape, joined));
+            }
+        }
+    }
+
+    SUBCASE("SCIPShapeUnionGlb") {
+        gs.isSCIPRuby = true;
+        core::UnfreezeNameTable names(gs);
+        core::UnfreezeSymbolTable symbols(gs);
+        // initEmpty does not load Hash's generic parameters from the RBI payload.
+        for (auto name : {"K", "V", "Elem"}) {
+            auto member = gs.enterTypeMember(core::Loc::none(), core::Symbols::Hash(), gs.enterNameConstant(name),
+                                             core::Variance::CoVariant);
+            member.data(gs)->resultType =
+                core::make_type<core::LambdaParam>(member, core::Types::bottom(), core::Types::top());
+        }
+        auto label = core::make_type<core::NamedLiteralType>(core::Symbols::Symbol(), gs.enterNameUTF8("label"));
+        auto shape = core::make_type<core::ShapeType>(vector<core::TypePtr>{label},
+                                                      vector<core::TypePtr>{core::Types::String()});
+        auto common = core::Types::any(gs, core::Types::Integer(), core::Types::Symbol());
+        auto precise = core::Types::any(gs, core::Types::any(gs, core::Types::Integer(), shape), core::Types::Symbol());
+        auto general = core::Types::any(gs, common, core::Types::hashOf(gs, core::Types::String()));
+
+        auto intersection = core::Types::all(gs, general, precise);
+        CHECK(core::Types::equiv(gs, intersection, precise));
+        CHECK(core::Types::isSubType(gs, intersection, precise));
+        CHECK(core::Types::isSubType(gs, intersection, general));
+        CHECK(core::Types::equiv(gs, intersection, core::Types::all(gs, precise, general)));
+    }
+
     SUBCASE("ClassesSubtyping") {
         processSource(gs, "class Bar; end; class Foo < Bar; end");
         const auto &rootScope = core::Symbols::root().data(gs);
