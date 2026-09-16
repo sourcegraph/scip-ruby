@@ -496,10 +496,18 @@ public:
                                          const ast::ExpressionPtr &constantLitExpr) {
         auto *expr = &constantLitExpr;
         while (auto constantLit = ast::cast_tree<ast::ConstantLit>(*expr)) {
-            if (constantLit->symbol().exists() && constantLit->symbol().asClassOrModuleRef().exists()) {
-                core::Context ctx(gs, constantLit->symbol(), file);
-                auto status = this->saveReference(ctx, GenericSymbolRef::classOrModule(constantLit->symbol()),
-                                                  /*overrideType*/ std::nullopt, constantLit->loc(), 0);
+            auto symbol = constantLit->symbol();
+            optional<GenericSymbolRef> symRef;
+            if (symbol.exists() && symbol.isClassOrModule()) {
+                symRef = GenericSymbolRef::classOrModule(symbol);
+            } else if (symbol.exists() && symbol.isFieldOrStaticField()) {
+                auto field = symbol.asFieldRef().data(gs);
+                symRef = GenericSymbolRef::field(field->owner, field->name, field->resultType);
+            }
+            if (symRef.has_value()) {
+                core::Context ctx(gs, symbol, file);
+                auto status =
+                    this->saveReference(ctx, symRef.value(), /*overrideType*/ std::nullopt, constantLit->loc(), 0);
                 if (!status.ok()) {
                     return status;
                 }

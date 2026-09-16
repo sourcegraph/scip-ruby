@@ -1,4 +1,5 @@
  # typed: true
+ # check-errors: true
  
  # 3+-level constant qualifier walks in class names, ancestors, and references.
  # Exercises the recursion in saveQualifierReferences.
@@ -53,6 +54,23 @@
 #                                                        ^^^^ reference [..] Outer#Inner#Deep#Base#
  end
 #  ⌃ enclosing_range_end [..] Outer#Inner#Deep#Derived#
+ 
+ # Constant aliases are fields in Sorbet's symbol table, even when they refer
+ # to classes.
+ AliasedBase = Outer::Inner::Deep::Base
+#^^^^^^^^^^^ definition [..] AliasedBase.
+#relation reference=[..] Outer#Inner#Deep#Base#
+#              ^^^^^ reference [..] Outer#
+#                     ^^^^^ reference [..] Outer#Inner#
+#                            ^^^^ reference [..] Outer#Inner#Deep#
+#                                  ^^^^ reference [..] Outer#Inner#Deep#Base#
+ 
+#⌄ enclosing_range_start [..] DerivedThroughAlias#
+ class DerivedThroughAlias < AliasedBase
+#      ^^^^^^^^^^^^^^^^^^^ definition [..] DerivedThroughAlias#
+#                            ^^^^^^^^^^^ reference [..] AliasedBase.
+ end
+#  ⌃ enclosing_range_end [..] DerivedThroughAlias#
  
  # Qualified include in an ancestor expression.
 #⌄ enclosing_range_start [..] WithDeepMixin#

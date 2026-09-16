@@ -1,4 +1,5 @@
 # typed: true
+# check-errors: true
 
 # 3+-level constant qualifier walks in class names, ancestors, and references.
 # Exercises the recursion in saveQualifierReferences.
@@ -21,6 +22,13 @@ end
 
 # 4-level qualifier in class header and in superclass position.
 class Outer::Inner::Deep::Derived < Outer::Inner::Deep::Base
+end
+
+# Constant aliases are fields in Sorbet's symbol table, even when they refer
+# to classes.
+AliasedBase = Outer::Inner::Deep::Base
+
+class DerivedThroughAlias < AliasedBase
 end
 
 # Qualified include in an ancestor expression.
