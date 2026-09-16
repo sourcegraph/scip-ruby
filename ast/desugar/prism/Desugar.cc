@@ -679,8 +679,15 @@ ast::ExpressionPtr Desugarer::desugarConditionalSend(core::LocOffsets location, 
     auto methodName = translateConstantName(methodNameID);
     auto methodNameLoc = translateLoc(methodNamePrismLoc);
 
+    // SCIP needs the receiver's source range on both branches: CFG dealiasing
+    // can replace the temporary with the original local.
+    auto scipRecvLoc = ctx.state.isSCIPRuby ? receiverExpr.loc() : recvLoc0;
+    if (ctx.state.isSCIPRuby) {
+        csendLoc = scipRecvLoc;
+    }
+
     // $temp = receiverExpr
-    auto assignment = MK::Assign(recvLoc0, receiverTempLocalVarName, move(receiverExpr));
+    auto assignment = MK::Assign(scipRecvLoc, receiverTempLocalVarName, move(receiverExpr));
 
     // Just compare with `NilClass` to avoid potentially calling into a class-defined `==`
     auto cond = MK::Send1(loc0, ast::MK::Constant(recvLoc0, core::Symbols::NilClass()), core::Names::tripleEq(),
@@ -691,7 +698,7 @@ ast::ExpressionPtr Desugarer::desugarConditionalSend(core::LocOffsets location, 
         MK::Send1(recvLoc.copyEndWithZeroLength(), MK::Magic(loc0), core::Names::nilForSafeNavigation(), loc0,
                   MK::Local(csendLoc, receiverTempLocalVarName));
 
-    auto receiverTempLocal = MK::Local(recvLoc0, receiverTempLocalVarName);
+    auto receiverTempLocal = MK::Local(scipRecvLoc, receiverTempLocalVarName);
 
     auto elseBody = body(move(receiverTempLocal), location, methodName, methodNameLoc);
 

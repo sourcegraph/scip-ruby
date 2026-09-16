@@ -1545,7 +1545,14 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
                     }
                 }
 
-                auto assgn = MK::Assign(zeroLengthRecvLoc, tempRecv, node2TreeImpl(dctx, csend->receiver));
+                // SCIP needs the receiver's source range on both branches: CFG
+                // dealiasing can replace the temporary with the original local.
+                auto receiver = node2TreeImpl(dctx, csend->receiver);
+                auto scipRecvLoc = dctx.ctx.state.isSCIPRuby ? receiver.loc() : zeroLengthRecvLoc;
+                if (dctx.ctx.state.isSCIPRuby) {
+                    csendLoc = scipRecvLoc;
+                }
+                auto assgn = MK::Assign(scipRecvLoc, tempRecv, move(receiver));
 
                 // Just compare with `NilClass` to avoid potentially calling into a class-defined `==`
                 auto cond =
@@ -1553,8 +1560,8 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
                               core::Names::tripleEq(), zeroLengthRecvLoc, MK::Local(zeroLengthRecvLoc, tempRecv));
 
                 unique_ptr<parser::Node> sendNode =
-                    make_unique<parser::Send>(loc, make_unique<parser::LVar>(zeroLengthRecvLoc, tempRecv),
-                                              csend->method, csend->methodLoc, move(csend->args));
+                    make_unique<parser::Send>(loc, make_unique<parser::LVar>(scipRecvLoc, tempRecv), csend->method,
+                                              csend->methodLoc, move(csend->args));
                 auto send = node2TreeImpl(dctx, sendNode);
 
                 ExpressionPtr nil =

@@ -815,13 +815,7 @@ core::LocOffsets computeMethodLoc(core::Context ctx, const cfg::Send &send) {
     return explicitLoc.source(ctx) == "[]=" ? explicitLoc.offsets() : bracketLoc.offsets();
 }
 
-core::ClassOrModuleRef computeReceiver(const core::GlobalState &gs, const cfg::Send &send, core::LocOffsets funLoc) {
-    auto recvType = send.recv.type;
-    // TODO(varun): When is the isTemporary check going to succeed?
-    if (!recvType || !send.fun.exists() || !funLoc.exists() || funLoc.empty() ||
-        isTemporary(gs, core::LocalVariable(send.fun, 1))) {
-        return core::ClassOrModuleRef();
-    }
+core::ClassOrModuleRef computeReceiver(const core::GlobalState &gs, core::TypePtr recvType, core::NameRef fun) {
     // Literal values dispatch to methods on their underlying class. Only widen
     // this lookup type, preserving the inferred literal type for hover information.
     recvType = core::Types::dropLiteral(gs, recvType);
@@ -836,7 +830,7 @@ core::ClassOrModuleRef computeReceiver(const core::GlobalState &gs, const cfg::S
         // as well as for class method calls. E.g.
         // XYZ::MyKlass.myKlassMethod
         auto recv = core::cast_type_nonnull<core::AppliedType>(recvType).klass;
-        if (recv.exists() && send.fun == core::Names::call()) {
+        if (recv.exists() && fun == core::Names::call()) {
             // Special case to mimic code navigation from rewriter/Command.cc
             // See associated test call.rb for details as well as GRAPH-895.
             auto recvAttached = recv.data(gs)->attachedClass(gs);
@@ -1035,6 +1029,30 @@ private:
         return true;
     }
 
+    void emitMethodReference(core::TypePtr recvType, core::NameRef fun, core::LocOffsets funLoc) {
+        auto &gs = ctx.state;
+        if (!recvType || !fun.exists() || !funLoc.exists() || funLoc.empty() ||
+            isTemporary(gs, core::LocalVariable(fun, 1))) {
+            return;
+        }
+        if (auto unionType = core::cast_type<core::OrType>(recvType)) {
+            // A union call can refer to multiple implementations. saveReference
+            // deduplicates methods inherited by more than one receiver branch.
+            emitMethodReference(unionType->left, fun, funLoc);
+            emitMethodReference(unionType->right, fun, funLoc);
+            return;
+        }
+        auto recv = computeReceiver(gs, recvType, fun);
+        if (!recv.exists()) {
+            return;
+        }
+        auto funSym = recv.data(gs)->findMethodTransitive(gs, fun);
+        if (funSym.exists()) {
+            auto status = this->scipState.saveReference(ctx, GenericSymbolRef::method(funSym), nullopt, funLoc, 0);
+            ENFORCE(status.ok());
+        }
+    }
+
     void copyLocalsFromParents(cfg::BasicBlock *bb, const cfg::CFG &cfg) {
         UnorderedSet<cfg::LocalRef> bbLocals{};
         for (auto parentBB : bb->backEdges) {
@@ -1134,8 +1152,7 @@ public:
                 };
                 switch (binding.value.tag()) {
                     case cfg::Tag::Ident: {
-                        if (isStaticInit &&
-                            binding.bind.variable.data(cfg)._name == core::Names::returnMethodTemp()) {
+                        if (isStaticInit && binding.bind.variable.data(cfg)._name == core::Names::returnMethodTemp()) {
                             break;
                         }
                         auto ident = cfg::cast_instruction<cfg::Ident>(binding.value);
@@ -1154,20 +1171,7 @@ public:
                         }
 
                         // Emit reference for the method being called
-                        auto funLoc = computeMethodLoc(ctx, *send);
-                        auto recv = computeReceiver(gs, *send, funLoc);
-                        if (recv.exists()) {
-                            auto funSym = recv.data(gs)->findMethodTransitive(gs, send->fun);
-                            auto funName = send->fun.showRaw(gs);
-                            if (funSym.exists()) {
-                                // TODO(varun): For arrays, hashes etc., try to identify if the function
-                                // matches a known operator (e.g. []=), and emit an appropriate
-                                // 'WriteAccess' symbol role for it.
-                                auto status = this->scipState.saveReference(ctx, GenericSymbolRef::method(funSym),
-                                                                            nullopt, funLoc, 0);
-                                ENFORCE(status.ok());
-                            }
-                        }
+                        this->emitMethodReference(send->recv.type, send->fun, computeMethodLoc(ctx, *send));
 
                         // Emit references for arguments
                         for (uint32_t i = 0; i < send->numArgs; ++i) {
