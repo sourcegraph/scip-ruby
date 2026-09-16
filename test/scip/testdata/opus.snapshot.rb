@@ -24,6 +24,7 @@
 #                                    ^^^^^^^ reference [..] Opus#Derived#
 #                                                 ^ reference [..] T#
 #                                                    ^^^^ reference [..] T#Hash#
+#                                                        ^ reference [..] T#`<Class:Hash>`#`[]`().
 #                                                         ^^^^^^ reference [..] Symbol#
 #                                                                 ^ reference [..] T#
 #                                                                   ^^^^ reference [..] `<Class:T>`#proc().

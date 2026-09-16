@@ -96,6 +96,7 @@
 #                         ^^^^^^^^ reference local 1$2300378703
 #                                    ^ reference [..] T#
 #                                       ^^^^^ reference [..] T#Array#
+#                                            ^ reference [..] T#`<Class:Array>`#`[]`().
 #                                             ^^^^^^^^ reference [..] Customer#
        customers.map do |customer|
 #      ^^^^^^^^^ reference local 5$2300378703

@@ -804,20 +804,42 @@ optional<core::TypePtr> computeOverrideType(core::TypePtr definitionType, core::
     return {newType};
 }
 
-core::LocOffsets computeMethodLoc(core::Context ctx, const cfg::Send &send) {
-    auto loc = send.funLoc;
-    if (!loc.exists() || !loc.empty() || send.fun != core::Names::squareBracketsEq()) {
+core::LocOffsets computeMethodLoc(core::Context ctx, core::NameRef fun, core::LocOffsets loc) {
+    if (!loc.exists() || !loc.empty() ||
+        (fun != core::Names::squareBrackets() && fun != core::Names::squareBracketsEq())) {
         return loc;
     }
-    // Indexed assignments use a zero-length method location for diagnostics. Give
+    // Indexed calls use a zero-length method location for diagnostics. Give
     // SCIP a navigable range on the opening bracket without changing that location.
     auto bracketLoc = ctx.locAt(loc).adjustLen(ctx, 0, 1);
     if (bracketLoc.source(ctx) != "[") {
         return loc;
     }
     // Prism also uses a zero-length location for explicit calls like hash.[]=(...).
-    auto explicitLoc = ctx.locAt(loc).adjustLen(ctx, 0, 3);
-    return explicitLoc.source(ctx) == "[]=" ? explicitLoc.offsets() : bracketLoc.offsets();
+    string_view methodName = fun == core::Names::squareBracketsEq() ? "[]=" : "[]";
+    auto explicitLoc = ctx.locAt(loc).adjustLen(ctx, 0, methodName.size());
+    return explicitLoc.source(ctx) == methodName ? explicitLoc.offsets() : bracketLoc.offsets();
+}
+
+core::LocOffsets computeWrappedMethodLoc(core::Context ctx, const cfg::Send &send, core::NameRef fun) {
+    // Block passes and splats lower to Magic calls whose first two arguments are
+    // the real receiver and method name. Ordinary calls retain the method's funLoc;
+    // &:method retains the symbol literal's location, including its delimiters.
+    auto loc = send.argLocs()[1];
+    auto source = ctx.locAt(loc).source(ctx);
+    if (!source.has_value() || source->size() < 2 || source->front() != ':') {
+        return computeMethodLoc(ctx, fun, send.funLoc);
+    }
+    auto begin = loc.beginPos() + 1;
+    auto end = loc.endPos();
+    if ((*source)[1] == '\'' || (*source)[1] == '"') {
+        if (source->size() < 4 || source->back() != (*source)[1]) {
+            return core::LocOffsets::none();
+        }
+        ++begin;
+        --end;
+    }
+    return core::LocOffsets{begin, end};
 }
 
 core::ClassOrModuleRef computeReceiver(const core::GlobalState &gs, core::TypePtr recvType, core::NameRef fun) {
@@ -1176,7 +1198,19 @@ public:
                         }
 
                         // Emit reference for the method being called
-                        this->emitMethodReference(send->recv.type, send->fun, computeMethodLoc(ctx, *send));
+                        if ((send->fun == core::Names::callWithSplat() ||
+                             send->fun == core::Names::callWithBlockPass() ||
+                             send->fun == core::Names::callWithSplatAndBlockPass()) &&
+                            send->numArgs >= 2 && core::isa_type<core::NamedLiteralType>(send->argTypes()[1])) {
+                            auto symbol = core::cast_type_nonnull<core::NamedLiteralType>(send->argTypes()[1]);
+                            if (symbol.kind == core::NamedLiteralType::Kind::Symbol) {
+                                this->emitMethodReference(send->argTypes()[0], symbol.name,
+                                                          computeWrappedMethodLoc(ctx, *send, symbol.name));
+                            }
+                        } else {
+                            this->emitMethodReference(send->recv.type, send->fun,
+                                                      computeMethodLoc(ctx, send->fun, send->funLoc));
+                        }
 
                         // Emit references for arguments
                         for (uint32_t i = 0; i < send->numArgs; ++i) {

@@ -31,10 +31,12 @@
 #      ^^^^^^ reference [..] T#Private#Methods#DeclBuilder#params().
 #                   ^ reference [..] T#
 #                      ^^^^ reference [..] T#Hash#
+#                          ^ reference [..] T#`<Class:Hash>`#`[]`().
 #                           ^^^^^^ reference [..] Symbol#
 #                                   ^^^^^^ reference [..] String#
 #                                                   ^ reference [..] T#
 #                                                      ^^^^^ reference [..] T#Array#
+#                                                           ^ reference [..] T#`<Class:Array>`#`[]`().
 #                                                            ^^^^^^ reference [..] String#
 #                                                                             ^^^^^^^^^^^^^ reference [..] IndexedWriter#
 #                                                                                                   ^^^^^^ reference [..] String#
@@ -64,6 +66,7 @@
 #                      ^^^^^ reference local 4$604258566
    hash[:default] ||= value
 #  ^^^^^^^^^^^^^^ reference local 1$604258566
+#      ^ reference [..] Hash#`[]`().
 #                     ^^^^^ reference local 4$604258566
    hash[
 #  ^^^^ reference local 1$604258566

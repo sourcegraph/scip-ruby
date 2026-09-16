@@ -28,6 +28,7 @@
 #               ^^^ definition local 2$1182647655
 #               ^^^ definition local 3$1182647655
    loopyDoopy(...)
+#  ^^^^^^^^^^ reference [..] Object#loopyDoopy().
 #  ^^^^^^^^^^^^^^^ reference local 3$1182647655
    return
  end
