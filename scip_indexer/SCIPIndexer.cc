@@ -1532,6 +1532,10 @@ public:
     bool isSCIPRuby() const override {
         return true;
     }
+    std::string_view cacheKey() const override {
+        // Version 2 records source ranges and handwritten test-body markers needed after the replay.
+        return "scip-ruby:2";
+    }
 
     virtual void typecheckClass(const core::GlobalState &gs, core::FileRef file,
                                 const ast::ClassDef &klass) const override {

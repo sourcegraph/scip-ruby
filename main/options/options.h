@@ -223,6 +223,7 @@ struct Options {
         }
     };
     CacheSensitiveOptions cacheSensitiveOptions;
+    std::string semanticExtensionCacheKey;
 
     // Enable support experimental method modifiers, such as `abstract def foo; end`
     bool experimentalMethodModifiers = false;

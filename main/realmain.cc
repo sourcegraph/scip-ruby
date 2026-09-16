@@ -491,6 +491,11 @@ int realmain(int argc, char *argv[]) {
 
     logger->trace("building initial global state");
 
+    for (const auto &extension : extensions) {
+        if (!extension->cacheKey().empty()) {
+            absl::StrAppend(&opts.semanticExtensionCacheKey, "|", extension->cacheKey());
+        }
+    }
     unique_ptr<const OwnedKeyValueStore> kvstore = cache::maybeCreateKeyValueStore(logger, opts);
     payload::createInitialGlobalState(*gs, opts, kvstore);
     pipeline::setGlobalStateOptions(*gs, opts);

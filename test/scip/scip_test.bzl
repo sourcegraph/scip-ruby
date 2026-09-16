@@ -55,7 +55,17 @@ def scip_unit_tests():
         data = ["//test:scip_test_runner"],
         size = "small",
     )
-    return ["unit_tests"]
+    native.sh_test(
+        name = "cache",
+        srcs = ["cache_test.sh"],
+        data = [
+            "//main:scip-ruby",
+            "//main:sorbet",
+            "cache_test.rb",
+        ],
+        size = "small",
+    )
+    return ["unit_tests", "cache"]
 
 def scip_test(path):
     if not path.endswith(".rb") or path.endswith(".snapshot.rb"):

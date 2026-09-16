@@ -1,6 +1,7 @@
 #ifndef SORBET_PIPELINE_SEMANTIC_EXTENSION
 #define SORBET_PIPELINE_SEMANTIC_EXTENSION
 #include <memory> // unique_ptr
+#include <string_view>
 #include <vector>
 
 namespace cxxopts {
@@ -29,6 +30,10 @@ class SemanticExtension {
 public:
     virtual bool isSCIPRuby() const {
         return false;
+    }
+    // Versioned identity for cached trees produced by this extension. Change it when rewrites change.
+    virtual std::string_view cacheKey() const {
+        return {};
     }
     virtual void prepareForTypechecking(const core::GlobalState &) = 0;
     virtual void finishTypecheckFile(const core::GlobalState &, const core::FileRef &) const = 0;
