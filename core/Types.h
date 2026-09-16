@@ -1119,8 +1119,20 @@ struct DispatchArgs {
     DispatchArgs withThisRef(const TypePtr &newThisRef) const;
 };
 
-// Retain the method components selected by intersection dispatch for SCIP.
+// SCIP retains call navigation from selected dispatch components instead of
+// repeating argument matching or approximating intersection dispatch.
+struct SCIPKeywordArgument {
+    MethodRef method;
+    NameRef name;
+    LocOffsets loc;
+};
+using SCIPKeywordArguments = InlinedVector<SCIPKeywordArgument, 1>;
+
 struct SCIPDispatchInfo {
+    SCIPKeywordArguments keywordArguments;
+    // Presence marks an intersection in the selected dispatch. Inference fills
+    // the method list before SCIP traverses the CFG; nullopt keeps the existing
+    // method lookup for ordinary receivers.
     std::optional<InlinedVector<MethodRef, 2>> intersectionMethods;
 };
 
@@ -1149,6 +1161,7 @@ struct DispatchComponent {
     ClassOrModuleRef rebind;
     Loc rebindLoc;
     std::unique_ptr<TypeConstraint> constr;
+    // Allocated only for SCIP calls needing retained navigation information.
     std::unique_ptr<SCIPDispatchInfo> scipDispatchInfo;
 };
 
@@ -1163,9 +1176,16 @@ struct DispatchResult {
 
     DispatchResult() = default;
     DispatchResult(TypePtr returnType, TypePtr receiverType, core::MethodRef method)
-        : returnType(returnType),
-          main(DispatchComponent{
-              std::move(receiverType), method, {}, std::move(returnType), nullptr, nullptr, {}, {}, nullptr, nullptr}){};
+        : returnType(returnType), main(DispatchComponent{std::move(receiverType),
+                                                         method,
+                                                         {},
+                                                         std::move(returnType),
+                                                         nullptr,
+                                                         nullptr,
+                                                         {},
+                                                         {},
+                                                         nullptr,
+                                                         nullptr}){};
     DispatchResult(TypePtr returnType, DispatchComponent comp)
         : returnType(std::move(returnType)), main(std::move(comp)){};
     DispatchResult(TypePtr returnType, DispatchComponent comp, std::unique_ptr<DispatchResult> secondary,

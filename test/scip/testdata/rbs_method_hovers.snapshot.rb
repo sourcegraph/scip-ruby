@@ -112,6 +112,16 @@
 #            | ```ruby
 #            | first (String)
 #            | ```
+#                                     ^^^^^^^ definition [..] RBSHovers#mixed().(enabled)
+#                                     documentation
+#                                     | ```ruby
+#                                     | enabled (T::Boolean)
+#                                     | ```
+#                                               ^^^^^ definition [..] RBSHovers#mixed().(label)
+#                                               documentation
+#                                               | ```ruby
+#                                               | label (String)
+#                                               | ```
 #                                                                       ^^^^^^^^^ definition local 2$3845391352
 #                                                                       documentation
 #                                                                       | ```ruby
@@ -161,6 +171,16 @@
 #      | ```
 #      documentation
 #      | : (?String, *Integer, Integer, flag: bool, ?limit: Integer, **String) ?{ -> void } -> void
+#                                             ^^^^ definition [..] RBSHovers#unnamed_mixed().(flag)
+#                                             documentation
+#                                             | ```ruby
+#                                             | flag (T::Boolean)
+#                                             | ```
+#                                                    ^^^^^ definition [..] RBSHovers#unnamed_mixed().(limit)
+#                                                    documentation
+#                                                    | ```ruby
+#                                                    | limit (Integer)
+#                                                    | ```
    end
 #    ⌃ enclosing_range_end [..] RBSHovers#unnamed_mixed().
  
@@ -496,6 +516,8 @@
  hovers.mixed("a", 1, :x, enabled: true, label: "b", x: 2) { |value| value.upcase }
 #^^^^^^ reference local 1$119448696
 #       ^^^^^ reference [..] RBSHovers#mixed().
+#                         ^^^^^^^ reference [..] RBSHovers#mixed().(enabled)
+#                                        ^^^^^ reference [..] RBSHovers#mixed().(label)
 #                                                             ^^^^^ definition local 3$119448696
 #                                                             documentation
 #                                                             | ```ruby
@@ -506,6 +528,7 @@
  hovers.unnamed_mixed("a", 1, 2, flag: true)
 #^^^^^^ reference local 1$119448696
 #       ^^^^^^^^^^^^^ reference [..] RBSHovers#unnamed_mixed().
+#                                ^^^^ reference [..] RBSHovers#unnamed_mixed().(flag)
  hovers.identity(1).abs
 #^^^^^^ reference local 1$119448696
 #       ^^^^^^^^ reference [..] RBSHovers#identity().

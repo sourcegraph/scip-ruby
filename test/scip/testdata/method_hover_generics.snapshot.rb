@@ -293,6 +293,16 @@
 #                 | ```ruby
 #                 | value (String)
 #                 | ```
+#                                          ^^^^ definition [..] `<Class:OrdinaryHovers>`#mixed().(flag)
+#                                          documentation
+#                                          | ```ruby
+#                                          | flag (T::Boolean)
+#                                          | ```
+#                                                 ^^^^^ definition [..] `<Class:OrdinaryHovers>`#mixed().(label)
+#                                                 documentation
+#                                                 | ```ruby
+#                                                 | label (String)
+#                                                 | ```
 #                                                                       ^^^^^ definition local 2$3845391352
 #                                                                       documentation
 #                                                                       | ```ruby
@@ -340,6 +350,7 @@
  OrdinaryHovers.mixed("a", flag: true) { |value| value.upcase }
 #^^^^^^^^^^^^^^ reference [..] OrdinaryHovers#
 #               ^^^^^ reference [..] `<Class:OrdinaryHovers>`#mixed().
+#                          ^^^^ reference [..] `<Class:OrdinaryHovers>`#mixed().(flag)
 #                                         ^^^^^ definition local 7$119448696
 #                                         documentation
 #                                         | ```ruby

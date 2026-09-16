@@ -21,13 +21,13 @@
 #    | sig { params(xyz: String).returns(String) }
 #    | def takes_string(xyz:)
 #    | ```
-#                 ^^^ definition local 1$1854267817
+#                 ^^^ definition [..] Object#takes_string().(xyz)
 #                 documentation
 #                 | ```ruby
 #                 | xyz (String)
 #                 | ```
    xyz
-#  ^^^ reference local 1$1854267817
+#  ^^^ reference [..] Object#takes_string().(xyz)
  end
 #  ⌃ enclosing_range_end [..] Object#takes_string().
  
@@ -40,6 +40,8 @@
  takes_string(xyz:)
 #^^^^^^^^^^^^ reference [..] Object#takes_string().
 #             ^^^ reference local 4$119448696
+#             ^^^ reference [..] Object#takes_string().(xyz)
  takes_string(xyz: xyz)
 #^^^^^^^^^^^^ reference [..] Object#takes_string().
+#             ^^^ reference [..] Object#takes_string().(xyz)
 #                  ^^^ reference local 4$119448696

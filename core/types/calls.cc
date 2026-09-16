@@ -1533,6 +1533,12 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                 if (kwargLocsIt != kwargLocs.end()) {
                     auto [kwKeyLoc, kwValLoc] = kwargLocsIt->second;
                     auto termLoc = core::Loc(args.locs.file, kwKeyLoc);
+                    if (gs.isSCIPRuby) {
+                        if (!component.scipDispatchInfo) {
+                            component.scipDispatchInfo = make_unique<SCIPDispatchInfo>();
+                        }
+                        component.scipDispatchInfo->keywordArguments.push_back({method, kwParam.name, kwKeyLoc});
+                    }
                     if (gs.lspQuery.matchesLoc(termLoc)) {
                         lsp::QueryResponse::pushQueryResponse(gs, args.locs.file,
                                                               lsp::KeywordArgResponse(termLoc, method, kwParam));

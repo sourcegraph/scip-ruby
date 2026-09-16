@@ -66,6 +66,11 @@ public:
         return UntypedGenericSymbolRef(klass, name);
     }
 
+    static UntypedGenericSymbolRef parameter(core::MethodRef method, core::NameRef name) {
+        ENFORCE(method.exists() && name.exists());
+        return UntypedGenericSymbolRef(method, name);
+    }
+
     // Try to compute a scip::Symbol for this value.
     utils::Result symbolForExpr(const core::GlobalState &gs, const GemMapping &gemMap, std::optional<core::Loc> loc,
                                 scip::Symbol &symbol) const;
@@ -103,6 +108,7 @@ public:
         ClassOrModule,
         Field,
         Method,
+        Parameter,
         Type,
     };
 
@@ -121,6 +127,9 @@ private:
             case Kind::Method:
                 ENFORCE(s.isMethod());
                 ENFORCE(!n.exists());
+                return;
+            case Kind::Parameter:
+                ENFORCE(s.isMethod() && n.exists());
                 return;
             case Kind::Type:
                 ENFORCE(s.isTypeMember() || s.isTypeParameter() || s.isFieldOrStaticField());
@@ -159,6 +168,10 @@ public:
         return GenericSymbolRef(self, {}, {}, Kind::Method);
     }
 
+    static GenericSymbolRef parameter(core::MethodRef method, core::NameRef name, core::TypePtr type = nullptr) {
+        return GenericSymbolRef(method, name, type, Kind::Parameter);
+    }
+
     static GenericSymbolRef typeSymbol(core::SymbolRef self) {
         return GenericSymbolRef(self, {}, {}, Kind::Type);
     }
@@ -169,7 +182,7 @@ public:
 
     Kind kind() const {
         if (this->name.exists()) {
-            return Kind::Field;
+            return this->selfOrOwner.isMethod() ? Kind::Parameter : Kind::Field;
         }
         if (this->selfOrOwner.isMethod()) {
             return Kind::Method;
@@ -194,6 +207,8 @@ public:
 
     UntypedGenericSymbolRef withoutType() const {
         switch (this->kind()) {
+            case Kind::Parameter:
+                return UntypedGenericSymbolRef::parameter(this->selfOrOwner.asMethodRef(), this->name);
             case Kind::Field:
                 ENFORCE(this->selfOrOwner.isClassOrModule());
                 return UntypedGenericSymbolRef::field(this->selfOrOwner.asClassOrModuleRef(), this->name);
@@ -208,7 +223,7 @@ public:
     std::string showRaw(const core::GlobalState &gs) const;
 
     core::SymbolRef asSymbolRef() const {
-        ENFORCE(this->kind() != Kind::Field);
+        ENFORCE(this->kind() != Kind::Field && this->kind() != Kind::Parameter);
         return this->selfOrOwner;
     }
 
@@ -219,6 +234,7 @@ public:
     bool isSorbetInternalClassOrMethod(const core::GlobalState &gs) const {
         switch (this->kind()) {
             case Kind::Field:
+            case Kind::Parameter:
                 return false;
             case Kind::Type:
             case Kind::ClassOrModule:

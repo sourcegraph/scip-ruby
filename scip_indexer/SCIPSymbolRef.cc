@@ -114,7 +114,7 @@ utils::Result UntypedGenericSymbolRef::symbolForExpr(const core::GlobalState &gs
     }
     if (this->name != core::NameRef::noName()) {
         scip::Descriptor descriptor;
-        descriptor.set_suffix(scip::Descriptor::Term);
+        descriptor.set_suffix(this->selfOrOwner.isMethod() ? scip::Descriptor::Parameter : scip::Descriptor::Term);
         *descriptor.mutable_name() = this->name.shortName(gs);
         ENFORCE(!descriptor.name().empty());
         *symbol.add_descriptors() = move(descriptor);
@@ -165,6 +165,9 @@ void UntypedGenericSymbolRef::saveParentRelationships(
 
 string GenericSymbolRef::showRaw(const core::GlobalState &gs) const {
     switch (this->kind()) {
+        case Kind::Parameter:
+            return fmt::format("Parameter(owner: {}, name: {})", this->selfOrOwner.showFullName(gs),
+                               this->name.toString(gs));
         case Kind::Field:
             return fmt::format("UndeclaredField(owner: {}, name: {})", this->selfOrOwner.showFullName(gs),
                                this->name.toString(gs));
@@ -201,6 +204,7 @@ void GenericSymbolRef::saveDocStrings(const core::GlobalState &gs, core::TypePtr
 
     string markdown = "";
     switch (this->kind()) {
+        case Kind::Parameter:
         case Kind::Field: {
             auto name = this->name.show(gs);
             checkType(fieldType, name);
@@ -253,6 +257,10 @@ void GenericSymbolRef::saveDocStrings(const core::GlobalState &gs, core::TypePtr
     if (!markdown.empty()) {
         docs.push_back(fmt::format("```ruby\n{}\n```", markdown));
     }
+    // Parameters have their own type hover, not the method's preceding comment.
+    if (this->kind() == Kind::Parameter) {
+        return;
+    }
     auto whatFile = loc.file();
     if (whatFile.exists()) {
         if (auto doc = realmain::lsp::findDocumentation(whatFile.data(gs).source(), loc.beginPos())) {
@@ -263,6 +271,13 @@ void GenericSymbolRef::saveDocStrings(const core::GlobalState &gs, core::TypePtr
 
 core::Loc GenericSymbolRef::symbolLoc(const core::GlobalState &gs) const {
     switch (this->kind()) {
+        case Kind::Parameter:
+            for (const auto &param : this->selfOrOwner.asMethodRef().data(gs)->parameters) {
+                if (param.name == this->name) {
+                    return param.loc;
+                }
+            }
+            return core::Loc();
         case Kind::Method: {
             auto method = this->selfOrOwner.asMethodRef().data(gs);
             if (!method->nameLoc.exists() || method->nameLoc.empty()) {

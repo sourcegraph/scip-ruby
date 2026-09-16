@@ -19,6 +19,7 @@
 #include "absl/synchronization/mutex.h"
 #include "spdlog/fmt/fmt.h"
 
+#include "ast/Helpers.h"
 #include "ast/Trees.h"
 #include "ast/treemap/treemap.h"
 #include "cfg/CFG.h"
@@ -542,6 +543,7 @@ public:
             case Kind::ClassOrModule:
             case Kind::Method:
                 break;
+            case Kind::Parameter:
             case Kind::Field:
                 if (overrideType.has_value()) {
                     symRef.saveDocStrings(gs, overrideType.value(), loc, overrideDocs);
@@ -1029,6 +1031,57 @@ core::ClassOrModuleRef computeReceiver(const core::GlobalState &gs, core::TypePt
     return core::ClassOrModuleRef();
 }
 
+// Parser locations can include the symbol's colon or quotes. Only accept an
+// exact spelling of the resolved name; never infer a key from a larger expression.
+core::LocOffsets keywordNameLoc(const core::Context &ctx, core::LocOffsets loc, core::NameRef name) {
+    if (!loc.exists() || loc.empty()) {
+        return core::LocOffsets::none();
+    }
+    auto source = ctx.locAt(loc).source(ctx);
+    if (!source) {
+        return core::LocOffsets::none();
+    }
+    auto text = *source;
+    auto begin = loc.beginPos();
+    auto end = loc.endPos();
+    if (absl::EndsWith(text, ":")) {
+        text.remove_suffix(1);
+        --end;
+    } else if (absl::StartsWith(text, ":")) {
+        text.remove_prefix(1);
+        ++begin;
+    }
+    if (text.size() >= 2 && (text.front() == '\'' || text.front() == '"') && text.back() == text.front()) {
+        text.remove_prefix(1);
+        text.remove_suffix(1);
+        ++begin;
+        --end;
+    }
+    return text == name.shortName(ctx) ? core::LocOffsets{begin, end} : core::LocOffsets::none();
+}
+
+void forEachKeywordParameter(const core::Context &ctx, const ast::MethodDef &methodDef,
+                             absl::FunctionRef<void(GenericSymbolRef, core::LocalVariable, core::LocOffsets)> visit) {
+    auto method = methodDef.symbol;
+    const auto &params = method.data(ctx)->parameters;
+    for (size_t i = 0; i < methodDef.params.size() && i < params.size(); ++i) {
+        const auto &param = params[i];
+        if (!param.flags.isKeyword || param.flags.isRepeated) {
+            continue;
+        }
+        auto local = ast::MK::arg2Local(methodDef.params[i]);
+        auto loc = keywordNameLoc(ctx, local->loc, param.name);
+        if (!loc.exists()) {
+            continue;
+        }
+        auto type = core::Types::resultTypeAsSeenFromSelf(ctx, param.type, method.data(ctx)->owner);
+        if (!type) {
+            type = core::Types::untyped(method);
+        }
+        visit(GenericSymbolRef::parameter(method, param.name, type), local->localVariable, loc);
+    }
+}
+
 /// Convenience type to handle CFG traversal and recording info in SCIPState.
 ///
 /// Any caches that are not specific to a traversal should be added to SCIPState.
@@ -1071,6 +1124,13 @@ class CFGTraversal final {
         core::LocOffsets loc;
     };
     UnorderedMap<core::NameRef, AnonymousParameter> anonymousParameters;
+    struct KeywordParameter {
+        GenericSymbolRef symbol;
+        core::LocOffsets loc;
+    };
+    // Include LocalVariable::unique so a shadowing block parameter stays local.
+    UnorderedMap<core::LocalVariable, KeywordParameter> keywordParameters;
+    unique_ptr<UnorderedMap<cfg::LocalRef, const cfg::Binding *>> keywordTupleDefinitions;
 
     // Local variable counter that is reset for every function.
     uint32_t counter = 0;
@@ -1110,6 +1170,50 @@ private:
             return DefRefData{ValueCategory::RValue, /*aliasRHS*/ nullopt};
         }
     };
+
+    core::LocOffsets wrappedKeywordNameLoc(const cfg::CFG &cfg, const cfg::Send &send, core::NameRef name) {
+        if (send.numArgs < 4) {
+            return core::LocOffsets::none();
+        }
+        // Splat intrinsics flatten tuples and lose individual key locations.
+        // Follow the CFG definitions of the keyword tuple and its symbol literals.
+        // Build this lookup only for methods that need a wrapped keyword range.
+        if (!keywordTupleDefinitions) {
+            keywordTupleDefinitions = make_unique<UnorderedMap<cfg::LocalRef, const cfg::Binding *>>();
+            for (const auto &bb : cfg.basicBlocks) {
+                for (const auto &binding : bb->exprs) {
+                    auto array = cfg::cast_instruction<cfg::Send>(binding.value);
+                    if ((array && array->fun == core::Names::buildArray()) ||
+                        binding.value.tag() == cfg::Tag::Literal) {
+                        keywordTupleDefinitions->emplace(binding.bind.variable, &binding);
+                    }
+                }
+            }
+        }
+        auto it = keywordTupleDefinitions->find(send.argRefs()[3]);
+        if (it == keywordTupleDefinitions->end()) {
+            return core::LocOffsets::none();
+        }
+        auto array = cfg::cast_instruction<cfg::Send>(it->second->value);
+        if (array == nullptr) {
+            return core::LocOffsets::none();
+        }
+        auto loc = core::LocOffsets::none();
+        for (uint32_t i = 0; i + 1 < array->numArgs; i += 2) {
+            if (!core::isa_type<core::NamedLiteralType>(array->argTypes()[i])) {
+                continue;
+            }
+            auto key = core::cast_type_nonnull<core::NamedLiteralType>(array->argTypes()[i]);
+            if (key.kind == core::NamedLiteralType::Kind::Symbol && key.name == name) {
+                auto definition = keywordTupleDefinitions->find(array->argRefs()[i]);
+                if (definition != keywordTupleDefinitions->end() &&
+                    definition->second->value.tag() == cfg::Tag::Literal) {
+                    loc = keywordNameLoc(ctx, definition->second->loc, name);
+                }
+            }
+        }
+        return loc;
+    }
 
     void defineAnonymousParameters(const ast::MethodDef *methodDef) {
         if (methodDef == nullptr) {
@@ -1172,6 +1276,20 @@ private:
         auto loc = local.loc;
         auto localRef = local.variable;
         auto localVar = localRef.data(cfg);
+        auto keyword = keywordParameters.find(localVar);
+        if (keyword != keywordParameters.end()) {
+            const auto &parameter = keyword->second;
+            loc = keywordNameLoc(ctx, loc, localVar._name);
+            if (!loc.exists() || (defRefData.valueCategory == ValueCategory::LValue && loc == parameter.loc)) {
+                return false;
+            }
+            auto role = defRefData.valueCategory == ValueCategory::LValue ? scip::SymbolRole::WriteAccess
+                                                                          : scip::SymbolRole::ReadAccess;
+            auto overrideType = computeOverrideType(parameter.symbol.definitionType(), type);
+            auto status = scipState.saveReference(ctx, parameter.symbol, overrideType, loc, role);
+            ENFORCE(status.ok());
+            return true;
+        }
         auto anonymous = anonymousParameters.find(localVar._name);
         if (localVar.unique == 0 && anonymous != anonymousParameters.end()) {
             // Definitions also survive when CFG optimization removes an unused
@@ -1367,6 +1485,11 @@ private:
 public:
     void traverse(const cfg::CFG &cfg, const ast::MethodDef *methodDef) {
         defineAnonymousParameters(methodDef);
+        if (methodDef != nullptr) {
+            forEachKeywordParameter(ctx, *methodDef, [&](auto symbol, auto local, auto loc) {
+                keywordParameters.emplace(local, KeywordParameter{symbol, loc});
+            });
+        }
         this->aliasMap.populate(this->ctx, cfg, this->scipState.fieldResolver,
                                 this->scipState.relationshipsMap[ctx.file]);
         auto &gs = this->ctx.state;
@@ -1533,6 +1656,34 @@ public:
                             this->emitMethodReference(send->recv.type, send->fun,
                                                       computeMethodLoc(ctx, send->fun, send->funLoc),
                                                       send->scipDispatchInfo.get());
+                        }
+
+                        if (send->scipDispatchInfo) {
+                            for (const auto &argument : send->scipDispatchInfo->keywordArguments) {
+                                // Intrinsics reuse a positional tuple's location for every
+                                // argument, even when its text happens to match a keyword.
+                                auto wrapped = send->fun == core::Names::callWithSplat() ||
+                                               send->fun == core::Names::callWithSplatAndBlockPass();
+                                auto loc = wrapped ? wrappedKeywordNameLoc(cfg, *send, argument.name)
+                                                   : keywordNameLoc(ctx, argument.loc, argument.name);
+                                if (loc.exists()) {
+                                    auto symbol = GenericSymbolRef::parameter(argument.method, argument.name);
+                                    if (argument.method.data(ctx)->flags.isRewriterSynthesized) {
+                                        // Generated constructors can have parameters covering an
+                                        // entire prop declaration, with no indexable definition.
+                                        auto definition = symbol.symbolLoc(ctx);
+                                        if (!definition.exists() ||
+                                            !keywordNameLoc(
+                                                 core::Context(ctx.state, argument.method, definition.file()),
+                                                 definition.offsets(), argument.name)
+                                                 .exists()) {
+                                            continue;
+                                        }
+                                    }
+                                    auto status = scipState.saveReference(ctx, symbol, nullopt, loc, 0);
+                                    ENFORCE(status.ok());
+                                }
+                            }
                         }
 
                         // Emit references for arguments
@@ -1971,6 +2122,11 @@ public:
                 ENFORCE(status.ok());
             }
         }
+        core::Context ctx(gs, methodDef.symbol, file);
+        scip_indexer::forEachKeywordParameter(ctx, methodDef, [&](auto symbol, auto local, auto loc) {
+            auto status = scipState->saveDefinition(gs, file, symbol, nullopt, loc);
+            ENFORCE(status.ok());
+        });
     }
 
     void typecheck(const core::GlobalState &gs, core::FileRef file, cfg::CFG &cfg,
