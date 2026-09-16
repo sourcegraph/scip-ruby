@@ -1,14 +1,44 @@
 #include <string>
+#include <string_view>
 
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
 
 #include "proto/SCIP.pb.h"
+#include "common/common.h"
+#include "rapidjson/encodings.h"
+#include "rapidjson/memorystream.h"
 
 namespace sorbet::scip_indexer::utils {
 
 using namespace std;
+
+string escapeInvalidUtf8(string_view text) {
+    string result;
+    result.reserve(text.size());
+    for (size_t offset = 0; offset < text.size();) {
+        auto byte = static_cast<unsigned char>(text[offset]);
+        if (byte < 0x80) {
+            result.push_back(text[offset++]);
+            continue;
+        }
+        rapidjson::MemoryStream input(text.data() + offset, text.size() - offset);
+        unsigned codepoint;
+        if (rapidjson::UTF8<>::Decode(input, &codepoint)) {
+            result.append(text.substr(offset, input.Tell()));
+            offset += input.Tell();
+        } else {
+            // Escape one byte at a time so a malformed prefix cannot consume valid following text.
+            result.push_back('\\');
+            result.push_back('0' + ((byte >> 6) & 7));
+            result.push_back('0' + ((byte >> 3) & 7));
+            result.push_back('0' + (byte & 7));
+            ++offset;
+        }
+    }
+    return result;
+}
 
 void addEscaped(string &out, const string &in) {
     bool needsEscape = false;

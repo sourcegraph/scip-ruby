@@ -2,11 +2,15 @@
 #define SORBET_SCIP_UTILS
 
 #include <string>
+#include <string_view>
 
 #include "absl/status/status.h"
 #include "proto/SCIP.pb.h"
 
 namespace sorbet::scip_indexer::utils {
+
+// Preserve valid Unicode and escape invalid bytes before writing protobuf string fields.
+std::string escapeInvalidUtf8(std::string_view text);
 
 class Result {
     bool skip_;

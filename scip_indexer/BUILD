@@ -19,9 +19,11 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        "//common",
         "//proto",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
+        "@rapidjson",
     ],
 )
 

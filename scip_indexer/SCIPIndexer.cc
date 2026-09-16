@@ -278,7 +278,7 @@ private:
         scip::SymbolInformation symbolInfo;
         symbolInfo.set_symbol(symbolString);
         for (auto &doc : docs) {
-            symbolInfo.add_documentation(doc);
+            symbolInfo.add_documentation(utils::escapeInvalidUtf8(doc));
         }
         for (auto &rel : rels) {
             *symbolInfo.add_relationships() = rel;
@@ -318,7 +318,7 @@ private:
                 break;
             case Emitted::Earlier:
                 for (auto &doc : docs) {
-                    *occurrence.add_override_documentation() = doc;
+                    *occurrence.add_override_documentation() = utils::escapeInvalidUtf8(doc);
                 }
         }
         this->occurrenceMap[file].push_back(occurrence);
@@ -342,7 +342,7 @@ private:
             occurrence.add_range(val);
         }
         for (auto &doc : overrideDocs) {
-            occurrence.add_override_documentation(doc);
+            occurrence.add_override_documentation(utils::escapeInvalidUtf8(doc));
         }
         this->occurrenceMap[file].push_back(occurrence);
         // TODO(varun): When should we fill out the diagnostics field?

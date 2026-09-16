@@ -51,6 +51,7 @@
 #include "scip_indexer/Debug.h"
 #include "scip_indexer/SCIPGemMetadata.h"
 #include "scip_indexer/SCIPIndexer.h"
+#include "scip_indexer/SCIPUtils.h"
 #include "test/helpers/MockFileSystem.h"
 #include "test/helpers/expectations.h"
 #include "test/helpers/position_assertions.h"
@@ -78,6 +79,23 @@ bool update;
 string inputFileOrDir;
 bool onlyRunUnitTests;
 optional<realmain::options::Parser> requestedParser;
+
+TEST_CASE("Utf8Documentation") {
+    if (!onlyRunUnitTests) {
+        return;
+    }
+    using scip_indexer::utils::escapeInvalidUtf8;
+    CHECK(escapeInvalidUtf8("plain\\n\n\"quoted\"") == "plain\\n\n\"quoted\"");
+    CHECK(escapeInvalidUtf8("café 日本語 😀") == "café 日本語 😀");
+    CHECK(escapeInvalidUtf8("\xff") == "\\377");
+    CHECK(escapeInvalidUtf8("\xc3(") == "\\303(");
+    CHECK(escapeInvalidUtf8("\xe2\x82") == "\\342\\202");
+    CHECK(escapeInvalidUtf8("\xc0\xaf") == "\\300\\257");
+    CHECK(escapeInvalidUtf8("\xed\xa0\x80") == "\\355\\240\\200");
+    CHECK(escapeInvalidUtf8("\xf4\x90\x80\x80") == "\\364\\220\\200\\200");
+    CHECK(escapeInvalidUtf8("é\xff😀") == "é\\377😀");
+    CHECK(escapeInvalidUtf8(string("a\0b", 3)) == string("a\0b", 3));
+}
 
 TEST_CASE("GemMetadataInference") {
     if (!onlyRunUnitTests) {

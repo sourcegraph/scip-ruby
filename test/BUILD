@@ -94,6 +94,7 @@ cc_binary(
         "//resolver",
         "//rewriter",
         "//scip_indexer:interface",
+        "//scip_indexer:scip_utils",
         "//scip_indexer",
         "//test/helpers",
         "@com_google_absl//absl/strings",
