@@ -53,3 +53,19 @@
 #    ⌃ enclosing_range_end [..] AbstractBody#render().
  end
 #  ⌃ enclosing_range_end [..] AbstractBody#
+ 
+ # Empty declarations have no handwritten body to index.
+#⌄ enclosing_range_start [..] EmptyAbstractBody#
+ class EmptyAbstractBody
+#      ^^^^^^^^^^^^^^^^^ definition [..] EmptyAbstractBody#
+   extend T::Sig, T::Helpers
+#  ^^^^^^ reference [..] Kernel#extend().
+   abstract!
+   sig { abstract.returns(String) }
+#                         ^^^^^^ reference [..] String#
+#  ⌄ enclosing_range_start [..] EmptyAbstractBody#name().
+   def name; end
+#      ^^^^ definition [..] EmptyAbstractBody#name().
+#              ⌃ enclosing_range_end [..] EmptyAbstractBody#name().
+ end
+#  ⌃ enclosing_range_end [..] EmptyAbstractBody#

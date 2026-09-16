@@ -23,3 +23,11 @@ class AbstractBody
     value.strip
   end
 end
+
+# Empty declarations have no handwritten body to index.
+class EmptyAbstractBody
+  extend T::Sig, T::Helpers
+  abstract!
+  sig { abstract.returns(String) }
+  def name; end
+end

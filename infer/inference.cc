@@ -11,7 +11,7 @@
 using namespace std;
 namespace sorbet::infer {
 
-bool Inference::willRun(core::Context ctx, core::LocOffsets loc, core::MethodRef method) {
+bool Inference::willRun(core::Context ctx, core::LocOffsets loc, core::MethodRef method, bool hasBody) {
     if (ctx.file.data(ctx).strictLevel < (ctx.state.isSCIPRuby ? core::StrictLevel::False : core::StrictLevel::True)) {
         return false;
     }
@@ -33,7 +33,7 @@ bool Inference::willRun(core::Context ctx, core::LocOffsets loc, core::MethodRef
 
     // Bundled RBIs can mark a method abstract even when an indexed Ruby file supplies a body.
     // Keep that source navigable, including bodies that Sorbet diagnoses as invalid.
-    if (methodData->flags.isAbstract && (!ctx.state.isSCIPRuby || ctx.file.data(ctx).isRBI())) {
+    if (methodData->flags.isAbstract && (!ctx.state.isSCIPRuby || ctx.file.data(ctx).isRBI() || !hasBody)) {
         return false;
     }
 

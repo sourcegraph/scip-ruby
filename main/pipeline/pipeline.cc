@@ -1347,7 +1347,7 @@ public:
         for (auto &extension : ctx.state.semanticExtensions) {
             extension->typecheckMethod(ctx, ctx.file, m);
         }
-        if (!infer::Inference::willRun(ctx, m.declLoc, m.symbol)) {
+        if (!infer::Inference::willRun(ctx, m.declLoc, m.symbol, !ast::isa_tree<ast::EmptyTree>(m.rhs))) {
             return;
         }
 
