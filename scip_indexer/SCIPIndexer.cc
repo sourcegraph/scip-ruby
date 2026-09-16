@@ -1424,6 +1424,8 @@ private:
             return;
         }
         if (dispatchInfo && dispatchInfo->intersectionMethods.has_value()) {
+            // Use exactly the components retained by Sorbet, including nested
+            // unions whose incomplete intersection branch was discarded.
             for (auto method : *dispatchInfo->intersectionMethods) {
                 auto status = scipState.saveReference(ctx, GenericSymbolRef::method(method), nullopt, funLoc, 0);
                 ENFORCE(status.ok());
