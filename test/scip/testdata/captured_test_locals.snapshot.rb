@@ -24,6 +24,7 @@
      value = 'outer'
 #    ^^^^^ definition local 2$3964620731
      ['inner'].each do |value|
+#              ^^^^ reference [..] Array#each().
 #                       ^^^^^ definition local 3$3964620731
        it 'captures the block argument' do
          value.upcase
@@ -64,6 +65,28 @@
 #      ⌃ enclosing_range_end [..] `<describe 'outer'>`#`<context 'independent variables'>`#`<it 'has a different local'>`().
    end
 #    ⌃ enclosing_range_end [..] `<describe 'outer'>`#`<context 'independent variables'>`#
+ 
+#  ⌄ enclosing_range_start [..] `<describe 'outer'>`#`<context 'rescue bindings remain local to the example'>`#
+   context 'rescue bindings remain local to the example' do
+#          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference [..] `<describe 'outer'>`#
+#          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] `<describe 'outer'>`#`<context 'rescue bindings remain local to the example'>`#
+#    ⌄ enclosing_range_start [..] `<describe 'outer'>`#`<context 'rescue bindings remain local to the example'>`#`<it 'introduces a rescue variable'>`().
+     it 'introduces a rescue variable' do
+#       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ definition [..] `<describe 'outer'>`#`<context 'rescue bindings remain local to the example'>`#`<it 'introduces a rescue variable'>`().
+       begin
+         raise 'example'
+#        ^^^^^ reference [..] Kernel#raise().
+       rescue RuntimeError => error
+#             ^^^^^^^^^^^^ reference [..] RuntimeError#
+#                             ^^^^^ definition local 2$2891928498
+         error.message
+#        ^^^^^ reference local 2$2891928498
+#              ^^^^^^^ reference [..] Exception#message().
+       end
+     end
+#      ⌃ enclosing_range_end [..] `<describe 'outer'>`#`<context 'rescue bindings remain local to the example'>`#`<it 'introduces a rescue variable'>`().
+   end
+#    ⌃ enclosing_range_end [..] `<describe 'outer'>`#`<context 'rescue bindings remain local to the example'>`#
  end
 #  ⌃ enclosing_range_end [..] `<describe 'outer'>`#
  

@@ -1119,6 +1119,11 @@ struct DispatchArgs {
     DispatchArgs withThisRef(const TypePtr &newThisRef) const;
 };
 
+// Retain the method components selected by intersection dispatch for SCIP.
+struct SCIPDispatchInfo {
+    std::optional<InlinedVector<MethodRef, 2>> intersectionMethods;
+};
+
 struct DispatchComponent {
     TypePtr receiver;
     MethodRef method;
@@ -1144,6 +1149,7 @@ struct DispatchComponent {
     ClassOrModuleRef rebind;
     Loc rebindLoc;
     std::unique_ptr<TypeConstraint> constr;
+    std::unique_ptr<SCIPDispatchInfo> scipDispatchInfo;
 };
 
 struct DispatchResult {
@@ -1159,7 +1165,7 @@ struct DispatchResult {
     DispatchResult(TypePtr returnType, TypePtr receiverType, core::MethodRef method)
         : returnType(returnType),
           main(DispatchComponent{
-              std::move(receiverType), method, {}, std::move(returnType), nullptr, nullptr, {}, {}, nullptr}){};
+              std::move(receiverType), method, {}, std::move(returnType), nullptr, nullptr, {}, {}, nullptr, nullptr}){};
     DispatchResult(TypePtr returnType, DispatchComponent comp)
         : returnType(std::move(returnType)), main(std::move(comp)){};
     DispatchResult(TypePtr returnType, DispatchComponent comp, std::unique_ptr<DispatchResult> secondary,

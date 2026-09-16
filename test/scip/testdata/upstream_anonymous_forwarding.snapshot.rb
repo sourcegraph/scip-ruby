@@ -58,6 +58,7 @@
 #    ^^^^^^^^^^^^ reference [..] AnonymousForwarding#accept_block().
 #                 ^ reference local 1$3273183207
      [1].each { accept_block(&) }
+#        ^^^^ reference [..] Array#each().
 #               ^^^^^^^^^^^^ reference [..] AnonymousForwarding#accept_block().
 #                            ^ reference local 1$3273183207
      accept_block(
@@ -98,6 +99,7 @@
 #      ^^^^^^ reference [..] `<Class:T>`#unsafe().
 #                                   ^^ reference local 1$1757449054
      [1].each { accept_keywords(**) }
+#        ^^^^ reference [..] Array#each().
 #               ^^^^^^^^^^^^^^^ reference [..] AnonymousForwarding#accept_keywords().
 #                               ^^ reference local 1$1757449054
      T.unsafe(self).accept_keywords(
@@ -125,6 +127,7 @@
 #      ^^^^^^ reference [..] `<Class:T>`#unsafe().
 #                                            ^ reference local 1$2667504296
      [1].each { T.unsafe(self).accept_all(*) }
+#        ^^^^ reference [..] Array#each().
 #               ^ reference [..] T#
 #                 ^^^^^^ reference [..] `<Class:T>`#unsafe().
 #                                         ^ reference local 1$2667504296
@@ -179,6 +182,7 @@
 #      ^^^^^^ reference [..] `<Class:T>`#unsafe().
 #                                     ^^^ reference local 1$3528527193
      [1].each { accept_all(...) }
+#        ^^^^ reference [..] Array#each().
 #               ^^^^^^^^^^ reference [..] AnonymousForwarding#accept_all().
 #                          ^^^ reference local 1$3528527193
      T.unsafe(self).accept_all(

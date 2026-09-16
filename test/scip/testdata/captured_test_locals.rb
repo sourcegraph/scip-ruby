@@ -33,6 +33,16 @@ describe 'outer' do
       value.downcase
     end
   end
+
+  context 'rescue bindings remain local to the example' do
+    it 'introduces a rescue variable' do
+      begin
+        raise 'example'
+      rescue RuntimeError => error
+        error.message
+      end
+    end
+  end
 end
 
 outside = 'file scope'

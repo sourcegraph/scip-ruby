@@ -823,7 +823,13 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
                         dctx.enclosingBlockParamLoc = send->loc;
                         dctx.enclosingBlockParamName = core::Names::implicitYield();
                     }
+                    auto scipCall = dctx.ctx.state.isSCIPRuby ? sendExpr.deepCopy() : nullptr;
                     result = MK::If(loc, MK::Local(loc, dctx.enclosingBlockParamName), move(sendExpr), MK::False(loc));
+                    if (scipCall) {
+                        // Inference may discard the conditional call when the
+                        // block is known absent. Keep navigation on the source token.
+                        result = MK::InsSeq1(loc, move(scipCall), move(result));
+                    }
 
                     return;
                 }

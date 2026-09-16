@@ -6,6 +6,7 @@
    y = 0
 #  ^ definition local 1$2822987882
    [].each { |x|
+#     ^^^^ reference [..] Array#each().
 #             ^ definition local 2$2822987882
      y += x
 #    ^ reference (write) local 1$2822987882
@@ -15,6 +16,7 @@
 #         ^ reference local 2$2822987882
    }
    [].each do |x|
+#     ^^^^ reference [..] Array#each().
 #              ^ definition local 3$2822987882
      y += x
 #    ^ reference (write) local 1$2822987882

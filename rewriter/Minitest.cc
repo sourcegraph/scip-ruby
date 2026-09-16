@@ -500,6 +500,9 @@ public:
     void preTransformAssign(core::MutableContext ctx, ast::ExpressionPtr &tree) {
         define(ast::cast_tree_nonnull<ast::Assign>(tree).lhs);
     }
+    void preTransformRescueCase(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        define(ast::cast_tree_nonnull<ast::RescueCase>(tree).var);
+    }
     void postTransformUnresolvedIdent(core::MutableContext ctx, ast::ExpressionPtr &tree) {
         auto &local = ast::cast_tree_nonnull<ast::UnresolvedIdent>(tree);
         if (!scopes.back().inRoot || local.kind != ast::UnresolvedIdent::Kind::Local ||

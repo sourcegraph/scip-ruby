@@ -1943,8 +1943,13 @@ ast::ExpressionPtr Desugarer::desugar(pm_node_t *node) {
                     this->enclosingBlockParamName = core::Names::implicitYield();
                 }
 
-                return MK::If(location, MK::Local(location, this->enclosingBlockParamName), move(sendExpr),
-                              MK::False(location));
+                auto scipCall = ctx.state.isSCIPRuby ? sendExpr.deepCopy() : nullptr;
+                auto result = MK::If(location, MK::Local(location, this->enclosingBlockParamName), move(sendExpr),
+                                     MK::False(location));
+                if (scipCall) {
+                    result = MK::InsSeq1(location, move(scipCall), move(result));
+                }
+                return result;
             }
 
             auto block = desugarBlock(callNode->block, callNode->arguments, callNode->base.location);

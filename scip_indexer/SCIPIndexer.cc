@@ -846,6 +846,14 @@ core::LocOffsets computeWrappedMethodLoc(core::Context ctx, const cfg::Send &sen
 }
 
 core::ClassOrModuleRef computeReceiver(const core::GlobalState &gs, core::TypePtr recvType, core::NameRef fun) {
+    // Recent inference preserves tuple and shape types through more expressions.
+    // Their runtime methods still belong to Array and Hash, respectively.
+    if (core::isa_type<core::TupleType>(recvType)) {
+        return core::Symbols::Array();
+    }
+    if (core::isa_type<core::ShapeType>(recvType)) {
+        return core::Symbols::Hash();
+    }
     // Literal values dispatch to methods on their underlying class. Only widen
     // this lookup type, preserving the inferred literal type for hover information.
     recvType = core::Types::dropLiteral(gs, recvType);
@@ -853,7 +861,11 @@ core::ClassOrModuleRef computeReceiver(const core::GlobalState &gs, core::TypePt
     // didn't quite work properly, but we might want to consolidate the implementation. I
     // didn't quite understand the bit about attachedClass.
     if (core::isa_type<core::ClassType>(recvType)) {
-        return core::cast_type_nonnull<core::ClassType>(recvType).symbol;
+        auto symbol = core::cast_type_nonnull<core::ClassType>(recvType).symbol;
+        // Preserve the old indexer's best-effort Object navigation for
+        // T.anything. This is a navigation fallback only: the new top type and
+        // Sorbet's diagnostics remain unchanged, including for BasicObject.
+        return symbol == core::Symbols::top() ? core::Symbols::Object() : symbol;
     }
     if (core::isa_type<core::AppliedType>(recvType)) {
         // Triggered for a module nested inside a class
@@ -1136,10 +1148,18 @@ private:
         return true;
     }
 
-    void emitMethodReference(core::TypePtr recvType, core::NameRef fun, core::LocOffsets funLoc) {
+    void emitMethodReference(core::TypePtr recvType, core::NameRef fun, core::LocOffsets funLoc,
+                             const core::SCIPDispatchInfo *dispatchInfo = nullptr) {
         auto &gs = ctx.state;
         if (!recvType || !fun.exists() || !funLoc.exists() || funLoc.empty() ||
             isTemporary(gs, core::LocalVariable(fun, 1))) {
+            return;
+        }
+        if (dispatchInfo && dispatchInfo->intersectionMethods.has_value()) {
+            for (auto method : *dispatchInfo->intersectionMethods) {
+                auto status = scipState.saveReference(ctx, GenericSymbolRef::method(method), nullopt, funLoc, 0);
+                ENFORCE(status.ok());
+            }
             return;
         }
         if (auto unionType = core::cast_type<core::OrType>(recvType)) {
@@ -1301,11 +1321,13 @@ public:
                             auto symbol = core::cast_type_nonnull<core::NamedLiteralType>(send->argTypes()[1]);
                             if (symbol.kind == core::NamedLiteralType::Kind::Symbol) {
                                 this->emitMethodReference(send->argTypes()[0], symbol.name,
-                                                          computeWrappedMethodLoc(ctx, *send, symbol.name));
+                                                          computeWrappedMethodLoc(ctx, *send, symbol.name),
+                                                          send->scipDispatchInfo.get());
                             }
                         } else {
                             this->emitMethodReference(send->recv.type, send->fun,
-                                                      computeMethodLoc(ctx, send->fun, send->funLoc));
+                                                      computeMethodLoc(ctx, send->fun, send->funLoc),
+                                                      send->scipDispatchInfo.get());
                         }
 
                         // Emit references for arguments
@@ -1663,8 +1685,8 @@ public:
         return true;
     }
     std::string_view cacheKey() const override {
-        // Preserve closure scopes and calls when rewriting test DSLs for indexing.
-        return "scip-ruby:4";
+        // Preserve closure scopes, DSL calls, and desugared block_given? calls.
+        return "scip-ruby:5";
     }
 
     virtual void typecheckClass(const core::GlobalState &gs, core::FileRef file,

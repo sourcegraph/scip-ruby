@@ -1062,6 +1062,29 @@ Environment::processBinding(core::Context ctx, const cfg::CFG &inWhat, cfg::Bind
                                                 ownerLoc,        send.isPrivateOk,
                                                 suppressErrors,  inWhat.symbol.data(ctx)->name};
                 auto dispatched = recvType.type.dispatchCall(ctx, dispatchArgs);
+                if (ctx.state.isSCIPRuby) {
+                    // Retain only the intersection components selected by this
+                    // inference pass, including dispatch through call wrappers.
+                    send.scipDispatchInfo.reset();
+                    bool intersection = false;
+                    for (auto result = &dispatched; result != nullptr; result = result->secondary.get()) {
+                        const auto &info = result->main.scipDispatchInfo;
+                        intersection |= info && info->intersectionMethods.has_value();
+                    }
+                    if (intersection) {
+                        send.scipDispatchInfo = make_unique<core::SCIPDispatchInfo>();
+                        auto &methods = send.scipDispatchInfo->intersectionMethods.emplace();
+                        auto wrapped = send.fun == core::Names::callWithSplat() ||
+                                       send.fun == core::Names::callWithBlockPass() ||
+                                       send.fun == core::Names::callWithSplatAndBlockPass();
+                        for (auto result = &dispatched; result != nullptr; result = result->secondary.get()) {
+                            auto method = result->main.method;
+                            if (method.exists() && !(wrapped && method.data(ctx)->name == send.fun)) {
+                                methods.push_back(method);
+                            }
+                        }
+                    }
+                }
 
                 auto it = &dispatched;
                 while (it != nullptr) {

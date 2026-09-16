@@ -21,6 +21,7 @@
 #| ```ruby
 #| A ([String, String])
 #| ```
+#            ^^^^^^ reference [..] Kernel#freeze().
  B = %W[#{X} Y].freeze
 #^ definition [..] B.
 #documentation
@@ -28,6 +29,7 @@
 #| B ([String, String])
 #| ```
 #         ^ reference [..] X.
+#               ^^^^^^ reference [..] Kernel#freeze().
  
 #⌄ enclosing_range_start [..] M#
  module M
@@ -49,6 +51,7 @@
 #  | ```ruby
 #  | A ([String, String, String])
 #  | ```
+#                ^^^^^^ reference [..] Kernel#freeze().
    B = %W[#{X} Y Z].freeze
 #  ^ definition [..] M#B.
 #  documentation
@@ -56,5 +59,6 @@
 #  | B ([String, String, String])
 #  | ```
 #           ^ reference [..] X.
+#                   ^^^^^^ reference [..] Kernel#freeze().
  end
 #  ⌃ enclosing_range_end [..] M#

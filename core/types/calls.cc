@@ -40,6 +40,16 @@ bool allComponentsPresent(DispatchResult &res) {
     }
     return allComponentsPresent(*res.secondary);
 }
+
+DispatchResult markIntersectionDispatch(const GlobalState &gs, DispatchResult result) {
+    if (gs.isSCIPRuby) {
+        if (!result.main.scipDispatchInfo) {
+            result.main.scipDispatchInfo = make_unique<SCIPDispatchInfo>();
+        }
+        result.main.scipDispatchInfo->intersectionMethods.emplace();
+    }
+    return result;
+}
 } // namespace
 
 bool NamedLiteralType::derivesFrom(const GlobalState &gs, core::ClassOrModuleRef klass) const {
@@ -108,10 +118,10 @@ DispatchResult AndType::dispatchCall(const GlobalState &gs, const DispatchArgs &
     auto leftOk = allComponentsPresent(leftRet);
     auto rightOk = allComponentsPresent(rightRet);
     if (leftOk && !rightOk) {
-        return leftRet;
+        return markIntersectionDispatch(gs, std::move(leftRet));
     }
     if (rightOk && !leftOk) {
-        return rightRet;
+        return markIntersectionDispatch(gs, std::move(rightRet));
     }
     if (!rightOk && !leftOk) {
         if (!args.suppressErrors) {
@@ -121,7 +131,8 @@ DispatchResult AndType::dispatchCall(const GlobalState &gs, const DispatchArgs &
         }
     }
 
-    return DispatchResult::merge(gs, DispatchResult::Combinator::AND, std::move(leftRet), std::move(rightRet));
+    return markIntersectionDispatch(
+        gs, DispatchResult::merge(gs, DispatchResult::Combinator::AND, std::move(leftRet), std::move(rightRet)));
 }
 
 TypePtr AndType::getCallArguments(const GlobalState &gs, NameRef name) const {
@@ -142,7 +153,7 @@ DispatchResult ShapeType::dispatchCall(const GlobalState &gs, const DispatchArgs
     if (method.exists()) {
         auto *intrinsic = method.data(gs)->getIntrinsic();
         if (intrinsic != nullptr) {
-            DispatchComponent comp{args.selfType, method, {}, nullptr, nullptr, nullptr, {}, {}, nullptr};
+            DispatchComponent comp{args.selfType, method, {}, nullptr, nullptr, nullptr, {}, {}, nullptr, nullptr};
             DispatchResult res{nullptr, std::move(comp)};
             intrinsic->apply(gs, args, res);
             if (res.returnType != nullptr) {
@@ -159,7 +170,7 @@ DispatchResult TupleType::dispatchCall(const GlobalState &gs, const DispatchArgs
     if (method.exists()) {
         auto *intrinsic = method.data(gs)->getIntrinsic();
         if (intrinsic != nullptr) {
-            DispatchComponent comp{args.selfType, method, {}, nullptr, nullptr, nullptr, {}, {}, nullptr};
+            DispatchComponent comp{args.selfType, method, {}, nullptr, nullptr, nullptr, {}, {}, nullptr, nullptr};
             DispatchResult res{nullptr, std::move(comp)};
             intrinsic->apply(gs, args, res);
             if (res.returnType != nullptr) {

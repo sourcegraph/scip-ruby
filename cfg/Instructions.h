@@ -311,6 +311,7 @@ public:
     core::LocOffsets receiverLoc;
     const uint32_t numArgs;
     LinkRef link;
+    std::unique_ptr<core::SCIPDispatchInfo> scipDispatchInfo;
 
     // We only need this for the first two sets of trailing types, but it's
     // defined identically for all three types and it's convenient to have it
@@ -415,7 +416,7 @@ public:
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs = 0) const;
 };
-CheckSize(Send, 56, 8);
+CheckSize(Send, 64, 8);
 
 INSN(Return) : public Instruction {
 public:
