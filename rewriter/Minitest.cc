@@ -541,6 +541,7 @@ ast::ExpressionPtr runUnderParameterized(core::MutableContext ctx, core::NameRef
             ast::TreeWalk::apply(ctx, constantMover, body);
 
             auto method = ast::MK::SyntheticMethod0(send->loc, declLoc, testHelperNameLoc(*send), methodName, move(body));
+            ast::cast_tree_nonnull<ast::MethodDef>(method).flags.hasHandwrittenBody = true;
             return constantMover.addConstantsToExpression(send->loc, move(method));
         }
 
@@ -968,6 +969,7 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::
 
             auto [methodName, declLoc] = maybeDecl.value();
             auto method = ast::MK::SyntheticMethod0(send->loc, declLoc, testHelperNameLoc(*send), methodName, std::move(block->body));
+            ast::cast_tree_nonnull<ast::MethodDef>(method).flags.hasHandwrittenBody = true;
             return constantMover.addConstantsToExpression(send->loc, move(method));
         }
 
