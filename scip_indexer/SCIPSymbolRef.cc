@@ -132,7 +132,7 @@ string UntypedGenericSymbolRef::showRaw(const core::GlobalState &gs) const {
 
 void UntypedGenericSymbolRef::saveParentRelationships(
     const core::GlobalState &gs, const RelationshipsMap &relationshipMap, SmallVec<scip::Relationship> &rels,
-    const absl::FunctionRef<void(UntypedGenericSymbolRef, std::string &)> &saveSymbolString) const {
+    const absl::FunctionRef<bool(UntypedGenericSymbolRef, std::string &)> &saveSymbolString) const {
     auto it = relationshipMap.find(*this);
     if (it == relationshipMap.end()) {
         return;
@@ -141,7 +141,11 @@ void UntypedGenericSymbolRef::saveParentRelationships(
         if (!this->name.exists()) {
             fmt::print(stderr, "problematic symbol {}\n", this->selfOrOwner.toStringFullName(gs));
         }
-        saveSymbolString(UntypedGenericSymbolRef::field(klass, this->name), *rel.mutable_symbol());
+        // A synthetic ancestor may have no source location and therefore no SCIP symbol.
+        // Keep the field's own occurrences and any other, indexable relationships.
+        if (!saveSymbolString(UntypedGenericSymbolRef::field(klass, this->name), *rel.mutable_symbol())) {
+            return;
+        }
         ENFORCE(!rel.symbol().empty());
         rels.push_back(move(rel));
     };

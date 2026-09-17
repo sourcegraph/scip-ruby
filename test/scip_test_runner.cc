@@ -406,6 +406,9 @@ void formatSnapshot(const scip::Document &document, FormatOptions options, std::
     UnorderedMap<string, scip::SymbolInformation> symbolTable{};
     symbolTable.reserve(document.symbols_size());
     for (auto &symbolInfo : document.symbols()) {
+        for (const auto &relationship : symbolInfo.relationships()) {
+            REQUIRE_MESSAGE(!relationship.symbol().empty(), "Empty relationship target on " << symbolInfo.symbol());
+        }
         symbolTable.insert({symbolInfo.symbol(), symbolInfo});
     }
     vector<scip::Occurrence> occurrences;

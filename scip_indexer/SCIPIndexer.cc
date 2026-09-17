@@ -411,6 +411,7 @@ private:
                                               [this, &gs](UntypedGenericSymbolRef sym, std::string &out) {
                                                   auto status = this->saveSymbolString(gs, sym, nullptr, out);
                                                   ENFORCE(status.skip() || status.ok());
+                                                  return status.ok();
                                               });
     }
 
@@ -434,8 +435,12 @@ public:
                                SmallVec<scip::Relationship> &rels) {
         scip::Relationship rel;
         rel.set_is_reference(true);
-        this->saveSymbolString(gs, aliasedSymbol, /*symbol*/ nullptr, *rel.mutable_symbol());
-        rels.push_back(move(rel));
+        auto status = this->saveSymbolString(gs, aliasedSymbol, /*symbol*/ nullptr, *rel.mutable_symbol());
+        ENFORCE(status.skip() || status.ok());
+        if (status.ok()) {
+            ENFORCE(!rel.symbol().empty());
+            rels.push_back(move(rel));
+        }
     }
 
     // Save definition when you have a sorbet Symbol.

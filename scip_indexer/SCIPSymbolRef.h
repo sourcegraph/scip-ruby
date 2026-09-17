@@ -77,7 +77,7 @@ public:
 
     void saveParentRelationships(
         const core::GlobalState &gs, const RelationshipsMap &relationshipMap, SmallVec<scip::Relationship> &rels,
-        const absl::FunctionRef<void(UntypedGenericSymbolRef, std::string &)> &saveSymbolString) const;
+        const absl::FunctionRef<bool(UntypedGenericSymbolRef, std::string &)> &saveSymbolString) const;
 
     std::string showRaw(const core::GlobalState &gs) const;
 };
