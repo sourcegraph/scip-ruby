@@ -70,7 +70,7 @@
    def get_new_ivar
 #      ^^^^^^^^^^^^ definition [..] C2#get_new_ivar().
      return @g
-#    ^^^^^^^^^ reference [..] C2#`@g`.
+#           ^^ reference [..] C2#`@g`.
    end
 #    ⌃ enclosing_range_end [..] C2#get_new_ivar().
  end

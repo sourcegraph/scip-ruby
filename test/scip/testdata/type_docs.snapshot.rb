@@ -50,11 +50,7 @@
 #             ^ reference [..] String#+().
 #               ^ reference local 2$194175550
      return ret
-#    ^^^^^^^^^^ reference local 4$194175550
-#    override_documentation
-#    | ```ruby
-#    | return ret (T.noreturn)
-#    | ```
+#           ^^^ reference local 4$194175550
    end
 #    ⌃ enclosing_range_end [..] M#js_add().
  end

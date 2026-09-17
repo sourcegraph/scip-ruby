@@ -1402,16 +1402,21 @@ public:
                         break;
                     }
                     case cfg::Tag::Return: {
-                        if (isStaticInit) {
+                        auto return_ = cfg::cast_instruction<cfg::Return>(binding.value);
+                        // File-level lambdas can contain explicit returns, even
+                        // though their CFG belongs to a static initializer.
+                        if (isStaticInit && binding.bind.variable == cfg::LocalRef::finalReturn()) {
                             break;
                         }
-                        auto return_ = cfg::cast_instruction<cfg::Return>(binding.value);
-                        emitLocal(return_->what.variable);
+                        this->emitLocalOccurrence(cfg, bb, return_->what.occurrence(), DefRefData::RValue(),
+                                                  return_->what.type);
                         break;
                     }
                     case cfg::Tag::BlockReturn: {
                         auto blockReturn = cfg::cast_instruction<cfg::BlockReturn>(binding.value);
-                        emitLocal(blockReturn->what.variable); // TODO(varun): When are BlockReturns generated?
+                        auto loc = blockReturn->what.loc.exists() ? blockReturn->what.loc : binding.loc;
+                        this->emitLocalOccurrence(cfg, bb, {blockReturn->what.variable, loc}, DefRefData::RValue(),
+                                                  blockReturn->what.type);
                         break;
                     }
                     case cfg::Tag::Cast: {
