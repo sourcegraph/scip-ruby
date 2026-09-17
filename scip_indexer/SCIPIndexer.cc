@@ -1225,6 +1225,55 @@ public:
         auto isMethodFileStaticInit = method == gs.lookupStaticInitForFile(file);
         auto isStaticInit = isMethodFileStaticInit || method.name(gs) == core::Names::staticInit();
 
+        // Safe navigation lowers one assignment into a nil path and a method-call
+        // path at the same source location. The nil path can be unreachable and
+        // have no type, but is visited first. Combine the inferred types before
+        // deduplicating that definition, without borrowing from later assignments.
+        UnorderedMap<pair<cfg::LocalRef, core::LocOffsets>, core::TypePtr> safeNavigationAssignmentTypes;
+        decltype(safeNavigationAssignmentTypes) safeNavigationReceiverTypes;
+        for (auto bb : cfg.forwardsTopoSort) {
+            for (const auto &binding : bb->exprs) {
+                auto send = cfg::cast_instruction<cfg::Send>(binding.value);
+                if (send == nullptr || send->fun != core::Names::nilForSafeNavigation()) {
+                    continue;
+                }
+                auto loc = lhsLocIfPresent(binding);
+                if (loc.exists() && !loc.empty() && !isTemporary(gs, binding.bind.variable.data(cfg))) {
+                    safeNavigationAssignmentTypes[{binding.bind.variable, loc}] = nullptr;
+                }
+                // The receiver is also read on both paths. Showing only the nil
+                // path's narrowed type would hide its actual method-bearing type.
+                if (send->numArgs == 1 && send->argLocs()[0].exists() && !send->argLocs()[0].empty()) {
+                    safeNavigationReceiverTypes[{send->argRefs()[0], send->argLocs()[0]}] = nullptr;
+                }
+            }
+        }
+        auto addType = [&gs](auto &types, cfg::LocalOccurrence occ, core::TypePtr type) {
+            auto it = types.find({occ.variable, occ.loc});
+            if (it != types.end() && type && it->second != type) {
+                it->second = it->second ? core::Types::any(gs, it->second, type) : type;
+            }
+        };
+        if (!safeNavigationAssignmentTypes.empty() || !safeNavigationReceiverTypes.empty()) {
+            for (auto bb : cfg.forwardsTopoSort) {
+                for (const auto &binding : bb->exprs) {
+                    addType(safeNavigationAssignmentTypes, {binding.bind.variable, lhsLocIfPresent(binding)},
+                            binding.bind.type);
+                    if (auto send = cfg::cast_instruction<cfg::Send>(binding.value)) {
+                        addType(safeNavigationReceiverTypes, send->recv.occurrence(), send->recv.type);
+                        for (uint32_t i = 0; i < send->numArgs; ++i) {
+                            addType(safeNavigationReceiverTypes, {send->argRefs()[i], send->argLocs()[i]},
+                                    send->argTypes()[i]);
+                        }
+                    }
+                }
+            }
+        }
+        auto receiverType = [&safeNavigationReceiverTypes](cfg::LocalOccurrence occ, core::TypePtr type) {
+            auto it = safeNavigationReceiverTypes.find({occ.variable, occ.loc});
+            return it == safeNavigationReceiverTypes.end() ? type : it->second;
+        };
+
         // Returns true if the caller should not process the binding further.
         auto skipProcessing = [&](const cfg::Binding &binding) -> bool {
             if ((binding.loc.exists() && !binding.loc.empty()) ||
@@ -1286,7 +1335,10 @@ public:
                         }
                     }
                     auto defRefData = DefRefData{ValueCategory::LValue, aliasRHS};
-                    this->emitLocalOccurrence(cfg, bb, occ, defRefData, binding.bind.type);
+                    auto assignment = safeNavigationAssignmentTypes.find({occ.variable, occ.loc});
+                    auto type =
+                        assignment == safeNavigationAssignmentTypes.end() ? binding.bind.type : assignment->second;
+                    this->emitLocalOccurrence(cfg, bb, occ, defRefData, type);
                 }
                 // Emit occurrence information for the RHS
                 auto emitLocal = [this, &cfg, &bb, &binding](cfg::LocalRef local) -> void {
@@ -1310,7 +1362,7 @@ public:
                         // Emit reference for the receiver, if present.
                         if (send->recv.loc.exists() && !send->recv.loc.empty()) {
                             this->emitLocalOccurrence(cfg, bb, send->recv.occurrence(), DefRefData::RValue(),
-                                                      send->recv.type);
+                                                      receiverType(send->recv.occurrence(), send->recv.type));
                         }
 
                         // Emit reference for the method being called
@@ -1343,7 +1395,8 @@ public:
                             // a read, and the first one is a write. Instead of emitting two occurrences, it'd
                             // be nice to emit a combined read-write occurrence. However, that would require
                             // complicating the code a bit, so let's leave it as-is for now.
-                            this->emitLocalOccurrence(cfg, bb, arg, DefRefData::RValue(), send->argTypes()[i]);
+                            this->emitLocalOccurrence(cfg, bb, arg, DefRefData::RValue(),
+                                                      receiverType(arg, send->argTypes()[i]));
                         }
 
                         break;
