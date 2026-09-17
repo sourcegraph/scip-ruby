@@ -2079,7 +2079,7 @@ public:
     }
     std::string_view cacheKey() const override {
         // Separate the additional RBS/type rewrites and each runtime compatibility mode.
-        return this->config.legacyTModule ? "scip-ruby:13:legacy-t-module" : "scip-ruby:13";
+        return this->config.legacyTModule ? "scip-ruby:15:legacy-t-module" : "scip-ruby:15";
     }
 
     virtual void typecheckClass(const core::GlobalState &gs, core::FileRef file,

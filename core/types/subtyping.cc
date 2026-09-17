@@ -1056,6 +1056,18 @@ TypePtr Types::glb(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) 
                     newTargs.emplace_back(Types::any(gs, a1->targs[j], a2->targs[i]));
                 }
             }
+            // Combining arguments using the ancestor's variance must also respect
+            // the subclass's variance, including invalid opposite-variance declarations.
+            // Preserve both constraints when the result would not subtype the original
+            // subclass. Ordinary subtype checks still allow refinements from untyped.
+            if (gs.isSCIPRuby && a1->klass != a2->klass && a1->targs[j] != newTargs.back()) {
+                const auto &flags = idx.data(gs)->flags;
+                if ((flags.isInvariant && !Types::equiv(gs, a1->targs[j], newTargs.back())) ||
+                    (flags.isCovariant && !Types::isSubType(gs, newTargs.back(), a1->targs[j])) ||
+                    (flags.isContravariant && !Types::isSubType(gs, a1->targs[j], newTargs.back()))) {
+                    return AndType::make_shared(t1, t2);
+                }
+            }
             j++;
         }
         if (absl::c_equal(a1->targs, newTargs)) {
