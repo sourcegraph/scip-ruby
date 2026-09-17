@@ -863,7 +863,12 @@ optional<TypeSyntax::ResultType> interpretTCombinator(core::Context ctx, const a
             if (posArgs.size() < 2 || send.hasKwArgs()) {
                 checkTypeFunArity(ctx, send, 2, SIZE_MAX);
                 checkUnexpectedKwargs(ctx, send);
-                return TypeSyntax::ResultType{core::Types::untypedUntracked(), core::Symbols::noClassOrModule()};
+                // Older RBIs sometimes wrap a type alias in a one-argument
+                // T.any. Preserve that type for indexing while retaining the
+                // diagnostic; empty unions and keyword arguments stay invalid.
+                if (!ctx.state.isSCIPRuby || posArgs.size() != 1 || send.hasKwArgs()) {
+                    return TypeSyntax::ResultType{core::Types::untypedUntracked(), core::Symbols::noClassOrModule()};
+                }
             }
             auto maybeResult = getResultTypeWithSelfTypeParams(ctx, posArgs[0], sig, args);
             if (!maybeResult.has_value()) {
