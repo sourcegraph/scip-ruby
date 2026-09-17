@@ -3483,7 +3483,9 @@ public:
         auto tuple = cast_type<TupleType>(args.thisType);
         ENFORCE(tuple);
 
-        if (!args.args.empty()) {
+        // The Array dispatch path supplies the comparator's parameter types and
+        // deferred return type; the tuple shortcut cannot typecheck a block.
+        if (!args.args.empty() || args.block != nullptr) {
             return;
         }
         if (tuple->elems.empty()) {
