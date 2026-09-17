@@ -50,6 +50,34 @@ DispatchResult markIntersectionDispatch(const GlobalState &gs, DispatchResult re
     }
     return result;
 }
+
+TypePtr legacySCIPConstructorResult(const GlobalState &gs, MethodRef method) {
+    auto data = method.data(gs);
+    if (!gs.isSCIPRuby || data->name != Names::new_() || data->hasSig() || data->locs().empty()) {
+        return nullptr;
+    }
+    // Unsigned project RBIs used to inherit Gem::Version.new's payload signature. Upstream
+    // moved it to initialize in 7616fd91f. Retain that known contract for legacy declarations,
+    // without assuming that arbitrary factories or handwritten Ruby overrides return instances.
+    for (auto loc : data->locs()) {
+        if (!loc.exists() || !loc.file().data(gs).isRBI()) {
+            return nullptr;
+        }
+    }
+    auto klass = data->owner.data(gs)->attachedClass(gs);
+    if (!klass.exists() || klass.data(gs)->name.shortName(gs) != "Version") {
+        return nullptr;
+    }
+    auto owner = klass.data(gs)->owner;
+    if (!owner.exists() || owner.data(gs)->owner != Symbols::root() || owner.data(gs)->name.shortName(gs) != "Gem") {
+        return nullptr;
+    }
+    if (!absl::c_any_of(klass.data(gs)->locs(),
+                       [&](auto loc) { return loc.exists() && loc.file().data(gs).isPayload(); })) {
+        return nullptr;
+    }
+    return make_type<ClassType>(klass);
+}
 } // namespace
 
 bool NamedLiteralType::derivesFrom(const GlobalState &gs, core::ClassOrModuleRef klass) const {
@@ -1692,6 +1720,9 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
             resultType = args.args[1]->type;
         } else {
             resultType = Types::resultTypeAsSeenFrom(gs, methodData->resultType, methodData->owner, symbol, targs);
+            if (!resultType) {
+                resultType = legacySCIPConstructorResult(gs, method);
+            }
         }
     }
     if (args.block == nullptr) {
