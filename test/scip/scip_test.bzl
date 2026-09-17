@@ -65,7 +65,13 @@ def scip_unit_tests():
         ],
         size = "small",
     )
-    return ["unit_tests", "cache"]
+    native.sh_test(
+        name = "runtime_compatibility",
+        srcs = ["runtime_compatibility_test.sh"],
+        data = ["//main:scip-ruby"],
+        size = "small",
+    )
+    return ["unit_tests", "cache", "runtime_compatibility"]
 
 def scip_test(path):
     if not path.endswith(".rb") or path.endswith(".snapshot.rb"):
@@ -81,6 +87,8 @@ def scip_multifile_test(dir, filepaths):
     data = ["//test:scip_test_runner", "//test/scip:{}".format(dir)]
     for filepath in filepaths:
         path_without_ext, ext = split_extension(filepath)
+        if basename(filepath) == "Gemfile.lock":
+            data.append(filepath)
         if (ext == "rb" or ext == "rbi") and not path_without_ext.endswith(".snapshot"):
             data.append(filepath)
             if not filepath.endswith("scip-ruby-args.rb"):  # Special file for reading Gem-level args.

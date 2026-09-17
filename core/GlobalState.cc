@@ -2024,6 +2024,7 @@ bool GlobalState::unfreezeSymbolTable() {
 
 void GlobalState::copyOptions(const core::GlobalState &other) {
     this->isSCIPRuby = other.isSCIPRuby;
+    this->scipRubyLegacyTModule = other.scipRubyLegacyTModule;
     this->unsilenceErrors = other.unsilenceErrors;
     this->logRecordedFilepaths = other.logRecordedFilepaths;
     this->silenceErrors = other.silenceErrors;

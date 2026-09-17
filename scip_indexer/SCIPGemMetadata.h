@@ -33,6 +33,9 @@ extern GemMetadataError configNotFoundError, multipleGemspecWarning, failedToPar
     failedToParseGemspecWarning, failedToParseNameFromGemspecWarning, failedToParseVersionFromGemspecWarning,
     failedToParseGemfileLockWarning;
 
+// Only an unambiguous released sorbet-runtime pin from the root lockfile enables compatibility.
+bool usesLegacyTModule(const FileSystem &fs);
+
 class GemMetadata final {
     std::string _name;
     std::string _version;

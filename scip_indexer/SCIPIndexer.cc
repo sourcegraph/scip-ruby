@@ -1684,9 +1684,12 @@ public:
     bool isSCIPRuby() const override {
         return true;
     }
+    void configureGlobalState(core::GlobalState &gs) const override {
+        gs.scipRubyLegacyTModule = this->config.legacyTModule;
+    }
     std::string_view cacheKey() const override {
-        // Include captured describe declarations in cached trees.
-        return "scip-ruby:12";
+        // Include captured describe declarations and the runtime compatibility mode in cached trees.
+        return this->config.legacyTModule ? "scip-ruby:12:legacy-t-module" : "scip-ruby:12";
     }
 
     virtual void typecheckClass(const core::GlobalState &gs, core::FileRef file,
@@ -1814,6 +1817,7 @@ public:
             indexFilePath = "index.scip";
         }
         scip_indexer::Config config{};
+        config.legacyTModule = scip_indexer::usesLegacyTModule(OSFileSystem());
         if (providedOptions.count("gem-map-path") > 0) {
             config.gemMapPath = providedOptions["gem-map-path"].as<string>();
         }

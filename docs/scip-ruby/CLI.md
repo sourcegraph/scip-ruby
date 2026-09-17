@@ -2,6 +2,19 @@
 
 This document describes scip-ruby specific flags.
 
+## Sorbet runtime compatibility
+
+scip-ruby reads `Gemfile.lock` in its working directory to preserve bare `Module`
+lookup inside `T` for projects pinned to sorbet-runtime versions before `0.6.12698`,
+which introduced `T::Module`. This applies only to the bundled constant: explicit
+`T::Module` references and project definitions keep their normal meaning.
+
+Only an unambiguous numeric release pin from a `GEM` section enables this behavior.
+Missing or conflicting pins, prereleases, and Git/path dependencies use current
+lookup. The compatibility mode is included in the cache identity, so changing the
+pin does not reuse resolution from the other mode. This is a targeted compatibility
+rule, not selection of a complete payload for each Sorbet version.
+
 ## `--gem-metadata <arg>`
 
 The argument should be `name@version` format, which identifies the current

@@ -13,6 +13,7 @@ struct Config {
     std::string gemMetadata;
     // Argument to --gem-map-path, missing state folded to ""
     std::string gemMapPath;
+    bool legacyTModule = false;
 };
 
 } // namespace sorbet::scip_indexer

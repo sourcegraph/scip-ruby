@@ -298,6 +298,16 @@ private:
                 // fast path in LSP, but we do need to explicitly look through type template
                 // static fields to find the field on the singleton class.
                 auto lookup = scope->scope.asClassOrModuleRef().data(ctx)->findMemberNoDealias(name);
+                if (ctx.state.isSCIPRuby && ctx.state.scipRubyLegacyTModule && lookup == core::Symbols::T_Module() &&
+                    !ctx.file.data(ctx).isPayload() &&
+                    absl::c_all_of(core::Symbols::T_Module().data(ctx)->locs(),
+                                   [&](auto loc) { return !loc.exists() || loc.file().data(ctx).isPayload(); })) {
+                    // On older runtimes a bare Module under T found ::Module. Do not let a
+                    // newly bundled constant shadow it. Explicit T::Module references and
+                    // project definitions still use normal lookup.
+                    scope = scope->parent.get();
+                    continue;
+                }
                 if (lookup.isStaticField(ctx)) {
                     if (lookup.asFieldRef().data(ctx)->isClassAlias()) {
                         auto dealiased = lookup.dealias(ctx);

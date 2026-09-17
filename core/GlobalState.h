@@ -525,6 +525,8 @@ public:
     int globalStateId;
     // SCIP records unresolved fields for navigation through untyped code.
     bool isSCIPRuby = false;
+    // The project's pinned runtime predates the payload's T::Module constant.
+    bool scipRubyLegacyTModule = false;
     // Field references remaining unresolved after name resolution, grouped by class.
     UnorderedMap<core::ClassOrModuleRef, UnorderedSet<core::NameRef>> unresolvedFields;
 

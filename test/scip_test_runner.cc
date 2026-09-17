@@ -142,6 +142,34 @@ PATH
     }
 }
 
+TEST_CASE("LegacySorbetRuntimePin") {
+    if (!onlyRunUnitTests) {
+        return;
+    }
+    MockFileSystem fs("/runtime-pin");
+    CHECK_FALSE(scip_indexer::usesLegacyTModule(fs));
+    const vector<pair<string, bool>> cases{
+        {"GEM\n  specs:\n    sorbet-runtime (0.5.11435)\n", true},
+        {"GEM\n  specs:\n    sorbet-runtime (0.6.12697)\n", true},
+        {"GEM\n  specs:\n    sorbet-runtime (0.6.12698)\n", false},
+        {"GEM\n  specs:\n    sorbet-runtime (0.7.1)\n", false},
+        {"GEM\r\n  specs:\r\n    sorbet-runtime (0.5.11435)\r\n", true},
+        {"GEM\n  specs:\n      sorbet-runtime (>= 0.5)\nDEPENDENCIES\n  sorbet-runtime (= 0.5.1)\n", false},
+        {"GEM\n  specs:\n    sorbet-runtime (0.5.1)\n    sorbet-runtime (0.6.12698)\n", false},
+        {"GEM\n  specs:\n    sorbet-runtime (0.5.1)\n    sorbet-runtime (0.5.1)\n", true},
+        {"GIT\n  specs:\n    sorbet-runtime (0.5.1)\n", false},
+        {"PATH\n  specs:\n    sorbet-runtime (0.5.1)\n", false},
+        {"GEM\n  specs:\n    sorbet-runtime (0.5.1.dev)\n", false},
+        {"GEM\n  specs:\n    sorbet-runtime (0.5.999999999999999999999)\n", false},
+    };
+    for (const auto &testCase : cases) {
+        const auto &contents = testCase.first;
+        INFO(contents);
+        fs.writeFile("Gemfile.lock", contents);
+        CHECK(scip_indexer::usesLegacyTModule(fs) == testCase.second);
+    }
+}
+
 TEST_CASE("GemMapParsing") {
     if (!onlyRunUnitTests) {
         return;
@@ -683,6 +711,7 @@ void test_one_gem(Expectations &test, const TestSettings &settings, realmain::op
     auto parseResult = options.parse(argv.size() - 1, argv.data());
 
     gs.semanticExtensions.push_back(scipProvider->readOptions(parseResult));
+    gs.semanticExtensions.back()->configureGlobalState(gs);
     {
         sorbet::core::UnfreezeNameTable nt(gs);
         vector<ast::ParsedFile> trees;

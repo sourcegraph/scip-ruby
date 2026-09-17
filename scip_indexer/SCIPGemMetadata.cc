@@ -1,3 +1,4 @@
+#include <array>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -7,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/strings/numbers.h"
 #include "absl/strings/str_replace.h"
 
 #include "common/FileSystem.h"
@@ -22,6 +24,43 @@
 using namespace std;
 
 namespace sorbet::scip_indexer {
+
+bool usesLegacyTModule(const FileSystem &fs) {
+    string contents;
+    try {
+        contents = fs.readFile("Gemfile.lock");
+    } catch (const FileNotFoundException &) {
+        return false;
+    }
+    istringstream lines(contents);
+    string section;
+    bool specs = false;
+    optional<array<uint32_t, 3>> pin;
+    const regex releasedVersion(R"(^    sorbet-runtime \(([0-9]+)\.([0-9]+)\.([0-9]+)\)$)");
+    for (string line; getline(lines, line);) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        if (!line.empty() && line[0] != ' ') {
+            section = line;
+            specs = false;
+        } else if (line == "  specs:") {
+            specs = true;
+        } else if (specs && absl::StartsWith(line, "    sorbet-runtime (")) {
+            // A Git/path dependency may have changes absent from its declared release version.
+            smatch match;
+            array<uint32_t, 3> version;
+            if (section != "GEM" || !regex_match(line, match, releasedVersion) ||
+                !absl::SimpleAtoi(match[1].str(), &version[0]) || !absl::SimpleAtoi(match[2].str(), &version[1]) ||
+                !absl::SimpleAtoi(match[3].str(), &version[2]) || (pin.has_value() && *pin != version)) {
+                return false;
+            }
+            pin = version;
+        }
+    }
+    // eaf645232: 0.6.12698.20251103181813-eaf645232 introduced T::Module.
+    return pin.has_value() && *pin < array<uint32_t, 3>{0, 6, 12698};
+}
 
 using GMEKind = GemMetadataError::Kind;
 GemMetadataError configNotFoundError =

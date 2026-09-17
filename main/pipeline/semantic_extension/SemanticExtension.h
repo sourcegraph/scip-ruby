@@ -35,6 +35,7 @@ public:
     virtual std::string_view cacheKey() const {
         return {};
     }
+    virtual void configureGlobalState(core::GlobalState &) const {}
     virtual void prepareForTypechecking(const core::GlobalState &) = 0;
     virtual void finishTypecheckFile(const core::GlobalState &, const core::FileRef &) const = 0;
     virtual void finishTypecheck(const core::GlobalState &) const = 0;
