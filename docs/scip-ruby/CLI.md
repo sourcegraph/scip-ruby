@@ -2,6 +2,13 @@
 
 This document describes scip-ruby specific flags.
 
+## `--cache-dir <dir>`
+
+Enables on-disk caching under `<dir>/scip-ruby/`. The subdirectory keeps SCIP's
+cache separate from Sorbet's, including when both tools read `--cache-dir` from
+the same `sorbet/config`. For example, `--cache-dir=.cache` uses `.cache/scip-ruby/`.
+Caching remains disabled when the option is absent or its value is empty.
+
 ## Sorbet runtime compatibility
 
 scip-ruby reads `Gemfile.lock` in its working directory to preserve bare `Module`

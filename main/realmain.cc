@@ -40,6 +40,7 @@
 #include "spdlog/sinks/stdout_color_sinks.h"
 
 #include <csignal>
+#include <filesystem>
 #include <iterator>
 #include <poll.h>
 
@@ -408,6 +409,13 @@ int realmain(int argc, char *argv[]) {
     vector<unique_ptr<sorbet::pipeline::semantic_extension::SemanticExtension>> extensions;
     options::Options opts;
     options::readOptions(opts, extensions, argc, argv, extensionProviders, logger);
+    for (const auto &extension : extensions) {
+        if (extension->isSCIPRuby() && !opts.cacheDir.empty()) {
+            // Isolate SCIP from Sorbet even when both inherit --cache-dir from sorbet/config.
+            opts.cacheDir = (filesystem::path(opts.cacheDir) / "scip-ruby").string();
+            break;
+        }
+    }
     if (opts.stdoutHUPHack) {
         startHUPMonitor();
     }
