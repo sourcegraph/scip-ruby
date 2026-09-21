@@ -298,6 +298,16 @@ private:
                 // fast path in LSP, but we do need to explicitly look through type template
                 // static fields to find the field on the singleton class.
                 auto lookup = scope->scope.asClassOrModuleRef().data(ctx)->findMemberNoDealias(name);
+                if (ctx.state.isSCIPRuby && ctx.state.scipRubyLegacyTModule && lookup == core::Symbols::T_Module() &&
+                    !ctx.file.data(ctx).isPayload() &&
+                    absl::c_all_of(core::Symbols::T_Module().data(ctx)->locs(),
+                                   [&](auto loc) { return !loc.exists() || loc.file().data(ctx).isPayload(); })) {
+                    // On older runtimes a bare Module under T found ::Module. Do not let a
+                    // newly bundled constant shadow it. Explicit T::Module references and
+                    // project definitions still use normal lookup.
+                    scope = scope->parent.get();
+                    continue;
+                }
                 if (lookup.isStaticField(ctx)) {
                     if (lookup.asFieldRef().data(ctx)->isClassAlias()) {
                         auto dealiased = lookup.dealias(ctx);
@@ -973,7 +983,8 @@ private:
         auto ancestorType =
             core::make_type<core::UnresolvedClassType>(unresolvedPath->first, move(unresolvedPath->second));
 
-        auto uaSym = ctx.state.enterMethodSymbol(core::Loc::none(), item.klass, core::Names::unresolvedAncestors());
+        auto uaSym = ctx.state.enterMethodSymbol(core::Loc::none(), item.klass, core::Names::unresolvedAncestors(),
+                                                 core::Loc::none());
 
         // Add a fake block argument so that this method symbol passes sanity checks
         auto &arg = ctx.state.enterMethodParameter(core::Loc::none(), uaSym, core::Names::blkArg());
@@ -2471,6 +2482,13 @@ class ResolveTypeMembersAndFieldsWalk {
             return false;
         }
 
+        if (gs.isSCIPRuby && job.cast->cast == core::Names::syntheticBind() && core::isa_type<core::SelfType>(type)) {
+            // Minitest keeps captured example bodies as blocks, but they run
+            // on instances. Resolve its synthetic self binding before static
+            // initializers are created, when the owner is the instance class.
+            type = ctx.owner.enclosingClass(gs).data(gs)->selfType(gs);
+        }
+
         job.cast->type = move(type);
 
         if (auto *kernelLambda = isKernelProcOrLambda(job.cast->arg)) {
@@ -3038,7 +3056,7 @@ class ResolveTypeMembersAndFieldsWalk {
         }
 
         auto loc = ctx.locAt(job.fromNameLoc);
-        auto alias = ctx.state.enterMethodSymbol(loc, job.owner, job.fromName);
+        auto alias = ctx.state.enterMethodSymbol(loc, job.owner, job.fromName, loc);
         alias.data(ctx)->addLoc(ctx, loc);
         alias.data(ctx)->resultType = core::make_type<core::AliasType>(core::SymbolRef(toMethod));
 
@@ -3928,7 +3946,12 @@ private:
                     }
                     param.type = core::Types::untypedUntracked();
                 }
-                param.loc = ctx.locAt(spec->nameLoc);
+                // SCIP hovers need the Ruby parameter name. A signature's key may
+                // have an empty generated RBS location or include symbol delimiters.
+                // Preserve declaration locations, falling back for synthetic parameters.
+                if (!ctx.state.isSCIPRuby || !param.loc.exists() || param.loc.empty()) {
+                    param.loc = ctx.locAt(spec->nameLoc);
+                }
                 param.rebind = spec->rebind;
                 sig.argTypes.erase(spec);
                 // Since methods always have (synthesized if necessary) block arguments,
@@ -4410,6 +4433,101 @@ public:
     }
 };
 
+/// Helper type to traverse ASTs and aggregate information about unresolved fields.
+///
+/// For perf, it would make sense to fuse this along with some other map-reduce
+/// operation over files, but I've kept it separate for now for ease of maintenance.
+class CollectUnresolvedFieldsWalk final {
+    UnorderedMap<core::ClassOrModuleRef, UnorderedSet<core::NameRef>> unresolvedFields;
+
+public:
+    void postTransformUnresolvedIdent(core::Context ctx, const ast::UnresolvedIdent &unresolvedIdent) {
+        using Kind = ast::UnresolvedIdent::Kind;
+        core::ClassOrModuleRef klass;
+        switch (unresolvedIdent.kind) {
+            case Kind::Global:
+            case Kind::Local:
+                return;
+            case Kind::Class: {
+                auto enclosingClass = ctx.owner.enclosingClass(ctx);
+                klass = enclosingClass.data(ctx)->isSingletonClass(ctx)
+                            ? enclosingClass                                       // in <static-init>
+                            : enclosingClass.data(ctx)->lookupSingletonClass(ctx); // in static methods
+                break;
+            }
+            case Kind::Instance: {
+                klass = ctx.owner.enclosingClass(ctx);
+            }
+        }
+        this->unresolvedFields[klass].insert(unresolvedIdent.name);
+    }
+
+    struct CollectWalkResult {
+        UnorderedMap<core::ClassOrModuleRef, UnorderedSet<core::NameRef>> unresolvedFields;
+        vector<ast::ParsedFile> trees;
+    };
+
+    static vector<ast::ParsedFile> collect(core::GlobalState &gs, vector<ast::ParsedFile> trees, WorkerPool &workers) {
+        Timer timeit(gs.tracer(), "resolver.collect_unresolved_fields");
+        const core::GlobalState &igs = gs;
+        auto resultq = make_shared<BlockingBoundedQueue<CollectWalkResult>>(trees.size());
+        auto fileq = make_shared<ConcurrentBoundedQueue<ast::ParsedFile>>(trees.size());
+        for (auto &tree : trees) {
+            fileq->push(move(tree), 1);
+        }
+        trees.clear();
+
+        workers.multiplexJob("collectUnresolvedFieldsWalk", [&igs, fileq, resultq]() {
+            Timer timeit(igs.tracer(), "CollectUnresolvedFieldsWorker");
+            CollectUnresolvedFieldsWalk collect;
+            CollectWalkResult walkResult;
+            vector<ast::ParsedFile> collectedTrees;
+            ast::ParsedFile job;
+            for (auto result = fileq->try_pop(job); !result.done(); result = fileq->try_pop(job)) {
+                if (!result.gotItem()) {
+                    continue;
+                }
+                core::Context ictx(igs, core::Symbols::root(), job.file);
+                ast::ConstTreeWalk::apply(ictx, collect, job.tree);
+                collectedTrees.emplace_back(move(job));
+            }
+            if (!collectedTrees.empty()) {
+                walkResult.trees = move(collectedTrees);
+                walkResult.unresolvedFields = std::move(collect.unresolvedFields);
+                resultq->push(move(walkResult), walkResult.trees.size());
+            }
+        });
+
+        {
+            CollectWalkResult threadResult;
+            for (auto result = resultq->wait_pop_timed(threadResult, WorkerPool::BLOCK_INTERVAL(), gs.tracer());
+                 !result.done();
+                 result = resultq->wait_pop_timed(threadResult, WorkerPool::BLOCK_INTERVAL(), gs.tracer())) {
+                if (!result.gotItem()) {
+                    continue;
+                }
+                trees.insert(trees.end(), make_move_iterator(threadResult.trees.begin()),
+                             make_move_iterator(threadResult.trees.end()));
+                gs.unresolvedFields.reserve(gs.unresolvedFields.size() + threadResult.unresolvedFields.size());
+                gs.unresolvedFields.insert(make_move_iterator(threadResult.unresolvedFields.begin()),
+                                           make_move_iterator(threadResult.unresolvedFields.end()));
+            }
+            // NOTE(varun): This walker is meant to be invoked after name resolution is finished.
+            // As such, one might expect that the unresolved fields across classes stay the same
+            // across runs, as all the single-threaded merging which requires cross-file data
+            // is complete. However, that's not the case. 😕
+            //
+            // In particular, when testing on the shopify-ruby-codebase, printing the
+            // printing the number of unresolved fields for each class gave varying results
+            // (e.g. in one run, a class would have 85 unresolved fields, in another run,
+            // it would have 87 unresolved fields).
+        }
+
+        fast_sort(trees, [](const auto &lhs, const auto &rhs) -> bool { return lhs.file < rhs.file; });
+        return trees;
+    }
+};
+
 class ResolveSanityCheckWalk {
 public:
     void postTransformClassDef(core::Context ctx, const ast::ClassDef &original) {
@@ -4565,6 +4683,9 @@ ast::ParsedFilesOrCancelled Resolver::run(core::GlobalState &gs, vector<ast::Par
 
     auto result = resolveSigs(gs, std::move(rtmafResult.trees), workers);
     ResolveTypeMembersAndFieldsWalk::resolvePendingCastItems(gs, rtmafResult.todoResolveCastItems);
+    if (gs.isSCIPRuby) {
+        result = CollectUnresolvedFieldsWalk::collect(gs, std::move(result), workers);
+    }
     sanityCheck(gs, result);
 
     // Update offsets for the next stratum.

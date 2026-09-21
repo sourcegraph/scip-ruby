@@ -17,6 +17,7 @@
 #include <filesystem>
 #include <memory>
 #include <variant>
+#include <sys/param.h>
 #include <vector>
 
 #include <sys/stat.h>
@@ -95,6 +96,10 @@ bool sorbet::FileOps::ensureDir(const string &path) {
     }
 
     return true;
+}
+
+std::string sorbet::FileOps::getCurrentDir() {
+    return std::filesystem::current_path();
 }
 
 void sorbet::FileOps::removeDir(const string &path) {

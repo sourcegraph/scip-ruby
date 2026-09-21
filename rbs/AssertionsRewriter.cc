@@ -28,7 +28,7 @@ const regex absurdPattern("^\\s*absurd\\s*(#.*)?$");
 optional<pair<pm_node_t *, InlineComment::Kind>>
 parseComment(core::MutableContext ctx, parser::Prism::Parser &parser, InlineComment comment,
              absl::Span<pair<core::LocOffsets, core::NameRef>> typeParams) {
-    Factory prism{parser};
+    Factory prism{parser, ctx.state.isSCIPRuby};
 
     if (comment.kind == InlineComment::Kind::MUST || comment.kind == InlineComment::Kind::UNSAFE ||
         comment.kind == InlineComment::Kind::ABSURD) {
@@ -283,7 +283,14 @@ void maybeSupplyGenericTypeArguments(core::MutableContext ctx, parser::Prism::Pa
     // We need to create a deep copy of the type node because it will be used in two places:
     // 1. As the receiver of .new()
     // 2. As the type argument to T.let()
-    newCall->receiver = deepCopyGenericTypeNode(parser, *type);
+    auto *instantiatedType = down_cast_nonnull<pm_call_node_t>(deepCopyGenericTypeNode(parser, *type));
+    if (ctx.state.isSCIPRuby) {
+        // Preserve the handwritten class reference in `Box.new #: Box[Elem]`.
+        // The copied type arguments retain their locations in the annotation.
+        parser.destroyNode(instantiatedType->receiver);
+        instantiatedType->receiver = newCall->receiver;
+    }
+    newCall->receiver = up_cast(instantiatedType);
 }
 
 } // namespace

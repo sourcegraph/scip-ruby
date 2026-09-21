@@ -1,6 +1,7 @@
 #ifndef SORBET_PIPELINE_SEMANTIC_EXTENSION
 #define SORBET_PIPELINE_SEMANTIC_EXTENSION
 #include <memory> // unique_ptr
+#include <string_view>
 #include <vector>
 
 namespace cxxopts {
@@ -27,9 +28,21 @@ class CFG;
 namespace pipeline::semantic_extension {
 class SemanticExtension {
 public:
+    virtual bool isSCIPRuby() const {
+        return false;
+    }
+    // Versioned identity for cached trees produced by this extension. Change it when rewrites change.
+    virtual std::string_view cacheKey() const {
+        return {};
+    }
+    virtual void configureGlobalState(core::GlobalState &) const {}
+    virtual void prepareForTypechecking(const core::GlobalState &) = 0;
     virtual void finishTypecheckFile(const core::GlobalState &, const core::FileRef &) const = 0;
     virtual void finishTypecheck(const core::GlobalState &) const = 0;
-    virtual void typecheck(const core::GlobalState &, core::FileRef file, cfg::CFG &) const = 0;
+    virtual void typecheck(const core::GlobalState &, core::FileRef file, cfg::CFG &,
+                           const ast::MethodDef * = nullptr) const = 0;
+    virtual void typecheckMethod(const core::GlobalState &, core::FileRef, const ast::MethodDef &) const = 0;
+    virtual void typecheckClass(const core::GlobalState &, core::FileRef file, const ast::ClassDef &) const = 0;
     virtual void run(core::MutableContext &, ast::ClassDef *) const = 0;
     virtual ~SemanticExtension() = default;
     virtual std::unique_ptr<SemanticExtension> deepCopy(const core::GlobalState &from, core::GlobalState &to) = 0;

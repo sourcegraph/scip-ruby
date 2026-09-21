@@ -1,0 +1,92 @@
+name: 'Publish Docker'
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish Docker image for (scip-ruby-vM.N.P)'
+  workflow_run:
+    workflows: ['Release']
+    types:
+      - completed
+
+jobs:
+  release-image:
+    runs-on: 'ubuntu-22.04'
+    steps:
+      - run: |
+          if [ -z "$TAG" ]; then
+            # From https://stackoverflow.com/questions/10649814/get-last-git-tag-from-a-remote-repo-without-cloning
+            TAG="$(git -c 'versionsort.suffix=-' \
+              ls-remote --exit-code --refs --sort='version:refname' --tags https://github.com/sourcegraph/scip-ruby.git 'scip-ruby-v*' \
+              | tail --lines=1 \
+              | cut --delimiter='/' --fields=3)"
+          fi
+          PATCH="${TAG/scip-ruby-v/}"
+          MINOR="${PATCH%.*}"
+          MAJOR="${MINOR%.*}"
+          {
+            echo "TAG=$TAG"
+            echo "PATCH=$PATCH"
+            echo "MINOR=$MINOR"
+            echo "MAJOR=$MAJOR"
+          } >> "$GITHUB_ENV"
+        env:
+          TAG: ${{ inputs.tag }}
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Build base image (not published)
+        id: docker_build_base
+        uses: docker/build-push-action@v6
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          file: Dockerfile.base
+          push: false
+          load: true
+          build-args: |
+            SCIP_RUBY_VERSION=${{ env.PATCH }}
+          tags: |
+            scip-ruby-base:${{ env.PATCH }}
+      - name: Build and push autoindex image
+        id: docker_build_autoindex
+        uses: docker/build-push-action@v6
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          file: Dockerfile.autoindex
+          push: true
+          build-contexts: |
+            scip-ruby-base=docker-image://scip-ruby-base:${{ env.PATCH }}
+          build-args: |
+            BASE_TAG=${{ env.PATCH }}
+          tags: |
+            sourcegraph/scip-ruby:autoindex
+            sourcegraph/scip-ruby:autoindex-${{ env.PATCH }}
+            sourcegraph/scip-ruby:autoindex-${{ env.MINOR }}
+            sourcegraph/scip-ruby:autoindex-${{ env.MAJOR }}
+      - name: Build and push scip-ruby image
+        id: docker_build_scip_ruby
+        uses: docker/build-push-action@v6
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          file: Dockerfile
+          push: true
+          build-contexts: |
+            scip-ruby-base=docker-image://scip-ruby-base:${{ env.PATCH }}
+          build-args: |
+            BASE_TAG=${{ env.PATCH }}
+          tags: |
+            sourcegraph/scip-ruby:latest
+            sourcegraph/scip-ruby:${{ env.PATCH }}
+            sourcegraph/scip-ruby:${{ env.MINOR }}
+            sourcegraph/scip-ruby:${{ env.MAJOR }}

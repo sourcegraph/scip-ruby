@@ -1,9 +1,11 @@
 workspace(name = "com_stripe_ruby_typer")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load("//third_party:externals.bzl", "register_sorbet_dependencies")
+load("//third_party:externals.bzl", "register_scip_ruby_dependencies", "register_sorbet_dependencies")
 
 register_sorbet_dependencies()
+
+register_scip_ruby_dependencies()
 
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 
@@ -49,12 +51,14 @@ compatibility_proxy_repo()
 load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
 
 llvm_toolchain(
-    name = "llvm_toolchain_15_0_7",
-    absolute_paths = True,
+    name = "llvm_toolchain_15_0_6",
+    # absolute_paths = False (the default) creates symlinks for tools like
+    # llvm-libtool-darwin -> libtool in the toolchain bin directory, which is
+    # required for proper tool resolution on macOS.
     alternative_llvm_sources = [
-        "https://github.com/sorbet/llvm-project/releases/download/llvmorg-{llvm_version}/{basename}",
+        "https://github.com/llvm/llvm-project/releases/download/llvmorg-{llvm_version}/{basename}",
     ],
-    llvm_version = "15.0.7",
+    llvm_version = "15.0.6",
     # The sysroots are needed for cross-compiling
     sysroot = {
         "": "",
@@ -63,7 +67,7 @@ llvm_toolchain(
     },
 )
 
-load("@llvm_toolchain_15_0_7//:toolchains.bzl", "llvm_register_toolchains")
+load("@llvm_toolchain_15_0_6//:toolchains.bzl", "llvm_register_toolchains")
 
 llvm_register_toolchains()
 

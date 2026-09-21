@@ -243,10 +243,21 @@ string CFG::toString(const core::GlobalState &gs) const {
     return to_string(buf);
 }
 
-string CFG::toTextualString(const core::GlobalState &gs) const {
+string CFG::toTextualString(const core::GlobalState &gs, optional<core::FileRef> file) const {
     fmt::memory_buffer buf;
     string symbolName = this->symbol.showFullName(gs);
-    fmt::format_to(std::back_inserter(buf), "method {} {{\n\n", symbolName);
+    if (file) {
+        auto method = this->symbol.data(gs);
+        if (method->nameLoc.exists() && !method->nameLoc.empty()) {
+            fmt::format_to(std::back_inserter(buf), "method @ {} {} {{\n\n", method->nameLoc.showRawLineColumn(gs),
+                           symbolName);
+        } else {
+            fmt::format_to(std::back_inserter(buf), "method @ {} (full) {} {{\n\n", method->loc().showRawLineColumn(gs),
+                           symbolName);
+        }
+    } else {
+        fmt::format_to(std::back_inserter(buf), "method {} {{\n\n", symbolName);
+    }
     for (auto &basicBlock : this->basicBlocks) {
         if (!basicBlock->backEdges.empty()) {
             fmt::format_to(std::back_inserter(buf), "# backedges\n");
@@ -255,7 +266,7 @@ string CFG::toTextualString(const core::GlobalState &gs) const {
             }
         }
 
-        fmt::format_to(std::back_inserter(buf), "{}\n", basicBlock->toTextualString(gs, *this));
+        fmt::format_to(std::back_inserter(buf), "{}\n", basicBlock->toTextualString(gs, file, *this));
     }
     fmt::format_to(std::back_inserter(buf), "}}");
     return to_string(buf);
@@ -370,7 +381,7 @@ string BasicBlock::toString(const core::GlobalState &gs, const CFG &cfg) const {
     return to_string(buf);
 }
 
-string BasicBlock::toTextualString(const core::GlobalState &gs, const CFG &cfg) const {
+string BasicBlock::toTextualString(const core::GlobalState &gs, optional<core::FileRef> file, const CFG &cfg) const {
     fmt::memory_buffer buf;
     fmt::format_to(std::back_inserter(buf), "bb{}[firstDead={}]({}):\n", this->id, this->firstDeadInstructionIdx,
                    fmt::map_join(
@@ -380,8 +391,7 @@ string BasicBlock::toTextualString(const core::GlobalState &gs, const CFG &cfg) 
         fmt::format_to(std::back_inserter(buf), "    # outerLoops: {}\n", this->outerLoops);
     }
     for (const Binding &exp : this->exprs) {
-        fmt::format_to(std::back_inserter(buf), "    {} = {}\n", exp.bind.toString(gs, cfg),
-                       exp.value.toString(gs, cfg));
+        fmt::format_to(std::back_inserter(buf), "    {}\n", exp.toTextualString(gs, file, cfg));
     }
 
     if (this->bexit.thenb == this->bexit.elseb) {
@@ -419,7 +429,19 @@ string BasicBlock::showRaw(const core::GlobalState &gs, const CFG &cfg) const {
     return to_string(buf);
 }
 
-Binding::Binding(LocalRef bind, core::LocOffsets loc, InstructionPtr value)
-    : bind(bind), loc(loc), value(std::move(value)) {}
+Binding::Binding(LocalOccurrence bind, core::LocOffsets loc, InstructionPtr value)
+    : bind(bind.variable, bind.loc), loc(loc), value(std::move(value)) {}
+
+std::string Binding::toTextualString(const core::GlobalState &gs, std::optional<core::FileRef> file,
+                                     const CFG &cfg) const {
+    string lhsPositionText = "";
+    string rhsPositionText = "";
+    if (file) {
+        lhsPositionText = fmt::format(" @ {}", core::Loc(file.value(), this->bind.loc).showRawLineColumn(gs));
+        rhsPositionText = fmt::format(" (@ {})", core::Loc(file.value(), this->loc).showRawLineColumn(gs));
+    }
+    return fmt::format("{}{} = {}{}", this->bind.toString(gs, cfg), lhsPositionText, this->value.toString(gs, cfg),
+                       rhsPositionText);
+}
 
 } // namespace sorbet::cfg

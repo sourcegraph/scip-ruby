@@ -1062,6 +1062,37 @@ Environment::processBinding(core::Context ctx, const cfg::CFG &inWhat, cfg::Bind
                                                 ownerLoc,        send.isPrivateOk,
                                                 suppressErrors,  inWhat.symbol.data(ctx)->name};
                 auto dispatched = recvType.type.dispatchCall(ctx, dispatchArgs);
+                if (ctx.state.isSCIPRuby) {
+                    // Replace matches from earlier inference passes. Keep only
+                    // selected components, including calls through intrinsics.
+                    send.scipDispatchInfo = std::move(dispatched.main.scipDispatchInfo);
+                    auto intersection = send.scipDispatchInfo && send.scipDispatchInfo->intersectionMethods.has_value();
+                    for (auto next = dispatched.secondary.get(); next != nullptr; next = next->secondary.get()) {
+                        auto &info = next->main.scipDispatchInfo;
+                        intersection = intersection || (info && info->intersectionMethods.has_value());
+                        if (!send.scipDispatchInfo) {
+                            send.scipDispatchInfo = std::move(info);
+                        } else if (info) {
+                            auto &matches = send.scipDispatchInfo->keywordArguments;
+                            matches.insert(matches.end(), info->keywordArguments.begin(), info->keywordArguments.end());
+                        }
+                    }
+                    auto wrapped = send.fun == core::Names::callWithSplat() ||
+                                   send.fun == core::Names::callWithBlockPass() ||
+                                   send.fun == core::Names::callWithSplatAndBlockPass();
+                    if (intersection) {
+                        ENFORCE(send.scipDispatchInfo);
+                        auto &methods = send.scipDispatchInfo->intersectionMethods.emplace();
+                        for (auto result = &dispatched; result != nullptr; result = result->secondary.get()) {
+                            auto method = result->main.method;
+                            // An intrinsic can stop before dispatching to the user's
+                            // method, for example when a splat's size is unknown.
+                            if (method.exists() && !(wrapped && method.data(ctx)->name == send.fun)) {
+                                methods.push_back(method);
+                            }
+                        }
+                    }
+                }
 
                 auto it = &dispatched;
                 while (it != nullptr) {

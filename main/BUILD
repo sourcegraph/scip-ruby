@@ -39,6 +39,28 @@ cc_binary(
 )
 
 cc_binary(
+    name = "scip-ruby",
+    srcs = [
+        "main.cc",
+    ],
+    linkstatic = select({
+        "//tools/config:linkshared": 0,
+        "//conditions:default": 1,
+    }),
+    malloc = select({
+        ":jemalloc": "@jemalloc//:jemalloc",
+        ":mimalloc": "@mimalloc//:mimalloc",
+        "//conditions:default": "@bazel_tools//tools/cpp:malloc",
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        "realmain",
+        "//payload",
+        "//scip_indexer",
+    ],
+)
+
+cc_binary(
     name = "sorbet-orig",
     srcs = [
         "main.cc",

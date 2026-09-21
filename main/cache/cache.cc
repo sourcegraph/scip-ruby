@@ -24,7 +24,8 @@ unique_ptr<KeyValueStore> openCache(shared_ptr<::spdlog::logger> logger, string 
     // the number of files stored * the number of flavors used. For this reason, we need to be very careful when
     // considering adding a new cache flavor.
     auto flavor = "default";
-    auto version = fmt::format("{}|{}", sorbet::full_version_string, opts.cacheSensitiveOptions.serialize());
+    auto version = fmt::format("{}|{}{}", sorbet::full_version_string, opts.cacheSensitiveOptions.serialize(),
+                               opts.semanticExtensionCacheKey);
     return make_unique<KeyValueStore>(std::move(logger), version, std::move(cacheDir), flavor, opts.maxCacheSizeBytes);
 }
 } // namespace

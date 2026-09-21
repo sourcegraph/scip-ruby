@@ -9,7 +9,7 @@ clang_tool("clang-tidy")
 sh_binary(
     name = "sanitizer_test_wrapper",
     srcs = ["sanitizer_test_wrapper.sh"],
-    data = ["@llvm_toolchain_15_0_7//:bin/llvm-symbolizer"],
+    data = ["@llvm_toolchain_15_0_6//:bin/llvm-symbolizer"],
 )
 
 compilation_database(
@@ -68,6 +68,7 @@ compilation_database(
         "//main:realmain",
         "//main:realmain-orig",
         "//main:sorbet",
+        "//main:scip-ruby",
         "//main:sorbet-orig",
         "//main/autogen:autogen",
         "//main/autogen/data:data",
@@ -112,6 +113,8 @@ compilation_database(
         "//payload/text:generate_payload",
         "//payload/text:some",
         "//payload/text:text",
+        "//scip_indexer:scip_utils",
+        "//scip_indexer:scip_indexer",
         "//rbi:generate_procs",
         "//rbs:rbs",
         "//resolver:resolver",
@@ -127,6 +130,7 @@ compilation_database(
         "//test:lsp_test_runner",
         "//test:parser_test_runner",
         "//test:pipeline_test_runner",
+        "//test:scip_test_runner",
         "//test:pkg-autocorrects-test",
         "//test:pkg-condensation-test",
         "//test:print_document_symbols",

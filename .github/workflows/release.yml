@@ -1,0 +1,121 @@
+name: Release # This name is used by the publish-docker workflow
+on:
+  push:
+    tags:
+      - 'scip-ruby-v*'
+
+jobs:
+  build-and-upload-artifacts:
+    name: 'Build and upload artifacts'
+    strategy:
+      matrix:
+        platform: ['ubuntu-24.04-32core-graph-team-amd64', 'macos-14-xlarge']
+        # Keep the platform list in sync with 'Supported Configurations' in README.md
+        config: ['asserts', 'release']
+    runs-on: ${{ matrix.platform }}
+    env:
+      TAG: ${{ github.event.ref }}
+    steps:
+      - uses: actions/checkout@v4
+      # Keep in sync with ci.yml
+      - uses: ruby/setup-ruby@v1
+      - name: Manually evict cache entry if applicable
+        if: ${{ runner.os == 'Linux' }}
+        run: ACCESS_TOKEN='${{ secrets.GITHUB_TOKEN }}' python3 .github/workflows/evict.py
+      - name: "🚀 Mount Bazel build cache"
+        if: ${{ runner.os == 'Linux' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/bazelcache/build
+          key: bazel-build-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            bazel-build-${{ runner.os }}-
+            bazel-build-
+      - name: "🚀 Mount Bazel repo cache"
+        uses: actions/cache@v4
+        if: ${{ runner.os == 'Linux' }}
+        with:
+          path: ~/bazelcache/repos
+          key: bazel-repos-${{ runner.os }}-${{ hashFiles('WORKSPACE') }}
+          restore-keys: |
+            bazel-repos-${{ runner.os }}-
+            bazel-repos-
+      - name: "⚙️ Setup Bazel"
+        run: VERSION="${GITHUB_REF/refs\/tags\/scip-ruby-v/}" .github/workflows/setup-bazel.sh
+      - name: "🔎 Identify OS"
+        run: echo "OS=$(uname -s | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+      - name: ${{ format('🏗 Build ({0})', matrix.config) }}
+        run: |
+          CONFIG="dev"
+          if [ "$CFG" == "release" ]; then
+            CONFIG="release-${OS/darwin/mac}"
+          fi
+          ./bazel build //main:scip-ruby --config="$CONFIG" --execution_log_binary_file=log
+          echo "config=$CONFIG" >> "$GITHUB_ENV"
+        env:
+          OS: ${{ env.OS }}
+          CFG: ${{ matrix.config }}
+      - name: "🪵 Upload log"
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ matrix.platform }}-${{ matrix.config }}
+          path: log
+      - name: ${{ format('🪄 Rename binary ({0})', matrix.config) }}
+        run: |
+          SUFFIX="-asserts"
+          if [ "$CFG" == "release" ]; then
+            SUFFIX=""
+          fi
+          outBinaryPath="scip-ruby${SUFFIX}-$(uname -m)-$OS"
+          cp bazel-bin/main/scip-ruby "$outBinaryPath"
+          echo "outBinaryPath=$outBinaryPath" >> "$GITHUB_ENV"
+          echo "suffix=$SUFFIX" >> "$GITHUB_ENV"
+        env:
+          OS: ${{ env.OS }}
+          CFG: ${{ matrix.config }}
+      - name: ${{ format('📦 Store binary ({0})', matrix.config) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-binary-${{ matrix.platform }}-${{ matrix.config }}
+          path: ${{ env.outBinaryPath }}
+      - name: ${{ format('💎 Build Gem(s) ({0})', matrix.config) }}
+        run: ./bazel build //gems/scip-ruby --config="${{ env.config }}"
+      - name: ${{ format('📦 Store Gem(s) to GitHub ({0})', matrix.config) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-gem-${{ matrix.platform }}-${{ matrix.config }}
+          path: bazel-bin/gems/scip-ruby/*.gem
+
+  create-release:
+    name: 'Create release'
+    needs: build-and-upload-artifacts
+    runs-on: 'ubuntu-22.04'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create Release
+        run: |
+          TAG="${GITHUB_REF/refs\/tags\//}"
+          TITLE="${TAG/-v/ v}"
+          TEMPLATE="$(< .github/workflows/release-template.md)"
+          echo "${TEMPLATE//TAG_PLACEHOLDER/$TAG}" > notes
+          gh release create "$TAG" --title "$TITLE" --notes-file notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Download everything to avoid spelling out the different
+      # platforms here.
+      - name: '📥 Download all artifacts'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: artifacts-*
+          path: release-artifacts
+          merge-multiple: true
+      - name: '📤 Upload artifacts for release'
+        run: gh release upload "${GITHUB_REF/refs\/tags\//}" ./release-artifacts/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # There is also publish-manual.yml in case that is needed for some reason.
+      - name: 'Publish gems'
+        run: |
+          for g in ./release-artifacts/**.gem; do
+            GEM_HOST_API_KEY=${{ secrets.RUBYGEMS_API_KEY }} gem push "$g"
+          done

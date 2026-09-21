@@ -355,12 +355,14 @@ pm_node_t *Factory::FalseClass(core::LocOffsets loc) const {
 }
 
 pm_node_t *Factory::T(core::LocOffsets loc) const {
-    return ConstantPathNode(loc, nullptr, "T");
+    // RBS lowering introduces this receiver; there is no source token to index.
+    // Keep locations on the named type in T::Array, T::Boolean, etc.
+    return ConstantPathNode(isSCIPRuby ? loc.copyWithZeroLength() : loc, nullptr, "T");
 }
 
 pm_node_t *Factory::THelpers(core::LocOffsets loc) const {
     // Create T::Helpers constant path
-    return ConstantPathNode(loc, T(loc), "Helpers");
+    return ConstantPathNode(isSCIPRuby ? loc.copyWithZeroLength() : loc, T(loc), "Helpers");
 }
 
 pm_node_t *Factory::TUntyped(core::LocOffsets loc) const {

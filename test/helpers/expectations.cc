@@ -79,8 +79,11 @@ bool addToExpectations(Expectations &exp, string_view filePath, bool isDirectory
         exp.minimizeRBI = filePath;
         return true;
     } else if (absl::EndsWith(filePath, ".rb") || absl::EndsWith(filePath, ".rbi")) {
-        exp.sourceFiles.emplace_back(filePath);
-        return true;
+        if (!absl::EndsWith(filePath, ".snapshot.rb") && !absl::EndsWith(filePath, ".snapshot.rbi") &&
+            !absl::EndsWith(filePath, "scip-ruby-args.rb")) {
+            exp.sourceFiles.emplace_back(filePath);
+            return true;
+        }
     } else if (absl::EndsWith(filePath, ".exp")) {
         auto kind_start = filePath.rfind(".", filePath.size() - strlen(".exp") - 1);
         auto kind = filePath.substr(kind_start + 1, filePath.size() - kind_start - strlen(".exp") - 1);
@@ -138,6 +141,7 @@ Expectations getExpectationsForFolderTest(string_view dir) {
     ENFORCE(dir.back() == '/');
 
     Expectations exp;
+    exp.isFolderTest = true;
     // No basename; all of these files belong to this expectations.
     exp.basename = "";
     exp.folder = dir;
@@ -155,7 +159,12 @@ Expectations getExpectationsForTest(string_view parentDir, string_view testName)
     vector<string> names = listTrimmedTestFilesInDir(parentDir, false);
     bool found = false;
     Expectations exp;
-    exp.basename = testName.substr(parentDir.size() + 1);
+    exp.isFolderTest = false;
+    if (absl::StartsWith(testName, parentDir)) {
+        exp.basename = testName.substr(parentDir.size() + 1);
+    } else {
+        exp.basename = testName;
+    }
     exp.folder = parentDir;
     exp.folder += "/";
     exp.testName = testName;

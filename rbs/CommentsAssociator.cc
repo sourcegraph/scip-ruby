@@ -355,6 +355,13 @@ int CommentsAssociator::maybeInsertStandalonePlaceholders(pm_node_list_t &nodes,
             // Create constant assignment node: `type foo = placeholder`
             pm_constant_id_t name_id = prism.addConstantToPool(nameStr);
             pm_node_t *constantWrite = prism.ConstantWriteNode(it->second.loc, name_id, placeholder);
+            if (ctx.state.isSCIPRuby) {
+                auto nameBegin = it->second.loc.beginPos() + matches.position(1);
+                auto nameLoc = core::LocOffsets{static_cast<uint32_t>(nameBegin),
+                                                static_cast<uint32_t>(nameBegin + matches.length(1))};
+                down_cast_nonnull<pm_constant_write_node_t>(constantWrite)->name_loc =
+                    parser.convertLocOffsets(nameLoc);
+            }
 
             // Insert the assignment into the statement list
             insertNodeAtIndex(nodes, constantWrite, index);
@@ -1257,7 +1264,8 @@ pm_node_t *CommentsAssociator::createSyntheticPlaceholder(const CommentNode &com
 
 CommentsAssociator::CommentsAssociator(core::MutableContext ctx, parser::Prism::Parser &parser,
                                        vector<core::LocOffsets> commentLocations)
-    : ctx(ctx), parser(parser), prism(parser), commentLocations(commentLocations), commentByLine() {
+    : ctx(ctx), parser(parser), prism(parser, ctx.state.isSCIPRuby), commentLocations(commentLocations),
+      commentByLine() {
     auto source = ctx.file.data(ctx).source();
     for (auto &loc : commentLocations) {
         auto commentString = source.substr(loc.beginPos(), loc.endPos() - loc.beginPos());

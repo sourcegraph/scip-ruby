@@ -679,8 +679,15 @@ ast::ExpressionPtr Desugarer::desugarConditionalSend(core::LocOffsets location, 
     auto methodName = translateConstantName(methodNameID);
     auto methodNameLoc = translateLoc(methodNamePrismLoc);
 
+    // SCIP needs the receiver's source range on both branches: CFG dealiasing
+    // can replace the temporary with the original local.
+    auto scipRecvLoc = ctx.state.isSCIPRuby ? receiverExpr.loc() : recvLoc0;
+    if (ctx.state.isSCIPRuby) {
+        csendLoc = scipRecvLoc;
+    }
+
     // $temp = receiverExpr
-    auto assignment = MK::Assign(recvLoc0, receiverTempLocalVarName, move(receiverExpr));
+    auto assignment = MK::Assign(scipRecvLoc, receiverTempLocalVarName, move(receiverExpr));
 
     // Just compare with `NilClass` to avoid potentially calling into a class-defined `==`
     auto cond = MK::Send1(loc0, ast::MK::Constant(recvLoc0, core::Symbols::NilClass()), core::Names::tripleEq(),
@@ -691,7 +698,7 @@ ast::ExpressionPtr Desugarer::desugarConditionalSend(core::LocOffsets location, 
         MK::Send1(recvLoc.copyEndWithZeroLength(), MK::Magic(loc0), core::Names::nilForSafeNavigation(), loc0,
                   MK::Local(csendLoc, receiverTempLocalVarName));
 
-    auto receiverTempLocal = MK::Local(recvLoc0, receiverTempLocalVarName);
+    auto receiverTempLocal = MK::Local(scipRecvLoc, receiverTempLocalVarName);
 
     auto elseBody = body(move(receiverTempLocal), location, methodName, methodNameLoc);
 
@@ -1936,8 +1943,13 @@ ast::ExpressionPtr Desugarer::desugar(pm_node_t *node) {
                     this->enclosingBlockParamName = core::Names::implicitYield();
                 }
 
-                return MK::If(location, MK::Local(location, this->enclosingBlockParamName), move(sendExpr),
-                              MK::False(location));
+                auto scipCall = ctx.state.isSCIPRuby ? sendExpr.deepCopy() : nullptr;
+                auto result = MK::If(location, MK::Local(location, this->enclosingBlockParamName), move(sendExpr),
+                                     MK::False(location));
+                if (scipCall) {
+                    result = MK::InsSeq1(location, move(scipCall), move(result));
+                }
+                return result;
             }
 
             auto block = desugarBlock(callNode->block, callNode->arguments, callNode->base.location);
@@ -2362,7 +2374,7 @@ ast::ExpressionPtr Desugarer::desugar(pm_node_t *node) {
                     blkLoc, MK::Local(methodContext.enclosingBlockParamLoc, methodContext.enclosingBlockParamName)));
             }
 
-            auto methodExpr = MK::Method(location, declLoc, name, move(paramsStore), move(body));
+            auto methodExpr = MK::Method(location, declLoc, translateLoc(defNode->name_loc), name, move(paramsStore), move(body));
 
             if (isSingletonMethod) {
                 ast::cast_tree<ast::MethodDef>(methodExpr)->flags.isSelfMethod = true;
@@ -4397,6 +4409,22 @@ ast::ExpressionPtr Desugarer::desugarMethodCall(ast::ExpressionPtr receiver, cor
         receiver = MK::Self(sendLoc0);
     }
 
+    // Keep the parser's token range for SCIP, including calls with other arguments
+    // or multiline calls. The diagnostic locations retain their existing behavior.
+    auto forwardedLoc = sendWithBlockLoc;
+    if (ctx.state.isSCIPRuby && (hasFwdRestArg || hasFwdArgs)) {
+        for (auto *arg : prismArgs) {
+            auto *splat = down_cast<pm_splat_node>(arg);
+            if ((splat && splat->expression == nullptr) || isa_node<pm_forwarding_arguments_node>(arg)) {
+                forwardedLoc = translateLoc(arg->location);
+                break;
+            }
+        }
+        if (hasFwdArgs && block.hasBlockPass()) {
+            block.blockPassExpr = MK::Local(forwardedLoc, core::Names::fwdBlock());
+        }
+    }
+
     if (hasSplat || hasFwdRestArg || hasFwdArgs) { // f(*a) || f(*) || f(...)
         // If we have a splat anywhere in the argument list, desugar the argument list as a single Array node,
         // and synthesize a call to `::Magic.<callWithSplat>(receiver, method, argArray[, &blk])`
@@ -4423,13 +4451,14 @@ ast::ExpressionPtr Desugarer::desugarMethodCall(ast::ExpressionPtr receiver, cor
             auto loc = sendWithBlockLoc;
 
             // `<fwd-args>`
-            auto fwdArgs = MK::Local(loc, core::Names::fwdArgs());
+            auto fwdArgs = MK::Local(forwardedLoc, core::Names::fwdArgs());
 
             // `<fwd-args>.to_a()`
             auto argsSplat = MK::Send0(loc, move(fwdArgs), core::Names::toA(), sendLoc0);
 
             // `T.unsafe(<fwd-args>.to_a())`
-            auto tUnsafe = MK::Unsafe(loc, move(argsSplat));
+            auto unsafeLoc = ctx.state.isSCIPRuby ? sendLoc0 : loc;
+            auto tUnsafe = MK::Send1(loc, MK::T(unsafeLoc), core::Names::unsafe(), unsafeLoc, move(argsSplat));
 
             // `argsArrayExpr.concat(T.unsafe(<fwd-args>.to_a()))`
             auto argsConcat = MK::Send1(loc, move(argsArrayExpr), core::Names::concat(), sendLoc0, move(tUnsafe));
@@ -4440,7 +4469,7 @@ ast::ExpressionPtr Desugarer::desugarMethodCall(ast::ExpressionPtr receiver, cor
 
             // `argsArrayExpr.concat(::Magic.<splat>(<fwd-args>)).concat([::<Magic>.<to-hash-dup>(<fwd-kwargs>)])`
             //                                       ^^^^^^^^^^
-            auto fwdArgs = MK::Local(loc, core::Names::fwdArgs());
+            auto fwdArgs = MK::Local(forwardedLoc, core::Names::fwdArgs());
 
             // `argsArrayExpr.concat(::Magic.<splat>(<fwd-args>)).concat([::<Magic>.<to-hash-dup>(<fwd-kwargs>)])`
             //                       ^^^^^^^^^^^^^^^^          ^
@@ -4454,7 +4483,7 @@ ast::ExpressionPtr Desugarer::desugarMethodCall(ast::ExpressionPtr receiver, cor
 
             // `argsArrayExpr.concat(::Magic.<splat>(<fwd-args>)).concat([::<Magic>.<to-hash-dup>(<fwd-kwargs>)])`
             //                                                                                    ^^^^^^^^^^^^
-            auto fwdKwargs = MK::Local(loc, core::Names::fwdKwargs());
+            auto fwdKwargs = MK::Local(forwardedLoc, core::Names::fwdKwargs());
 
             // `argsArrayExpr.concat(::Magic.<splat>(<fwd-args>)).concat([::<Magic>.<to-hash-dup>(<fwd-kwargs>)])`
             //                                                            ^^^^^^^^^^^^^^^^^^^^^^^^            ^
@@ -4841,7 +4870,10 @@ ast::ExpressionPtr Desugarer::desugarKeyValuePairs(core::LocOffsets loc, pm_node
         if (splatNode->value) { // Splatting an expression like `f(**h)`
             expr = desugar(splatNode->value);
         } else { // An anonymous splat like `f(**)`
-            expr = MK::Unsafe(loc, MK::Local(loc, core::Names::fwdKwargs()));
+            auto argLoc = ctx.state.isSCIPRuby ? translateLoc(splatNode->base.location) : loc;
+            auto unsafeLoc = ctx.state.isSCIPRuby ? loc.copyWithZeroLength() : loc;
+            expr = MK::Send1(loc, MK::T(unsafeLoc), core::Names::unsafe(), unsafeLoc,
+                             MK::Local(argLoc, core::Names::fwdKwargs()));
         }
 
         if (havePairsToMerge) {

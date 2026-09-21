@@ -40,6 +40,7 @@
 #include "spdlog/sinks/stdout_color_sinks.h"
 
 #include <csignal>
+#include <filesystem>
 #include <iterator>
 #include <poll.h>
 
@@ -408,6 +409,13 @@ int realmain(int argc, char *argv[]) {
     vector<unique_ptr<sorbet::pipeline::semantic_extension::SemanticExtension>> extensions;
     options::Options opts;
     options::readOptions(opts, extensions, argc, argv, extensionProviders, logger);
+    for (const auto &extension : extensions) {
+        if (extension->isSCIPRuby() && !opts.cacheDir.empty()) {
+            // Isolate SCIP from Sorbet even when both inherit --cache-dir from sorbet/config.
+            opts.cacheDir = (filesystem::path(opts.cacheDir) / "scip-ruby").string();
+            break;
+        }
+    }
     if (opts.stdoutHUPHack) {
         startHUPMonitor();
     }
@@ -491,6 +499,11 @@ int realmain(int argc, char *argv[]) {
 
     logger->trace("building initial global state");
 
+    for (const auto &extension : extensions) {
+        if (!extension->cacheKey().empty()) {
+            absl::StrAppend(&opts.semanticExtensionCacheKey, "|", extension->cacheKey());
+        }
+    }
     unique_ptr<const OwnedKeyValueStore> kvstore = cache::maybeCreateKeyValueStore(logger, opts);
     payload::createInitialGlobalState(*gs, opts, kvstore);
     pipeline::setGlobalStateOptions(*gs, opts);
@@ -517,6 +530,10 @@ int realmain(int argc, char *argv[]) {
     }
 
     gs->semanticExtensions = move(extensions);
+    for (const auto &extension : gs->semanticExtensions) {
+        gs->isSCIPRuby |= extension->isSCIPRuby();
+        extension->configureGlobalState(*gs);
+    }
 
     logger->trace("done building initial global state");
 

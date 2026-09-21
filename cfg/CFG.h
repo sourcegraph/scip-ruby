@@ -7,6 +7,7 @@
 #include "core/Types.h"
 #include <climits>
 #include <memory>
+#include <optional>
 
 #include "cfg/Instructions.h"
 #include "cfg/LinkRef.h"
@@ -39,18 +40,35 @@ public:
     BlockExit() : cond(), thenb(nullptr), elseb(nullptr){};
 };
 
+/// A single entry in a CFG, nominally represented as an "assignment"
+/// of the form.
+///
+///  binding = <instruction>
+///
+/// The loc field is a source location for the entire Binding.
+/// For example, for an assignment in the source code:
+///     a = b
+///     ^^^^^
+///   loc for corresponding Binding
+///
+/// Individual instructions (such as Send) may track extra source locations
+/// for different parts of the RHS.
 class Binding final {
 public:
+    /// LHS for a single "assignment" in the CFG.
     VariableUseSite bind;
+    /// Location for the full "assignment" (use bind.loc if you need the location for the LHS only).
     core::LocOffsets loc;
-
+    /// RHS for a single "assignment" in the CFG.
     InstructionPtr value;
 
-    Binding(LocalRef bind, core::LocOffsets loc, InstructionPtr value);
+    Binding(LocalOccurrence bind, core::LocOffsets loc, InstructionPtr value);
     Binding(Binding &&other) = default;
     Binding() = default;
 
     Binding &operator=(Binding &&) = default;
+
+    std::string toTextualString(const core::GlobalState &gs, std::optional<core::FileRef> file, const CFG &cfg) const;
 };
 
 class BasicBlock final {
@@ -90,7 +108,8 @@ public:
     std::optional<BlockExitCondInfo> maybeGetUpdateKnowledgeReceiver(const cfg::CFG &inWhat) const;
 
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
-    std::string toTextualString(const core::GlobalState &gs, const CFG &cfg) const;
+    // If a FileRef is passed in, also prints line and column numbers.
+    std::string toTextualString(const core::GlobalState &gs, std::optional<core::FileRef> file, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg) const;
 };
 
@@ -157,8 +176,9 @@ public:
 
     // Abbreviated debug output in dot format, useful if you already know what you're looking at
     std::string toString(const core::GlobalState &gs) const;
-    // As above, but without dot annotations
-    std::string toTextualString(const core::GlobalState &gs) const;
+    // As above, but without dot annotations. If a FileRef is passed in,
+    // line and column numbers are printed as well.
+    std::string toTextualString(const core::GlobalState &gs, std::optional<core::FileRef> = std::nullopt) const;
     // Verbose debug output
     std::string showRaw(core::Context ctx) const;
 
@@ -177,7 +197,9 @@ public:
     class ReadsAndWrites {
     public:
         ReadsAndWrites(uint32_t maxBasicBlockId, uint32_t numLocalVariables);
+        // Describes which variables are read from each basic block id.
         std::vector<UIntSet> reads;
+        // Describes which variables are written to in each basic block id.
         std::vector<UIntSet> writes;
 
         // The "dead" set reports, for each block, variables that are *only*

@@ -1,4 +1,5 @@
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
+load("//third_party:test_gem_data.bzl", "gem_build_info")
 
 # We define our externals here instead of directly in WORKSPACE
 def register_sorbet_dependencies():
@@ -190,21 +191,16 @@ def register_sorbet_dependencies():
         urls = ["https://github.com/bazelbuild/rules_cc/archive/refs/tags/0.2.14.tar.gz"],
     )
 
-    # TODO(jez) We keep our changes on the `sorbet` branch of `sorbet/bazel-toolchain`
-    # The `master` branch is the commit of `bazel-contrib/toolchains_llvm` that we're based on
-    # In 2ddd7d791 (#7912) we upgraded the toolchain. Our old toolchain patches are on the `sorbet-old-toolchain` branch
-    #
-    # You can use this version of `toolchains_llvm` when tinkering locally. You'll want to run `bazel clean --expunge`
-    # to ensure that your changes get picked up between builds.
-    # native.local_repository(
-    #     name = "toolchains_llvm",
-    #     path = "../bazel-toolchain",
-    # )
     http_archive(
         name = "toolchains_llvm",
-        url = "https://github.com/sorbet/bazel-toolchain/archive/3f912e338d79ea29ad35f20321f24d551d7d89ad.tar.gz",
-        sha256 = "4c998dc3f3b0c7b31a66aa4e262191b94da93cf31698eb6ac5a751267afbe26a",
-        strip_prefix = "bazel-toolchain-3f912e338d79ea29ad35f20321f24d551d7d89ad",
+        url = "https://github.com/bazel-contrib/toolchains_llvm/releases/download/v1.5.0/toolchains_llvm-v1.5.0.tar.gz",
+        sha256 = "49e69c011bcaa4c9a7246a287ab1fb4f7ed3fde7cbd7300374c1030f40d2bb95",
+        strip_prefix = "toolchains_llvm-v1.5.0",
+        patches = [
+            # Backport of https://github.com/bazel-contrib/toolchains_llvm/pull/686;
+            # remove when upgrading to toolchains_llvm >= v1.7.0.
+            "@com_stripe_ruby_typer//third_party:toolchains_llvm/no_toolchain_lib_dir_on_macos.patch",
+        ],
     )
 
     http_archive(
@@ -356,3 +352,12 @@ def register_sorbet_dependencies():
         strip_prefix = "rbs-23daeea3f8075170788b24daba0cddd51488c54f",
         build_file = "@com_stripe_ruby_typer//third_party:rbs_parser.BUILD",
     )
+
+
+def register_scip_ruby_dependencies():
+    for data in gem_build_info:
+        http_file(
+            name = data["repo_name"] + "_zip",
+            urls = [data["archive_url"]],
+            sha256 = data["archive_sha256"],
+        )

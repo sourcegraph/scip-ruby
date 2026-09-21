@@ -60,6 +60,8 @@ void setGlobalStateOptions(core::GlobalState &gs, const options::Options &opts) 
     if (opts.silenceErrors) {
         gs.silenceErrors = true;
     }
+    gs.unsilenceErrors = opts.unsilenceErrors;
+    gs.logRecordedFilepaths = opts.logRecordedFilepaths;
     gs.autocorrect = opts.autocorrect;
     gs.didYouMean = opts.didYouMean;
     if (opts.censorForSnapshotTests) {
@@ -1335,8 +1337,17 @@ class CFGCollectorAndTyper {
 public:
     CFGCollectorAndTyper(const options::Options &opts) : opts(opts){};
 
+    void postTransformClassDef(core::Context ctx, const ast::ClassDef &c) {
+        for (auto &extension : ctx.state.semanticExtensions) {
+            extension->typecheckClass(ctx, ctx.file, c);
+        }
+    }
+
     void preTransformMethodDef(core::Context ctx, const ast::MethodDef &m) {
-        if (!infer::Inference::willRun(ctx, m.declLoc, m.symbol)) {
+        for (auto &extension : ctx.state.semanticExtensions) {
+            extension->typecheckMethod(ctx, ctx.file, m);
+        }
+        if (!infer::Inference::willRun(ctx, m.declLoc, m.symbol, !ast::isa_tree<ast::EmptyTree>(m.rhs))) {
             return;
         }
 
@@ -1347,7 +1358,7 @@ public:
             cfg = infer::Inference::run(ctx.withOwner(cfg->symbol), move(cfg));
             if (cfg) {
                 for (auto &extension : ctx.state.semanticExtensions) {
-                    extension->typecheck(ctx, ctx.file, *cfg);
+                    extension->typecheck(ctx, ctx.file, *cfg, &m);
                 }
             }
         }
@@ -1356,6 +1367,9 @@ public:
         }
         if (print.CFGText.enabled) {
             print.CFGText.fmt("{}\n\n", cfg->toTextualString(ctx));
+        }
+        if (print.CFGTextLoc.enabled) {
+            print.CFGTextLoc.fmt("{}\n\n", cfg->toTextualString(ctx, ctx.file));
         }
         if (print.CFGRaw.enabled) {
             print.CFGRaw.fmt("{}\n\n", cfg->showRaw(ctx));
@@ -1385,6 +1399,9 @@ public:
         }
         if (print.CFGText.enabled) {
             print.CFGText.fmt("{}\n\n", cfg->toTextualString(ctx));
+        }
+        if (print.CFGTextLoc.enabled) {
+            print.CFGTextLoc.fmt("{}\n\n", cfg->toTextualString(ctx, ctx.file));
         }
         if (print.CFGRaw.enabled) {
             print.CFGRaw.fmt("{}\n\n", cfg->showRaw(ctx));
@@ -1533,6 +1550,9 @@ void typecheck(const core::GlobalState &gs, vector<ast::ParsedFile> &&what, cons
 
         {
             ProgressIndicator cfgInferProgress(opts.showProgress, "CFG+Inference", what.size());
+            for (auto &extension : gs.semanticExtensions) {
+                extension->prepareForTypechecking(gs);
+            }
             workers.multiplexJob("typecheck", [&gs, &opts, epoch, &epochManager, &preemptionManager, &recordedErrors,
                                                fileq, outputq, cancelable, relevantPackages, checkRelevantPackages,
                                                intentionallyLeakASTs]() {

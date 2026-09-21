@@ -147,17 +147,17 @@ vector<ast::ExpressionPtr> Struct::run(core::MutableContext ctx, ast::Assign *as
         newArgs.emplace_back(ast::MK::OptionalParam(symLoc, move(argName), ast::MK::Nil(symLoc)));
 
         body.emplace_back(ast::MK::Sig0(symLoc.copyWithZeroLength(), ast::MK::Untyped(symLoc.copyWithZeroLength())));
-        body.emplace_back(ast::MK::SyntheticMethod0(symLoc, symLoc, name, ast::MK::RaiseTypedUnimplemented(loc)));
+        body.emplace_back(ast::MK::SyntheticMethod0(symLoc, symLoc, symLoc, name, ast::MK::RaiseTypedUnimplemented(loc)));
         body.emplace_back(ast::MK::Sig1(symLoc.copyWithZeroLength(), ast::MK::Symbol(symLoc, name),
                                         ast::MK::Untyped(symLoc.copyWithZeroLength()),
                                         ast::MK::Untyped(symLoc.copyWithZeroLength())));
-        body.emplace_back(ast::MK::SyntheticMethod1(symLoc, symLoc, name.addEq(ctx), ast::MK::Local(symLoc, name),
+        body.emplace_back(ast::MK::SyntheticMethod1(symLoc, symLoc, symLoc, name.addEq(ctx), ast::MK::Local(symLoc, name),
                                                     ast::MK::RaiseTypedUnimplemented(loc)));
     }
 
     body.emplace_back(elemFixedUntyped(loc));
     body.emplace_back(ast::MK::SigVoid(loc, std::move(sigArgs)));
-    body.emplace_back(ast::MK::SyntheticMethod(loc, loc, core::Names::initialize(), std::move(newArgs),
+    body.emplace_back(ast::MK::SyntheticMethod(loc, loc, loc, core::Names::initialize(), std::move(newArgs),
                                                ast::MK::RaiseTypedUnimplemented(loc)));
 
     vector<ast::ExpressionPtr> stats;

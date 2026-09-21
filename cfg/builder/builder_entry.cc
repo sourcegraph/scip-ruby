@@ -38,8 +38,8 @@ unique_ptr<CFG> CFGBuilder::buildFor(core::Context ctx, const ast::MethodDef &md
     res->declLoc = md.declLoc;
     res->symbol = md.symbol.data(ctx)->dealiasMethod(ctx);
 
-    UnorderedMap<core::SymbolRef, LocalRef> aliases;
-    UnorderedMap<core::NameRef, LocalRef> discoveredUndeclaredFields;
+    UnorderedMap<core::SymbolRef, LocalOccurrence> aliases;
+    UnorderedMap<core::NameRef, LocalOccurrence> discoveredUndeclaredFields;
     uint32_t temporaryCounter = 1;
     CFGContext cctx(ctx, *res.get(), LocalRef::noVariable(), 0, nullptr, nullptr, nullptr, aliases,
                     discoveredUndeclaredFields, temporaryCounter);
@@ -53,8 +53,8 @@ unique_ptr<CFG> CFGBuilder::buildFor(core::Context ctx, const ast::ClassDef &cd,
     res->declLoc = cd.declLoc;
     res->symbol = symbol;
 
-    UnorderedMap<core::SymbolRef, LocalRef> aliases;
-    UnorderedMap<core::NameRef, LocalRef> discoveredUndeclaredFields;
+    UnorderedMap<core::SymbolRef, LocalOccurrence> aliases;
+    UnorderedMap<core::NameRef, LocalOccurrence> discoveredUndeclaredFields;
     uint32_t temporaryCounter = 1;
     CFGContext cctx(ctx, *res.get(), LocalRef::noVariable(), 0, nullptr, nullptr, nullptr, aliases,
                     discoveredUndeclaredFields, temporaryCounter);
@@ -75,12 +75,12 @@ unique_ptr<CFG> CFGBuilder::buildFor(CFGContext cctx, unique_ptr<CFG> res, absl:
     auto ctx = cctx.ctx;
     Timer timeit(ctx.state.tracer(), "cfg");
 
-    LocalRef retSym;
+    LocalOccurrence retSym;
     BasicBlock *entry = res->entry();
     BasicBlock *cont;
     {
         CFG::UnfreezeCFGLocalVariables unfreezeVars(*res);
-        retSym = cctx.newTemporary(core::Names::returnMethodTemp());
+        retSym = cctx.newTemporaryOccurrence(core::Names::returnMethodTemp());
 
         auto selfClaz = res->symbol.data(ctx)->rebind;
         if (!selfClaz.exists()) {
@@ -94,7 +94,7 @@ unique_ptr<CFG> CFGBuilder::buildFor(CFGContext cctx, unique_ptr<CFG> res, absl:
         BasicBlock *defaultCont = nullptr;
 
         auto &paramInfos = res->symbol.data(ctx)->parameters;
-        bool isAbstract = res->symbol.data(ctx)->flags.isAbstract;
+        bool isAbstract = res->symbol.data(ctx)->flags.isAbstract && !ctx.state.isSCIPRuby;
         bool seenKeyword = false;
         int i = -1;
         for (auto &paramExpr : params) {
@@ -178,16 +178,16 @@ unique_ptr<CFG> CFGBuilder::buildFor(CFGContext cctx, unique_ptr<CFG> res, absl:
     } else {
         rvLoc = cont->exprs.back().loc;
     }
-    synthesizeExpr(cont, retSym1, rvLoc, make_insn<Return>(retSym, rvLoc)); // dead assign.
+    synthesizeExpr(cont, retSym1, rvLoc, make_insn<Return>(retSym.variable, rvLoc)); // dead assign.
     jumpToDead(cont, *res.get(), rvLoc);
 
     vector<Binding> aliasesPrefix;
     for (auto kv : cctx.aliases) {
         core::SymbolRef global = kv.first;
-        LocalRef local = kv.second;
-        aliasesPrefix.emplace_back(local, core::LocOffsets::none(), make_insn<Alias>(global));
+        LocalOccurrence local = kv.second;
+        aliasesPrefix.emplace_back(LocalOccurrence::synthetic(local.variable), local.loc, make_insn<Alias>(global));
         if (global.isFieldOrStaticField()) {
-            res->minLoops[local.id()] = CFG::MIN_LOOP_FIELD;
+            res->minLoops[local.variable.id()] = CFG::MIN_LOOP_FIELD;
         } else {
             // We used to have special handling here for "MIN_LOOP_GLOBAL" but it was meaningless,
             // because it only happened for type members, and we already prohibit re-assigning type
@@ -198,9 +198,9 @@ unique_ptr<CFG> CFGBuilder::buildFor(CFGContext cctx, unique_ptr<CFG> res, absl:
         }
     }
     for (auto kv : cctx.discoveredUndeclaredFields) {
-        aliasesPrefix.emplace_back(kv.second, core::LocOffsets::none(),
+        aliasesPrefix.emplace_back(LocalOccurrence::synthetic(kv.second.variable), kv.second.loc,
                                    make_insn<Alias>(core::Symbols::Magic_undeclaredFieldStub(), kv.first));
-        res->minLoops[kv.second.id()] = CFG::MIN_LOOP_FIELD;
+        res->minLoops[kv.second.variable.id()] = CFG::MIN_LOOP_FIELD;
     }
     histogramInc("cfgbuilder.aliases", aliasesPrefix.size());
     auto basicBlockCreated = res->basicBlocks.size();
@@ -256,7 +256,7 @@ void CFGBuilder::fillInTopoSorts(core::Context ctx, CFG &cfg) {
     }
 }
 
-CFGContext CFGContext::withTarget(LocalRef target) {
+CFGContext CFGContext::withTarget(LocalOccurrence target) {
     auto ret = CFGContext(*this);
     ret.target = target;
     return ret;

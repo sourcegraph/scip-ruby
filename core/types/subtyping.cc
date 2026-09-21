@@ -1,5 +1,6 @@
 #include "common/common.h"
 #include "common/typecase.h"
+#include "core/GlobalState.h"
 #include "core/Symbols.h"
 #include "core/TypeConstraint.h"
 #include "core/Types.h"
@@ -128,10 +129,17 @@ TypePtr lubDistributeOr(const GlobalState &gs, const TypePtr &t1, const TypePtr 
             typesConsumed.emplace_back(component);
         }
     }
+    // SCIP-only: keep shapes precise when adding them to a union, as lub does for non-union operands.
+    // glb also uses this helper to rebuild distributed intersections; widening a shape to Hash[untyped]
+    // there can produce a result that is no longer a subtype of the original shape-containing union.
+    auto unionWithT2 = [&](const TypePtr &other) {
+        auto component = gs.isSCIPRuby && isa_type<ShapeType>(t2) ? t2 : underlying(gs, t2);
+        return OrType::make_shared(other, component);
+    };
     if (typesConsumed.empty()) {
         // t1 has no components that overlap with t2
         categoryCounterInc("lubDistributeOr.outcome", "worst");
-        return OrType::make_shared(t1, underlying(gs, t2));
+        return unionWithT2(t1);
     }
     // lub back everything except typesConsumed
     auto remainingTypes = filterOrComponents(t1, typesConsumed);
@@ -141,7 +149,7 @@ TypePtr lubDistributeOr(const GlobalState &gs, const TypePtr &t1, const TypePtr 
         return t2;
     }
     categoryCounterInc("lubDistributeOr.outcome", "consumedComponent");
-    return OrType::make_shared(move(remainingTypes), underlying(gs, t2));
+    return unionWithT2(remainingTypes);
 }
 
 TypePtr glbDistributeAnd(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) {
@@ -355,6 +363,15 @@ TypePtr Types::lub(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) 
         if (is_proxy_type(t2)) {
             categoryCounterInc("lub", "proxy>");
             // both are proxy
+            auto lubLiteralWithProxy = [&](const TypePtr &literalUnderlying) {
+                // SCIP-only: preserve shapes and tuples when widening a literal, just as when joining its class
+                // type. Widening the aggregate too can make a narrower tuple's underlying Array type broader than
+                // that of its supertype, violating the upper-bound invariant when merging nilable tuples.
+                if (gs.isSCIPRuby && (isa_type<ShapeType>(t2) || isa_type<TupleType>(t2))) {
+                    return lub(gs, literalUnderlying, t2);
+                }
+                return lub(gs, literalUnderlying, t2.underlying(gs));
+            };
             TypePtr result;
             typecase(
                 t1,
@@ -442,7 +459,7 @@ TypePtr Types::lub(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) 
                             result = lubGround(gs, l1.underlying(gs), l2.underlying(gs));
                         }
                     } else {
-                        result = lub(gs, l1.underlying(gs), t2.underlying(gs));
+                        result = lubLiteralWithProxy(l1.underlying(gs));
                     }
                 },
                 [&](const IntegerLiteralType &l1) {
@@ -454,7 +471,7 @@ TypePtr Types::lub(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) 
                             result = l1.underlying(gs);
                         }
                     } else {
-                        result = lub(gs, l1.underlying(gs), t2.underlying(gs));
+                        result = lubLiteralWithProxy(l1.underlying(gs));
                     }
                 },
                 [&](const FloatLiteralType &l1) {
@@ -466,7 +483,7 @@ TypePtr Types::lub(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) 
                             result = l1.underlying(gs);
                         }
                     } else {
-                        result = lub(gs, l1.underlying(gs), t2.underlying(gs));
+                        result = lubLiteralWithProxy(l1.underlying(gs));
                     }
                 });
             ENFORCE(result != nullptr);
@@ -909,6 +926,12 @@ TypePtr Types::glb(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) 
             if (rght.isBottom()) {
                 return lft;
             }
+            if (gs.isSCIPRuby) {
+                // Keep the narrowed branches: nested unions can contain impossible intersections that
+                // were eliminated above. Reusing the original union hides that simplification from
+                // subtype checks. Build an exact union, without lub's literal/aggregate widening.
+                return OrType::make_shared(lft, rght);
+            }
         }
 
         if (auto o1 = cast_type<OrType>(t1)) { // 6
@@ -938,6 +961,21 @@ TypePtr Types::glb(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) 
             }
 
             if (score > 0) {
+                if (gs.isSCIPRuby) {
+                    // These branches form an intersection, so their union must not widen. In particular,
+                    // lubbing distinct shapes can produce Hash[untyped], which is not a subtype of either
+                    // input union. Eliminate empty and identical branches without merging aggregates.
+                    auto exactUnion = [](const TypePtr &left, const TypePtr &right) {
+                        if (left.isBottom() || left == right) {
+                            return right;
+                        }
+                        if (right.isBottom()) {
+                            return left;
+                        }
+                        return OrType::make_shared(left, right);
+                    };
+                    return exactUnion(exactUnion(t11, t12), exactUnion(t21, t22));
+                }
                 return Types::any(gs, Types::any(gs, t11, t12), Types::any(gs, t21, t22));
             }
         }
@@ -1016,6 +1054,18 @@ TypePtr Types::glb(const GlobalState &gs, const TypePtr &t1, const TypePtr &t2) 
                     }
                 } else if (a2TypeMember.data(gs)->flags.isContravariant) {
                     newTargs.emplace_back(Types::any(gs, a1->targs[j], a2->targs[i]));
+                }
+            }
+            // Combining arguments using the ancestor's variance must also respect
+            // the subclass's variance, including invalid opposite-variance declarations.
+            // Preserve both constraints when the result would not subtype the original
+            // subclass. Ordinary subtype checks still allow refinements from untyped.
+            if (gs.isSCIPRuby && a1->klass != a2->klass && a1->targs[j] != newTargs.back()) {
+                const auto &flags = idx.data(gs)->flags;
+                if ((flags.isInvariant && !Types::equiv(gs, a1->targs[j], newTargs.back())) ||
+                    (flags.isCovariant && !Types::isSubType(gs, newTargs.back(), a1->targs[j])) ||
+                    (flags.isContravariant && !Types::isSubType(gs, a1->targs[j], newTargs.back()))) {
+                    return AndType::make_shared(t1, t2);
                 }
             }
             j++;

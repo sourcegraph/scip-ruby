@@ -1,0 +1,301 @@
+// NOTE: Protobuf headers should go first since they use poisoned functions.
+#include "proto/SCIP.pb.h"
+
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "absl/status/status.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_replace.h"
+#include "spdlog/fmt/fmt.h"
+
+#include "common/FileSystem.h"
+#include "common/sort/sort.h"
+#include "core/Loc.h"
+#include "core/source_generator/source_generator.h"
+#include "main/lsp/LSPLoop.h"
+
+#include "scip_indexer/Debug.h"
+#include "scip_indexer/SCIPGemMetadata.h"
+#include "scip_indexer/SCIPProtoExt.h"
+#include "scip_indexer/SCIPSymbolRef.h"
+#include "scip_indexer/SCIPUtils.h"
+
+using namespace std;
+
+namespace sorbet::scip_indexer {
+
+string showRawRelationshipsMap(const core::GlobalState &gs, const RelationshipsMap &relMap) {
+    return showMap(relMap, [&gs](const UntypedGenericSymbolRef &ugsr, const auto &result) -> string {
+        return fmt::format(
+            "{}: (inherited={}, mixins={})", ugsr.showRaw(gs), result.inherited.showFullName(gs),
+            showVec(*result.mixedIn, [&gs](const auto &mixin) -> string { return mixin.showFullName(gs); }));
+    });
+}
+
+bool isGlobal(const core::GlobalState &gs, core::NameRef name) {
+    if (!name.exists())
+        return false;
+    auto shortName = name.shortName(gs);
+    return !shortName.empty() && shortName.front() == '$';
+}
+
+// Try to compute a scip::Symbol for this value.
+utils::Result UntypedGenericSymbolRef::symbolForExpr(const core::GlobalState &gs, const GemMapping &gemMap,
+                                                     optional<core::Loc> loc, scip::Symbol &symbol) const {
+    optional<shared_ptr<GemMetadata>> metadata;
+    if (isGlobal(gs, this->name)) {
+        metadata = gemMap.globalPlaceholderGem;
+    } else {
+        auto owningFile = loc.has_value() ? loc->file() : this->selfOrOwner.loc(gs).file();
+        if (!owningFile.exists()) {
+            // Synthetic symbols and built-in like constructs do not have a source location.
+            return utils::Result::skipValue();
+        }
+        metadata = gemMap.lookupGemForFile(gs, owningFile);
+        ENFORCE(metadata.has_value(), "missing gem information for file {} which contains symbol {}",
+                owningFile.data(gs).path(), this->showRaw(gs));
+        if (!metadata.has_value()) {
+            return utils::Result::skipValue();
+        }
+    }
+    // Don't set symbol.scheme and package.manager here because
+    // those are hard-coded to 'scip-ruby' and 'gem' anyways.
+    scip::Package package;
+    package.set_name(metadata.value()->name());
+    package.set_version(metadata.value()->version());
+    *symbol.mutable_package() = move(package);
+
+    InlinedVector<scip::Descriptor, 4> descriptors;
+    auto cur = this->selfOrOwner;
+    while (cur != core::Symbols::root()) {
+        // NOTE(varun): The current scheme will cause multiple 'definitions' for the same
+        // entity if it is present in different files, because the path is not encoded
+        // in the descriptor whose parent is the root. This matches the semantics of
+        // RubyMine, but we may want to revisit this if it is problematic for classes
+        // that are extended in lots of places.
+        scip::Descriptor descriptor;
+        *descriptor.mutable_name() = cur.name(gs).show(gs);
+        ENFORCE(!descriptor.name().empty());
+        // TODO(varun): Are the scip descriptor kinds correct?
+        switch (cur.kind()) {
+            case core::SymbolRef::Kind::Method:
+                // NOTE(varun): There is a separate isOverloaded field in the flags field,
+                // despite SO/docs saying that Ruby doesn't support method overloading,
+                // Technically, we should better understand how this works and set the
+                // disambiguator based on that. However, right now, an extension's
+                // type-checking function is not run if a method is overloaded,
+                // (see pipeline.cc), so it's unclear if we need to care about that.
+                descriptor.set_suffix(scip::Descriptor::Method);
+                break;
+            case core::SymbolRef::Kind::ClassOrModule:
+                descriptor.set_suffix(scip::Descriptor::Type);
+                break;
+            case core::SymbolRef::Kind::TypeParameter:
+                descriptor.set_suffix(scip::Descriptor::TypeParameter);
+                break;
+            case core::SymbolRef::Kind::FieldOrStaticField:
+                descriptor.set_suffix(scip::Descriptor::Term);
+                break;
+            case core::SymbolRef::Kind::TypeMember:
+                descriptor.set_suffix(scip::Descriptor::Type);
+                break;
+            default:
+                return utils::Result::statusValue(
+                    absl::InvalidArgumentError("unexpected expr type for symbol computation"));
+        }
+        descriptors.push_back(move(descriptor));
+        cur = cur.owner(gs);
+    }
+    while (!descriptors.empty()) {
+        *symbol.add_descriptors() = move(descriptors.back());
+        descriptors.pop_back();
+    }
+    if (this->name != core::NameRef::noName()) {
+        scip::Descriptor descriptor;
+        descriptor.set_suffix(this->selfOrOwner.isMethod() ? scip::Descriptor::Parameter : scip::Descriptor::Term);
+        *descriptor.mutable_name() = this->name.shortName(gs);
+        ENFORCE(!descriptor.name().empty());
+        *symbol.add_descriptors() = move(descriptor);
+    }
+    return utils::Result::okValue();
+}
+
+string UntypedGenericSymbolRef::showRaw(const core::GlobalState &gs) const {
+    if (this->name.exists()) {
+        return fmt::format("UGSR({}.{})", absl::StripAsciiWhitespace(this->selfOrOwner.showFullName(gs)),
+                           this->name.toString(gs));
+    }
+    return fmt::format("UGSR({})", absl::StripAsciiWhitespace(this->selfOrOwner.showFullName(gs)));
+}
+
+void UntypedGenericSymbolRef::saveParentRelationships(
+    const core::GlobalState &gs, const RelationshipsMap &relationshipMap, SmallVec<scip::Relationship> &rels,
+    const absl::FunctionRef<bool(UntypedGenericSymbolRef, std::string &)> &saveSymbolString) const {
+    auto it = relationshipMap.find(*this);
+    if (it == relationshipMap.end()) {
+        return;
+    }
+    auto saveSymbol = [&](core::ClassOrModuleRef klass, scip::Relationship &rel) {
+        if (!this->name.exists()) {
+            fmt::print(stderr, "problematic symbol {}\n", this->selfOrOwner.toStringFullName(gs));
+        }
+        // A synthetic ancestor may have no source location and therefore no SCIP symbol.
+        // Keep the field's own occurrences and any other, indexable relationships.
+        if (!saveSymbolString(UntypedGenericSymbolRef::field(klass, this->name), *rel.mutable_symbol())) {
+            return;
+        }
+        ENFORCE(!rel.symbol().empty());
+        rels.push_back(move(rel));
+    };
+
+    auto result = it->second;
+
+    if (core::SymbolRef(result.inherited) != this->selfOrOwner) {
+        scip::Relationship rel;
+        rel.set_is_definition(true);
+        saveSymbol(result.inherited, rel);
+    }
+
+    for (auto mixin : *result.mixedIn) {
+        scip::Relationship rel;
+        rel.set_is_reference(true);
+        saveSymbol(mixin, rel);
+    }
+
+    fast_sort(rels, [](const auto &r1, const auto &r2) -> bool { return scip::compareRelationship(r1, r2) < 0; });
+}
+
+string GenericSymbolRef::showRaw(const core::GlobalState &gs) const {
+    switch (this->kind()) {
+        case Kind::Parameter:
+            return fmt::format("Parameter(owner: {}, name: {})", this->selfOrOwner.showFullName(gs),
+                               this->name.toString(gs));
+        case Kind::Field:
+            return fmt::format("UndeclaredField(owner: {}, name: {})", this->selfOrOwner.showFullName(gs),
+                               this->name.toString(gs));
+        case Kind::ClassOrModule:
+            return fmt::format("ClassOrModule {}", this->selfOrOwner.showFullName(gs));
+        case Kind::Method:
+            return fmt::format("Method {}", this->selfOrOwner.showFullName(gs));
+        case Kind::Type:
+            return fmt::format("Type {}", this->selfOrOwner.showFullName(gs));
+    }
+}
+
+bool GenericSymbolRef::isSorbetInternal(const core::GlobalState &gs, core::SymbolRef sym) {
+    UnorderedSet<core::SymbolRef> visited;
+    auto classT = core::Symbols::T().data(gs)->lookupSingletonClass(gs);
+    while (sym.exists() && !visited.contains(sym)) {
+        if (sym.isClassOrModule()) {
+            auto klass = sym.asClassOrModuleRef();
+            if (klass == core::Symbols::Sorbet_Private() || klass == core::Symbols::T() || klass == classT) {
+                return true;
+            }
+        }
+        visited.insert(sym);
+        sym = sym.owner(gs);
+    }
+    return false;
+}
+
+void GenericSymbolRef::saveDocStrings(const core::GlobalState &gs, core::TypePtr fieldType, core::Loc loc,
+                                      SmallVec<string> &docs) const {
+    auto checkType = [&gs, &loc](core::TypePtr ty, const std::string &name) {
+        ENFORCE(ty, "missing type for {} in file {}\n{}\n", name, loc.file().data(gs).path(), loc.toString(gs));
+    };
+
+    string markdown = "";
+    switch (this->kind()) {
+        case Kind::Parameter:
+        case Kind::Field: {
+            auto name = this->name.show(gs);
+            checkType(fieldType, name);
+            markdown = fmt::format("{} ({})", name, fieldType.show(gs));
+            break;
+        }
+        case Kind::Type: {
+            auto sym = this->selfOrOwner;
+            if (sym.isTypeAlias(gs)) {
+                markdown =
+                    fmt::format("{} = T.type_alias {{ {} }}", sym.name(gs).show(gs), sym.resultType(gs).show(gs));
+            } else if (sym.isTypeParameter()) {
+                markdown = fmt::format("T.type_parameter({})", sym.name(gs).showAsSymbolLiteral(gs));
+            } else {
+                auto owner = sym.owner(gs).asClassOrModuleRef();
+                auto keyword = owner.data(gs)->isSingletonClass(gs) ? "type_template" : "type_member";
+                markdown = fmt::format("{} = {}", sym.name(gs).show(gs), keyword);
+            }
+            break;
+        }
+        case Kind::ClassOrModule: {
+            auto ref = this->selfOrOwner.asClassOrModuleRef();
+            auto classOrModule = ref.data(gs);
+            if (classOrModule->isClass()) {
+                auto super = classOrModule->superClass();
+                if (super.exists() && super != core::Symbols::Object()) {
+                    markdown = fmt::format("class {} < {}", ref.show(gs), super.show(gs));
+                } else {
+                    markdown = fmt::format("class {}", ref.show(gs));
+                }
+            } else {
+                markdown = fmt::format("module {}", ref.show(gs));
+            }
+            break;
+        }
+        case Kind::Method: {
+            auto ref = this->selfOrOwner.asMethodRef();
+            // A definition describes the method inside its declaring class. The
+            // external type erases unfixed class parameters to T.untyped.
+            auto recvType = ref.data(gs)->owner.data(gs)->selfType(gs);
+            checkType(recvType, fmt::format("receiver type for {}", ref.showFullName(gs)));
+            markdown = core::source_generator::prettyTypeForMethod(gs, ref, recvType, core::ShowOptions());
+            // FIXME(varun): For some reason, it looks like a bunch of public methods
+            // get marked as private here. Avoid printing misleading info until we fix that.
+            // https://github.com/sourcegraph/scip-ruby/issues/33
+            markdown = absl::StrReplaceAll(markdown, {{"private def", "def"}, {"; end", ""}});
+            break;
+        }
+    }
+    if (!markdown.empty()) {
+        docs.push_back(fmt::format("```ruby\n{}\n```", markdown));
+    }
+    // Parameters have their own type hover, not the method's preceding comment.
+    if (this->kind() == Kind::Parameter) {
+        return;
+    }
+    auto whatFile = loc.file();
+    if (whatFile.exists()) {
+        if (auto doc = realmain::lsp::findDocumentation(whatFile.data(gs).source(), loc.beginPos())) {
+            docs.push_back(doc.value());
+        }
+    }
+}
+
+core::Loc GenericSymbolRef::symbolLoc(const core::GlobalState &gs) const {
+    switch (this->kind()) {
+        case Kind::Parameter:
+            for (const auto &param : this->selfOrOwner.asMethodRef().data(gs)->parameters) {
+                if (param.name == this->name) {
+                    return param.loc;
+                }
+            }
+            return core::Loc();
+        case Kind::Method: {
+            auto method = this->selfOrOwner.asMethodRef().data(gs);
+            if (!method->nameLoc.exists() || method->nameLoc.empty()) {
+                return method->loc();
+            }
+            return method->nameLoc;
+        }
+        case Kind::Type:
+        case Kind::ClassOrModule:
+            return this->selfOrOwner.loc(gs);
+        case Kind::Field:
+            ENFORCE(false, "case UndeclaredField should not be triggered here");
+            return core::Loc();
+    }
+}
+
+} // namespace sorbet::scip_indexer

@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+#!/usr/bin/env ruby
+
+=begin 2>/dev/null
+
+# START Bash
+
+# This is both a Ruby script and a Bash script similar to srb.
+# Unlike srb, I'm mixing languages because it didn't seem terribly
+# useful to spend time figuring out how to write this in Ruby.
+#
+# We don't care about perf here similar to srb; as you can see below,
+# I'm spawning a bunch of processes. And that's OK, because we don't
+# expect someone to keep invoking the indexer repeatedly (unlike say,
+# the type-checker which may be invoked through something like entr).
+
+set -euo pipefail
+
+if [ -n "${DEBUG:-}" ]; then
+  set -x
+fi
+
+die() {
+  echo "Expected to be invoked as 'bundle exec scip-ruby'"
+  echo "Did you invoke this binary directly?"
+  exit 1
+}
+
+if [ -z "${BUNDLE_GEMFILE:-}" ]; then
+  echo "Missing BUNDLE_GEMFILE environment variable"
+  die
+elif [ -z "${BUNDLE_BIN_PATH:-}" ]; then
+  echo "Missing BUNDLE_BIN_PATH environment variable"
+  die
+fi
+
+GEMFILE_CONTENTS="$(< "$BUNDLE_GEMFILE")"
+if [ "$GEMFILE_CONTENTS" == *"scip-ruby-debug"* ]; then
+  SCIP_RUBY="scip-ruby-debug"
+elif [ "$GEMFILE_CONTENTS" == *"scip-ruby"* ]; then
+  SCIP_RUBY="scip-ruby"
+elif grep -q -e "scip-ruby-debug" "$(dirname "$BUNDLE_GEMFILE")"/*.gemspec; then
+  SCIP_RUBY="scip-ruby-debug"
+else
+  SCIP_RUBY="scip-ruby"
+fi
+
+# Calling the bundle in BUNDLE_BIN_PATH tries to mess with system directories.
+if [[ "$BUNDLE_BIN_PATH" =~ (.*)/lib/ruby/gems/.* ]]; then
+  BUNDLE_BIN_PATH="${BASH_REMATCH[1]}/bin/bundle"
+  file "$BUNDLE_BIN_PATH" > /dev/null || (echo "scip-ruby: warning: bundle not found at $BUNDLE_BIN_PATH, this may lead to errors")
+else
+  echo "scip-ruby: warning: unexpected BUNDLE_BIN_PATH = $BUNDLE_BIN_PATH"
+  echo "scip-ruby: warning: this may lead to further errors"
+fi
+
+# Careful about trying to "optimize" the regex here.
+# I tried to use -E but that doesn't match with BSD sed.
+GEM_INSTALL_PATH="$("$BUNDLE_BIN_PATH" info "$SCIP_RUBY" | grep 'Path:' | sed -e 's/\s*Path://')"
+# From https://stackoverflow.com/a/3352015/2682729
+trim() {
+    local var="$*"
+    var="${var#"${var%%[![:space:]]*}"}"
+    var="${var%"${var##*[![:space:]]}"}"
+    printf '%s' "$var"
+}
+GEM_INSTALL_PATH="$(trim "$GEM_INSTALL_PATH")"
+
+chmod +x "$GEM_INSTALL_PATH/native/scip-ruby"
+exec "$GEM_INSTALL_PATH/native/scip-ruby" "$@"
+
+# END Bash
+=end
+
+exec(__FILE__, *ARGV)

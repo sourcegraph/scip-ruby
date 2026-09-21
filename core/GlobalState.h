@@ -373,7 +373,7 @@ public:
     ClassOrModuleRef enterClassOrModuleSymbol(Loc loc, ClassOrModuleRef owner, NameRef name);
     TypeMemberRef enterTypeMember(Loc loc, ClassOrModuleRef owner, NameRef name, Variance variance);
     TypeParameterRef enterTypeParameter(Loc loc, MethodRef owner, NameRef name, Variance variance);
-    MethodRef enterMethodSymbol(Loc loc, ClassOrModuleRef owner, NameRef name);
+    MethodRef enterMethodSymbol(Loc loc, ClassOrModuleRef owner, NameRef name, Loc nameLoc = Loc::none());
     MethodRef enterNewMethodOverload(Loc loc, MethodRef original, core::NameRef originalName, uint32_t num,
                                      const std::vector<bool> &paramsToKeep);
     FieldRef enterFieldSymbol(Loc loc, ClassOrModuleRef owner, NameRef name);
@@ -523,7 +523,16 @@ public:
     void incrementNameTableDiffCount();
 
     int globalStateId;
+    // SCIP records unresolved fields for navigation through untyped code.
+    bool isSCIPRuby = false;
+    // The project's pinned runtime predates the payload's T::Module constant.
+    bool scipRubyLegacyTModule = false;
+    // Field references remaining unresolved after name resolution, grouped by class.
+    UnorderedMap<core::ClassOrModuleRef, UnorderedSet<core::NameRef>> unresolvedFields;
+
     bool silenceErrors = false;
+    bool unsilenceErrors = false;
+    bool logRecordedFilepaths = false;
     bool autocorrect = false;
     bool didYouMean = true;
     TrackUntyped trackUntyped = TrackUntyped::Nowhere;

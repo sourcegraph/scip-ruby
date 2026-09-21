@@ -1,5 +1,1 @@
-#!/bin/bash
-
-set -euo pipefail
-
-true
+../.sorbet-buildkite/all-succeeded.sh

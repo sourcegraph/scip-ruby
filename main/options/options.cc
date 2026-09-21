@@ -128,6 +128,7 @@ const vector<PrintOptions> print_options({
     {"cfg", &Printers::CFG},
     {"cfg-raw", &Printers::CFGRaw},
     {"cfg-text", &Printers::CFGText},
+    {"cfg-text-loc", &Printers::CFGTextLoc},
     {"symbol-table", &Printers::SymbolTable},
     {"symbol-table-raw", &Printers::SymbolTableRaw},
     {"symbol-table-json", &Printers::SymbolTableJson},
@@ -207,6 +208,7 @@ vector<reference_wrapper<PrinterConfig>> Printers::printers() {
         ASTRaw,
         CFG,
         CFGText,
+        CFGTextLoc,
         CFGRaw,
         SymbolTable,
         SymbolTableRaw,
@@ -396,6 +398,7 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
     section = groupToString(Group::OUTPUT);
     // TODO(jez) What is critical error? How does this affect the exit code?
     options.add_options(section)("q,quiet", "Silence all non-critical errors");
+    options.add_options()("unquiet", "(scip-ruby) Show non-critical errors, which are hidden by default");
     options.add_options(section)("P,progress", "Draw progressbar");
     options.add_options(section)("color", "Use color output. For `auto`: use color if stderr is a tty",
                                  cxxopts::value<string>()->default_value("auto"), "{always,never,[auto]}");
@@ -695,6 +698,7 @@ buildOptions(const vector<pipeline::semantic_extension::SemanticExtensionProvide
                                  "Force Sorbet to calculate file hashes, even from the CLI. Useful for profiling.");
     options.add_options(section)("trace-lexer", "Emit the lexer's token stream in a debug format");
     options.add_options(section)("trace-parser", "Enable bison's parser trace functionality");
+    options.add_options("dev")("log-recorded-filepaths", "Emit paths recorded for different files");
     auto partitioned_print_options = print_options;
     auto stableEnd = absl::c_stable_partition(partitioned_print_options, [](const auto &po) { return po.stable; });
     fmt::memory_buffer print_help;
@@ -1058,11 +1062,17 @@ void readOptions(Options &opts,
         }
 
         opts.silenceErrors = raw["quiet"].as<bool>();
+        opts.unsilenceErrors = raw["unquiet"].as<bool>();
+        opts.logRecordedFilepaths = raw["log-recorded-filepaths"].as<bool>();
+        if (opts.silenceErrors && opts.unsilenceErrors) {
+            logger->error("You can't pass both `{}` and `{}`", "--unquiet", "--quiet");
+            throw EarlyReturnWithCode(1);
+        }
         opts.autocorrect = raw["autocorrect"].as<bool>();
         opts.didYouMean = raw["did-you-mean"].as<bool>();
         opts.inlineInput = raw["e"].as<string>();
         opts.inlineRBIInput = raw["e-rbi"].as<string>();
-        if (opts.autocorrect && opts.silenceErrors) {
+        if (opts.autocorrect && opts.silenceErrors && !opts.unsilenceErrors) {
             logger->error("You may not use autocorrect when silencing errors.");
             throw EarlyReturnWithCode(1);
         }

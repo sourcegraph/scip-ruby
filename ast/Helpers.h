@@ -268,49 +268,79 @@ public:
                                              core::make_type<core::NamedLiteralType>(core::Symbols::String(), value));
     }
 
-    static ExpressionPtr Method(core::LocOffsets loc, core::LocOffsets declLoc, core::NameRef name,
+    static ExpressionPtr Method(core::LocOffsets loc, core::LocOffsets declLoc, core::LocOffsets nameLoc, core::NameRef name,
                                 MethodDef::PARAMS_store params, ExpressionPtr rhs,
                                 MethodDef::Flags flags = MethodDef::Flags()) {
         if (params.empty() || (!isa_tree<ast::Local>(params.back()) && !isa_tree<ast::BlockParam>(params.back()))) {
             auto blkLoc = core::LocOffsets::none();
             params.emplace_back(make_expression<ast::BlockParam>(blkLoc, MK::Local(blkLoc, core::Names::blkArg())));
         }
-        return make_expression<MethodDef>(loc, declLoc, core::Symbols::todoMethod(), name, std::move(params),
+        return make_expression<MethodDef>(loc, declLoc, nameLoc, core::Symbols::todoMethod(), name, std::move(params),
                                           std::move(rhs), flags);
     }
 
-    static ExpressionPtr Method0(core::LocOffsets loc, core::LocOffsets declLoc, core::NameRef name, ExpressionPtr rhs,
+    static ExpressionPtr Method0(core::LocOffsets loc, core::LocOffsets declLoc, core::LocOffsets nameLoc, core::NameRef name, ExpressionPtr rhs,
                                  MethodDef::Flags flags = MethodDef::Flags()) {
         MethodDef::PARAMS_store params;
-        return Method(loc, declLoc, name, std::move(params), std::move(rhs), flags);
+        return Method(loc, declLoc, nameLoc, name, std::move(params), std::move(rhs), flags);
     }
 
-    static ExpressionPtr Method1(core::LocOffsets loc, core::LocOffsets declLoc, core::NameRef name,
+    static ExpressionPtr Method1(core::LocOffsets loc, core::LocOffsets declLoc, core::LocOffsets nameLoc, core::NameRef name,
                                  ExpressionPtr param0, ExpressionPtr rhs, MethodDef::Flags flags = MethodDef::Flags()) {
         MethodDef::PARAMS_store params;
         params.emplace_back(std::move(param0));
-        return Method(loc, declLoc, name, std::move(params), std::move(rhs), flags);
+        return Method(loc, declLoc, nameLoc, name, std::move(params), std::move(rhs), flags);
     }
 
-    static ExpressionPtr SyntheticMethod(core::LocOffsets loc, core::LocOffsets declLoc, core::NameRef name,
+    static ExpressionPtr SyntheticMethod(core::LocOffsets loc, core::LocOffsets declLoc, core::LocOffsets nameLoc, core::NameRef name,
                                          MethodDef::PARAMS_store params, ExpressionPtr rhs,
                                          MethodDef::Flags flags = MethodDef::Flags()) {
         flags.isRewriterSynthesized = true;
-        return Method(loc, declLoc, name, std::move(params), std::move(rhs), flags);
+        return Method(loc, declLoc, nameLoc, name, std::move(params), std::move(rhs), flags);
     }
 
-    static ExpressionPtr SyntheticMethod0(core::LocOffsets loc, core::LocOffsets declLoc, core::NameRef name,
+    static ExpressionPtr SyntheticMethod0(core::LocOffsets loc, core::LocOffsets declLoc, core::LocOffsets nameLoc, core::NameRef name,
                                           ExpressionPtr rhs, MethodDef::Flags flags = MethodDef::Flags()) {
         MethodDef::PARAMS_store params;
-        return SyntheticMethod(loc, declLoc, name, std::move(params), std::move(rhs), flags);
+        return SyntheticMethod(loc, declLoc, nameLoc, name, std::move(params), std::move(rhs), flags);
     }
 
-    static ExpressionPtr SyntheticMethod1(core::LocOffsets loc, core::LocOffsets declLoc, core::NameRef name,
+    static ExpressionPtr SyntheticMethod1(core::LocOffsets loc, core::LocOffsets declLoc, core::LocOffsets nameLoc, core::NameRef name,
                                           ExpressionPtr param0, ExpressionPtr rhs,
                                           MethodDef::Flags flags = MethodDef::Flags()) {
         MethodDef::PARAMS_store params;
         params.emplace_back(std::move(param0));
-        return SyntheticMethod(loc, declLoc, name, std::move(params), std::move(rhs), flags);
+        return SyntheticMethod(loc, declLoc, nameLoc, name, std::move(params), std::move(rhs), flags);
+    }
+
+    static ExpressionPtr Method(core::LocOffsets loc, core::LocOffsets declLoc, core::NameRef name,
+        MethodDef::PARAMS_store params, ExpressionPtr rhs, MethodDef::Flags flags = MethodDef::Flags()) {
+        return Method(loc, declLoc, core::LocOffsets::none(), name, std::move(params), std::move(rhs), flags);
+    }
+
+    static ExpressionPtr Method0(core::LocOffsets loc, core::LocOffsets declLoc, core::NameRef name,
+        ExpressionPtr rhs, MethodDef::Flags flags = MethodDef::Flags()) {
+        return Method0(loc, declLoc, core::LocOffsets::none(), name, std::move(rhs), flags);
+    }
+
+    static ExpressionPtr Method1(core::LocOffsets loc, core::LocOffsets declLoc, core::NameRef name,
+        ExpressionPtr param0, ExpressionPtr rhs, MethodDef::Flags flags = MethodDef::Flags()) {
+        return Method1(loc, declLoc, core::LocOffsets::none(), name, std::move(param0), std::move(rhs), flags);
+    }
+
+    static ExpressionPtr SyntheticMethod(core::LocOffsets loc, core::LocOffsets declLoc, core::NameRef name,
+        MethodDef::PARAMS_store params, ExpressionPtr rhs, MethodDef::Flags flags = MethodDef::Flags()) {
+        return SyntheticMethod(loc, declLoc, core::LocOffsets::none(), name, std::move(params), std::move(rhs), flags);
+    }
+
+    static ExpressionPtr SyntheticMethod0(core::LocOffsets loc, core::LocOffsets declLoc, core::NameRef name,
+        ExpressionPtr rhs, MethodDef::Flags flags = MethodDef::Flags()) {
+        return SyntheticMethod0(loc, declLoc, core::LocOffsets::none(), name, std::move(rhs), flags);
+    }
+
+    static ExpressionPtr SyntheticMethod1(core::LocOffsets loc, core::LocOffsets declLoc, core::NameRef name,
+        ExpressionPtr param0, ExpressionPtr rhs, MethodDef::Flags flags = MethodDef::Flags()) {
+        return SyntheticMethod1(loc, declLoc, core::LocOffsets::none(), name, std::move(param0), std::move(rhs), flags);
     }
 
     static ExpressionPtr ClassOrModule(core::LocOffsets loc, core::LocOffsets declLoc, ExpressionPtr name,

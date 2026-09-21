@@ -110,7 +110,7 @@ void Command::run(core::MutableContext ctx, ast::ClassDef *klass) {
         ast::MethodDef::Flags flags;
         flags.isSelfMethod = true;
         flags.discardDef = true;
-        auto selfCall = ast::MK::SyntheticMethod(call->loc, call->declLoc, call->name, std::move(newParams),
+        auto selfCall = ast::MK::SyntheticMethod(call->loc, call->declLoc, core::LocOffsets::none(), call->name, std::move(newParams),
                                                  ast::MK::RaiseTypedUnimplemented(call->declLoc), flags);
 
         // We are now in the weird situation where we have an actual method that
@@ -120,7 +120,7 @@ void Command::run(core::MutableContext ctx, ast::ClassDef *klass) {
         // the location(s) on the non-synthetic method so that LSP only sees the
         // synthetic method.
         auto hiddenCall = ast::MK::Method(call->loc.copyWithZeroLength(), call->declLoc.copyWithZeroLength(),
-                                          call->name, std::move(call->params), std::move(call->rhs), call->flags);
+                                          call->nameLoc.copyWithZeroLength(), call->name, std::move(call->params), std::move(call->rhs), call->flags);
 
         // We need to make sure we assign into `callptr` prior to inserting into
         // `klass->rhs`, otherwise our pointer might not be live anymore.

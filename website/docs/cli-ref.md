@@ -400,8 +400,8 @@ Usage:
                                 rewrite-tree-raw, index-tree, index-tree-raw, name-tree,
                                 name-tree-raw, resolve-tree, resolve-tree-raw,
                                 flatten-tree, flatten-tree-raw, ast, ast-raw, cfg,
-                                cfg-raw, cfg-text, symbol-table, symbol-table-raw,
-                                symbol-table-json, symbol-table-full,
+                                cfg-raw, cfg-text, cfg-text-loc, symbol-table,
+                                symbol-table-raw, symbol-table-json, symbol-table-full,
                                 symbol-table-full-raw, symbol-table-full-json, autogen,
                                 autogen-msgpack, autogen-subclasses, package-tree,
                                 minimized-rbi

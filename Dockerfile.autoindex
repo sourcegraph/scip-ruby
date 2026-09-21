@@ -1,0 +1,13 @@
+# Build from the base image (local, not published)
+ARG BASE_TAG
+FROM scip-ruby-base:${BASE_TAG}
+
+# This Docker image is meant for auto-indexing support in Sourcegraph
+# and is not recommended for third-party use.
+
+# Copy and install the autoindex script
+COPY scip_indexer/autoindex.sh /usr/bin/scip-ruby-autoindex
+RUN chmod +x /usr/bin/scip-ruby-autoindex
+
+# Default command is shell for autoindex operations
+CMD ["/bin/sh"]

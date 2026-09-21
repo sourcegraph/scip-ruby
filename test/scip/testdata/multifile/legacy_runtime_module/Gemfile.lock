@@ -1,0 +1,6 @@
+GEM
+  specs:
+    sorbet-runtime (0.5.11435)
+
+DEPENDENCIES
+  sorbet-runtime

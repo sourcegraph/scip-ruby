@@ -472,7 +472,7 @@ vector<ast::ExpressionPtr> processProp(core::MutableContext ctx, PropInfo &prop,
     } else {
         readerBody = ast::MK::RaiseTypedUnimplemented(loc);
     }
-    nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, std::move(readerBody)));
+    nodes.emplace_back(ASTUtil::mkGet(ctx, loc, name, nameLoc, std::move(readerBody)));
 
     core::NameRef setName = name.addEq(ctx);
 
@@ -512,7 +512,8 @@ vector<ast::ExpressionPtr> processProp(core::MutableContext ctx, PropInfo &prop,
 }
 
 vector<ast::ExpressionPtr> mkTypedInitialize(core::MutableContext ctx, core::LocOffsets klassLoc,
-                                             core::LocOffsets klassDeclLoc, const vector<PropInfo> &props) {
+                                             core::LocOffsets klassDeclLoc, core::LocOffsets klassNameLoc,
+                                             const vector<PropInfo> &props) {
     ast::MethodDef::PARAMS_store params;
     ast::Send::ARGS_store sigArgs;
     params.reserve(props.size());
@@ -551,7 +552,7 @@ vector<ast::ExpressionPtr> mkTypedInitialize(core::MutableContext ctx, core::Loc
 
     vector<ast::ExpressionPtr> result;
     result.emplace_back(ast::MK::SigVoid(klassDeclLoc, std::move(sigArgs)));
-    result.emplace_back(ast::MK::SyntheticMethod(klassLoc, klassDeclLoc, core::Names::initialize(), std::move(params),
+    result.emplace_back(ast::MK::SyntheticMethod(klassLoc, klassDeclLoc, klassNameLoc, core::Names::initialize(), std::move(params),
                                                  std::move(body)));
     return result;
 }
@@ -628,7 +629,7 @@ void Prop::run(core::MutableContext ctx, ast::ClassDef *klass) {
     vector<ast::ExpressionPtr> typedInitializeStats;
     if (wantTypedInitialize(syntacticSuperClass)) {
         // For direct T::Struct subclasses, we know that seeing no props means the constructor should be zero-arity.
-        typedInitializeStats = mkTypedInitialize(ctx, klass->loc, klass->declLoc, props);
+        typedInitializeStats = mkTypedInitialize(ctx, klass->loc, klass->declLoc, klass->name.loc(), props);
     }
 
     auto capacity = klass->rhs.size() + typedInitializeStats.size();

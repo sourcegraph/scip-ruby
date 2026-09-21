@@ -23,6 +23,9 @@ public:
     /** Writes the specified data to the given file. */
     virtual void writeFile(const std::string &filename, std::string_view text) = 0;
 
+    /** Gets the path for the current directory. */
+    virtual std::string getCurrentDir() const = 0;
+
     /**
      * Returns a list of all files in the given directory. Returns paths that include the path to directory.
      *
@@ -52,6 +55,7 @@ public:
 
     std::string readFile(const std::string &path) const override;
     void writeFile(const std::string &filename, std::string_view text) override;
+    std::string getCurrentDir() const override;
     std::vector<std::string> listFilesInDir(std::string_view path, const UnorderedSet<std::string> &extensions,
                                             WorkerPool &workerPool, bool recursive,
                                             const std::vector<std::string> &absoluteIgnorePatterns,

@@ -66,6 +66,7 @@ struct Printers {
     PrinterConfig ASTRaw;
     PrinterConfig CFG;
     PrinterConfig CFGText;
+    PrinterConfig CFGTextLoc;
     PrinterConfig CFGRaw;
     PrinterConfig TypedSource;
     PrinterConfig SymbolTable;
@@ -134,6 +135,8 @@ struct Options {
     bool suggestTyped = false;
     std::optional<std::string> suggestUnsafe = std::nullopt;
     bool silenceErrors = false;
+    bool unsilenceErrors = false;
+    bool logRecordedFilepaths = false;
     bool silenceDevMessage = false;
     bool suppressNonCriticalErrors = false;
     bool runLSP = false;
@@ -220,6 +223,7 @@ struct Options {
         }
     };
     CacheSensitiveOptions cacheSensitiveOptions;
+    std::string semanticExtensionCacheKey;
 
     // Enable support experimental method modifiers, such as `abstract def foo; end`
     bool experimentalMethodModifiers = false;

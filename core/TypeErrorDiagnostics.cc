@@ -153,11 +153,19 @@ optional<pair<Loc, int>> calculateIndentedNextLine(const GlobalState &gs, const 
 optional<core::AutocorrectSuggestion::Edit>
 TypeErrorDiagnostics::editForDSLMethod(const GlobalState &gs, FileRef fileToEdit, Loc defaultInsertLoc,
                                        ClassOrModuleRef inWhatRef, ClassOrModuleRef dslOwner, string_view dsl) {
+    // A missing method such as `instance.sig` has no attached class to extend.
+    // Preserve the unknown-method diagnostic without proposing a class edit.
+    if (!inWhatRef.exists()) {
+        return nullopt;
+    }
     auto inWhat = inWhatRef.data(gs);
     auto inWhatSingleton = inWhat->lookupSingletonClass(gs);
 
     auto needsDslOwner = false;
     if (dslOwner.exists()) {
+        if (!inWhatSingleton.exists()) {
+            return nullopt;
+        }
         needsDslOwner = !inWhatSingleton.data(gs)->derivesFrom(gs, dslOwner);
     }
 

@@ -3,6 +3,7 @@
 
 #include <memory>
 
+#include "core/GlobalState.h"
 #include "parser/prism/Factory.h"
 #include "parser/prism/Helpers.h"
 #include "parser/prism/Parser.h"
@@ -38,7 +39,7 @@ class SigsRewriter {
 public:
     SigsRewriter(core::MutableContext ctx, parser::Prism::Parser &parser,
                  UnorderedMap<pm_node_t *, std::vector<rbs::CommentNode>> &commentsByNode)
-        : ctx{ctx}, parser{parser}, prism{parser}, commentsByNode{commentsByNode} {}
+        : ctx{ctx}, parser{parser}, prism{parser, ctx.state.isSCIPRuby}, commentsByNode{commentsByNode} {}
 
     // Rewrite the RBS signatures in the Prism AST, in-place.
     void run(pm_node_t *node);

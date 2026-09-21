@@ -1,0 +1,60 @@
+name: Check Gem build
+on: workflow_dispatch
+
+jobs:
+  check-gem-build:
+    name: 'Build gem'
+    strategy:
+      matrix:
+        platform: ['ubuntu-24.04', 'macos-14']
+        config: ['asserts', 'release']
+    runs-on: ${{ matrix.platform }}
+    env:
+      TAG: ${{ github.event.ref }}
+    steps:
+      - uses: actions/checkout@v4
+      # Keep in sync with ci.yml
+      - uses: ruby/setup-ruby@v1
+      - name: Manually evict cache entry if applicable
+        if: ${{ runner.os == 'Linux' }}
+        run: ACCESS_TOKEN='${{ secrets.GITHUB_TOKEN }}' python3 .github/workflows/evict.py
+      - name: "🚀 Mount Bazel build cache"
+        if: ${{ runner.os == 'Linux' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/bazelcache/build
+          key: bazel-build-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            bazel-build-${{ runner.os }}-
+            bazel-build-
+      - name: "🚀 Mount Bazel repo cache"
+        uses: actions/cache@v4
+        if: ${{ runner.os == 'Linux' }}
+        with:
+          path: ~/bazelcache/repos
+          key: bazel-repos-${{ runner.os }}-${{ hashFiles('WORKSPACE') }}
+          restore-keys: |
+            bazel-repos-${{ runner.os }}-
+            bazel-repos-
+      - name: "⚙️ Setup Bazel"
+        run: .github/workflows/setup-bazel.sh
+      - name: "🔎 Identify OS"
+        run: echo "OS=$(uname -s | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+      - name: ${{ format('🏗 Build ({0})', matrix.config) }}
+        run: |
+          CONFIG="dev"
+          if [ "$CFG" == "release" ]; then
+            CONFIG="release-${OS/darwin/mac}"
+          fi
+          ./bazel build //main:scip-ruby --config="$CONFIG" --execution_log_binary_file=log
+          echo "config=$CONFIG" >> "$GITHUB_ENV"
+        env:
+          OS: ${{ env.OS }}
+          CFG: ${{ matrix.config }}
+      - name: "🪵 Upload log"
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.config }}-build-log
+          path: log
+      - name: ${{ format('💎 Build Gem(s) ({0})', matrix.config) }}
+        run: ./bazel build //gems/scip-ruby --config="${{ env.config }}"

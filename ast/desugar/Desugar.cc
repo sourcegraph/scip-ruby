@@ -381,7 +381,7 @@ ExpressionPtr validateRBIBody(DesugarContext dctx, ExpressionPtr body) {
     return body;
 }
 
-ExpressionPtr buildMethod(DesugarContext dctx, core::LocOffsets loc, core::LocOffsets declLoc, core::NameRef name,
+ExpressionPtr buildMethod(DesugarContext dctx, core::LocOffsets loc, core::LocOffsets declLoc, core::LocOffsets nameLoc, core::NameRef name,
                           parser::Node *argnode, unique_ptr<parser::Node> &body, bool isSelf) {
     // Reset uniqueCounter within this scope (to keep numbers small)
     uint32_t uniqueCounter = 1;
@@ -412,7 +412,7 @@ ExpressionPtr buildMethod(DesugarContext dctx, core::LocOffsets loc, core::LocOf
         blockParam->expr = MK::Local(enclosingBlockParamLoc, enclosingBlockParamName);
     }
 
-    auto mdef = MK::Method(loc, declLoc, name, move(params), move(desugaredBody));
+    auto mdef = MK::Method(loc, declLoc, nameLoc, name, move(params), move(desugaredBody));
     cast_tree<MethodDef>(mdef)->flags.isSelfMethod = isSelf;
     return mdef;
 }
@@ -823,7 +823,13 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
                         dctx.enclosingBlockParamLoc = send->loc;
                         dctx.enclosingBlockParamName = core::Names::implicitYield();
                     }
+                    auto scipCall = dctx.ctx.state.isSCIPRuby ? sendExpr.deepCopy() : nullptr;
                     result = MK::If(loc, MK::Local(loc, dctx.enclosingBlockParamName), move(sendExpr), MK::False(loc));
+                    if (scipCall) {
+                        // Inference may discard the conditional call when the
+                        // block is known absent. Keep navigation on the source token.
+                        result = MK::InsSeq1(loc, move(scipCall), move(result));
+                    }
 
                     return;
                 }
@@ -866,6 +872,7 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
                 auto hasFwdArgs = false;
                 auto hasFwdRestArg = false;
                 auto hasSplat = false;
+                auto forwardedLoc = loc;
                 auto newEndIt = remove_if(send->args.begin(), send->args.end(), [&](auto &arg) {
                     bool eraseFromArgs = false;
 
@@ -874,7 +881,10 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
 
                         ENFORCE(blockPassArg == nullptr, "The parser should have rejected `foo(&, ...)`");
                         // Desugar a call like `foo(...)` so it has a block argument like `foo(..., &<fwd-block>)`.
-                        blockPassArg = MK::Local(loc, core::Names::fwdBlock());
+                        if (dctx.ctx.state.isSCIPRuby) {
+                            forwardedLoc = arg->loc;
+                        }
+                        blockPassArg = MK::Local(forwardedLoc, core::Names::fwdBlock());
                         blockPassLoc = loc.copyEndWithZeroLength();
 
                         hasFwdArgs = true;
@@ -882,6 +892,9 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
                     } else if (parser::isa_node<parser::ForwardedRestArg>(arg.get())) {
                         // Pull out the ForwardedRestArg (an anonymous splat like `f(*)`)
                         hasFwdRestArg = true;
+                        if (dctx.ctx.state.isSCIPRuby) {
+                            forwardedLoc = arg->loc;
+                        }
                         eraseFromArgs = true;
                     } else if (parser::isa_node<parser::Splat>(arg.get())) {
                         // Detect if there's a splat in the argument list
@@ -908,13 +921,13 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
                     auto args = node2TreeImpl(dctx, array);
 
                     if (hasFwdArgs) {
-                        auto fwdArgs = MK::Local(loc, core::Names::fwdArgs());
+                        auto fwdArgs = MK::Local(forwardedLoc, core::Names::fwdArgs());
                         auto argsSplat = MK::Splat(loc, move(fwdArgs));
                         auto argsConcat =
                             argsEmpty ? move(argsSplat)
                                       : MK::Send1(loc, move(args), core::Names::concat(), locZeroLen, move(argsSplat));
 
-                        auto fwdKwargs = MK::Local(loc, core::Names::fwdKwargs());
+                        auto fwdKwargs = MK::Local(forwardedLoc, core::Names::fwdKwargs());
                         auto kwargsSplat =
                             MK::Send1(loc, MK::Magic(loc), core::Names::toHashDup(), locZeroLen, move(fwdKwargs));
 
@@ -927,9 +940,12 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
 
                         args = move(argsConcat);
                     } else if (hasFwdRestArg) {
-                        auto fwdArgs = MK::Local(loc, core::Names::fwdArgs());
+                        auto fwdArgs = MK::Local(forwardedLoc, core::Names::fwdArgs());
                         auto argsSplat = MK::Send0(loc, move(fwdArgs), core::Names::toA(), locZeroLen);
-                        auto tUnsafe = MK::Unsafe(loc, move(argsSplat));
+                        // Preserve the forwarding token without indexing the generated T.unsafe.
+                        auto unsafeLoc = dctx.ctx.state.isSCIPRuby ? locZeroLen : loc;
+                        auto tUnsafe =
+                            MK::Send1(loc, MK::T(unsafeLoc), core::Names::unsafe(), unsafeLoc, move(argsSplat));
                         auto argsConcat = MK::Send1(loc, move(args), core::Names::concat(), locZeroLen, move(tUnsafe));
 
                         args = move(argsConcat);
@@ -1126,8 +1142,10 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
                         auto *fwdKwrestArg = parser::cast_node<parser::ForwardedKwrestArg>(pairAsExpression.get());
                         ENFORCE(fwdKwrestArg != nullptr, "kwsplat and fwdkwrestarg cast failed");
 
-                        auto fwdKwargs = MK::Local(loc, core::Names::fwdKwargs());
-                        expr = MK::Unsafe(loc, move(fwdKwargs));
+                        auto argLoc = dctx.ctx.state.isSCIPRuby ? fwdKwrestArg->loc : loc;
+                        auto unsafeLoc = dctx.ctx.state.isSCIPRuby ? locZeroLen : loc;
+                        auto fwdKwargs = MK::Local(argLoc, core::Names::fwdKwargs());
+                        expr = MK::Send1(loc, MK::T(unsafeLoc), core::Names::unsafe(), unsafeLoc, move(fwdKwargs));
                     }
 
                     if (havePairsToMerge) {
@@ -1545,7 +1563,14 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
                     }
                 }
 
-                auto assgn = MK::Assign(zeroLengthRecvLoc, tempRecv, node2TreeImpl(dctx, csend->receiver));
+                // SCIP needs the receiver's source range on both branches: CFG
+                // dealiasing can replace the temporary with the original local.
+                auto receiver = node2TreeImpl(dctx, csend->receiver);
+                auto scipRecvLoc = dctx.ctx.state.isSCIPRuby ? receiver.loc() : zeroLengthRecvLoc;
+                if (dctx.ctx.state.isSCIPRuby) {
+                    csendLoc = scipRecvLoc;
+                }
+                auto assgn = MK::Assign(scipRecvLoc, tempRecv, move(receiver));
 
                 // Just compare with `NilClass` to avoid potentially calling into a class-defined `==`
                 auto cond =
@@ -1553,8 +1578,8 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
                               core::Names::tripleEq(), zeroLengthRecvLoc, MK::Local(zeroLengthRecvLoc, tempRecv));
 
                 unique_ptr<parser::Node> sendNode =
-                    make_unique<parser::Send>(loc, make_unique<parser::LVar>(zeroLengthRecvLoc, tempRecv),
-                                              csend->method, csend->methodLoc, move(csend->args));
+                    make_unique<parser::Send>(loc, make_unique<parser::LVar>(scipRecvLoc, tempRecv), csend->method,
+                                              csend->methodLoc, move(csend->args));
                 auto send = node2TreeImpl(dctx, sendNode);
 
                 ExpressionPtr nil =
@@ -1654,7 +1679,7 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
             },
             [&](parser::DefMethod *method) {
                 bool isSelf = false;
-                ExpressionPtr res = buildMethod(dctx, method->loc, method->declLoc, method->name, method->params.get(),
+                ExpressionPtr res = buildMethod(dctx, method->loc, method->declLoc, method->nameLoc, method->name, method->params.get(),
                                                 method->body, isSelf);
                 result = move(res);
             },
@@ -1671,7 +1696,7 @@ ExpressionPtr node2TreeImplBody(DesugarContext dctx, parser::Node *what) {
                     }
                 }
                 bool isSelf = true;
-                ExpressionPtr res = buildMethod(dctx, method->loc, method->declLoc, method->name, method->params.get(),
+                ExpressionPtr res = buildMethod(dctx, method->loc, method->declLoc, method->nameLoc, method->name, method->params.get(),
                                                 method->body, isSelf);
                 result = move(res);
             },

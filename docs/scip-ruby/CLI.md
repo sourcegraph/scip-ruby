@@ -1,0 +1,103 @@
+# scip-ruby CLI
+
+This document describes scip-ruby specific flags.
+
+## `--cache-dir <dir>`
+
+Enables on-disk caching under `<dir>/scip-ruby/`. The subdirectory keeps SCIP's
+cache separate from Sorbet's, including when both tools read `--cache-dir` from
+the same `sorbet/config`. For example, `--cache-dir=.cache` uses `.cache/scip-ruby/`.
+Caching remains disabled when the option is absent or its value is empty.
+
+## Sorbet runtime compatibility
+
+scip-ruby reads `Gemfile.lock` in its working directory to preserve bare `Module`
+lookup inside `T` for projects pinned to sorbet-runtime versions before `0.6.12698`,
+which introduced `T::Module`. This applies only to the bundled constant: explicit
+`T::Module` references and project definitions keep their normal meaning.
+
+Only an unambiguous numeric release pin from a `GEM` section enables this behavior.
+Missing or conflicting pins, prereleases, and Git/path dependencies use current
+lookup. The compatibility mode is included in the cache identity, so changing the
+pin does not reuse resolution from the other mode. This is a targeted compatibility
+rule, not selection of a complete payload for each Sorbet version.
+
+## `--gem-metadata <arg>`
+
+The argument should be `name@version` format, which identifies the current
+repository for cross-repo code navigation. By default, `scip-ruby` will
+attempt to infer the name and version by looking at `Gemfile.lock`,
+any available `.gemspec` files and, both of those failing, the current directory
+name (for the version).
+
+If you don't have any of these files, or the information is specified
+dynamically (since arbitrary Ruby code is allowed in `.gemspec` files),
+you can supply this argument explicitly instead.
+
+The version should generally correspond to the previously released version.
+For example, with Git, you can use the last tag
+(`git describe --tags --abbrev=0`). However, the version can be an arbitrary
+string. For repos which index every commit, you could also use the SHA
+instead (`git rev-parse HEAD`).
+
+## `--gem-map-path <arg>`
+
+For cross-repo navigation, scip-ruby needs to know which files
+belong to which gem. By default, scip-ruby will attempt to
+infer this from filepaths, assuming that files under `sorbet/rbi/{gems,annotations,dsl}/`
+belong to external gems as per the [standard layout](https://sorbet.org/docs/rbi#quickref).
+
+If you have files that contain definitions belonging to other gems,
+but are placed in non-standard directories, you can specify the correct gem information
+using a newline-delimited JSON file in the following format:
+
+<!-- 
+TODO: Uncomment this
+By default, `scip-ruby` will attempt to identify which gems the
+ingested files belong to based on the standard layout of paths
+as used by Bundler. If it can't identify the gems for certain files,
+it will print a warning. This may happen if you're using a custom
+build system or different filesystem layout.
+
+To get correct cross-repo code navigation, you can explicitly
+supply information about files and gems using a supplementary
+newline-delimited JSON file in the following format:
+-->
+```json
+{"path": "a/b/c.rb", "gem": "my_gem@1.2.3"}
+{"path": "a/b/d.rb", "gem": "my_gem@1.2.3"}
+{"path": "a/x/y.rb", "gem": "other_gem@3.4.9"}
+...
+```
+
+Pass the path to the JSON file:
+
+```bash
+scip-ruby --gem-map-path path/to/cross-repo-metadata.json
+```
+
+Paths in the JSON file are interpreted relative to the working directory
+for the `scip-ruby` invocation.
+
+If information about the primary gem being indexed (i.e. the one corresponding to the project root)
+cannot be inferred from the filesystem, then you can supply
+the `--gem-metadata` argument as described earlier.
+
+If you run into an error message where a path in the JSON file
+is not recognized by `scip-ruby`, you can re-run the indexing command
+with extra arguments `--log-recorded-filepaths --debug-log-file out.log`
+to identify differences between the JSON file
+and paths created by traversing directories.
+
+## `--index-file <arg>`
+
+The path for emitting the SCIP index. Defaults to `index.scip`.
+
+## `--unquiet`
+
+scip-ruby defaults to running in Sorbet's quiet mode, as scip-ruby supports
+indexing `# typed: false` files on a best-effort basis, but Sorbet may
+rightfully flag many errors in those files. The number of errors can be
+overwhelming if there is a large amount of untyped code.
+
+This flag restores Sorbet's default behavior.

@@ -40,6 +40,44 @@ bool allComponentsPresent(DispatchResult &res) {
     }
     return allComponentsPresent(*res.secondary);
 }
+
+DispatchResult markIntersectionDispatch(const GlobalState &gs, DispatchResult result) {
+    if (gs.isSCIPRuby) {
+        if (!result.main.scipDispatchInfo) {
+            result.main.scipDispatchInfo = make_unique<SCIPDispatchInfo>();
+        }
+        result.main.scipDispatchInfo->intersectionMethods.emplace();
+    }
+    return result;
+}
+
+TypePtr legacySCIPConstructorResult(const GlobalState &gs, MethodRef method) {
+    auto data = method.data(gs);
+    if (!gs.isSCIPRuby || data->name != Names::new_() || data->hasSig() || data->locs().empty()) {
+        return nullptr;
+    }
+    // Unsigned project RBIs used to inherit Gem::Version.new's payload signature. Upstream
+    // moved it to initialize in 7616fd91f. Retain that known contract for legacy declarations,
+    // without assuming that arbitrary factories or handwritten Ruby overrides return instances.
+    for (auto loc : data->locs()) {
+        if (!loc.exists() || !loc.file().data(gs).isRBI()) {
+            return nullptr;
+        }
+    }
+    auto klass = data->owner.data(gs)->attachedClass(gs);
+    if (!klass.exists() || klass.data(gs)->name.shortName(gs) != "Version") {
+        return nullptr;
+    }
+    auto owner = klass.data(gs)->owner;
+    if (!owner.exists() || owner.data(gs)->owner != Symbols::root() || owner.data(gs)->name.shortName(gs) != "Gem") {
+        return nullptr;
+    }
+    if (!absl::c_any_of(klass.data(gs)->locs(),
+                       [&](auto loc) { return loc.exists() && loc.file().data(gs).isPayload(); })) {
+        return nullptr;
+    }
+    return make_type<ClassType>(klass);
+}
 } // namespace
 
 bool NamedLiteralType::derivesFrom(const GlobalState &gs, core::ClassOrModuleRef klass) const {
@@ -108,10 +146,10 @@ DispatchResult AndType::dispatchCall(const GlobalState &gs, const DispatchArgs &
     auto leftOk = allComponentsPresent(leftRet);
     auto rightOk = allComponentsPresent(rightRet);
     if (leftOk && !rightOk) {
-        return leftRet;
+        return markIntersectionDispatch(gs, std::move(leftRet));
     }
     if (rightOk && !leftOk) {
-        return rightRet;
+        return markIntersectionDispatch(gs, std::move(rightRet));
     }
     if (!rightOk && !leftOk) {
         if (!args.suppressErrors) {
@@ -121,7 +159,8 @@ DispatchResult AndType::dispatchCall(const GlobalState &gs, const DispatchArgs &
         }
     }
 
-    return DispatchResult::merge(gs, DispatchResult::Combinator::AND, std::move(leftRet), std::move(rightRet));
+    return markIntersectionDispatch(
+        gs, DispatchResult::merge(gs, DispatchResult::Combinator::AND, std::move(leftRet), std::move(rightRet)));
 }
 
 TypePtr AndType::getCallArguments(const GlobalState &gs, NameRef name) const {
@@ -142,7 +181,7 @@ DispatchResult ShapeType::dispatchCall(const GlobalState &gs, const DispatchArgs
     if (method.exists()) {
         auto *intrinsic = method.data(gs)->getIntrinsic();
         if (intrinsic != nullptr) {
-            DispatchComponent comp{args.selfType, method, {}, nullptr, nullptr, nullptr, {}, {}, nullptr};
+            DispatchComponent comp{args.selfType, method, {}, nullptr, nullptr, nullptr, {}, {}, nullptr, nullptr};
             DispatchResult res{nullptr, std::move(comp)};
             intrinsic->apply(gs, args, res);
             if (res.returnType != nullptr) {
@@ -159,7 +198,7 @@ DispatchResult TupleType::dispatchCall(const GlobalState &gs, const DispatchArgs
     if (method.exists()) {
         auto *intrinsic = method.data(gs)->getIntrinsic();
         if (intrinsic != nullptr) {
-            DispatchComponent comp{args.selfType, method, {}, nullptr, nullptr, nullptr, {}, {}, nullptr};
+            DispatchComponent comp{args.selfType, method, {}, nullptr, nullptr, nullptr, {}, {}, nullptr, nullptr};
             DispatchResult res{nullptr, std::move(comp)};
             intrinsic->apply(gs, args, res);
             if (res.returnType != nullptr) {
@@ -1494,6 +1533,12 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
                 if (kwargLocsIt != kwargLocs.end()) {
                     auto [kwKeyLoc, kwValLoc] = kwargLocsIt->second;
                     auto termLoc = core::Loc(args.locs.file, kwKeyLoc);
+                    if (gs.isSCIPRuby) {
+                        if (!component.scipDispatchInfo) {
+                            component.scipDispatchInfo = make_unique<SCIPDispatchInfo>();
+                        }
+                        component.scipDispatchInfo->keywordArguments.push_back({method, kwParam.name, kwKeyLoc});
+                    }
                     if (gs.lspQuery.matchesLoc(termLoc)) {
                         lsp::QueryResponse::pushQueryResponse(gs, args.locs.file,
                                                               lsp::KeywordArgResponse(termLoc, method, kwParam));
@@ -1681,6 +1726,9 @@ DispatchResult dispatchCallSymbol(const GlobalState &gs, const DispatchArgs &arg
             resultType = args.args[1]->type;
         } else {
             resultType = Types::resultTypeAsSeenFrom(gs, methodData->resultType, methodData->owner, symbol, targs);
+            if (!resultType) {
+                resultType = legacySCIPConstructorResult(gs, method);
+            }
         }
     }
     if (args.block == nullptr) {
@@ -2271,8 +2319,12 @@ public:
         ClassOrModuleRef self = unwrapSymbol(gs, args.thisType, mustExist);
         auto tClassSelfType = Types::tClass(Types::widen(gs, args.selfType));
         if (self.data(gs)->isModule()) {
-            ENFORCE(gs.cacheSensitiveOptions.requiresAncestorEnabled,
-                    "Congrats, you've found a test case. Please add it, then delete this.");
+            // SCIP-only: error recovery can retain Object in a module's ancestry after an invalid class inclusion.
+            // Dispatch can then reach this intrinsic without requires_ancestor; use the existing module result type.
+            if (!gs.isSCIPRuby) {
+                ENFORCE(gs.cacheSensitiveOptions.requiresAncestorEnabled,
+                        "Congrats, you've found a test case. Please add it, then delete this.");
+            }
             // This normally can't happen, because `Object` is not an ancestor of any module
             // instance by default. But Sorbet supports requires ancestor in a really weird way (by
             // simply dispatching to a completely unrelated method) which means that sometimes we
@@ -3431,7 +3483,9 @@ public:
         auto tuple = cast_type<TupleType>(args.thisType);
         ENFORCE(tuple);
 
-        if (!args.args.empty()) {
+        // The Array dispatch path supplies the comparator's parameter types and
+        // deferred return type; the tuple shortcut cannot typecheck a block.
+        if (!args.args.empty() || args.block != nullptr) {
             return;
         }
         if (tuple->elems.empty()) {

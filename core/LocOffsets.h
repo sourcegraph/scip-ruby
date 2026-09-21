@@ -11,6 +11,8 @@ class MutableContext;
 
 constexpr uint32_t INVALID_POS_LOC = UINT32_MAX;
 struct LocOffsets {
+    template <typename H> friend H AbslHashValue(H h, const LocOffsets &m);
+
     uint32_t beginLoc = INVALID_POS_LOC;
     uint32_t endLoc = INVALID_POS_LOC;
     uint32_t beginPos() const {

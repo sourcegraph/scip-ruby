@@ -75,6 +75,11 @@ vector<pm_node_t *> TypeParamsToParserNodes::typeParams(const rbs_node_list_t *r
 
         auto typeCall = prism.Call(loc, prism.SorbetPrivateStatic(loc), "type_member"sv, absl::MakeSpan(args), block);
         auto assign = prism.ConstantWriteNode(loc, prism.addConstantToPool(nameStr), typeCall);
+        if (ctx.state.isSCIPRuby) {
+            auto nameLoc = declaration.typeLocFromRange(rbsTypeParam->name_range);
+            parser::Prism::down_cast_nonnull<pm_constant_write_node_t>(assign)->name_loc =
+                prismParser.convertLocOffsets(nameLoc);
+        }
         result.push_back(assign);
     }
 

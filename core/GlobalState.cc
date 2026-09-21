@@ -13,6 +13,7 @@
 #include "core/hashing/hashing.h"
 #include "core/lsp/TypecheckEpochManager.h"
 #include <string_view>
+#include <filesystem>
 #include <utility>
 
 #include "absl/strings/str_cat.h"
@@ -128,7 +129,7 @@ struct MethodBuilder {
 };
 
 MethodBuilder enterMethod(GlobalState &gs, ClassOrModuleRef klass, NameRef name) {
-    return MethodBuilder{gs, gs.enterMethodSymbol(Loc::none(), klass, name)};
+    return MethodBuilder{gs, gs.enterMethodSymbol(Loc::none(), klass, name, Loc::none())};
 }
 
 struct ParentLinearizationInformation {
@@ -309,7 +310,7 @@ void GlobalState::initEmpty() {
     ClassOrModuleRef klass;
     klass = synthesizeClass(core::Names::Constants::NoSymbol(), 0);
     ENFORCE_NO_TIMER(klass == Symbols::noClassOrModule());
-    MethodRef method = enterMethodSymbol(Loc::none(), Symbols::noClassOrModule(), Names::noMethod());
+    MethodRef method = enterMethodSymbol(Loc::none(), Symbols::noClassOrModule(), Names::noMethod(), Loc::none());
     ENFORCE_NO_TIMER(method == Symbols::noMethod());
     FieldRef field = enterFieldSymbol(Loc::none(), Symbols::noClassOrModule(), Names::noFieldOrStaticField());
     ENFORCE_NO_TIMER(field == Symbols::noField());
@@ -603,7 +604,7 @@ void GlobalState::initEmpty() {
     method = enterMethod(*this, Symbols::Class(), Names::new_()).repeatedArg(Names::args()).build();
     ENFORCE_NO_TIMER(method == Symbols::Class_new());
 
-    method = enterMethodSymbol(Loc::none(), Symbols::noClassOrModule(), Names::TodoMethod());
+    method = enterMethodSymbol(Loc::none(), Symbols::noClassOrModule(), Names::TodoMethod(), Loc::none());
     enterMethodParameter(Loc::none(), method, Names::args());
     ENFORCE_NO_TIMER(method == Symbols::todoMethod());
 
@@ -994,7 +995,7 @@ void GlobalState::installIntrinsics() {
                 break;
         }
         auto countBefore = methodsUsed();
-        auto method = enterMethodSymbol(Loc::none(), symbol, entry.method);
+        auto method = enterMethodSymbol(Loc::none(), symbol, entry.method, Loc::none());
         method.data(*this)->intrinsicOffset = offset + Method::FIRST_VALID_INTRINSIC_OFFSET;
         if (countBefore != methodsUsed()) {
             auto &blkParam = enterMethodParameter(Loc::none(), method, Names::blkArg());
@@ -1052,8 +1053,12 @@ bool matchesArityHash(const GlobalState &gs, ArityHash arityHash, MethodRef meth
     auto methodData = method.data(gs);
     // lookupMethodSymbolWithHash is called from namer, before resolver enters overloads.
     // It wants to be able to find the "namer version" of the method, not the overload.
+    // Intrinsics start as location-less stubs with only a synthetic block argument. Allow the first real definition
+    // to find and fill in that stub regardless of its arity. Once the stub has been defined, require subsequent
+    // definitions to match its actual arity so that incompatible MethodDefs receive distinct symbols.
+    auto isUninitializedIntrinsic = methodData->hasIntrinsic() && !methodData->hasSig() && !methodData->loc().exists();
     return !methodData->name.isOverloadName(gs) &&
-           (methodData->methodArityHash(gs) == arityHash || (methodData->hasIntrinsic() && !methodData->hasSig()));
+           (methodData->methodArityHash(gs) == arityHash || isUninitializedIntrinsic);
 }
 } // namespace
 
@@ -1353,7 +1358,7 @@ TypeParameterRef GlobalState::enterTypeParameter(Loc loc, MethodRef owner, NameR
     return result;
 }
 
-MethodRef GlobalState::enterMethodSymbol(Loc loc, ClassOrModuleRef owner, NameRef name) {
+MethodRef GlobalState::enterMethodSymbol(Loc loc, ClassOrModuleRef owner, NameRef name, Loc nameLoc) {
     ClassOrModuleData ownerScope = owner.dataAllowingNone(*this);
 
     auto &store = ownerScope->members()[name];
@@ -1370,6 +1375,7 @@ MethodRef GlobalState::enterMethodSymbol(Loc loc, ClassOrModuleRef owner, NameRe
 
     MethodData data = result.dataAllowingNone(*this);
     data->name = name;
+    data->nameLoc = nameLoc;
     data->owner = owner;
     data->addLoc(*this, loc);
     DEBUG_ONLY(categoryCounterInc("symbols", "method"));
@@ -1381,7 +1387,7 @@ MethodRef GlobalState::enterNewMethodOverload(Loc sigLoc, MethodRef original, co
                                               const vector<bool> &paramsToKeep) {
     NameRef name = freshNameUnique(UniqueNameKind::Overload, originalName, num);
     auto owner = original.data(*this)->owner;
-    auto res = enterMethodSymbol(sigLoc, owner, name);
+    auto res = enterMethodSymbol(sigLoc, owner, name, original.data(*this)->nameLoc);
     bool newMethod = res != original;
     const auto &resParameters = res.data(*this)->parameters;
     ENFORCE_NO_TIMER(newMethod || !resParameters.empty(), "must be at least the block arg");
@@ -1687,16 +1693,31 @@ FileRef GlobalState::enterFile(shared_ptr<File> file) {
     })
 
     symbolsReferencedByFile.emplace_back();
+    if (this->logRecordedFilepaths) {
+        this->errorQueue->logger.debug("recording file with path: {}", file->path());
+    }
     return files->emplace(std::move(file));
 }
 
 FileRef GlobalState::enterFile(string_view path, string_view source) {
+    string pathBuf;
+    if (this->isSCIPRuby && !absl::StartsWith(path, "https://")) { // See [NOTE: scip-ruby-path-normalization]
+        pathBuf = string(std::filesystem::path(path).lexically_normal());
+    } else {
+        pathBuf = string(path);
+    }
     return GlobalState::enterFile(
-        make_shared<File>(string(path.begin(), path.end()), string(source.begin(), source.end()), File::Type::Normal));
+        make_shared<File>(move(pathBuf), string(source.begin(), source.end()), File::Type::Normal));
 }
 
 FileRef GlobalState::reserveFileRef(string path) {
-    return GlobalState::enterFile(make_shared<File>(move(path), "", File::Type::NotYetRead));
+    std::string pathBuf;
+    if (this->isSCIPRuby && !absl::StartsWith(path, "https://")) { // See [NOTE: scip-ruby-path-normalization]
+        pathBuf = string(std::filesystem::path(path).lexically_normal());
+    } else {
+        pathBuf = move(path);
+    }
+    return GlobalState::enterFile(make_shared<File>(move(pathBuf), "", File::Type::NotYetRead));
 }
 
 NameRef GlobalState::nextMangledName(ClassOrModuleRef owner, NameRef origName) {
@@ -2006,6 +2027,10 @@ bool GlobalState::unfreezeSymbolTable() {
 }
 
 void GlobalState::copyOptions(const core::GlobalState &other) {
+    this->isSCIPRuby = other.isSCIPRuby;
+    this->scipRubyLegacyTModule = other.scipRubyLegacyTModule;
+    this->unsilenceErrors = other.unsilenceErrors;
+    this->logRecordedFilepaths = other.logRecordedFilepaths;
     this->silenceErrors = other.silenceErrors;
     this->autocorrect = other.autocorrect;
     this->didYouMean = other.didYouMean;
@@ -2035,6 +2060,7 @@ unique_ptr<GlobalState> GlobalState::deepCopyGlobalState(bool keepId) const {
     auto result = make_unique<GlobalState>(this->errorQueue, this->epochManager);
 
     result->copyOptions(*this);
+    result->isSCIPRuby = this->isSCIPRuby;
 
     if (keepId) {
         result->globalStateId = this->globalStateId;
@@ -2363,8 +2389,13 @@ bool GlobalState::shouldReportErrorOn(FileRef file, ErrorClass what) const {
     if (what.minLevel == StrictLevel::Internal) {
         return true;
     }
-    if (this->silenceErrors) {
+    if (this->silenceErrors && !this->unsilenceErrors) {
         return false;
+    }
+    if (this->isSCIPRuby && !this->unsilenceErrors) {
+        if (what != scip_indexer::errors::SCIPRubyDebug && what != scip_indexer::errors::SCIPRuby) {
+            return false;
+        }
     }
     if (suppressedErrorClasses.count(what.code) != 0) {
         return false;
@@ -2611,7 +2642,7 @@ unique_ptr<LocalSymbolTableHashes> GlobalState::hash(uint32_t foundClassesHash) 
 
 MethodRef GlobalState::staticInitForClass(ClassOrModuleRef klass, Loc loc) {
     auto prevCount = methodsUsed();
-    auto sym = enterMethodSymbol(loc, klass.data(*this)->singletonClass(*this), core::Names::staticInit());
+    auto sym = enterMethodSymbol(loc, klass.data(*this)->singletonClass(*this), core::Names::staticInit(), loc);
     if (prevCount != methodsUsed()) {
         auto blkLoc = core::Loc::none(loc.file());
         auto &blkSym = enterMethodParameter(blkLoc, sym, core::Names::blkArg());
@@ -2634,7 +2665,7 @@ MethodRef GlobalState::lookupStaticInitForClass(ClassOrModuleRef klass, bool all
 MethodRef GlobalState::staticInitForFile(Loc loc) {
     auto nm = freshNameUnique(core::UniqueNameKind::Namer, core::Names::staticInit(), loc.file().id());
     auto prevCount = this->methodsUsed();
-    auto sym = enterMethodSymbol(loc, core::Symbols::rootSingleton(), nm);
+    auto sym = enterMethodSymbol(loc, core::Symbols::rootSingleton(), nm, Loc::none());
     if (prevCount != this->methodsUsed()) {
         auto blkLoc = core::Loc::none(loc.file());
         auto &blkSym = this->enterMethodParameter(blkLoc, sym, core::Names::blkArg());

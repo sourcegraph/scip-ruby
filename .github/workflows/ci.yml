@@ -1,32 +1,77 @@
 name: CI
-
 on:
-  [push, pull_request]
+  push:
+    branches:
+      - scip-ruby/master
+  pull_request:
+    branches:
+      - scip-ruby/master
 
-# Runs Prism specific tests in a Github Action workflow only on Shopify's fork
-# This is useful during Prism migration as it contains extra tests.
-# It'll be removed once the migration is complete.
 jobs:
-  tests:
-    runs-on: ubuntu-latest
-    name: Prism Parser Regression Tests
-    if: github.repository == 'Shopify/sorbet'
+  test:
+    runs-on: 'ubuntu-22.04'
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@v1
+      # Keep in sync with release.yml
+      - name: Manually evict cache entry if applicable
+        run: ACCESS_TOKEN='${{ secrets.GITHUB_TOKEN }}' python3 .github/workflows/evict.py
+      - name: "🚀 Mount Bazel build cache"
+        uses: actions/cache@v4
         with:
-          ruby-version: 3.3.0
-      - name: Set up Bazel
-        uses: bazel-contrib/setup-bazel@0.9.0
+          path: ~/bazelcache/build
+          key: bazel-build-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            bazel-build-${{ runner.os }}-
+            bazel-build-
+      - name: "🚀 Mount Bazel repo cache"
+        uses: actions/cache@v4
         with:
-          # Avoid downloading Bazel every time.
-          bazelisk-cache: true
-          # Store build cache per workflow.
-          disk-cache: ${{ github.workflow }}
-          # Share repository cache between workflows.
-          repository-cache: true
-      - name: Run tests
-        run: ./bazel test //test:prism_regression --config=dbg --test_output=errors
-      - name: Run corpus tests
-        run: ./bazel test //test:test_corpus_prism --config=dbg --test_output=errors
+          path: ~/bazelcache/repos
+          key: bazel-repos-${{ runner.os }}-${{ hashFiles('WORKSPACE') }}
+          restore-keys: |
+            bazel-repos-${{ runner.os }}-
+            bazel-repos-
+      - name: "⚙️ Setup Bazel"
+        run: .github/workflows/setup-bazel.sh
+      - name: "🏗 Build"
+        run: ./bazel build //main:scip-ruby //test:scip_test_runner --config=dbg --execution_log_binary_file=log
+      - name: "🪵 Upload log"
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-build-log
+          path: log
+      - name: "🏋️‍♂️ Run tests"
+        run: ./bazel test //test/scip --config=dbg
+      # Repo tests are kinda' broken right now because the bundle cache step needs synchronization
+      #
+      # - name: "🏋️‍♂️ Build repo tests"
+      #   continue-on-error: true
+      #   run: |
+      #     sudo apt-get install --reinstall build-essential
+      #     ls "$(dirname "$(command -v gcc)")"
+      #     echo "$PATH"
+      #     ls /usr/bin /usr/local/bin /bin
+      #     # Technically, this is for Ruby 2.7.0 but it's probably fine.
+      #     sudo apt-get install ruby2.7-dev
+      #     ./bazel test //test/scip/repos --test_env GITHUB_ACTIONS=1 --test_env GEM_PATH="$(dirname "$(command -v gem)")" --config=dbg
+      #
+      # Blocked on a bundler bug in 2.3.4. I get a crash trace like this when running locally.
+      #
+      # NoMethodError: undefined method `metadata' for nil:NilClass
+      #   /Users/varun/Code/scip-ruby/.cache_ruby/versions/2.7.2/lib/ruby/gems/2.7.0/gems/bundler-2.3.4/lib/bundler/cli/common.rb:22:in `block in output_fund_metadata_summary'
+      #   /Users/varun/Code/scip-ruby/.cache_ruby/versions/2.7.2/lib/ruby/gems/2.7.0/gems/bundler-2.3.4/lib/bundler/cli/common.rb:22:in `count'
+      #   /Users/varun/Code/scip-ruby/.cache_ruby/versions/2.7.2/lib/ruby/gems/2.7.0/gems/bundler-2.3.4/lib/bundler/cli/common.rb:22:in `output_fund_metadata_summary'
+      #   /Users/varun/Code/scip-ruby/.cache_ruby/versions/2.7.2/lib/ruby/gems/2.7.0/gems/bundler-2.3.4/lib/bundler/cli/install.rb:87:in `run'
+      #
+      # This is the method in question:
+      #
+      # def self.output_fund_metadata_summary
+      #   definition = Bundler.definition
+      #   current_dependencies = definition.requested_dependencies
+      #   current_specs = definition.specs
+      #
+      #   count = current_dependencies.count {|dep| current_specs[dep.name].first.metadata.key?("funding_uri") }
+      #                                                                          ^ boom!
+      # We should probably file a bug against bundler but I haven't been able to repro
+      # the issue outside of a Bazel sandbox yet.

@@ -324,6 +324,7 @@ public:
         foundMethod.name = method.name;
         foundMethod.loc = method.loc;
         foundMethod.declLoc = method.declLoc;
+        foundMethod.nameLoc = method.nameLoc;
         foundMethod.flags = method.flags;
         foundMethod.parsedParams = ast::ParamParsing::parseParams(method.params);
         foundMethod.arityHash = ast::ParamParsing::hashParams(ctx, foundMethod.parsedParams);
@@ -492,6 +493,7 @@ public:
         foundMethod.name = fromName;
         foundMethod.loc = send.loc;
         foundMethod.declLoc = send.loc;
+        foundMethod.nameLoc = send.loc;
         foundMethod.arityHash = core::ArityHash::aliasMethodHash();
         foundDefs->addMethod(move(foundMethod));
     }
@@ -705,6 +707,8 @@ public:
 
 using BehaviorLocs = InlinedVector<core::Loc, 1>;
 using ClassBehaviorLocsMap = UnorderedMap<core::ClassOrModuleRef, BehaviorLocs>;
+// SCIP-only: keep class scopes stable when enterNewDefinitions clears a redeclared alias's resultType.
+using ClassAliases = UnorderedMap<pair<core::ClassOrModuleRef, core::NameRef>, core::ClassOrModuleRef>;
 
 vector<core::NameRef> fullyQualifiedNameFromMangledName(const core::GlobalState &gs, core::ClassOrModuleRef owner) {
     auto klass = owner;
@@ -790,6 +794,7 @@ public:
 
 private:
     const core::FoundDefinitions &foundDefs;
+    ClassAliases &classAliases;
 
     vector<core::ClassOrModuleRef> &symbolsToRecompute;
 
@@ -1084,7 +1089,7 @@ private:
         auto &parsedParams = method.parsedParams;
         auto symTableSize = ctx.state.methodsUsed();
         auto declLoc = ctx.locAt(method.declLoc);
-        auto sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name);
+        auto sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name, ctx.locAt(method.nameLoc));
         const bool isNewSymbol = symTableSize != ctx.state.methodsUsed();
         if (!isNewSymbol) {
             // See if this is == to the method we're defining now, or if we have a redefinition error.
@@ -1094,14 +1099,12 @@ private:
                 // existing one and create a new one
                 if (!isIntrinsic(sym.data(ctx))) {
                     paramMismatchErrors(ctx.withOwner(sym), declLoc, parsedParams);
-                    ctx.state.mangleRenameMethod(sym, method.name);
-                    // Re-enter a new symbol.
-                    sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name);
-                } else {
-                    // ...unless it's an intrinsic, because we allow multiple incompatible definitions of those in code
-                    // TODO(jvilk): Wouldn't this always fail since `!sym.exists()`?
-                    matchingSym.data(ctx)->addLoc(ctx, declLoc);
                 }
+                // Incompatible intrinsic definitions are allowed without an error, but still need distinct symbols so
+                // that every MethodDef has the same argument shape as its symbol.
+                ctx.state.mangleRenameMethod(sym, method.name);
+                // Re-enter a new symbol.
+                sym = ctx.state.enterMethodSymbol(declLoc, owner, method.name, ctx.locAt(method.nameLoc));
             } else {
                 // if the symbol does exist, then we're running in incremental mode, and we need to compare it to
                 // the previously defined equivalent to re-report any errors
@@ -1216,6 +1219,10 @@ private:
             if (member.exists()) {
                 // If member exists with this name, it must be a class or module, because we never mangle-rename them.
                 symbol = member.asClassOrModuleRef();
+                if (ctx.state.isSCIPRuby && !owner.data(ctx)->findMemberNoDealias(klass.name).isClassOrModule()) {
+                    // Remember the class behind a payload alias before a redeclaration resets its resultType.
+                    classAliases[{owner, klass.name}] = symbol;
+                }
             } else {
                 auto newClass = ctx.state.enterClassOrModuleSymbol(ctx.locAt(klass.declLoc), owner, klass.name);
                 symbol = newClass;
@@ -1782,8 +1789,9 @@ public:
         }
     }
 
-    SymbolDefiner(const core::FoundDefinitions &foundDefs, vector<core::ClassOrModuleRef> &symbolsToRecompute)
-        : foundDefs(foundDefs), symbolsToRecompute{symbolsToRecompute} {}
+    SymbolDefiner(const core::FoundDefinitions &foundDefs, vector<core::ClassOrModuleRef> &symbolsToRecompute,
+                  ClassAliases &classAliases)
+        : foundDefs(foundDefs), classAliases(classAliases), symbolsToRecompute{symbolsToRecompute} {}
 
     SymbolDefiner::State enterClassDefinitions(core::MutableContext ctx, bool willDeleteOldDefs,
                                                ClassBehaviorLocsMap &classBehaviorLocs) {
@@ -1928,6 +1936,8 @@ public:
 class TreeSymbolizer {
     friend class Namer;
 
+    const ClassAliases &classAliases;
+
     core::SymbolRef squashNamesInner(core::Context ctx, core::SymbolRef owner, ast::ExpressionPtr &node,
                                      bool firstName) {
         auto constLit = ast::cast_tree<ast::UnresolvedConstantLit>(node);
@@ -1960,6 +1970,13 @@ class TreeSymbolizer {
         ENFORCE(newOwner.exists());
 
         core::SymbolRef existing = ctx.state.lookupClassSymbol(newOwner.asClassOrModuleRef(), constLit->cnst);
+        if (ctx.state.isSCIPRuby && !existing.exists()) {
+            auto alias = classAliases.find({newOwner.asClassOrModuleRef(), constLit->cnst});
+            if (alias != classAliases.end()) {
+                // Use the same class as SymbolDefiner, even if the alias has since been reset.
+                existing = alias->second;
+            }
+        }
         if (firstName && !existing.exists() && newOwner.isClassOrModule()) {
             existing = ctx.state.lookupStaticFieldSymbol(newOwner.asClassOrModuleRef(), constLit->cnst);
             if (existing.exists()) {
@@ -1989,7 +2006,7 @@ class TreeSymbolizer {
     }
 
 public:
-    TreeSymbolizer() {}
+    explicit TreeSymbolizer(const ClassAliases &classAliases) : classAliases(classAliases) {}
 
     void preTransformClassDef(core::Context ctx, ast::ExpressionPtr &tree) {
         auto &klass = ast::cast_tree_nonnull<ast::ClassDef>(tree);
@@ -2451,7 +2468,8 @@ void findConflictingClassDefs(const core::GlobalState &gs, ClassBehaviorLocsMap 
 
 void defineSymbols(core::GlobalState &gs, AllFoundDefinitions allFoundDefinitions,
                    UnorderedMap<core::FileRef, shared_ptr<const core::FileHash>> &&oldFoundHashesForFiles,
-                   core::FoundDefHashesResult *foundHashesOut, vector<core::ClassOrModuleRef> &updatedSymbols) {
+                   core::FoundDefHashesResult *foundHashesOut, vector<core::ClassOrModuleRef> &updatedSymbols,
+                   ClassAliases &classAliases) {
     Timer timeit(gs.tracer(), "naming.defineSymbols");
     const auto &epochManager = *gs.epochManager;
     uint32_t count = 0;
@@ -2468,7 +2486,7 @@ void defineSymbols(core::GlobalState &gs, AllFoundDefinitions allFoundDefinition
         }
         core::MutableContext ctx(gs, core::Symbols::root(), fref);
 
-        SymbolDefiner symbolDefiner(*fileFoundDefinitions, updatedSymbols);
+        SymbolDefiner symbolDefiner(*fileFoundDefinitions, updatedSymbols, classAliases);
         auto state = symbolDefiner.enterClassDefinitions(ctx, willDeleteOldDefs, classBehaviorLocs);
         if (willDeleteOldDefs) {
             auto frefIt = oldFoundHashesForFiles.find(fref);
@@ -2494,19 +2512,21 @@ void defineSymbols(core::GlobalState &gs, AllFoundDefinitions allFoundDefinition
 
         core::MutableContext ctx(gs, core::Symbols::root(), fref);
 
-        SymbolDefiner symbolDefiner(*fileFoundDefinitions, updatedSymbols);
+        SymbolDefiner symbolDefiner(*fileFoundDefinitions, updatedSymbols, classAliases);
         symbolDefiner.enterNewDefinitions(ctx, move(incrementalDefinitions[fref]));
     }
     return;
 }
 
-void symbolizeTrees(const core::GlobalState &gs, absl::Span<ast::ParsedFile> trees, WorkerPool &workers) {
+void symbolizeTrees(const core::GlobalState &gs, absl::Span<ast::ParsedFile> trees, WorkerPool &workers,
+                    const ClassAliases &classAliases) {
     Timer timeit(gs.tracer(), "naming.symbolizeTrees");
-    Parallel::iterate(workers, "symbolizeTrees", trees, [&gs, inserter = TreeSymbolizer()](auto &parsedFile) mutable {
-        Timer timeit(gs.tracer(), "naming.symbolizeTreesOne", {{"file", string(parsedFile.file.data(gs).path())}});
-        core::Context ctx(gs, core::Symbols::root(), parsedFile.file);
-        ast::TreeWalk::apply(ctx, inserter, parsedFile.tree);
-    });
+    Parallel::iterate(
+        workers, "symbolizeTrees", trees, [&gs, inserter = TreeSymbolizer(classAliases)](auto &parsedFile) mutable {
+            Timer timeit(gs.tracer(), "naming.symbolizeTreesOne", {{"file", string(parsedFile.file.data(gs).path())}});
+            core::Context ctx(gs, core::Symbols::root(), parsedFile.file);
+            ast::TreeWalk::apply(ctx, inserter, parsedFile.tree);
+        });
 }
 
 } // namespace
@@ -2524,12 +2544,13 @@ Namer::runInternal(core::GlobalState &gs, absl::Span<ast::ParsedFile> trees, Wor
         ENFORCE(foundDefs.size() == 1,
                 "Producing foundMethodHashes is meant to only happen when hashing a single file");
     }
-    defineSymbols(gs, move(foundDefs), std::move(oldFoundHashesForFiles), foundHashesOut, updatedSymbols);
+    ClassAliases classAliases;
+    defineSymbols(gs, move(foundDefs), std::move(oldFoundHashesForFiles), foundHashesOut, updatedSymbols, classAliases);
     if (gs.epochManager->wasTypecheckingCanceled()) {
         return true;
     }
 
-    symbolizeTrees(gs, trees, workers);
+    symbolizeTrees(gs, trees, workers, classAliases);
     return false;
 }
 

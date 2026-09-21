@@ -1,0 +1,33 @@
+name: "Request a feature"
+description: To propose and discuss problems that scip-ruby cannot currently solve.
+labels: [enhancement, unconfirmed]
+body:
+  - type: textarea
+    validations:
+      required: true
+    attributes:
+      label: Problem
+      description: |
+        Please describe the problem you are trying to solve,
+        NOT the solution you would like.
+  - type: textarea
+    attributes:
+      label: Suggested solution
+      description: |
+        (Optional) If you have a suggestion in mind for how to solve the
+        above problem, feel free to include it here.
+  - type: textarea
+    attributes:
+      label: Compared to other tools
+      description: |
+        (Optional) Are there editor/IDE plugins (or native functionality)
+        which do not suffer from this problem? If so, mention
+        those as examples here.
+  - type: textarea
+    attributes:
+      label: OSS Examples
+      description: |
+        (Optional) Are there any OSS repos which are similar to your code
+        in terms of repo structure and/or dependencies (such as using a
+        specific framework), and would likely run into the same problem
+        you're running into?

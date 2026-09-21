@@ -23,7 +23,7 @@ public:
 
     static ast::ExpressionPtr mkKwArgsHash(const ast::Send *send);
 
-    static ast::ExpressionPtr mkGet(core::Context ctx, core::LocOffsets loc, core::NameRef name, ast::ExpressionPtr rhs,
+    static ast::ExpressionPtr mkGet(core::Context ctx, core::LocOffsets loc, core::NameRef name, core::LocOffsets nameLoc, ast::ExpressionPtr rhs,
                                     ast::MethodDef::Flags flags = ast::MethodDef::Flags());
 
     static ast::ExpressionPtr mkSet(core::Context ctx, core::LocOffsets loc, core::NameRef name,
@@ -31,7 +31,7 @@ public:
                                     ast::MethodDef::Flags flags = ast::MethodDef::Flags());
 
     static ast::ExpressionPtr mkSyntheticGet(core::Context ctx, core::LocOffsets loc, core::NameRef name,
-                                             ast::ExpressionPtr rhs,
+                                             core::LocOffsets nameLoc, ast::ExpressionPtr rhs,
                                              ast::MethodDef::Flags flags = ast::MethodDef::Flags());
 
     static ast::ExpressionPtr mkSyntheticSet(core::Context ctx, core::LocOffsets loc, core::NameRef name,

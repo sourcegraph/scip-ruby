@@ -15,19 +15,55 @@
 #include <memory>
 
 namespace sorbet::cfg {
+
+/// Convenience type for representing a local variable with its source range
+/// but without a type.
+struct LocalOccurrence final {
+    LocalRef variable;
+    /// Original source location for this occurrence, potentially non-existent
+    /// (such as for temporaries generated during lowering).
+    core::LocOffsets loc;
+
+    LocalOccurrence() = default;
+    LocalOccurrence(LocalRef variable, core::LocOffsets loc = core::LocOffsets::none()) : variable(variable), loc(loc) {}
+
+    static LocalOccurrence synthetic(LocalRef variable) {
+        return {variable, core::LocOffsets::none()};
+    }
+
+    std::string showRaw(const core::GlobalState &gs, core::FileRef file, const CFG &cfg) const;
+};
+
 class VariableUseSite final {
 public:
     LocalRef variable;
     core::TypePtr type;
+    /// Location for the LHS of an "assignment" in the CFG.
+    core::LocOffsets loc;
     VariableUseSite() = default;
     explicit VariableUseSite(LocalRef local) : variable(local){};
     VariableUseSite(LocalRef local, core::TypePtr type) : variable(local), type(std::move(type)){};
+    VariableUseSite(LocalRef local, core::LocOffsets loc) : variable(local), loc(loc){};
     VariableUseSite(const VariableUseSite &) = delete;
-    const VariableUseSite &operator=(const VariableUseSite &rhs) = delete;
+    VariableUseSite &operator=(const VariableUseSite &rhs) = delete;
+    VariableUseSite &operator=(LocalOccurrence l) { // HACK(varun): For assignments from maybeDealias
+        this->variable = l.variable;
+        this->loc = l.loc;
+        return *this;
+    }
     VariableUseSite(VariableUseSite &&) = default;
     VariableUseSite &operator=(VariableUseSite &&rhs) = default;
+
+    static VariableUseSite synthetic(LocalRef local) {
+        return VariableUseSite(local, core::LocOffsets::none());
+    }
+    // TODO(varun): These need to take a FileRef to also print the source location.
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs = 0) const;
+
+    LocalOccurrence occurrence() const {
+        return {this->variable, this->loc};
+    }
 };
 
 // TODO: convert it to implicitly numbered instead of explicitly bound
@@ -265,12 +301,17 @@ INSN(Send) : public Instruction, private core::TrailingObjects<Send, LocalRef, c
 public:
     bool isPrivateOk;
     const uint16_t numPosArgs;
+    /// The method name, i.e. 'f' in 'x.f(<args>)'.
     core::NameRef fun;
+    /// The receiver for the message send, i.e. 'x' in 'x.f(<args>)'.
     VariableUseSite recv;
+    /// Source location for 'f' in 'x.f(<args>)'.
     core::LocOffsets funLoc;
+    /// Source location for 'x' in 'x.f(<args>)'.
     core::LocOffsets receiverLoc;
     const uint32_t numArgs;
     LinkRef link;
+    std::unique_ptr<core::SCIPDispatchInfo> scipDispatchInfo;
 
     // We only need this for the first two sets of trailing types, but it's
     // defined identically for all three types and it's convenient to have it
@@ -357,6 +398,10 @@ public:
         return span<core::LocOffsets>();
     }
 
+    absl::Span<const core::LocOffsets> argLocs() const {
+        return span<core::LocOffsets>();
+    }
+
     core::ZippedPairSpan<LocalRef, core::TypePtr> argSpan() {
         return core::ZippedPairSpan<LocalRef, core::TypePtr>{argRefs(), argTypes()};
     }
@@ -371,7 +416,7 @@ public:
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs = 0) const;
 };
-CheckSize(Send, 48, 8);
+CheckSize(Send, 64, 8);
 
 INSN(Return) : public Instruction {
 public:
@@ -382,7 +427,7 @@ public:
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs = 0) const;
 };
-CheckSize(Return, 24, 8);
+CheckSize(Return, 32, 8);
 
 INSN(BlockReturn) : public Instruction {
 public:
@@ -393,7 +438,7 @@ public:
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs = 0) const;
 };
-CheckSize(BlockReturn, 24, 8);
+CheckSize(BlockReturn, 32, 8);
 
 INSN(LoadSelf) : public Instruction {
 public:
@@ -485,14 +530,14 @@ public:
     uint16_t argId;
     VariableUseSite yieldParam;
 
-    YieldLoadArg(uint16_t argId, core::ParamInfo::Flags flags, LocalRef yieldParam)
-        : flags(flags), argId(argId), yieldParam(yieldParam) {
+    YieldLoadArg(uint16_t argId, core::ParamInfo::Flags flags, LocalOccurrence yieldParam)
+        : flags(flags), argId(argId), yieldParam(yieldParam.variable, yieldParam.loc) {
         categoryCounterInc("cfg", "yieldloadarg");
     }
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs = 0) const;
 };
-CheckSize(YieldLoadArg, 24, 8);
+CheckSize(YieldLoadArg, 32, 8);
 
 INSN(Cast) : public Instruction {
 public:
@@ -501,28 +546,30 @@ public:
     core::LocOffsets valueLoc;
     core::TypePtr type;
 
+    // NOTE(varun): loc copying
     Cast(LocalRef value, core::LocOffsets valueLoc, const core::TypePtr &type, core::NameRef cast)
-        : cast(cast), value(value), valueLoc(valueLoc), type(type) {
+        : cast(cast), value(VariableUseSite(value, valueLoc)), valueLoc(valueLoc), type(type) {
         categoryCounterInc("cfg", "cast");
     }
 
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs = 0) const;
 };
-CheckSize(Cast, 40, 8);
+CheckSize(Cast, 48, 8);
 
 INSN(TAbsurd) : public Instruction {
 public:
     VariableUseSite what;
 
-    TAbsurd(LocalRef what) : what(what) {
+    // TODO(varun): Add location here?
+    TAbsurd(LocalRef what) : what(VariableUseSite::synthetic(what)) {
         categoryCounterInc("cfg", "tabsurd");
     }
 
     std::string toString(const core::GlobalState &gs, const CFG &cfg) const;
     std::string showRaw(const core::GlobalState &gs, const CFG &cfg, int tabs = 0) const;
 };
-CheckSize(TAbsurd, 16, 8);
+CheckSize(TAbsurd, 24, 8);
 
 INSN(KeepAlive) : public Instruction {
 public:

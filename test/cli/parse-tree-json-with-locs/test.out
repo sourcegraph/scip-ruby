@@ -22,6 +22,7 @@
       "type" : "DefMethod",
       "loc" : "test/cli/parse-tree-json-with-locs/parse-tree-json-with-locs1.rb:5:5-7:8",
       "declLoc" : "test/cli/parse-tree-json-with-locs/parse-tree-json-with-locs1.rb:5:5-5:12",
+      "nameLoc" : "test/cli/parse-tree-json-with-locs/parse-tree-json-with-locs1.rb:5:9-5:12",
       "name" : "foo",
       "params" : null,
       "body" : {
@@ -81,6 +82,7 @@
         "type" : "DefMethod",
         "loc" : "test/cli/parse-tree-json-with-locs/parse-tree-json-with-locs2.rb:7:3-7:20",
         "declLoc" : "test/cli/parse-tree-json-with-locs/parse-tree-json-with-locs2.rb:7:3-7:10",
+        "nameLoc" : "test/cli/parse-tree-json-with-locs/parse-tree-json-with-locs2.rb:7:7-7:10",
         "name" : "bar",
         "params" : null,
         "body" : {
@@ -111,6 +113,7 @@
     "type" : "DefMethod",
     "loc" : "test/cli/parse-tree-json-with-locs/parse-tree-json-with-locs3.rb:4:3-7:6",
     "declLoc" : "test/cli/parse-tree-json-with-locs/parse-tree-json-with-locs3.rb:4:3-4:11",
+    "nameLoc" : "test/cli/parse-tree-json-with-locs/parse-tree-json-with-locs3.rb:4:7-4:11",
     "name" : "main",
     "params" : null,
     "body" : {

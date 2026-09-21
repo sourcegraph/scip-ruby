@@ -13,6 +13,14 @@ using namespace std;
 namespace sorbet::rewriter {
 
 namespace {
+
+core::LocOffsets testHelperNameLoc(const ast::Send &send) {
+    if (send.fun == core::Names::before() || send.fun == core::Names::after() || send.numPosArgs() == 0) {
+        return send.funLoc;
+    }
+    return send.getPosArg(0).loc();
+}
+
 class ConstantMover {
     uint32_t classDepth = 0;
     vector<ast::ExpressionPtr> movedConstants = {};
@@ -148,8 +156,25 @@ core::LocOffsets declLocForSendWithBlock(const ast::Send &send) {
 // at the top level inside the InsSeq of the Block body, that should count as a an ancestor in namer.
 // But if we just plop the whole InsSeq as a single element inside the the ClassDef rhs, they won't
 // be at the top level anymore.
-ast::ClassDef::RHS_store flattenDescribeBody(ast::ExpressionPtr body) {
+void flattenStatements(ast::ClassDef::RHS_store &rhs, ast::ExpressionPtr body) {
+    if (auto seq = ast::cast_tree<ast::InsSeq>(body)) {
+        for (auto &stat : seq->stats) {
+            flattenStatements(rhs, std::move(stat));
+        }
+        flattenStatements(rhs, std::move(seq->expr));
+    } else {
+        rhs.emplace_back(std::move(body));
+    }
+}
+
+ast::ClassDef::RHS_store flattenDescribeBody(core::Context ctx, ast::ExpressionPtr body) {
     ast::ClassDef::RHS_store rhs;
+    if (ctx.state.isSCIPRuby) {
+        // Preserved DSL calls wrap rewritten include_context/include_examples
+        // in another InsSeq. Keep their includes visible to namer as ancestors.
+        flattenStatements(rhs, std::move(body));
+        return rhs;
+    }
     if (auto bodySeq = ast::cast_tree<ast::InsSeq>(body)) {
         absl::c_move(bodySeq->stats, back_inserter(rhs));
         rhs.emplace_back(move(bodySeq->expr));
@@ -410,8 +435,120 @@ ast::ExpressionPtr prepareParameterizedBody(core::MutableContext ctx, core::Name
                                             absl::Span<const ast::ExpressionPtr> destructuringStmts,
                                             ast::ExpressionPtr &iteratee, bool insideDescribe);
 
+// A describe with captured locals keeps its executable body in the original
+// block, while its helper declarations belong to a separate synthetic class.
+struct CapturedDescribe {
+    const ast::ExpressionPtr &name;
+    ast::ClassDef::RHS_store &declarations;
+};
+
 ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::ExpressionPtr &maybeSharedExamplesName,
-                             ast::Send *send, bool insideDescribe);
+                             ast::Send *send, bool insideDescribe, CapturedDescribe *capturedDescribe = nullptr);
+
+// A Ruby block can capture a local from an enclosing block. Replacing either
+// side with a class or method loses that binding. Keep these blocks intact when
+// indexing; ordinary Sorbet continues to use its test DSL rewrites.
+class CapturedTestLocals {
+    struct Scope {
+        UnorderedMap<core::NameRef, size_t> bindings;
+        bool crossesRewrite = false;
+        bool inRoot = true;
+    };
+    vector<Scope> scopes;
+    UnorderedSet<const ast::Block *> rewrittenBlocks;
+    UnorderedSet<core::NameRef> rootParameters;
+
+    void define(const ast::ExpressionPtr &expr, bool shadow = false) {
+        if (auto local = ast::cast_tree<ast::UnresolvedIdent>(expr)) {
+            if (local->kind == ast::UnresolvedIdent::Kind::Local) {
+                auto &bindings = scopes.back().bindings;
+                if (shadow || !bindings.contains(local->name)) {
+                    bindings[local->name] = scopes.size() - 1;
+                }
+            }
+        } else if (auto rest = ast::cast_tree<ast::RestParam>(expr)) {
+            define(rest->expr, shadow);
+        } else if (auto keyword = ast::cast_tree<ast::KeywordArg>(expr)) {
+            define(keyword->expr, shadow);
+        } else if (auto optional = ast::cast_tree<ast::OptionalParam>(expr)) {
+            define(optional->expr, shadow);
+        } else if (auto block = ast::cast_tree<ast::BlockParam>(expr)) {
+            define(block->expr, shadow);
+        } else if (auto local = ast::cast_tree<ast::ShadowArg>(expr)) {
+            define(local->expr, shadow);
+        }
+    }
+
+public:
+    bool captures = false;
+    bool externalCaptures = false;
+    bool copiesParameters = false;
+
+    void preTransformSend(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        auto &send = ast::cast_tree_nonnull<ast::Send>(tree);
+        if (!send.hasBlock()) {
+            return;
+        }
+        if (nameForTestHelperMethod(ctx, send, true).exists() ||
+            send.fun == core::Names::let() || send.fun == core::Names::let_bang() ||
+            send.fun == core::Names::subject() || send.fun == core::Names::describe() ||
+            send.fun == core::Names::context() || send.fun == core::Names::exampleGroup() ||
+            send.fun == core::Names::xdescribe() || send.fun == core::Names::fdescribe() ||
+            send.fun == core::Names::xcontext() || send.fun == core::Names::fcontext() ||
+            send.fun == core::Names::its() || isSharedExamplesName(send.fun)) {
+            rewrittenBlocks.insert(send.block());
+        }
+    }
+
+    void preTransformBlock(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        auto &block = ast::cast_tree_nonnull<ast::Block>(tree);
+        Scope scope = scopes.empty() ? Scope{} : scopes.back();
+        scope.crossesRewrite |= !scopes.empty() && rewrittenBlocks.contains(&block);
+        scopes.emplace_back(std::move(scope));
+        for (const auto &param : block.params) {
+            define(param, true);
+        }
+        if (scopes.size() == 1 && copiesParameters) {
+            for (const auto &[name, depth] : scopes.back().bindings) {
+                rootParameters.insert(name);
+            }
+        }
+    }
+    void postTransformBlock(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        scopes.pop_back();
+    }
+    void preTransformClassDef(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        scopes.emplace_back(Scope{{}, false, false});
+    }
+    void postTransformClassDef(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        scopes.pop_back();
+    }
+    void preTransformMethodDef(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        scopes.emplace_back(Scope{{}, false, false});
+    }
+    void postTransformMethodDef(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        scopes.pop_back();
+    }
+    void preTransformAssign(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        define(ast::cast_tree_nonnull<ast::Assign>(tree).lhs);
+    }
+    void preTransformRescueCase(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        define(ast::cast_tree_nonnull<ast::RescueCase>(tree).var);
+    }
+    void postTransformUnresolvedIdent(core::MutableContext ctx, ast::ExpressionPtr &tree) {
+        auto &local = ast::cast_tree_nonnull<ast::UnresolvedIdent>(tree);
+        if (!scopes.back().inRoot || local.kind != ast::UnresolvedIdent::Kind::Local ||
+            local.name.kind() != core::NameKind::UTF8 ||
+            ctx.locAt(local.loc).source(ctx) != local.name.show(ctx)) {
+            return;
+        }
+        const auto &scope = scopes.back();
+        auto binding = scope.bindings.find(local.name);
+        externalCaptures |= binding == scope.bindings.end();
+        captures |= binding == scope.bindings.end() ||
+                    (binding->second == 0 && scope.crossesRewrite && !rootParameters.contains(local.name));
+    }
+};
 
 ast::ExpressionPtr invalidUnderParameterizedBody(core::MutableContext ctx, core::NameRef eachName,
                                                  ast::ExpressionPtr stmt) {
@@ -491,7 +628,9 @@ ast::ExpressionPtr runUnderParameterized(core::MutableContext ctx, core::NameRef
                                         send->loc.copyWithZeroLength(), move(blk));
         // put that into a method def named the appropriate thing
         auto declLoc = declLocForSendWithBlock(*send);
-        auto method = addSigVoid(ctx, ast::MK::SyntheticMethod0(send->loc, declLoc, move(name), move(each)));
+        auto method = ast::MK::SyntheticMethod0(send->loc, declLoc, testHelperNameLoc(*send), move(name), move(each));
+        ast::cast_tree_nonnull<ast::MethodDef>(method).flags.hasHandwrittenBody = true;
+        method = addSigVoid(ctx, move(method));
         // add back any moved constants
         return constantMover.addConstantsToExpression(send->loc, move(method));
     }
@@ -530,7 +669,26 @@ ast::ExpressionPtr runUnderParameterized(core::MutableContext ctx, core::NameRef
             auto body = move(send->block()->body);
             ast::TreeWalk::apply(ctx, constantMover, body);
 
-            auto method = ast::MK::SyntheticMethod0(send->loc, declLoc, methodName, move(body));
+            if (ctx.state.isSCIPRuby && !args.empty()) {
+                // Shared-example helpers capture the shared block's parameters,
+                // just like its examples do. Carry their definitions into the
+                // synthetic helper so these reads do not become dangling locals.
+                ast::MethodDef::PARAMS_store params;
+                for (const auto &arg : args) {
+                    params.emplace_back(arg.deepCopy());
+                }
+                ast::InsSeq::STATS_store stmts;
+                for (const auto &stmt : destructuringStmts) {
+                    stmts.emplace_back(stmt.deepCopy());
+                }
+                body = ast::MK::InsSeq(body.loc(), std::move(stmts), std::move(body));
+                auto block = ast::MK::Block(send->block()->loc, std::move(body), std::move(params));
+                body = ast::MK::Send0Block(send->loc, iteratee.deepCopy(), core::Names::each(),
+                                           send->loc.copyWithZeroLength(), std::move(block));
+            }
+
+            auto method = ast::MK::SyntheticMethod0(send->loc, declLoc, testHelperNameLoc(*send), methodName, move(body));
+            ast::cast_tree_nonnull<ast::MethodDef>(method).flags.hasHandwrittenBody = true;
             return constantMover.addConstantsToExpression(send->loc, move(method));
         }
 
@@ -643,10 +801,20 @@ ast::ExpressionPtr prepareParameterizedBody(core::MutableContext ctx, core::Name
 
 ast::ExpressionPtr tryRunSingleOnSend(core::MutableContext ctx, bool isClass,
                                       const ast::ExpressionPtr &maybeSharedExamplesName, ast::ExpressionPtr body,
-                                      bool insideDescribe) {
+                                      bool insideDescribe, CapturedDescribe *capturedDescribe) {
+    if (capturedDescribe && (ast::isa_tree<ast::MethodDef>(body) || ast::isa_tree<ast::ClassDef>(body))) {
+        capturedDescribe->declarations.emplace_back(std::move(body));
+        return ast::MK::EmptyTree();
+    }
     auto bodySend = ast::cast_tree<ast::Send>(body);
     if (bodySend) {
-        auto change = runSingle(ctx, isClass, move(maybeSharedExamplesName), bodySend, insideDescribe);
+        if (capturedDescribe && bodySend->recv.isSelfReference() &&
+            (bodySend->fun == core::Names::sig() || bodySend->fun == core::Names::include() ||
+             bodySend->fun == core::Names::extend())) {
+            capturedDescribe->declarations.emplace_back(std::move(body));
+            return ast::MK::EmptyTree();
+        }
+        auto change = runSingle(ctx, isClass, maybeSharedExamplesName, bodySend, insideDescribe, capturedDescribe);
         if (change) {
             return change;
         }
@@ -656,23 +824,114 @@ ast::ExpressionPtr tryRunSingleOnSend(core::MutableContext ctx, bool isClass,
 
 ast::ExpressionPtr prepareBody(core::MutableContext ctx, bool isClass,
                                const ast::ExpressionPtr &maybeSharedExamplesName, ast::ExpressionPtr body,
-                               bool insideDescribe) {
-    body = tryRunSingleOnSend(ctx, isClass, maybeSharedExamplesName, std::move(body), insideDescribe);
+                               bool insideDescribe, CapturedDescribe *capturedDescribe = nullptr) {
+    body = tryRunSingleOnSend(ctx, isClass, maybeSharedExamplesName, std::move(body), insideDescribe, capturedDescribe);
 
     if (auto bodySeq = ast::cast_tree<ast::InsSeq>(body)) {
         for (auto &exp : bodySeq->stats) {
-            exp = tryRunSingleOnSend(ctx, isClass, maybeSharedExamplesName, std::move(exp), insideDescribe);
+            exp = tryRunSingleOnSend(ctx, isClass, maybeSharedExamplesName, std::move(exp), insideDescribe,
+                                     capturedDescribe);
         }
 
-        bodySeq->expr =
-            tryRunSingleOnSend(ctx, isClass, maybeSharedExamplesName, std::move(bodySeq->expr), insideDescribe);
+        bodySeq->expr = tryRunSingleOnSend(ctx, isClass, maybeSharedExamplesName, std::move(bodySeq->expr),
+                                           insideDescribe, capturedDescribe);
     }
     return body;
 }
 
+ast::ExpressionPtr runSingleImpl(core::MutableContext ctx, bool isClass,
+                                 const ast::ExpressionPtr &maybeSharedExamplesName, ast::Send *send,
+                                 bool insideDescribe, bool &retainsOriginalCall, CapturedDescribe *capturedDescribe);
+
 ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::ExpressionPtr &maybeSharedExamplesName,
-                             ast::Send *send, bool insideDescribe) {
+                             ast::Send *send, bool insideDescribe, CapturedDescribe *capturedDescribe) {
+    if (ctx.state.isSCIPRuby && send->flags.isRewriterSynthesized) {
+        return nullptr;
+    }
+    ast::ExpressionPtr originalCall;
+    if (ctx.state.isSCIPRuby) {
+        // Replacing the DSL call with a class/method must not erase navigation
+        // on `context`, `specify`, etc. Keep its receiver and arguments in their
+        // original scope. The rewritten node owns the handwritten block body.
+        ast::Send::ARGS_store args;
+        for (const auto &arg : send->nonBlockArgs()) {
+            args.emplace_back(arg.deepCopy());
+        }
+        if (auto block = send->block()) {
+            args.emplace_back(ast::MK::Block(block->loc, ast::MK::EmptyTree(), {}));
+        }
+        auto flags = send->flags;
+        flags.isRewriterSynthesized = true;
+        originalCall = ast::MK::Send(send->loc, send->recv.deepCopy(), send->fun, send->funLoc,
+                                    send->numPosArgs(), std::move(args), flags);
+    }
+    bool retainsOriginalCall = false;
+    auto result = runSingleImpl(ctx, isClass, maybeSharedExamplesName, send, insideDescribe, retainsOriginalCall,
+                                capturedDescribe);
+    if (result && originalCall && !retainsOriginalCall) {
+        return ast::MK::InsSeq1(send->loc, std::move(originalCall), std::move(result));
+    }
+    return result;
+}
+
+ast::ExpressionPtr runSingleImpl(core::MutableContext ctx, bool isClass,
+                                 const ast::ExpressionPtr &maybeSharedExamplesName, ast::Send *send,
+                                 bool insideDescribe, bool &retainsOriginalCall, CapturedDescribe *capturedDescribe) {
     auto *block = send->block();
+    bool preserveDescribe = false;
+    if (ctx.state.isSCIPRuby && block != nullptr && send->fun != core::Names::testEach() &&
+        send->fun != core::Names::testEachHash()) {
+        CapturedTestLocals locals;
+        locals.copiesParameters = isSharedExamplesName(send->fun);
+        ast::TreeWalk::apply(ctx, locals, *send->rawBlock());
+        const bool isDescribe = send->fun == core::Names::describe() || send->fun == core::Names::context() ||
+                                send->fun == core::Names::exampleGroup() || send->fun == core::Names::xdescribe() ||
+                                send->fun == core::Names::fdescribe() || send->fun == core::Names::xcontext() ||
+                                send->fun == core::Names::fcontext();
+        preserveDescribe = isDescribe && (locals.externalCaptures || capturedDescribe != nullptr);
+        if (!isDescribe && (locals.captures || capturedDescribe != nullptr)) {
+            bool isLet = send->fun == core::Names::let() || send->fun == core::Names::let_bang() ||
+                         send->fun == core::Names::subject();
+            if (insideDescribe && send->recv.isSelfReference() &&
+                (isLet || nameForTestHelperMethod(ctx, *send, ctx.state.cacheSensitiveOptions.rspecRewriterEnabled).exists())) {
+                // An example executes on an instance even when it stays a block
+                // to retain its lexical locals. Match the self type of the
+                // method that the ordinary test rewriter would have generated.
+                auto loc = block->loc.copyWithZeroLength();
+                auto type = capturedDescribe ? capturedDescribe->name.deepCopy()
+                                             : (maybeSharedExamplesName ? maybeSharedExamplesName.deepCopy()
+                                                                        : ast::MK::SelfType(loc));
+                auto bind = ast::MK::SyntheticBind(loc, ast::MK::Self(loc), std::move(type));
+                block->body = ast::MK::InsSeq1(block->loc, std::move(bind), std::move(block->body));
+                if (isLet) {
+                    if (auto decl = getLetNameAndDeclLoc(*send)) {
+                        // Keep the body in its closure, and expose the helper
+                        // name to other examples. Its return type is untyped,
+                        // just as for an unsignatured handwritten method.
+                        auto [name, declLoc] = *decl;
+                        auto method = ast::MK::SyntheticMethod0(send->loc, declLoc, testHelperNameLoc(*send), name,
+                                                               ast::MK::UntypedNil(loc));
+                        if (capturedDescribe) {
+                            capturedDescribe->declarations.emplace_back(std::move(method));
+                            return nullptr;
+                        }
+                        ast::Send::ARGS_store args;
+                        for (const auto &arg : send->nonBlockArgs()) {
+                            args.emplace_back(arg.deepCopy());
+                        }
+                        args.emplace_back(send->rawBlock()->deepCopy());
+                        auto flags = send->flags;
+                        flags.isRewriterSynthesized = true;
+                        auto original = ast::MK::Send(send->loc, send->recv.deepCopy(), send->fun, send->funLoc,
+                                                      send->numPosArgs(), std::move(args), flags);
+                        retainsOriginalCall = true;
+                        return ast::MK::InsSeq1(send->loc, std::move(original), std::move(method));
+                    }
+                }
+            }
+            return nullptr;
+        }
+    }
 
     switch (send->fun.rawId()) {
         case core::Names::testEach().rawId():
@@ -801,10 +1060,6 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::
                 ancestors.emplace_back(maybeSharedExamplesName.deepCopy());
             }
 
-            auto rhs =
-                prepareBody(ctx, /* isClass */ true, /* maybeSharedExamplesName */ nullptr, std::move(block->body),
-                            /* insideDescribe */ true);
-
             auto testName = fmt::format("<{} '{}'>", send->fun.show(ctx), argString);
             // When the describe argument is a constant (e.g., `RSpec.describe MyClass`),
             // use a zero-length loc for the synthetic class name so that hovering on
@@ -814,7 +1069,24 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::
                                : arg.loc();
             auto name = ast::MK::UnresolvedConstantParts(nameLoc, {ctx.state.enterNameConstant(testName)});
             auto declLoc = declLocForSendWithBlock(*send);
-            auto classBody = flattenDescribeBody(move(rhs));
+            ast::ClassDef::RHS_store classBody;
+            if (preserveDescribe) {
+                // Keep the closure in its lexical scope. Only declarations move
+                // into the describe class, so nested helpers remain distinct from
+                // outer helpers even when their bodies capture the same local.
+                auto loc = send->loc.copyWithZeroLength();
+                auto scope = capturedDescribe ? capturedDescribe->name.deepCopy() : ast::MK::EmptyTree();
+                auto instanceType =
+                    ast::MK::UnresolvedConstant(loc, std::move(scope), ctx.state.enterNameConstant(testName));
+                CapturedDescribe current{instanceType, classBody};
+                auto body = prepareBody(ctx, true, nullptr, std::move(block->body), true, &current);
+                auto bind =
+                    ast::MK::SyntheticBind(loc, ast::MK::Self(loc), ast::MK::ClassOf(loc, instanceType.deepCopy()));
+                block->body = ast::MK::InsSeq1(block->loc, std::move(bind), std::move(body));
+            } else {
+                auto rhs = prepareBody(ctx, true, nullptr, std::move(block->body), true);
+                classBody = flattenDescribeBody(ctx, std::move(rhs));
+            }
 
             // For an RSpec `describe`/`context` with a constant arg, synthesize an instance method
             // `described_class` typed `T.class_of(arg)`. Without this, callers see the `T.untyped`
@@ -834,6 +1106,17 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::
 
             auto classDef =
                 ast::MK::Class(send->loc, declLoc, std::move(name), std::move(ancestors), std::move(classBody));
+
+            if (preserveDescribe) {
+                auto original = send->deepCopy();
+                ast::cast_tree_nonnull<ast::Send>(original).flags.isRewriterSynthesized = true;
+                retainsOriginalCall = true;
+                if (capturedDescribe) {
+                    capturedDescribe->declarations.emplace_back(std::move(classDef));
+                    return original;
+                }
+                return ast::MK::InsSeq1(send->loc, std::move(classDef), std::move(original));
+            }
 
             // Preserve the original constant reference in the tree so Sorbet can
             // resolve it for hover and go-to-definition.
@@ -870,13 +1153,14 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::
             ast::TreeWalk::apply(ctx, constantMover, block->body);
             auto declLoc = declLocForSendWithBlock(*send);
             auto method = ast::MK::SyntheticMethod0(
-                send->loc, declLoc, std::move(name),
+                send->loc, declLoc, testHelperNameLoc(*send), std::move(name),
                 prepareBody(ctx, isClass, move(maybeSharedExamplesName), std::move(block->body), insideDescribe));
 
             // This prevents the `RuntimeMethodDefinition` from getting generated. For these `it`-block
             // defined methods, we don't actually need to care about the RuntimeMethodDefinition, and
             // omitting it saves memory.
             ast::cast_tree_nonnull<ast::MethodDef>(method).flags.discardDef = true;
+            ast::cast_tree_nonnull<ast::MethodDef>(method).flags.hasHandwrittenBody = true;
             method = addSigVoid(ctx, move(method));
             if (send->numPosArgs() > 0 && !ast::isa_tree<ast::Literal>(send->getPosArg(0))) {
                 method = ast::MK::InsSeq1(send->loc, send->getPosArg(0).deepCopy(), move(method));
@@ -921,10 +1205,11 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::
             ConstantMover constantMover;
             ast::TreeWalk::apply(ctx, constantMover, itBody);
 
-            auto itMethod = ast::MK::SyntheticMethod0(send->loc, itDeclLoc, itName,
+            auto itMethod = ast::MK::SyntheticMethod0(send->loc, itDeclLoc, arg.loc(), itName,
                                                       prepareBody(ctx, /* isClass */ true, maybeSharedExamplesName,
                                                                   std::move(itBody), /* insideDescribe */ true));
             ast::cast_tree_nonnull<ast::MethodDef>(itMethod).flags.discardDef = true;
+            ast::cast_tree_nonnull<ast::MethodDef>(itMethod).flags.hasHandwrittenBody = true;
             itMethod = addSigVoid(ctx, move(itMethod));
             itMethod = constantMover.addConstantsToExpression(send->loc, move(itMethod));
 
@@ -955,7 +1240,8 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::
             }
 
             auto [methodName, declLoc] = maybeDecl.value();
-            auto method = ast::MK::SyntheticMethod0(send->loc, declLoc, methodName, std::move(block->body));
+            auto method = ast::MK::SyntheticMethod0(send->loc, declLoc, testHelperNameLoc(*send), methodName, std::move(block->body));
+            ast::cast_tree_nonnull<ast::MethodDef>(method).flags.hasHandwrittenBody = true;
             return constantMover.addConstantsToExpression(send->loc, move(method));
         }
 
@@ -1010,7 +1296,7 @@ ast::ExpressionPtr runSingle(core::MutableContext ctx, bool isClass, const ast::
                 body = prepareParameterizedBody(ctx, send->fun, move(block->body), block->params, {}, iteratee,
                                                 /* insideDescribe */ true);
             }
-            auto rhs = flattenDescribeBody(move(body));
+            auto rhs = flattenDescribeBody(ctx, move(body));
 
             if (ctx.state.cacheSensitiveOptions.requiresAncestorEnabled) {
                 // Don't generate this if the option isn't enabled.

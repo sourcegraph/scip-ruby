@@ -66,7 +66,7 @@ class CFGCollectorAndTyper {
 public:
     vector<unique_ptr<cfg::CFG>> cfgs;
     void preTransformMethodDef(core::Context ctx, const ast::MethodDef &m) {
-        if (!infer::Inference::willRun(ctx, m.declLoc, m.symbol)) {
+        if (!infer::Inference::willRun(ctx, m.declLoc, m.symbol, !ast::isa_tree<ast::EmptyTree>(m.rhs))) {
             return;
         }
 

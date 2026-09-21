@@ -142,7 +142,7 @@ vector<ast::ExpressionPtr> ModuleFunction::run(core::MutableContext ctx, ast::Se
             ast::MethodDef::PARAMS_store params;
             params.emplace_back(ast::MK::RestParam(loc, ast::MK::Local(loc, core::Names::arg0())));
             params.emplace_back(ast::make_expression<ast::BlockParam>(loc, ast::MK::Local(loc, core::Names::blkArg())));
-            auto methodDef = ast::MK::SyntheticMethod(loc, loc, methodName, std::move(params), ast::MK::EmptyTree());
+            auto methodDef = ast::MK::SyntheticMethod(loc, loc, lit->loc, methodName, std::move(params), ast::MK::EmptyTree());
             ast::cast_tree_nonnull<ast::MethodDef>(methodDef).flags.isSelfMethod = true;
             stats.emplace_back(std::move(methodDef));
         } else {
