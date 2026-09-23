@@ -399,6 +399,7 @@ private:
                                               [this, &gs](UntypedGenericSymbolRef sym, std::string &out) {
                                                   auto status = this->saveSymbolString(gs, sym, nullptr, out);
                                                   ENFORCE(status.skip() || status.ok());
+                                                  return status.ok();
                                               });
     }
 

@@ -70,9 +70,10 @@ public:
     utils::Result symbolForExpr(const core::GlobalState &gs, const GemMapping &gemMap, std::optional<core::Loc> loc,
                                 scip::Symbol &symbol) const;
 
+    // saveSymbolString returns false when the parent has no indexable symbol.
     void saveParentRelationships(
         const core::GlobalState &gs, const RelationshipsMap &relationshipMap, SmallVec<scip::Relationship> &rels,
-        const absl::FunctionRef<void(UntypedGenericSymbolRef, std::string &)> &saveSymbolString) const;
+        const absl::FunctionRef<bool(UntypedGenericSymbolRef, std::string &)> &saveSymbolString) const;
 
     std::string showRaw(const core::GlobalState &gs) const;
 };
