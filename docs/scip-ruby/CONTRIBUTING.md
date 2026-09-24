@@ -347,7 +347,7 @@ to use the [GitHub CLI](https://cli.github.com/) instead.
 gh pr create -R sourcegraph/scip-ruby
 ```
 
-This will correctly use the `scip-ruby/master` branch as the target.
+This will correctly use the `master` branch as the target.
 
 ## Syncing Sorbet upstream
 

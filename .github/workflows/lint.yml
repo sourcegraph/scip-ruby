@@ -2,10 +2,10 @@ name: Lint
 on:
   push:
     branches:
-      - scip-ruby/master
+      - master
   pull_request:
     branches:
-      - scip-ruby/master
+      - master
 
 jobs:
   test:

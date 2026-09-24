@@ -25,7 +25,7 @@ import requests
 import operator
 import os
 
-DEFAULT_BRANCH_NAME = 'scip-ruby/master'
+DEFAULT_BRANCH_REF = 'refs/heads/master'
 
 CACHES_URL = 'https://api.github.com/repos/sourcegraph/scip-ruby/actions/caches'
 
@@ -59,14 +59,14 @@ def default_main():
 
     default_branch_cache_entries, other_branch_cache_entries = partition(
         caches['actions_caches'],
-        lambda x: x['ref'].endswith(DEFAULT_BRANCH_NAME)
+        lambda x: x['ref'] == DEFAULT_BRANCH_REF
     )
     if len(default_branch_cache_entries) > 1:
         # Even if the cache action decides to evict a cache entry
         # for the default branch, it'll be OK, since we'll at least have
         # one cache entry left. This is assuming that we don't have a ginormous
         # cache entry, but that's OK.
-        print('Found multiple cache entries for {}'.format(DEFAULT_BRANCH_NAME))
+        print('Found multiple cache entries for {}'.format(DEFAULT_BRANCH_REF))
         print('Not manually evicting any entry.')
         return
 
