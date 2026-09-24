@@ -353,7 +353,6 @@ def register_sorbet_dependencies():
         build_file = "@com_stripe_ruby_typer//third_party:rbs_parser.BUILD",
     )
 
-
 def register_scip_ruby_dependencies():
     for data in gem_build_info:
         http_file(
