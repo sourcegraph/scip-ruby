@@ -41,8 +41,8 @@ case "$ORIGIN_PUSH_URL" in
     ;;
 esac
 
-if ! git rev-parse --abbrev-ref HEAD | grep -q "scip-ruby/master"; then
-  echo "error: Releases should be published from scip-ruby/master but HEAD is on a different branch" >&2
+if [[ "$(git rev-parse --abbrev-ref HEAD)" != "master" ]]; then
+  echo "error: Releases should be published from master but HEAD is on a different branch" >&2
   exit 1
 fi
 
