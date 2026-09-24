@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v0.5.0
+
+Updates scip-ruby with ~2,000+ and approximately two years of upstream Sorbet changes.
+
+The updated indexer preserves and improves existing navigation and source
+information, supports modern Sorbet projects, and fixes additional navigation
+gaps, crashes, and cache conflicts. ([#261](https://github.com/sourcegraph/scip-ruby/pull/261),
+[#262](https://github.com/sourcegraph/scip-ruby/pull/262),
+[#263](https://github.com/sourcegraph/scip-ruby/pull/263))
+
 ## v0.4.8
 
 Adds enclosing ranges to SCIP class and method definition occurrences,
