@@ -63,7 +63,7 @@ static uint32_t fnv1a_32(const string &s) {
     return h;
 }
 
-const char scip_ruby_version[] = "0.4.8";
+const char scip_ruby_version[] = "0.5.0";
 
 // Upstream revision used for this replay.
 const char scip_ruby_sync_upstream_sorbet_sha[] = "e8f0eb82de923877387fa02fd6bbb2aac4801a66";
