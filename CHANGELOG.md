@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## v0.5.1
+
+Rebases the Docker images (`sourcegraph/scip-ruby` and its `autoindex` tags)
+on `ruby:3.4-slim-trixie` (Debian 13) instead of `ruby:2.7.6-alpine3.16`.
+([#271](https://github.com/sourcegraph/scip-ruby/pull/271))
+
+- The images no longer trust the compromised eMudhra intermediate CAs
+  ([disclosure](https://emudhra.we-have-a-problem.com/)).
+- Fixes `scip-ruby` failing to start in the v0.4.8 and v0.5.0 images
+  (`Error relocating /usr/bin/scip-ruby: __isoc23_strtol: symbol not found`).
+- Auto-indexing now runs `bundle install` and `tapioca init` with Ruby 3.4
+  instead of Ruby 2.7, so it can install current versions of sorbet and tapioca.
+
 ## v0.5.0
 
 Updates scip-ruby with ~2,000+ and approximately two years of upstream Sorbet changes.
