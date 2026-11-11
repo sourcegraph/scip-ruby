@@ -12,15 +12,15 @@ jobs:
     env:
       TAG: ${{ github.event.ref }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       # Keep in sync with ci.yml
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
       - name: Manually evict cache entry if applicable
         if: ${{ runner.os == 'Linux' }}
         run: ACCESS_TOKEN='${{ secrets.GITHUB_TOKEN }}' python3 .github/workflows/evict.py
       - name: "🚀 Mount Bazel build cache"
         if: ${{ runner.os == 'Linux' }}
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/bazelcache/build
           key: bazel-build-${{ runner.os }}-${{ github.sha }}
@@ -28,7 +28,7 @@ jobs:
             bazel-build-${{ runner.os }}-
             bazel-build-
       - name: "🚀 Mount Bazel repo cache"
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         if: ${{ runner.os == 'Linux' }}
         with:
           path: ~/bazelcache/repos
@@ -52,7 +52,7 @@ jobs:
           OS: ${{ env.OS }}
           CFG: ${{ matrix.config }}
       - name: "🪵 Upload log"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ matrix.config }}-build-log
           path: log

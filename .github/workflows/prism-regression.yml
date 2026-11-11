@@ -12,13 +12,13 @@ jobs:
     name: Prism Parser Regression Tests
     if: github.repository == 'Shopify/sorbet'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
         with:
           ruby-version: 3.3.0
       - name: Set up Bazel
-        uses: bazel-contrib/setup-bazel@0.9.0
+        uses: bazel-contrib/setup-bazel@90b352333885f9fb6bf262d8e659f01b6219cc25 # 0.9.0
         with:
           # Avoid downloading Bazel every time.
           bazelisk-cache: true

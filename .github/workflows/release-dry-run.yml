@@ -19,15 +19,15 @@ jobs:
     env:
       FAKE_VERSION: ${{ inputs.fakeVersion }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       # Keep in sync with ci.yml
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
       - name: Manually evict cache entry if applicable
         if: ${{ runner.os == 'Linux' }}
         run: ACCESS_TOKEN='${{ secrets.GITHUB_TOKEN }}' python3 .github/workflows/evict.py
       - name: "🚀 Mount Bazel build cache"
         if: ${{ runner.os == 'Linux' }}
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/bazelcache/build
           key: bazel-build-${{ runner.os }}-${{ github.sha }}
@@ -35,7 +35,7 @@ jobs:
             bazel-build-${{ runner.os }}-
             bazel-build-
       - name: "🚀 Mount Bazel repo cache"
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         if: ${{ runner.os == 'Linux' }}
         with:
           path: ~/bazelcache/repos
@@ -78,7 +78,7 @@ jobs:
           OS: ${{ env.OS }}
           CFG: ${{ matrix.config }}
       - name: ${{ format('📦 Store binary ({0})', matrix.config) }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: artifacts-binary-${{ matrix.platform }}-${{ matrix.config }}
           path: ${{ env.outBinaryPath }}
@@ -86,7 +86,7 @@ jobs:
       - name: ${{ format('💎 Build Gem(s) ({0})', matrix.config) }}
         run: ./bazel build //gems/scip-ruby --config="${{ env.config }}"
       - name: ${{ format('📦 Store Gem(s) to GitHub ({0})', matrix.config) }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: artifacts-gem-${{ matrix.platform }}-${{ matrix.config }}
           path: bazel-bin/gems/scip-ruby/*.gem
@@ -99,7 +99,7 @@ jobs:
     env:
       FAKE_VERSION: ${{ inputs.fakeVersion }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Create Release
         run: |
           TAG="$FAKE_VERSION"
@@ -108,7 +108,7 @@ jobs:
           echo "${TEMPLATE//TAG_PLACEHOLDER/$TAG}" > notes
           echo "Create release: tag=$TAG, title=$TITLE"
       - name: '📥 Download all artifacts'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: artifacts-*
           path: release-artifacts
