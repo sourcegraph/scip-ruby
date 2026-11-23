@@ -1,5 +1,5 @@
 FROM --platform=linux/amd64 \
-    ruby:3.4-slim-trixie@sha256:a1e521f7710a59431695c0628de8ffdbbceec17065a217bd67b59343d4d17b22
+    ruby:3.4.13-slim-trixie@sha256:2139ce9a85d720a874952570ae8537a506cb31737155fd6baf62cf2f3fdca7ee
 
 # This is the base Docker image for scip-ruby with common dependencies
 
