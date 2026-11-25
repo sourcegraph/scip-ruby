@@ -33,7 +33,8 @@ fi
 
 ORIGIN_PUSH_URL="$(git remote get-url --push origin 2>/dev/null || true)"
 case "$ORIGIN_PUSH_URL" in
-  https://github.com/sourcegraph/scip-ruby.git|git@github.com:sourcegraph/scip-ruby.git)
+  # actions/checkout sets the URL without the .git suffix (see tag-release.yml).
+  https://github.com/sourcegraph/scip-ruby|https://github.com/sourcegraph/scip-ruby.git|git@github.com:sourcegraph/scip-ruby.git)
     ;;
   *)
     echo "error: remote 'origin' doesn't point to sourcegraph/scip-ruby"

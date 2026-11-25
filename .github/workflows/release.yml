@@ -1,15 +1,20 @@
-name: Release # This name is used by the publish-docker workflow
+name: Release
 on:
   push:
     tags:
       - 'scip-ruby-v*'
+  # tag-release.yml dispatches this workflow on the tag it pushes,
+  # because tags pushed with GITHUB_TOKEN don't trigger the push event.
+  workflow_dispatch:
 
 jobs:
   build-and-upload-artifacts:
     name: 'Build and upload artifacts'
+    # A dispatch on a branch would create a release named after the branch.
+    if: startsWith(github.ref, 'refs/tags/scip-ruby-v')
     strategy:
       matrix:
-        platform: ['ubuntu-24.04-32core-graph-team-amd64', 'macos-14-xlarge']
+        platform: ['ubuntu-24.04-32core-graph-team-amd64', 'macos-15-xlarge']
         # Keep the platform list in sync with 'Supported Configurations' in README.md
         config: ['asserts', 'release']
     runs-on: ${{ matrix.platform }}
@@ -89,7 +94,7 @@ jobs:
   create-release:
     name: 'Create release'
     needs: build-and-upload-artifacts
-    runs-on: 'ubuntu-22.04'
+    runs-on: 'ubuntu-24.04'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Create Release
@@ -98,7 +103,10 @@ jobs:
           TITLE="${TAG/-v/ v}"
           TEMPLATE="$(< .github/workflows/release-template.md)"
           echo "${TEMPLATE//TAG_PLACEHOLDER/$TAG}" > notes
-          gh release create "$TAG" --title "$TITLE" --notes-file notes
+          # A rerun after a partial failure resumes the existing release.
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "$TITLE" --notes-file notes --generate-notes
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Download everything to avoid spelling out the different
@@ -110,12 +118,50 @@ jobs:
           path: release-artifacts
           merge-multiple: true
       - name: '📤 Upload artifacts for release'
-        run: gh release upload "${GITHUB_REF/refs\/tags\//}" ./release-artifacts/*
+        run: gh release upload --clobber "${GITHUB_REF/refs\/tags\//}" ./release-artifacts/*
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # There is also publish-manual.yml in case that is needed for some reason.
-      - name: 'Publish gems'
+
+  # A separate job, so a failed gem push can be retried without republishing the Docker images.
+  # There is also publish-manual.yml in case that is needed for some reason.
+  publish-gems:
+    name: 'Publish gems'
+    needs: create-release
+    runs-on: 'ubuntu-24.04'
+    permissions:
+      contents: read
+    steps:
+      - name: '📥 Download gems'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: artifacts-gem-*
+          path: gems
+          merge-multiple: true
+      - name: '💎 Publish gems'
         run: |
-          for g in ./release-artifacts/**.gem; do
-            GEM_HOST_API_KEY=${{ secrets.RUBYGEMS_API_KEY }} gem push "$g"
+          for g in ./gems/*.gem; do
+            # On a rerun, skip gems that an earlier attempt already published.
+            if ! out="$(gem push "$g" 2>&1)"; then
+              echo "$out"
+              grep -q 'Repushing of gem versions is not allowed' <<<"$out" || exit 1
+            else
+              echo "$out"
+            fi
           done
+        env:
+          GEM_HOST_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
+
+  # A dispatch rather than a workflow_run trigger in publish-docker.yml,
+  # because workflow_run doesn't fire for Release runs that tag-release.yml dispatches.
+  # The images download the release binary, so this waits for create-release.
+  publish-docker:
+    name: 'Publish Docker images'
+    needs: create-release
+    runs-on: 'ubuntu-24.04'
+    permissions:
+      actions: write
+    steps:
+      - name: '🐳 Start Publish Docker'
+        run: gh workflow run publish-docker.yml -R "$GITHUB_REPOSITORY" -f tag="${GITHUB_REF#refs/tags/}"
+        env:
+          GH_TOKEN: ${{ github.token }}
