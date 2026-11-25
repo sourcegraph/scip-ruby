@@ -1,0 +1,67 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "local>sourcegraph/renovate-config"
+  ],
+  "timezone": "Europe/Warsaw",
+  "schedule": [
+    "before 9am on monday"
+  ],
+  "description": "Bazel, npm, and gem dependencies come from upstream Sorbet and are updated when syncing with it, so Renovate only updates what scip-ruby owns.",
+  "enabledManagers": [
+    "github-actions",
+    "dockerfile",
+    "ruby-version"
+  ],
+  "packageRules": [
+    {
+      "description": "Merge non-major updates once checks pass; major updates need review.",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest",
+        "pin",
+        "pinDigest"
+      ],
+      "automerge": true
+    },
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "matchDepNames": [
+        "ruby"
+      ],
+      "separateMinorPatch": true
+    },
+    {
+      "description": "Update Ruby in .ruby-version, the Docker base image, and setup-ruby together, as in #274. Ruby patch releases get their own PR, so a newer Ruby minor doesn't hide them.",
+      "matchDepNames": [
+        "ruby",
+        "ruby/setup-ruby"
+      ],
+      "groupName": "Ruby"
+    },
+    {
+      "description": "A Ruby minor version changes the Ruby that auto-indexing runs bundle install with, and CI doesn't build the Docker images, so it needs review. Its own group keeps it from holding back the Ruby group's auto-merge.",
+      "matchDepNames": [
+        "ruby"
+      ],
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "groupName": "Ruby minor",
+      "automerge": false
+    },
+    {
+      "description": "This upstream workflow only runs in Shopify/sorbet.",
+      "matchFileNames": [
+        ".github/workflows/prism-regression.yml"
+      ],
+      "enabled": false
+    }
+  ]
+}
