@@ -1,0 +1,47 @@
+name: 'Tag release'
+
+# Tags a release when a scip_ruby_version bump in SCIPIndexer.cc lands on master.
+on:
+  push:
+    branches: ['master']
+    paths: ['scip_indexer/SCIPIndexer.cc']
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  tag:
+    runs-on: 'ubuntu-24.04'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: '🏷️ Tag release'
+        id: tag
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -nE 's/^const char scip_ruby_version\[\] = "(.*)";$/\1/p' scip_indexer/SCIPIndexer.cc)"
+          TAG="scip-ruby-v$VERSION"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            # A rerun of this workflow finds its own tag; release again.
+            # Other changes to SCIPIndexer.cc find an older tag.
+            if [ "$(git rev-parse "$TAG^{commit}")" != "$GITHUB_SHA" ]; then
+              echo "$TAG already exists on an earlier commit; nothing to release"
+              exit 0
+            fi
+          else
+            # Checks the CHANGELOG entry, then tags HEAD ($GITHUB_SHA) and pushes the tag.
+            NEW_VERSION="$VERSION" ./tools/scripts/publish-scip-ruby.sh
+          fi
+          echo "tag=$TAG" >>"$GITHUB_OUTPUT"
+
+      # Tags pushed with GITHUB_TOKEN don't trigger workflows,
+      # so start the Release workflow for the tag explicitly.
+      - name: '🚀 Start Release'
+        if: steps.tag.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: gh workflow run release.yml --ref "$TAG"

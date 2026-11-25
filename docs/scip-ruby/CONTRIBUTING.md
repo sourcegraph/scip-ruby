@@ -362,18 +362,27 @@ This will correctly use the `master` branch as the target.
 
 ## Cutting a release
 
-1. Add release notes to the [CHANGELOG](/CHANGELOG.md).
-2. Bump `scip_ruby_version` in `SCIPIndexer.cc`.
+A [scheduled workflow](/.github/workflows/scheduled-release.yml)
+opens a patch release PR every 4 weeks on Monday, even without code changes,
+so the Docker images pick up the latest Debian package updates.
+It can also be run on demand from the
+[GitHub Actions UI](https://github.com/sourcegraph/scip-ruby/actions/workflows/scheduled-release.yml).
+GitHub doesn't start CI on its own for PRs opened by GitHub Actions,
+so click "Approve workflows to run" on the PR.
 
-Run the release script:
+To release by hand, land a PR with the following (the scheduled PR already has both):
 
-```bash
-NEW_VERSION=M.N.P ./tools/scripts/publish-scip-ruby.sh
-```
+1. Release notes in the [CHANGELOG](/CHANGELOG.md).
+2. A `scip_ruby_version` bump in `SCIPIndexer.cc`.
 
-If there are any errors, fix those and re-run.
-A CI job will be kicked off to trigger a release.
-See the [release workflow](/.github/workflows/release.yml) for details.
+`NEW_VERSION=M.N.P ./tools/scripts/prepare-release.sh` prepares both
+(without `NEW_VERSION`, it bumps the patch version); edit the CHANGELOG entry afterwards.
+
+Once the PR is merged to master, the [tag workflow](/.github/workflows/tag-release.yml)
+runs `tools/scripts/publish-scip-ruby.sh` to push the `scip-ruby-vM.N.P` tag,
+then starts the [release workflow](/.github/workflows/release.yml),
+which publishes the binaries and gems and then the Docker images.
+GitHub adds the PRs merged since the previous release to the release notes.
 
 ## Auto-indexing support
 

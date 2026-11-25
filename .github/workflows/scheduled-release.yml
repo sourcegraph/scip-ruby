@@ -1,0 +1,79 @@
+name: 'Scheduled release'
+
+# Opens a patch release PR every 4 weeks on Monday, even without code changes,
+# so the Docker images are rebuilt with the latest Debian package updates.
+# Merging the PR publishes the release (see tag-release.yml).
+on:
+  # Cron can't express "every 4 weeks", so this runs every Monday
+  # and skips weeks that aren't a multiple of 4 after RELEASE_MONDAY.
+  # The other SCIP indexers use the same RELEASE_MONDAY, so they release in the same week.
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+env:
+  RELEASE_MONDAY: '2026-11-23'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# Runs that overlap would push the same release branch.
+concurrency:
+  group: scheduled-release
+
+jobs:
+  open-release-pr:
+    runs-on: 'ubuntu-24.04'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Release from master even when dispatched from another branch.
+          ref: master
+          fetch-depth: 0
+
+      - name: '📝 Open release PR'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
+            DAYS=$(( ($(date -u +%s) - $(date -u -d "$RELEASE_MONDAY" +%s)) / 86400 ))
+            if (( DAYS % 28 != 0 )); then
+              echo "Not a release week ($DAYS days after $RELEASE_MONDAY)"
+              exit 0
+            fi
+          fi
+
+          ./tools/scripts/prepare-release.sh
+          VERSION="$(sed -nE 's/^const char scip_ruby_version\[\] = "(.*)";$/\1/p' scip_indexer/SCIPIndexer.cc)"
+          TAG="scip-ruby-v$VERSION"
+          BRANCH="release/v$VERSION"
+
+          # A separate assignment, so a failed lookup stops the job under set -e.
+          OPEN_PR="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')"
+          if [ -n "$OPEN_PR" ]; then
+            echo "::warning::PR #$OPEN_PR for $BRANCH is already open; merge or close it first."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git commit -am "chore: prepare v$VERSION release"
+          # No PR is open for the branch, so replace whatever an earlier run left behind:
+          # a push whose PR creation failed, or the branch of a closed PR.
+          git push --force origin "$BRANCH"
+
+          gh pr create --base master --head "$BRANCH" --title "chore: prepare v$VERSION release" --body "$(cat <<EOF
+          Scheduled release to rebuild the Docker images with the latest Debian package updates.
+          GitHub adds the PRs merged since the last release to the release notes;
+          edit the CHANGELOG entry here if any of them should be called out.
+
+          GitHub doesn't start CI on its own for PRs opened by GitHub Actions:
+          click **Approve workflows to run** below, then merge once the checks pass.
+
+          Merging this PR tags $TAG and runs the Release workflow,
+          which publishes the binaries, gems, and Docker images.
+          EOF
+          )"

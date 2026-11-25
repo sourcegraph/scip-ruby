@@ -13,7 +13,10 @@ RUN test -n "${SCIP_RUBY_VERSION}" || \
 # ca-certificates is listed so the build picks up trust store fixes from
 # trixie-security (e.g. 20250419+deb13u1 distrusts the compromised eMudhra chains).
 # The other deps are used by the autoindex script and to build C extensions in gems.
+# Upgrade the base image's packages too, so every release picks up Debian
+# security updates even though the ruby image is pinned by digest.
 RUN apt-get update && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
         wget \

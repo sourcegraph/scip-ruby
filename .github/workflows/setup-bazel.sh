@@ -23,6 +23,11 @@ fi
   if [ -n "${VERSION:-}" ]; then
     echo "build --//gems/scip-ruby:version=$VERSION"
   fi
+  if [ "$os" == "Darwin" ]; then
+    # Pin the minimum macOS version instead of inheriting the runner's SDK version,
+    # which rises whenever GitHub retires a runner image. v0.5.1 shipped with 14.5.
+    echo "build --copt=-mmacosx-version-min=14.5 --linkopt=-mmacosx-version-min=14.5"
+  fi
   echo "test   --disk_cache=$CACHE_ROOT/build --repository_cache=$CACHE_ROOT/repos --test_output=errors"
 } > .bazelrc.local
 
